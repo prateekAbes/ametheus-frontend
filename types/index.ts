@@ -1,0 +1,175 @@
+export type GameCategory = "all" | "pc" | "mobile" | "crossplay" | "solo";
+
+export interface Game {
+  id: string;
+  slug: string;
+  name: string;
+  category: GameCategory;
+  platform: string;
+  tag: string;
+  isTeamGame: boolean;
+  minTeamSize: number;
+  maxTeamSize: number;
+  bannerUrl: string;
+  logoUrl: string;
+  activePool: string;
+  activeTournaments: number;
+  upcomingTournaments: number;
+  description: string;
+  serverRegion: string;
+  antiCheat: string;
+  matchProtocol: string;
+  accentColor?: string;
+}
+
+export interface TeamMember {
+  userId: string;
+  username: string;
+  role: "CAPTAIN" | "MEMBER";
+  gameId: string;
+  riotId?: string;
+  avatarUrl?: string;
+  joinedAt: string;
+}
+
+export interface Team {
+  id: string;
+  gameSlug: string;
+  name: string;
+  tag: string;
+  logoUrl: string;
+  inviteCode: string;
+  captainUserId: string;
+  captainUsername: string;
+  members: TeamMember[];
+  maxMembers: number;
+  createdAt: string;
+}
+
+export interface BracketMatch {
+  id: string;
+  round: number;
+  matchNumber: number;
+  teamA: {
+    name: string;
+    tag: string;
+    score?: number;
+    seed?: number;
+    isWinner?: boolean;
+  };
+  teamB: {
+    name: string;
+    tag: string;
+    score?: number;
+    seed?: number;
+    isWinner?: boolean;
+  };
+  status: "SCHEDULED" | "LIVE" | "COMPLETED";
+  scheduledTime?: string;
+}
+
+export interface BracketRound {
+  name: string;
+  matches: BracketMatch[];
+}
+
+export interface Tournament {
+  id: string;
+  slug: string;
+  title: string;
+  gameSlug: string;
+  gameName: string;
+  prizePool: string;
+  prizePoolNum: number;
+  entryFee: string;
+  entryFeeNum: number;
+  status: "REGISTRATION_OPEN" | "CHECK_IN" | "LIVE" | "COMPLETED";
+  statusLabel: string;
+  startsAt: string;
+  rosterLockTime: string;
+  serverRegion: string;
+  registeredTeams: number;
+  maxTeams: number;
+  rankRequirement: string;
+  format: string;
+  bannerUrl: string;
+  badgeColor: string;
+  description: string;
+  rules: string[];
+  schedule: Array<{ stage: string; time: string; details: string }>;
+  prizes: Array<{ rank: string; amount: string; share: string; badge: string }>;
+  bracketRounds: BracketRound[];
+  registeredRosters: Array<{
+    name: string;
+    tag: string;
+    captain: string;
+    members: string[];
+    isVerified: boolean;
+  }>;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  name: string;
+  tag: string;
+  type: "team" | "player";
+  gameSlug: string;
+  gameName: string;
+  captain: string;
+  logoUrl: string;
+  winRate: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  rating: number;
+  earnings: number;
+  form: Array<"W" | "L">;
+  isVerified: boolean;
+  category: "all" | "pc" | "mobile" | "solo";
+}
+
+export interface MatchLobbyInfo {
+  id: string;
+  tournamentId: string;
+  tournamentTitle: string;
+  gameSlug: string;
+  gameName: string;
+  stage: string;
+  format: string;
+  scheduledTime: string;
+  status: "CHECK_IN_OPEN" | "LIVE" | "PENDING_VERIFICATION" | "DISPUTED" | "COMPLETED";
+  teamA: {
+    id: string;
+    name: string;
+    tag: string;
+    logoUrl: string;
+    score?: number;
+    isCheckedIn: boolean;
+    roster: Array<{ username: string; gameId: string }>;
+  };
+  teamB: {
+    id: string;
+    name: string;
+    tag: string;
+    logoUrl: string;
+    score?: number;
+    isCheckedIn: boolean;
+    roster: Array<{ username: string; gameId: string }>;
+  };
+  serverRegion: string;
+  lobbyCode: string;
+  lobbyPassword: string;
+  disputeNotes?: string;
+  evidenceUrl?: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  timestamp: string;
+  operator: string;
+  role: "SUPER_ADMIN" | "TOURNAMENT_ADMIN";
+  action: string;
+  target: string;
+  ipAddress: string;
+}

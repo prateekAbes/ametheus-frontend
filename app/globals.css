@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #e56a10;
+  --color-primary-hover: #c95b0a;
+  --color-secondary: #f59e0b;
+  --color-vanguard: #0f172a;
+
+  --color-shell-base: #0b0e16;
+  --color-shell-surface: #10131b;
+  --color-shell-card: #161a24;
+  --color-shell-border: #242c3d;
+  --color-shell-text: #f8fafc;
+  --color-shell-muted: #94a3b8;
+
+  --color-canvas-base: #f8f9fa;
+  --color-canvas-sub: #f1f3f5;
+  --color-canvas-card: #ffffff;
+  --color-canvas-border: #e2e8f0;
+  --color-canvas-border-strong: #cbd5e1;
+  --color-canvas-text-head: #0f172a;
+  --color-canvas-text-body: #475569;
+  --color-canvas-text-muted: #64748b;
+
+  --color-status-live: #10b981;
+  --color-status-error: #ef4444;
+  --color-status-info: #3b82f6;
+
+  --font-headline: var(--font-space-grotesk), sans-serif;
+  --font-body: var(--font-inter), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+}
+
+:root {
+  --background: #f8f9fa;
+  --foreground: #0f172a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numbers for competitive telemetry and match readouts */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
