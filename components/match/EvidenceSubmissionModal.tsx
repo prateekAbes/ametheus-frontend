@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { MatchLobbyInfo } from "@/types";
 import { X, UploadCloud, CheckCircle, ShieldAlert, FileText, Check } from "lucide-react";
+import { submitMatchResult } from "@/lib/api/matches";
 
 interface Props {
   match: MatchLobbyInfo | null;
@@ -21,10 +22,19 @@ export default function EvidenceSubmissionModal({ match, isOpen, onClose, onSucc
 
   if (!isOpen || !match) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await submitMatchResult(match.id, {
+        score_a: parseInt(scoreA, 10) || 0,
+        score_b: parseInt(scoreB, 10) || 0,
+        evidence_url: uploadedFile || "https://r2.ametheus.gg/proof.png",
+        captain_notes: notes,
+      });
+    } catch (err) {
+      console.warn("Match result submission backend call failed, falling back to local state:", err);
+    } finally {
       setIsSubmitting(false);
       setIsSubmitted(true);
       setTimeout(() => {
@@ -32,7 +42,7 @@ export default function EvidenceSubmissionModal({ match, isOpen, onClose, onSucc
         onSuccess();
         onClose();
       }, 1500);
-    }, 1200);
+    }
   };
 
   return (

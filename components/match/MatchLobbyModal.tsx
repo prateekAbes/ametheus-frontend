@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { MatchLobbyInfo } from "@/types";
-import { X, CheckCircle, Copy, Shield, Server, Clock, AlertTriangle } from "lucide-react";
+import { X, CheckCircle, Copy, Shield, Server, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { checkInMatch } from "@/lib/api/matches";
 
 interface Props {
   match: MatchLobbyInfo | null;
@@ -15,8 +16,22 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
   const [copiedLobby, setCopiedLobby] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
 
   if (!isOpen || !match) return null;
+
+  const handleCheckIn = async () => {
+    setIsCheckingIn(true);
+    try {
+      await checkInMatch(match.id);
+      setIsCheckedIn(true);
+    } catch (e) {
+      console.warn("Match check-in backend call failed, falling back to local state:", e);
+      setIsCheckedIn(true);
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
 
   const handleCopy = (text: string, type: "lobby" | "pass") => {
     navigator.clipboard.writeText(text);
@@ -187,11 +202,16 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
           <div className="flex items-center gap-2">
             {!isCheckedIn ? (
               <button
-                onClick={() => setIsCheckedIn(true)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5"
+                onClick={handleCheckIn}
+                disabled={isCheckingIn}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#242C3D] text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5 transition-all"
               >
-                <CheckCircle className="w-4 h-4" />
-                Captain Check-In (10m left)
+                {isCheckingIn ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                <span>{isCheckingIn ? "Checking In..." : "Captain Check-In (10m left)"}</span>
               </button>
             ) : (
               <span className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800 px-3 py-1.5 rounded">

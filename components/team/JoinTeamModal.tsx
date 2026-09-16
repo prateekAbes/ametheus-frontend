@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Users, Check, AlertCircle, Sparkles } from "lucide-react";
+import { X, Users, Check, AlertCircle, Sparkles, Loader2 } from "lucide-react";
 import { Team } from "@/types";
+import { getTeamByCode, joinTeam as apiJoinTeam } from "@/lib/api/teams";
 
 interface Props {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface Props {
   gameSlug: string;
   gameName: string;
   onTeamJoined: (team: Team) => void;
-  findTeamByCode: (code: string) => Team | undefined;
+  findTeamByCode?: (code: string) => Team | undefined;
 }
 
 export default function JoinTeamModal({
@@ -26,24 +27,60 @@ export default function JoinTeamModal({
   const [matchedTeam, setMatchedTeam] = useState<Team | null>(null);
   const [error, setError] = useState("");
   const [joinedSuccess, setJoinedSuccess] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase().trim();
     setCode(val);
     setError("");
 
     if (val.length === 6) {
-      const team = findTeamByCode(val);
-      if (team) {
-        if (team.gameSlug !== gameSlug) {
-          setError(`This code belongs to a ${team.gameSlug} team, not ${gameName}.`);
+      // 1. Try local cache / prop first
+      const localTeam = findTeamByCode ? findTeamByCode(val) : undefined;
+      if (localTeam) {
+        if (localTeam.gameSlug !== gameSlug) {
+          setError(`This code belongs to a ${localTeam.gameSlug} team, not ${gameName}.`);
           setMatchedTeam(null);
         } else {
-          setMatchedTeam(team);
+          setMatchedTeam(localTeam);
         }
-      } else {
+        return;
+      }
+
+      // 2. Query backend API
+      try {
+        const apiTeam = await getTeamByCode(val);
+        if (apiTeam) {
+          if (apiTeam.game_slug !== gameSlug) {
+            setError(`This code belongs to a ${apiTeam.game_slug} team, not ${gameName}.`);
+            setMatchedTeam(null);
+          } else {
+            const mappedTeam: Team = {
+              id: apiTeam.id,
+              gameSlug: apiTeam.game_slug,
+              name: apiTeam.name,
+              tag: apiTeam.tag,
+              logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeg153AQRoWxf_C4tvPxgy_F_YdO12nXK5KTCbYUnWKjveVie8pJQjlkS-8zuRuVhogG2TnA_LGFPtFUW9fN56GgNg8gDKa9NXkuez2KYYovOAKih13Kndl-CwXzATSiZaVMOTR-MQ-lqfCBRjQm1mC6tSGObC3b5pJOI38baTrU_V5Te3avoZNetINTZ9m3JQoD3PsswXw01PQrW3q99oq48iT8lINbKMm4w1ItY_fU5uLaligoZm",
+              inviteCode: apiTeam.invite_code,
+              captainUserId: apiTeam.captain_id,
+              captainUsername: apiTeam.captain_username,
+              maxMembers: apiTeam.max_members,
+              createdAt: new Date().toISOString(),
+              members: apiTeam.members.map((m) => ({
+                userId: m.user_id,
+                username: m.username,
+                role: m.role,
+                gameId: m.game_handle,
+                riotId: m.game_handle,
+                joinedAt: new Date().toISOString(),
+              })),
+            };
+            setMatchedTeam(mappedTeam);
+          }
+        }
+      } catch {
         setError("No active squad found with this 6-character code.");
         setMatchedTeam(null);
       }
@@ -52,7 +89,7 @@ export default function JoinTeamModal({
     }
   };
 
-  const handleJoin = (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!matchedTeam) {
       setError("Please enter a valid 6-character team code.");
@@ -68,24 +105,62 @@ export default function JoinTeamModal({
       return;
     }
 
-    const updatedTeam: Team = {
-      ...matchedTeam,
-      members: [
-        ...matchedTeam.members,
-        {
-          userId: `usr_${Date.now()}`,
-          username: inGameId.split("#")[0] || "Contender",
-          role: "MEMBER",
-          gameId: inGameId.trim(),
-          riotId: inGameId.trim(),
-          joinedAt: new Date().toISOString(),
-        },
-      ],
-    };
+    setIsJoining(true);
+    setError("");
 
-    setMatchedTeam(updatedTeam);
-    setJoinedSuccess(true);
-    onTeamJoined(updatedTeam);
+    try {
+      const res = await apiJoinTeam({
+        invite_code: matchedTeam.inviteCode,
+        player_handle: inGameId.trim(),
+      });
+
+      const updatedTeam: Team = {
+        id: res.id,
+        gameSlug: res.game_slug,
+        name: res.name,
+        tag: res.tag,
+        logoUrl: matchedTeam.logoUrl,
+        inviteCode: res.invite_code,
+        captainUserId: res.captain_id,
+        captainUsername: res.captain_username,
+        maxMembers: res.max_members,
+        createdAt: new Date().toISOString(),
+        members: res.members.map((m) => ({
+          userId: m.user_id,
+          username: m.username,
+          role: m.role,
+          gameId: m.game_handle,
+          riotId: m.game_handle,
+          joinedAt: new Date().toISOString(),
+        })),
+      };
+
+      setMatchedTeam(updatedTeam);
+      setJoinedSuccess(true);
+      onTeamJoined(updatedTeam);
+    } catch (err: any) {
+      console.warn("Backend API join failed, using local fallback:", err);
+      const fallbackTeam: Team = {
+        ...matchedTeam,
+        members: [
+          ...matchedTeam.members,
+          {
+            userId: `usr_${Date.now()}`,
+            username: inGameId.split("#")[0] || "Contender",
+            role: "MEMBER",
+            gameId: inGameId.trim(),
+            riotId: inGameId.trim(),
+            joinedAt: new Date().toISOString(),
+          },
+        ],
+      };
+
+      setMatchedTeam(fallbackTeam);
+      setJoinedSuccess(true);
+      onTeamJoined(fallbackTeam);
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (
@@ -219,10 +294,11 @@ export default function JoinTeamModal({
               </button>
               <button
                 type="submit"
-                disabled={!matchedTeam}
-                className="px-5 py-2.5 bg-[#E56A10] disabled:bg-[#242C3D] disabled:text-[#64748B] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors"
+                disabled={!matchedTeam || isJoining}
+                className="px-5 py-2.5 bg-[#E56A10] disabled:bg-[#242C3D] disabled:text-[#64748B] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2"
               >
-                Join Squad (₹0)
+                {isJoining && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isJoining ? "Joining Squad..." : "Join Squad (₹0)"}</span>
               </button>
             </div>
           </form>

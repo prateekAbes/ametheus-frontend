@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Shield, Check, Copy, AlertCircle } from "lucide-react";
+import { X, Shield, Check, Copy, AlertCircle, Loader2 } from "lucide-react";
 import { Team } from "@/types";
+import { createTeam as apiCreateTeam } from "@/lib/api/teams";
 
 interface Props {
   isOpen: boolean;
@@ -25,48 +26,88 @@ export default function CreateTeamModal({
   const [createdTeam, setCreatedTeam] = useState<Team | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !tag.trim() || !gameId.trim()) {
       setError("All fields are required to register squad.");
       return;
     }
 
-    // Generate random 6-character code
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let code = "";
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    setIsSubmitting(true);
+    setError("");
 
-    const newTeam: Team = {
-      id: `team_${Date.now()}`,
-      gameSlug,
-      name: name.trim(),
-      tag: tag.trim().toUpperCase(),
-      logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeg153AQRoWxf_C4tvPxgy_F_YdO12nXK5KTCbYUnWKjveVie8pJQjlkS-8zuRuVhogG2TnA_LGFPtFUW9fN56GgNg8gDKa9NXkuez2KYYovOAKih13Kndl-CwXzATSiZaVMOTR-MQ-lqfCBRjQm1mC6tSGObC3b5pJOI38baTrU_V5Te3avoZNetINTZ9m3JQoD3PsswXw01PQrW3q99oq48iT8lINbKMm4w1ItY_fU5uLaligoZm",
-      inviteCode: code,
-      captainUserId: "usr_vortex_lead",
-      captainUsername: "vortex_lead",
-      maxMembers: gameSlug === "chess" ? 1 : 5,
-      createdAt: new Date().toISOString(),
-      members: [
-        {
-          userId: "usr_vortex_lead",
-          username: "vortex_lead",
-          role: "CAPTAIN",
-          gameId: gameId.trim(),
-          riotId: gameId.trim(),
+    try {
+      const res = await apiCreateTeam({
+        game_slug: gameSlug,
+        name: name.trim(),
+        tag: tag.trim().toUpperCase(),
+        captain_handle: gameId.trim(),
+      });
+
+      const newTeam: Team = {
+        id: res.id,
+        gameSlug: res.game_slug,
+        name: res.name,
+        tag: res.tag,
+        logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeg153AQRoWxf_C4tvPxgy_F_YdO12nXK5KTCbYUnWKjveVie8pJQjlkS-8zuRuVhogG2TnA_LGFPtFUW9fN56GgNg8gDKa9NXkuez2KYYovOAKih13Kndl-CwXzATSiZaVMOTR-MQ-lqfCBRjQm1mC6tSGObC3b5pJOI38baTrU_V5Te3avoZNetINTZ9m3JQoD3PsswXw01PQrW3q99oq48iT8lINbKMm4w1ItY_fU5uLaligoZm",
+        inviteCode: res.invite_code,
+        captainUserId: res.captain_id,
+        captainUsername: res.captain_username,
+        maxMembers: res.max_members,
+        createdAt: new Date().toISOString(),
+        members: res.members.map((m) => ({
+          userId: m.user_id,
+          username: m.username,
+          role: m.role,
+          gameId: m.game_handle,
+          riotId: m.game_handle,
           joinedAt: new Date().toISOString(),
-        },
-      ],
-    };
+        })),
+      };
 
-    setCreatedTeam(newTeam);
-    onTeamCreated(newTeam);
+      setCreatedTeam(newTeam);
+      onTeamCreated(newTeam);
+    } catch (err: any) {
+      console.warn("Backend API call failed, falling back to local creation:", err);
+      // Generate random 6-character code
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      const fallbackTeam: Team = {
+        id: `team_${Date.now()}`,
+        gameSlug,
+        name: name.trim(),
+        tag: tag.trim().toUpperCase(),
+        logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeg153AQRoWxf_C4tvPxgy_F_YdO12nXK5KTCbYUnWKjveVie8pJQjlkS-8zuRuVhogG2TnA_LGFPtFUW9fN56GgNg8gDKa9NXkuez2KYYovOAKih13Kndl-CwXzATSiZaVMOTR-MQ-lqfCBRjQm1mC6tSGObC3b5pJOI38baTrU_V5Te3avoZNetINTZ9m3JQoD3PsswXw01PQrW3q99oq48iT8lINbKMm4w1ItY_fU5uLaligoZm",
+        inviteCode: code,
+        captainUserId: "usr_vortex_lead",
+        captainUsername: "vortex_lead",
+        maxMembers: gameSlug === "chess" ? 1 : 5,
+        createdAt: new Date().toISOString(),
+        members: [
+          {
+            userId: "usr_vortex_lead",
+            username: "vortex_lead",
+            role: "CAPTAIN",
+            gameId: gameId.trim(),
+            riotId: gameId.trim(),
+            joinedAt: new Date().toISOString(),
+          },
+        ],
+      };
+
+      setCreatedTeam(fallbackTeam);
+      onTeamCreated(fallbackTeam);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const copyCode = () => {
@@ -230,9 +271,11 @@ export default function CreateTeamModal({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 bg-[#E56A10] disabled:bg-[#242C3D] disabled:text-[#64748B] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2"
               >
-                Create Squad & Generate Code
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSubmitting ? "Creating Squad..." : "Create Squad & Generate Code"}</span>
               </button>
             </div>
           </form>

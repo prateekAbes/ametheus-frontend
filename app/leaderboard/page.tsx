@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { LEADERBOARD_ENTRIES } from "@/lib/data/leaderboard";
 import { LeaderboardEntry } from "@/types";
+import { getLeaderboard } from "@/lib/api/leaderboard";
 import {
   Trophy,
   Shield,
@@ -20,10 +21,45 @@ import {
 } from "lucide-react";
 
 export default function LeaderboardPage() {
+  const [entries, setEntries] = useState<LeaderboardEntry[]>(LEADERBOARD_ENTRIES);
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<"teams" | "players">("teams");
   const [searchQuery, setSearchQuery] = useState("");
   const [timeframe, setTimeframe] = useState<"all" | "season" | "month" | "weekly">("all");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getLeaderboard();
+        if (data && data.length > 0) {
+          const mapped: LeaderboardEntry[] = data.map((d) => ({
+            rank: d.rank,
+            id: d.id,
+            name: d.name,
+            tag: d.tag,
+            type: (d.type as any) || "team",
+            gameSlug: d.game_slug,
+            gameName: d.game_name,
+            captain: d.captain,
+            logoUrl: d.logo_url,
+            winRate: d.win_rate,
+            matchesPlayed: d.matches_played,
+            wins: d.wins,
+            losses: d.losses,
+            rating: d.rating,
+            earnings: d.earnings,
+            form: (d.form as any) || ["W", "W", "W", "W", "W"],
+            isVerified: d.is_verified,
+            category: (d.category as any) || "pc",
+          }));
+          setEntries(mapped);
+        }
+      } catch (e) {
+        console.warn("Leaderboard live API fetch fallback:", e);
+      }
+    }
+    loadData();
+  }, []);
 
   const disciplines = [
     { id: "all", name: "All Games" },
@@ -36,7 +72,7 @@ export default function LeaderboardPage() {
   ];
 
   // Filter entries
-  const filteredEntries = LEADERBOARD_ENTRIES.filter((entry) => {
+  const filteredEntries = entries.filter((entry) => {
     const matchesDiscipline = selectedDiscipline === "all" || entry.gameSlug === selectedDiscipline;
     const matchesType = selectedType === "teams" ? entry.type === "team" : entry.type === "player";
     const matchesSearch =
@@ -46,7 +82,7 @@ export default function LeaderboardPage() {
     return matchesDiscipline && matchesType && matchesSearch;
   });
 
-  const topThree = LEADERBOARD_ENTRIES.filter((e) => e.rank <= 3);
+  const topThree = entries.filter((e) => e.rank <= 3);
   const matrixEntries = filteredEntries.filter((e) => e.rank > 3);
 
   const exportCsv = () => {

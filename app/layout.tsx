@@ -3,6 +3,7 @@ import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -24,7 +25,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "AMETHEUS — Online Esports Tournament Platform",
-  description: "Enter the competition. High-stakes esports tournaments, automated brackets, verified results, and instant team competition.",
+  description:
+    "Enter the competition. High-stakes esports tournaments, automated brackets, verified results, and instant team competition.",
   icons: {
     icon: "/brand/ametheus-logo.svg",
   },
@@ -41,14 +43,16 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#0F172A]">
-        {/* Dark Arena Header */}
-        <Header />
+        <AuthProvider>
+          {/* Dark Arena Header */}
+          <Header />
 
-        {/* Daylight Operational Canvas */}
-        <main className="flex-1 w-full pt-16">{children}</main>
+          {/* Daylight Operational Canvas */}
+          <main className="flex-1 w-full pt-16">{children}</main>
 
-        {/* Dark Arena Footer */}
-        <Footer />
+          {/* Dark Arena Footer */}
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

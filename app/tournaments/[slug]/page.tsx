@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useState } from "react";
+import { useEffect, use, useState } from "react";
+import { getTournamentBySlug, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -31,15 +32,35 @@ interface Props {
 
 export default function TournamentDetailPage({ params }: Props) {
   const resolvedParams = use(params);
-  const tournament = TOURNAMENTS_DATA.find(
+  const staticMatch = TOURNAMENTS_DATA.find(
     (t) => t.slug === resolvedParams.slug || t.id === resolvedParams.slug
   );
 
-  if (!tournament) {
+  const [tournament, setTournament] = useState<NormalizedTournament | null>(() =>
+    staticMatch ? normalizeTournament(staticMatch) : null
+  );
+
+  useEffect(() => {
+    getTournamentBySlug(resolvedParams.slug)
+      .then((data) => {
+        if (data) {
+          setTournament(normalizeTournament(data));
+        }
+      })
+      .catch(() => {
+        // Retain static fallback
+      });
+  }, [resolvedParams.slug]);
+
+  const activeTourn = tournament || (staticMatch ? normalizeTournament(staticMatch) : null);
+
+  if (!activeTourn) {
     notFound();
   }
 
-  const { teams, findTeamByCode } = useTeamStore(tournament.gameSlug);
+  // Narrowed non-null reference
+  const currentTournament: NormalizedTournament = activeTourn;
+  const { teams, findTeamByCode } = useTeamStore(currentTournament.gameSlug);
 
   const [activeTab, setActiveTab] = useState<
     "overview" | "schedule" | "prizes" | "bracket" | "rosters"
@@ -56,14 +77,14 @@ export default function TournamentDetailPage({ params }: Props) {
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#E56A10] text-white text-xs font-mono font-bold rounded uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              {tournament.statusLabel}
+              {currentTournament.statusLabel}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F1F3F5] text-[#0F172A] text-xs font-mono rounded">
               <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
               AMETHEUS ESCROW GUARANTEED
             </span>
             <span className="px-2.5 py-1 bg-[#F1F3F5] text-[#64748B] text-xs font-mono rounded">
-              SERVER: {tournament.serverRegion}
+              SERVER: {currentTournament.serverRegion}
             </span>
           </div>
 
@@ -71,22 +92,22 @@ export default function TournamentDetailPage({ params }: Props) {
             <div className="lg:col-span-8 flex flex-col justify-between">
               <div>
                 <h1 className="text-3xl sm:text-5xl font-bold font-headline uppercase tracking-tight text-[#0F172A]">
-                  {tournament.title}
+                  {currentTournament.title}
                 </h1>
                 <p className="text-sm sm:text-base text-[#475569] mt-2 max-w-2xl leading-relaxed">
-                  {tournament.description}
+                  {currentTournament.description}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-6 pt-6 text-xs text-[#64748B] font-mono">
                 <div>
-                  <strong className="text-[#0F172A]">Discipline:</strong> {tournament.gameName}
+                  <strong className="text-[#0F172A]">Discipline:</strong> {currentTournament.gameName}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A]">Roster Lock:</strong> {tournament.rosterLockTime}
+                  <strong className="text-[#0F172A]">Roster Lock:</strong> {currentTournament.rosterLockTime}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A]">Launch:</strong> {tournament.startsAt}
+                  <strong className="text-[#0F172A]">Launch:</strong> {currentTournament.startsAt}
                 </div>
               </div>
             </div>
@@ -114,7 +135,7 @@ export default function TournamentDetailPage({ params }: Props) {
                       Captain Slot (Host)
                     </span>
                     <span className="font-headline font-bold text-xl text-[#E56A10]">
-                      {tournament.entryFee}
+                      {currentTournament.entryFee}
                     </span>
                   </div>
                   <p className="text-[10px] text-[#64748B] mt-0.5">
@@ -148,7 +169,7 @@ export default function TournamentDetailPage({ params }: Props) {
                       onClick={() => setIsRegisterModalOpen(true)}
                       className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs"
                     >
-                      Register Squad — {tournament.entryFee}
+                      Register Squad — {currentTournament.entryFee}
                     </button>
                     <button
                       onClick={() => setIsJoinModalOpen(true)}
@@ -169,7 +190,7 @@ export default function TournamentDetailPage({ params }: Props) {
                 Total Prize Escrow
               </span>
               <div className="text-2xl font-bold font-headline text-[#E56A10] mt-0.5 tabular-nums">
-                {tournament.prizePool}
+                {currentTournament.prizePool}
               </div>
               <span className="text-[11px] text-[#64748B] font-mono">
                 100% Escrow Backed
@@ -192,17 +213,17 @@ export default function TournamentDetailPage({ params }: Props) {
               <div className="flex justify-between items-center text-[10px] font-mono">
                 <span className="text-[#64748B] uppercase">Tournament Bracket</span>
                 <span className="text-[#E56A10] font-bold">
-                  {tournament.registeredTeams} / {tournament.maxTeams} Teams
+                  {currentTournament.registeredTeams} / {currentTournament.maxTeams} Teams
                 </span>
               </div>
               <div className="text-2xl font-bold font-headline text-[#0F172A] mt-0.5">
-                {Math.round((tournament.registeredTeams / tournament.maxTeams) * 100)}% Filled
+                {Math.round((currentTournament.registeredTeams / currentTournament.maxTeams) * 100)}% Filled
               </div>
               <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full mt-1.5 overflow-hidden">
                 <div
                   className="bg-[#E56A10] h-full rounded-full"
                   style={{
-                    width: `${(tournament.registeredTeams / tournament.maxTeams) * 100}%`,
+                    width: `${(currentTournament.registeredTeams / currentTournament.maxTeams) * 100}%`,
                   }}
                 />
               </div>
@@ -232,7 +253,7 @@ export default function TournamentDetailPage({ params }: Props) {
               { id: "schedule", label: "Schedule & Timeline" },
               { id: "prizes", label: "Prize Distribution" },
               { id: "bracket", label: "Live Bracket" },
-              { id: "rosters", label: `Rosters (${tournament.registeredRosters.length})` },
+              { id: "rosters", label: `Rosters (${currentTournament.registeredRosters.length})` },
             ].map((t) => (
               <button
                 key={t.id}
@@ -267,7 +288,7 @@ export default function TournamentDetailPage({ params }: Props) {
                 Tournament Regulations &amp; Protocols
               </h2>
               <ul className="space-y-3 text-xs text-[#475569]">
-                {tournament.rules.map((rule, idx) => (
+                {currentTournament.rules.map((rule, idx) => (
                   <li key={idx} className="flex items-start gap-2.5">
                     <CheckCircle className="w-4 h-4 text-[#E56A10] flex-shrink-0 mt-0.5" />
                     <span className="leading-relaxed">{rule}</span>
@@ -284,7 +305,7 @@ export default function TournamentDetailPage({ params }: Props) {
               Schedule &amp; Match Progression
             </h2>
             <div className="space-y-4">
-              {tournament.schedule.map((item, idx) => (
+              {currentTournament.schedule.map((item, idx) => (
                 <div
                   key={idx}
                   className="p-4 bg-[#F8F9FA] rounded-lg border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
@@ -310,11 +331,11 @@ export default function TournamentDetailPage({ params }: Props) {
               Prize Pool Distribution
             </h2>
             <p className="text-xs text-[#64748B] mb-6">
-              Total Escrow Backed: <strong className="text-[#E56A10]">{tournament.prizePool}</strong>. Payouts processed automatically within 30 minutes of final match verification.
+              Total Escrow Backed: <strong className="text-[#E56A10]">{currentTournament.prizePool}</strong>. Payouts processed automatically within 30 minutes of final match verification.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {tournament.prizes.map((p, idx) => (
+              {currentTournament.prizes.map((p, idx) => (
                 <div
                   key={idx}
                   className="p-5 bg-[#F8F9FA] rounded-xl border border-[#E2E8F0] flex flex-col justify-between"
@@ -355,18 +376,18 @@ export default function TournamentDetailPage({ params }: Props) {
               </span>
             </div>
 
-            <BracketTree rounds={tournament.bracketRounds} />
+            <BracketTree rounds={currentTournament.bracketRounds} />
           </div>
         )}
 
         {activeTab === "rosters" && (
           <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
             <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-4">
-              Confirmed Squad Rosters ({tournament.registeredRosters.length})
+              Confirmed Squad Rosters ({currentTournament.registeredRosters.length})
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tournament.registeredRosters.map((roster, idx) => (
+              {currentTournament.registeredRosters.map((roster, idx) => (
                 <div
                   key={idx}
                   className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E2E8F0] flex flex-col gap-3"
@@ -414,7 +435,7 @@ export default function TournamentDetailPage({ params }: Props) {
       <RegisterTournamentModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
-        tournament={tournament}
+        tournament={currentTournament as any}
         userTeams={teams}
         onRegistrationSuccess={() => {
           setIsRegistered(true);
@@ -425,8 +446,8 @@ export default function TournamentDetailPage({ params }: Props) {
       <JoinTeamModal
         isOpen={isJoinModalOpen}
         onClose={() => setIsJoinModalOpen(false)}
-        gameSlug={tournament.gameSlug}
-        gameName={tournament.gameName}
+        gameSlug={currentTournament.gameSlug}
+        gameName={currentTournament.gameName}
         findTeamByCode={findTeamByCode}
         onTeamJoined={() => {}}
       />

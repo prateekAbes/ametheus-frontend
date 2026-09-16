@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { registerForTournament } from "@/lib/api/tournaments";
 import { Tournament, Team } from "@/types";
 import { X, Shield, Check, AlertCircle, CreditCard, Lock } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  tournament: Tournament;
+  tournament: any;
   userTeams: Team[];
   onRegistrationSuccess: () => void;
 }
@@ -48,20 +49,35 @@ export default function RegisterTournamentModal({
     setError("");
     if (tournament.entryFeeNum === 0) {
       // Free tournament
-      setStep("SUCCESS");
-      onRegistrationSuccess();
+      setIsProcessing(true);
+      registerForTournament(tournament.id, selectedTeam.id)
+        .then(() => {
+          setStep("SUCCESS");
+          onRegistrationSuccess();
+        })
+        .catch((err) => {
+          setError(err.message || "Registration failed");
+        })
+        .finally(() => setIsProcessing(false));
     } else {
       setStep("CHECKOUT");
     }
   };
 
   const handleMockRazorpayPayment = () => {
+    if (!selectedTeam) return;
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setStep("SUCCESS");
-      onRegistrationSuccess();
-    }, 1200);
+    registerForTournament(tournament.id, selectedTeam.id)
+      .then(() => {
+        setStep("SUCCESS");
+        onRegistrationSuccess();
+      })
+      .catch((err) => {
+        setError(err.message || "Registration payment failed");
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
   };
 
   return (

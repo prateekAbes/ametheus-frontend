@@ -103,13 +103,13 @@ export function useTeamStore(gameSlug?: string) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setTeams(JSON.parse(stored));
+        setTimeout(() => setTeams(JSON.parse(stored)), 0);
       } else {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TEAMS));
-        setTeams(INITIAL_TEAMS);
+        setTimeout(() => setTeams(INITIAL_TEAMS), 0);
       }
     } catch {
-      setTeams(INITIAL_TEAMS);
+      setTimeout(() => setTeams(INITIAL_TEAMS), 0);
     }
     setIsLoaded(true);
   }, []);

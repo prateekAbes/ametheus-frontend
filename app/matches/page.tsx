@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { MOCK_MATCHES } from "@/lib/data/matches";
 import { MatchLobbyInfo } from "@/types";
+import { getMatches, Match as ApiMatch } from "@/lib/api/matches";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
 import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
 import {
@@ -15,13 +16,76 @@ import {
   ArrowRight,
   Filter,
   FileCheck,
+  RefreshCw,
 } from "lucide-react";
+
+function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
+  return {
+    id: m.id,
+    tournamentId: m.tournament_id,
+    tournamentTitle: m.tournament_title || "Championship",
+    gameSlug: m.game_slug || "valorant",
+    gameName: m.game_name || "Valorant",
+    stage: m.stage || "Competitive Bracket Match",
+    format: m.format || "Standard Match",
+    scheduledTime: m.scheduled_time || "Today, 8:00 PM IST",
+    status: (m.status as any) || "CHECK_IN_OPEN",
+    serverRegion: m.server_region || "AWS Mumbai (ap-south-1)",
+    lobbyCode: m.lobby_code || "AMETHEUS-LOBBY-01",
+    lobbyPassword: m.lobby_password || "ESCROW_PASS_99",
+    teamA: {
+      id: m.team_a?.tag || "t-a",
+      name: m.team_a?.name || "TBD (Slot 1)",
+      tag: m.team_a?.tag || "TBD",
+      logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDdPWn2ez9ufUiy3oobQMiyzKWPPQYVyngmyTfKqJMWwfmrnUALrqljOu3fdZn-93iR00dO8abRLetxpR3H_YY3Lw0kKtOiie2zXvcvZIFoaGNsiSwx85D3D6OxG0gHpFRiib2Ya4XvFEph7nC919c8zczdq9v32ddvS6lpbCcpe-vwqwPx1OMgEU1xRwlEmm5SIE6Rj7g-L0YKOPoAoiiNPDGGv944Lu6ZDoOPAhH3_SduIY6JiOlN",
+      score: m.team_a?.score ?? undefined,
+      isCheckedIn: true,
+      roster: [
+        { username: `${m.team_a?.tag || "Player"}_1`, gameId: `${m.team_a?.tag || "P"}#1` },
+      ],
+    },
+    teamB: {
+      id: m.team_b?.tag || "t-b",
+      name: m.team_b?.name || "TBD (Slot 2)",
+      tag: m.team_b?.tag || "TBD",
+      logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDMYikVhkT2cPuCcT6iHyvC8KRrGxi2uWjy_Yg4PRywCpZ0Qk_XuBVy-SRnVARKIhqdj-kgUgfYlRjv_KTabBT194pEvMHjgNWeddHSPbu6P_N7NZD2B8VX7etUUzxmFCcI_NOLjS7LndnhoB8Te6UWYv5FexbsBx1329LlvMT7RFsiQ8_LX9hHuWmyhH0syOHCVlI_t-LXya3oFvZnd1NPJyQz_IZjYv6PmnX97rPssU0Rf0xwleEz",
+      score: m.team_b?.score ?? undefined,
+      isCheckedIn: true,
+      roster: [
+        { username: `${m.team_b?.tag || "Player"}_1`, gameId: `${m.team_b?.tag || "P"}#1` },
+      ],
+    },
+  };
+}
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState<MatchLobbyInfo[]>(MOCK_MATCHES);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [activeLobbyMatch, setActiveLobbyMatch] = useState<MatchLobbyInfo | null>(null);
   const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<MatchLobbyInfo | null>(null);
+
+  const fetchMatchesData = useCallback(async () => {
+    try {
+      const data = await getMatches();
+      if (data && data.length > 0) {
+        setMatches(data.map(mapApiMatchToLobby));
+      } else {
+        setMatches(MOCK_MATCHES);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch live matches from backend, using default mock matches:", err);
+      setMatches(MOCK_MATCHES);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMatchesData();
+    const interval = setInterval(fetchMatchesData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchMatchesData]);
 
   const filteredMatches = matches.filter((m) => {
     if (filterStatus === "all") return true;
@@ -176,7 +240,7 @@ export default function MatchesPage() {
         match={activeEvidenceMatch}
         isOpen={!!activeEvidenceMatch}
         onClose={() => setActiveEvidenceMatch(null)}
-        onSuccess={() => {}}
+        onSuccess={() => fetchMatchesData()}
       />
     </div>
   );
