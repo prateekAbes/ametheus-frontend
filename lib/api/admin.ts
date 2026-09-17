@@ -72,3 +72,49 @@ export async function getAdminStats(): Promise<AdminStats> {
   return apiClient<AdminStats>("/admin/stats");
 }
 
+export interface Dispute {
+  id: string;
+  tournament_id: string;
+  match_id: string;
+  submitted_by: string;
+  reason: string;
+  description: string;
+  evidence_url?: string;
+  status: string;
+  created_at: string;
+}
+
+export async function getDisputes(): Promise<Dispute[]> {
+  return apiClient<Dispute[]>("/admin/disputes");
+}
+
+export async function resolveDispute(
+  disputeId: string,
+  decision: "RESOLVED_UPHELD" | "RESOLVED_OVERTURNED" | "DISMISSED",
+  resolutionNotes: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/disputes/${disputeId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({
+      decision,
+      resolution_notes: resolutionNotes,
+    }),
+  });
+}
+
+export async function setUserRole(
+  userId: string,
+  role: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN"
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/users/${userId}/set-role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function triggerSeedCatalog(): Promise<{ status: string; message: string }> {
+  return apiClient("/admin/seed-catalog", {
+    method: "POST",
+  });
+}
+

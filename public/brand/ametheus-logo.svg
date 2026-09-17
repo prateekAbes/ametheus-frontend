@@ -1,12 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
-  <!-- AMETHEUS Mythic Flame & Solar Sigil -->
-  <g transform="translate(4, 4)">
-    <polygon points="20,0 36,36 26,36 20,20 14,36 4,36" fill="#E56A10" />
-    <polygon points="20,6 28,30 20,24 12,30" fill="#F59E0B" />
-    <circle cx="20" cy="14" r="3.5" fill="#FFFFFF" />
-    <path d="M6 38 L34 38" stroke="#E56A10" stroke-width="2.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 52" width="280" height="52" fill="none">
+  <!-- Centered composite logo with tight canvas margins and prominent size -->
+  <g transform="translate(140, 26)">
+    <!-- Total width of logo is ~250px, shifted left by 125px to be centered exactly at (0,0) -->
+    <g transform="translate(-125, -21)">
+      <!-- AMETHEUS Mythic Flame & Solar Sigil (Enlarged to 36x40) -->
+      <g transform="translate(0, 0)">
+        <polygon points="18,0 36,37 25,37 18,19 11,37 0,37" fill="#E56A10" />
+        <polygon points="18,6 27,31 18,24 9,31" fill="#F59E0B" />
+        <circle cx="18" cy="14" r="3.5" fill="#FFFFFF" />
+        <path d="M2 39 L34 39" stroke="#E56A10" stroke-width="2.8" stroke-linecap="round"/>
+      </g>
+      <!-- Wordmark - Scaled up font-size 28, ultra-bold Space Grotesk -->
+      <text x="48" y="31" font-family="'Space Grotesk', 'Inter', -apple-system, sans-serif" font-weight="900" font-size="28" letter-spacing="2.2" fill="#F1F5F9">AMETHEUS</text>
+      <!-- Trailing Solar Accent Dot -->
+      <circle cx="242" cy="21" r="4.2" fill="#E56A10" />
+    </g>
   </g>
-  <!-- Wordmark -->
-  <text x="48" y="32" font-family="'Space Grotesk', 'Inter', sans-serif" font-weight="900" font-size="24" letter-spacing="3" fill="#F1F5F9">AMETHEUS</text>
-  <circle cx="188" cy="22" r="3" fill="#E56A10" />
 </svg>
