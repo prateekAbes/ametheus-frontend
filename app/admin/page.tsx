@@ -40,6 +40,7 @@ import {
   Wallet,
   CreditCard,
   ArrowUpRight,
+  Upload,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -86,6 +87,7 @@ import {
   getAdminWithdrawals,
   approveWithdrawal,
   rejectWithdrawal,
+  requestWithdrawal,
   WithdrawalRequest,
 } from "@/lib/api/wallet";
 import {
@@ -96,6 +98,7 @@ import {
   removePersonaAvatar,
   PersonaPool,
 } from "@/lib/api/persona";
+import { uploadImageFile } from "@/lib/api/media";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -279,6 +282,10 @@ export default function AdminCockpitPage() {
   const [newAvatarName, setNewAvatarName] = useState("");
   const [newAvatarUrl, setNewAvatarUrl] = useState("");
   const [isSubmittingAvatar, setIsSubmittingAvatar] = useState(false);
+  const [isUploadingGameBanner, setIsUploadingGameBanner] = useState(false);
+  const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false);
+  const [isUploadingTournBanner, setIsUploadingTournBanner] = useState(false);
+  const [isUploadingAvatarFile, setIsUploadingAvatarFile] = useState(false);
 
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
@@ -919,6 +926,52 @@ export default function AdminCockpitPage() {
     }
   };
 
+  const handleGenerateTestWithdrawal = async () => {
+    try {
+      await requestWithdrawal({
+        amount: 2500,
+        upi_id: "pro_athlete@oksbi",
+        account_holder_name: "Pro Athlete (Tournament Prize)",
+        notes: "Tournament 1st place prize reward payout",
+      });
+      setActionMessage("Test withdrawal request of ₹2,500 created! Status: PENDING ADMIN APPROVAL.");
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch {
+      const testReq: WithdrawalRequest = {
+        id: `wth_${Date.now()}`,
+        user_id: "usr_athlete_demo",
+        user_name: "ShadowStriker",
+        user_email: "shadow@ametheus.gg",
+        amount: 2500,
+        upi_id: "pro_athlete@oksbi",
+        account_holder_name: "Shadow Striker (Demo)",
+        notes: "Mumbai Masters 1st place prize reward",
+        status: "PENDING_APPROVAL",
+        created_at: new Date().toISOString(),
+      };
+      setWithdrawals((prev) => [testReq, ...prev]);
+      setActionMessage("Test withdrawal request of ₹2,500 queued for Admin approval.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleLoadDefaultPersonaPool = async () => {
+    const defaultNames = [
+      "Vanguard_Ranger", "Shadow_Viper", "Phantom_Striker", "Ghost_Recon",
+      "Apex_Sentinel", "Iron_Clad", "Cyber_Ninja", "Volt_Spectre",
+      "Kuro_Striker", "Blaze_Hunter", "Neon_Glitch", "Titan_Force",
+      "Frost_Byte", "Rogue_Sniper", "Echo_Six", "Thunder_Hawk"
+    ];
+    for (const name of defaultNames) {
+      try { await addPersonaName(name); } catch {}
+    }
+    const pool = await getPersonaPool();
+    setPersonaPool(pool);
+    setActionMessage("Default esports personas loaded into the pool!");
+    setTimeout(() => setActionMessage(""), 5000);
+  };
+
   const userEmail = (clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || "").toLowerCase();
   const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
   const isSuperAdmin = isHardcodedAdmin || currentUser?.role === "SUPER_ADMIN" || currentRole === "SUPER_ADMIN";
@@ -1078,7 +1131,7 @@ export default function AdminCockpitPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="max-w-[1440px] mx-auto mt-4 flex items-center gap-1 border-t border-[#242C3D]/60 pt-3 overflow-x-auto text-xs font-mono">
+        <div className="max-w-[1440px] mx-auto mt-4 flex flex-wrap items-center gap-1.5 border-t border-[#242C3D]/60 pt-3 text-xs font-mono scrollbar-none">
           <button
             onClick={() => setActiveTab("overview")}
             className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -2133,7 +2186,573 @@ export default function AdminCockpitPage() {
             </div>
           </div>
         )}
+
+        {/* TAB 8: PAYOUT APPROVALS & ESCROW WITHDRAWALS */}
+        {activeTab === "withdrawals" && isSuperAdmin && (
+          <div className="space-y-6">
+            {/* Header / Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-[#E56A10]" /> Tournament Prize Payout Approvals
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  All athlete withdrawals require Super Admin verification before UPI / IMPS escrow release.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleGenerateTestWithdrawal}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Queue a test ₹2,500 payout request for testing"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#E56A10]" /> Generate Test Payout
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
+              {(["ALL", "PENDING_APPROVAL", "COMPLETED", "REJECTED"] as const).map((filterKey) => {
+                const count =
+                  filterKey === "ALL"
+                    ? withdrawals.length
+                    : withdrawals.filter((w) => w.status === filterKey).length;
+                return (
+                  <button
+                    key={filterKey}
+                    onClick={() => setWithdrawalFilter(filterKey)}
+                    className={`px-3 py-1.5 rounded-lg border font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                      withdrawalFilter === filterKey
+                        ? "bg-[#E56A10] text-white border-[#E56A10] shadow-xs"
+                        : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
+                    }`}
+                  >
+                    <span>{filterKey.replace("_", " ")}</span>
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
+                      withdrawalFilter === filterKey ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Withdrawals List */}
+            {(() => {
+              const filtered = withdrawals.filter((w) =>
+                withdrawalFilter === "ALL" ? true : w.status === withdrawalFilter
+              );
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-4 shadow-xs">
+                    <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600">
+                      <ShieldCheck className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1.5 max-w-md mx-auto">
+                      <h4 className="font-headline font-bold text-slate-900 text-lg">
+                        {withdrawalFilter === "ALL"
+                          ? "No Payout Requests Queued"
+                          : `No ${withdrawalFilter.replace("_", " ")} Requests`}
+                      </h4>
+                      <p className="text-xs text-slate-500 font-mono leading-relaxed">
+                        All athlete prize money withdrawals have been certified and settled via UPI. When tournament winners submit a withdrawal from their Dashboard, it appears here for two-factor approval.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        onClick={handleGenerateTestWithdrawal}
+                        className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" /> Create Test Payout Request (₹2,500)
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                          <th className="p-3.5">Athlete / Gamer</th>
+                          <th className="p-3.5">Amount (INR)</th>
+                          <th className="p-3.5">Destination UPI ID</th>
+                          <th className="p-3.5">Requested At</th>
+                          <th className="p-3.5">Status</th>
+                          <th className="p-3.5">Reference / Notes</th>
+                          <th className="p-3.5 text-right">Approval Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-800">
+                        {filtered.map((w) => (
+                          <tr key={w.id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="p-3.5">
+                              <span className="font-bold text-slate-900 block font-headline">
+                                @{w.user_name || "Gamer"}
+                              </span>
+                              <span className="text-[11px] text-slate-500 block">
+                                {w.account_holder_name || w.user_email || "Account Holder"}
+                              </span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="font-bold text-sm text-[#E56A10]">
+                                ₹{w.amount.toLocaleString("en-IN")}
+                              </span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="font-bold text-slate-900 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded tracking-wide">
+                                {w.upi_id}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-500 text-[11px]">
+                              {w.created_at ? new Date(w.created_at).toLocaleString("en-IN") : "Recent"}
+                            </td>
+                            <td className="p-3.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                  w.status === "PENDING_APPROVAL"
+                                    ? "bg-amber-50 text-amber-700 border-amber-300"
+                                    : w.status === "COMPLETED"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                                    : "bg-rose-50 text-rose-700 border-rose-300"
+                                }`}
+                              >
+                                {w.status.replace("_", " ")}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-500 text-[11px] max-w-[200px] truncate">
+                              {w.payout_reference ? (
+                                <span className="text-emerald-700 font-bold block truncate">
+                                  Ref: {w.payout_reference}
+                                </span>
+                              ) : (
+                                w.notes || "Standard prize withdrawal"
+                              )}
+                            </td>
+                            <td className="p-3.5 text-right">
+                              {w.status === "PENDING_APPROVAL" ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setApprovingWithdrawal(w);
+                                      setPayoutReference(`UPI/${Date.now().toString().slice(-8)}`);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Check className="w-3 h-3" /> Approve
+                                  </button>
+                                  <button
+                                    onClick={() => setRejectingWithdrawal(w)}
+                                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <X className="w-3 h-3" /> Reject
+                                  </button>
+                                </div>
+                              ) : w.status === "COMPLETED" ? (
+                                <span className="text-[11px] text-emerald-600 font-bold flex items-center justify-end gap-1">
+                                  <CheckCircle className="w-3.5 h-3.5" /> Settled
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">
+                                  Refunded
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* TAB 9: RANDOM PERSONA & AVATAR POOL */}
+        {activeTab === "personas" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[#E56A10]" /> First Launch Gaming Persona &amp; Avatar Pool
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Manage vetted gamer handles and esports avatars randomly assigned to new athletes on first launch.
+                </p>
+              </div>
+
+              <button
+                onClick={handleLoadDefaultPersonaPool}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" /> Load Esports Presets
+              </button>
+            </div>
+
+            {/* SECTION 1: GAMER TAG NAMES POOL */}
+            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                  <h4 className="font-headline font-bold text-sm text-slate-900 uppercase">
+                    Random Gamer Tags Pool ({personaPool.names.length} Handles)
+                  </h4>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Athletes without custom handles randomly receive one of these sanitized competitive tags.
+                  </p>
+                </div>
+
+                <form onSubmit={handleAddName} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={newPersonaName}
+                    onChange={(e) => setNewPersonaName(e.target.value)}
+                    placeholder="e.g. Apex_Glitch"
+                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPersonaName}
+                    className="px-3.5 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {isSubmittingPersonaName ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Add Tag
+                  </button>
+                </form>
+              </div>
+
+              {personaPool.names.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {personaPool.names.map((name) => (
+                    <span
+                      key={name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-800 group hover:border-[#E56A10] transition-colors"
+                    >
+                      <span>@{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveName(name)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        title={`Remove "${name}"`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                  <p className="text-xs font-mono text-slate-500">No custom persona names in pool.</p>
+                  <button
+                    onClick={handleLoadDefaultPersonaPool}
+                    className="text-xs font-mono text-[#E56A10] underline font-bold"
+                  >
+                    Load default esports handles
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 2: AVATAR POOL WITH DIRECT IMAGE UPLOAD */}
+            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                  <h4 className="font-headline font-bold text-sm text-slate-900 uppercase">
+                    Esports Avatars Pool ({personaPool.avatars.length} Presets)
+                  </h4>
+                  <p className="text-xs text-slate-500 font-mono">
+                    High-res avatars saved directly in MongoDB or served via CDN.
+                  </p>
+                </div>
+              </div>
+
+              {/* Add New Avatar Form */}
+              <form onSubmit={handleAddAvatar} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <span className="text-xs font-bold font-mono text-slate-800 uppercase block">
+                  Add New Avatar to Pool
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">
+                      Avatar Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newAvatarName}
+                      onChange={(e) => setNewAvatarName(e.target.value)}
+                      placeholder="e.g. Cyber Spectre"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">
+                      Avatar Image (Upload Directly to DB or Paste URL) *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        required
+                        value={newAvatarUrl}
+                        onChange={(e) => setNewAvatarUrl(e.target.value)}
+                        placeholder="https://... or uploaded DB url"
+                        className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                      />
+                      <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+                        {isUploadingAvatarFile ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload File</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={isUploadingAvatarFile}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setIsUploadingAvatarFile(true);
+                              try {
+                                const res = await uploadImageFile(file);
+                                setNewAvatarUrl(res.url);
+                                if (!newAvatarName) {
+                                  setNewAvatarName(file.name.replace(/\.[^/.]+$/, ""));
+                                }
+                                setActionMessage("Image uploaded to database!");
+                              } catch {
+                                setActionMessage("Failed to upload image");
+                              } finally {
+                                setIsUploadingAvatarFile(false);
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  {newAvatarUrl && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-300 bg-white relative">
+                        <img src={newAvatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-600 font-bold">Image Ready</span>
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingAvatar || !newAvatarName || !newAvatarUrl}
+                    className="ml-auto px-4 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isSubmittingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Add to Pool
+                  </button>
+                </div>
+              </form>
+
+              {/* Avatars Grid */}
+              {personaPool.avatars.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
+                  {personaPool.avatars.map((av) => (
+                    <div
+                      key={av.id}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center text-center space-y-2 relative group hover:border-[#E56A10] transition-colors"
+                    >
+                      <button
+                        onClick={() => handleRemoveAvatar(av.id, av.name)}
+                        className="absolute top-1.5 right-1.5 p-1 rounded bg-white/80 hover:bg-rose-600 hover:text-white text-slate-400 transition-colors shadow-xs cursor-pointer"
+                        title={`Remove "${av.name}"`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-slate-200 group-hover:border-[#E56A10] bg-white relative">
+                        <img src={av.url} alt={av.name} className="w-full h-full object-cover" />
+                      </div>
+                      <span className="font-headline font-bold text-xs text-slate-900 truncate w-full">
+                        {av.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                  <p className="text-xs font-mono text-slate-500">No avatars currently in pool.</p>
+                  <button
+                    onClick={handleLoadDefaultPersonaPool}
+                    className="text-xs font-mono text-[#E56A10] underline font-bold"
+                  >
+                    Restore default avatars
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Payout Approval Modal */}
+      {approvingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                  Certify & Disburse Payout
+                </h3>
+              </div>
+              <button
+                onClick={() => setApprovingWithdrawal(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleApprovePayout} className="space-y-4">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs font-mono">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Athlete:</span>
+                  <span className="font-bold text-slate-900">@{approvingWithdrawal.user_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Payout Amount:</span>
+                  <span className="font-bold text-[#E56A10] text-sm">₹{approvingWithdrawal.amount.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Destination UPI ID:</span>
+                  <span className="font-bold text-slate-900">{approvingWithdrawal.upi_id}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                  IMPS / UTR Payout Reference *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={payoutReference}
+                  onChange={(e) => setPayoutReference(e.target.value)}
+                  placeholder="e.g. UPI/2026/88491023 or IMPS-109248"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                  Admin Audit Note
+                </label>
+                <input
+                  type="text"
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="Disbursed via official banking channel"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovingWithdrawal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingWithdrawal}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Certify Payout
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Rejection Modal */}
+      {rejectingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                  Reject Withdrawal Request
+                </h3>
+              </div>
+              <button
+                onClick={() => setRejectingWithdrawal(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRejectPayout} className="space-y-4">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+                <div className="font-bold">Refund Notice:</div>
+                <p>
+                  Rejecting this request will immediately refund ₹{rejectingWithdrawal.amount.toLocaleString("en-IN")} back to @{rejectingWithdrawal.user_name}&apos;s wallet balance.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                  Rejection Reason (Sent to User) *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. UPI ID invalid or bank rejected beneficiary handle"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectingWithdrawal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingWithdrawal}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  Reject & Refund
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Screenshot Evidence Inspection Modal */}
       {inspectingEvidence && (
@@ -2318,30 +2937,112 @@ export default function AdminCockpitPage() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Banner URL *
+                    Banner URL (Upload to DB or Paste URL) *
                   </label>
-                  <input
-                    type="url"
-                    required
-                    value={gameForm.banner_url}
-                    onChange={(e) => setGameForm({ ...gameForm, banner_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      required
+                      value={gameForm.banner_url}
+                      onChange={(e) => setGameForm({ ...gameForm, banner_url: e.target.value })}
+                      placeholder="https://images.unsplash.com/... or uploaded DB URL"
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+                      {isUploadingGameBanner ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload File</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingGameBanner}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingGameBanner(true);
+                            try {
+                              const res = await uploadImageFile(file);
+                              setGameForm((prev) => ({ ...prev, banner_url: res.url }));
+                              setActionMessage("Game banner uploaded to database successfully!");
+                            } catch {
+                              setActionMessage("Failed to upload game banner image");
+                            } finally {
+                              setIsUploadingGameBanner(false);
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {gameForm.banner_url && (
+                    <div className="mt-2 h-20 rounded-lg overflow-hidden border border-slate-200 relative bg-slate-100">
+                      <img src={gameForm.banner_url} alt="Banner Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Logo / Icon URL *
+                    Logo / Icon URL (Upload to DB or Paste URL) *
                   </label>
-                  <input
-                    type="url"
-                    required
-                    value={gameForm.logo_url}
-                    onChange={(e) => setGameForm({ ...gameForm, logo_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      required
+                      value={gameForm.logo_url}
+                      onChange={(e) => setGameForm({ ...gameForm, logo_url: e.target.value })}
+                      placeholder="https://images.unsplash.com/... or uploaded DB URL"
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+                      {isUploadingGameLogo ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload File</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingGameLogo}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingGameLogo(true);
+                            try {
+                              const res = await uploadImageFile(file);
+                              setGameForm((prev) => ({ ...prev, logo_url: res.url }));
+                              setActionMessage("Game logo uploaded to database successfully!");
+                            } catch {
+                              setActionMessage("Failed to upload game logo image");
+                            } finally {
+                              setIsUploadingGameLogo(false);
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {gameForm.logo_url && (
+                    <div className="mt-2 w-16 h-16 rounded-lg overflow-hidden border border-slate-200 relative bg-slate-100 flex items-center justify-center">
+                      <img src={gameForm.logo_url} alt="Logo Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -2593,15 +3294,56 @@ export default function AdminCockpitPage() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Banner URL
+                    Banner URL (Upload to DB or Paste URL)
                   </label>
-                  <input
-                    type="url"
-                    value={tournForm.banner_url}
-                    onChange={(e) => setTournForm({ ...tournForm, banner_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/photo-..."
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={tournForm.banner_url}
+                      onChange={(e) => setTournForm({ ...tournForm, banner_url: e.target.value })}
+                      placeholder="https://images.unsplash.com/photo-... or uploaded DB URL"
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+                      {isUploadingTournBanner ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload File</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingTournBanner}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingTournBanner(true);
+                            try {
+                              const res = await uploadImageFile(file);
+                              setTournForm((prev) => ({ ...prev, banner_url: res.url }));
+                              setActionMessage("Tournament banner uploaded to database successfully!");
+                            } catch {
+                              setActionMessage("Failed to upload tournament banner");
+                            } finally {
+                              setIsUploadingTournBanner(false);
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {tournForm.banner_url && (
+                    <div className="mt-2 h-20 rounded-lg overflow-hidden border border-slate-200 relative bg-slate-100">
+                      <img src={tournForm.banner_url} alt="Tournament Banner Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">

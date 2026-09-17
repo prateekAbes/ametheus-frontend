@@ -76,10 +76,11 @@ export default function DedicatedGameHubPage({ params }: Props) {
             <div className="flex flex-col sm:flex-row items-start gap-5 max-w-3xl">
               <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-[#0B0E16] flex-shrink-0 flex items-center justify-center shadow-md overflow-hidden">
                 <Image
-                  src={game.logoUrl}
+                  src={game.logoUrl || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop"}
                   alt={game.name}
                   width={112}
                   height={112}
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
                 <span className="absolute bottom-1.5 right-1.5 px-1.5 bg-[#E56A10] text-white font-mono text-[9px] font-bold rounded">

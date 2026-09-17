@@ -9,4 +9,7 @@ export * from "./organizer";
 export * from "./admin";
 export * from "./payments";
 export * from "./notifications";
+export * from "./wallet";
+export * from "./persona";
+export * from "./media";
 

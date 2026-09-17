@@ -107,37 +107,49 @@ export function generateRandomGamingIdentity() {
 /**
  * Checks if the user is on their first launch or has no avatar/tag set,
  * and automatically assigns a gaming persona.
+ * Never overwrites user's configured display name or avatar.
  */
 export function initFirstLaunchPersona(currentDisplayName?: string, currentAvatar?: string) {
   if (typeof window === "undefined") return null;
 
+  // 1. If user already has a saved display name in MongoDB, preserve it completely
+  if (currentDisplayName && currentDisplayName.trim() !== "" && !currentDisplayName.includes("@")) {
+    const existing = {
+      gamerTag: currentDisplayName,
+      avatarUrl: currentAvatar || generateRandomGamingAvatar(currentDisplayName),
+      clanTag: "AMX",
+      isNew: false,
+    };
+    try {
+      localStorage.setItem("ametheus_gamer_identity", JSON.stringify(existing));
+    } catch {}
+    return existing;
+  }
+
+  // 2. If already initialized in localStorage, return it with isNew: false
   const stored = localStorage.getItem("ametheus_gamer_identity");
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.gamerTag) {
+        return {
+          ...parsed,
+          isNew: false,
+        };
+      }
     } catch {
       // ignore
     }
   }
 
-  // If user already has both a custom name and avatar, don't overwrite
-  if (currentDisplayName && currentAvatar && !currentDisplayName.includes("@")) {
-    return {
-      gamerTag: currentDisplayName,
-      avatarUrl: currentAvatar,
-      clanTag: "AMX",
-      isNew: false,
-    };
-  }
-
-  // Generate new identity for first launch
+  // 3. Generate new identity only for genuine first launch
   const newIdentity = {
     ...generateRandomGamingIdentity(),
     isNew: true,
   };
 
   try {
-    localStorage.setItem("ametheus_gamer_identity", JSON.stringify(newIdentity));
+    localStorage.setItem("ametheus_gamer_identity", JSON.stringify({ ...newIdentity, isNew: false }));
   } catch {
     // ignore
   }

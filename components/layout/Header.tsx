@@ -72,17 +72,57 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sync / fetch current user's profile for authoritative role
+  // Sync / fetch current user's profile for authoritative role & custom avatar
   useEffect(() => {
+    // 1. Initial immediate restore from localStorage to prevent avatar/name flicker
+    try {
+      const stored = localStorage.getItem("ametheus_user_profile");
+      if (stored) {
+        setUserProfile(JSON.parse(stored));
+      } else {
+        const storedIdentity = localStorage.getItem("ametheus_gamer_identity");
+        if (storedIdentity) {
+          const parsed = JSON.parse(storedIdentity);
+          if (parsed?.gamerTag) {
+            setUserProfile((prev) => ({
+              id: prev?.id || user?.id || "usr_me",
+              email: prev?.email || user?.primaryEmailAddress?.emailAddress || "",
+              username: parsed.gamerTag,
+              display_name: parsed.gamerTag,
+              avatar_url: parsed.avatarUrl,
+              role: prev?.role || "PLAYER",
+              inr_balance: prev?.inr_balance || "0.00",
+            }));
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Fetch authoritative profile from API
     if (isSignedIn) {
       getCurrentUserProfile()
-        .then((profile) => setUserProfile(profile))
+        .then((profile) => {
+          setUserProfile(profile);
+          try {
+            localStorage.setItem("ametheus_user_profile", JSON.stringify(profile));
+          } catch {}
+        })
         .catch(() => {
-          // If profile fetch fails, fallback to Clerk user metadata
+          // Keep local fallback
         });
     } else {
       setUserProfile(null);
     }
+
+    // 3. Listen for profile updates emitted from Dashboard or avatar upload
+    const handleProfileUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<UserProfile>;
+      if (customEvent.detail) {
+        setUserProfile(customEvent.detail);
+      }
+    };
+    window.addEventListener("ametheus:profile_updated", handleProfileUpdate);
+    return () => window.removeEventListener("ametheus:profile_updated", handleProfileUpdate);
   }, [isSignedIn, user]);
 
   // Close mobile menu and dropdown on route change
@@ -329,32 +369,47 @@ export default function Header() {
             </Show>
 
             <Show when="signed-in">
-              <div className="flex items-center gap-2.5 pl-2 border-l border-[#242C3D]">
+              <div className="flex items-center gap-3 pl-3 border-l border-[#242C3D]">
+                {/* Spacious, De-congested Esports User Identity Chip */}
                 <Link
                   href="/dashboard"
-                  className="hidden sm:flex flex-col text-right text-xs hover:opacity-80 transition-opacity"
+                  className="flex items-center gap-2.5 px-2.5 py-1 rounded-lg bg-[#161A24]/60 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all group"
+                  title="View Athlete Dashboard"
                 >
-                  <span className="text-white font-medium text-xs truncate max-w-[120px]">
-                    {userProfile?.display_name || user?.username || "My Account"}
-                  </span>
-                  <div className="flex items-center justify-end gap-1">
+                  {/* Custom Esports Avatar */}
+                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#242C3D] group-hover:border-[#E56A10] bg-slate-900 shrink-0">
+                    <img
+                      src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[#0B0E16]" />
+                  </div>
+
+                  {/* Gamer Tag & Distinct Role Badge */}
+                  <div className="hidden sm:flex flex-col text-left">
+                    <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[130px]">
+                      {userProfile?.display_name || user?.username || "Gamer"}
+                    </span>
                     <span
-                      className={`px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border ${
+                      className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit ${
                         isSuperAdmin
                           ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
                           : role === "ORGANIZER"
                           ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
-                          : "bg-[#161A24] text-[#94A3B8] border-[#242C3D]"
+                          : "bg-slate-800/80 text-slate-300 border-slate-700"
                       }`}
                     >
                       {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
                     </span>
                   </div>
                 </Link>
+
+                {/* Account & Sign Out Control */}
                 <UserButton
                   appearance={{
                     elements: {
-                      avatarBox: "w-8 h-8 border border-[#242C3D] hover:border-[#E56A10] transition-colors",
+                      avatarBox: "w-7 h-7 border border-[#242C3D] hover:border-[#E56A10] transition-colors opacity-80 hover:opacity-100",
                     },
                   }}
                 />

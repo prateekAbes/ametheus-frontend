@@ -34,6 +34,7 @@ import {
   Award,
   Bell,
   CheckCircle,
+  Upload,
 } from "lucide-react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { getCurrentUserProfile, updateUserProfile, UserProfile } from "@/lib/api/auth";
@@ -52,6 +53,8 @@ import {
   GAMING_AVATAR_PRESETS,
 } from "@/lib/utils/gamingIdentity";
 import { requestWithdrawal, depositFunds } from "@/lib/api/wallet";
+import { uploadImageFile } from "@/lib/api/media";
+import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 export default function DashboardPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -74,6 +77,7 @@ export default function DashboardPage() {
     avatar_url: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Wallet Modals (from previous dashboard)
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -142,6 +146,9 @@ export default function DashboardPage() {
               display_name: currentProf.display_name || "",
               avatar_url: currentProf.avatar_url || "",
             });
+            try {
+              localStorage.setItem("ametheus_user_profile", JSON.stringify(currentProf));
+            } catch {}
           }
         }
 
@@ -170,35 +177,45 @@ export default function DashboardPage() {
           }
 
           // First Launch Persona Check:
-          // If the user has no custom handle or avatar, automatically assign a cool gaming persona on first launch
-          const autoPersona = initFirstLaunchPersona(currentProf?.display_name, currentProf?.avatar_url);
-          if (autoPersona && autoPersona.isNew) {
-            setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
-            // Update backend silently
-            updateUserProfile({
-              display_name: autoPersona.gamerTag,
-              avatar_url: autoPersona.avatarUrl,
-            })
-              .then((updated) => {
-                if (isMounted) {
-                  setProfile(updated);
-                  setProfileForm((prev) => ({
-                    ...prev,
-                    display_name: updated.display_name || autoPersona.gamerTag,
-                    avatar_url: updated.avatar_url || autoPersona.avatarUrl,
-                  }));
-                }
+          // ONLY trigger if the user has NO configured display name and NO custom avatar
+          const hasExistingIdentity = Boolean(
+            (currentProf?.display_name && !currentProf.display_name.includes("@")) ||
+            currentProf?.avatar_url
+          );
+
+          if (!hasExistingIdentity) {
+            const autoPersona = initFirstLaunchPersona(currentProf?.display_name, currentProf?.avatar_url);
+            if (autoPersona && autoPersona.isNew) {
+              setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
+              // Update backend silently
+              updateUserProfile({
+                display_name: autoPersona.gamerTag,
+                avatar_url: autoPersona.avatarUrl,
               })
-              .catch(() => {
-                // If backend not available yet, local state still reflects the persona seamlessly
-                if (isMounted && currentProf) {
-                  setProfile({
-                    ...currentProf,
-                    display_name: autoPersona.gamerTag,
-                    avatar_url: autoPersona.avatarUrl,
-                  });
-                }
-              });
+                .then((updated) => {
+                  if (isMounted) {
+                    setProfile(updated);
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      display_name: updated.display_name || autoPersona.gamerTag,
+                      avatar_url: updated.avatar_url || autoPersona.avatarUrl,
+                    }));
+                    try {
+                      localStorage.setItem("ametheus_user_profile", JSON.stringify(updated));
+                      window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: updated }));
+                    } catch {}
+                  }
+                })
+                .catch(() => {
+                  if (isMounted && currentProf) {
+                    setProfile({
+                      ...currentProf,
+                      display_name: autoPersona.gamerTag,
+                      avatar_url: autoPersona.avatarUrl,
+                    });
+                  }
+                });
+            }
           }
         }
       } catch (e) {
@@ -224,6 +241,19 @@ export default function DashboardPage() {
         avatar_url: profileForm.avatar_url,
       });
       setProfile(updated);
+      try {
+        localStorage.setItem("ametheus_user_profile", JSON.stringify(updated));
+        localStorage.setItem(
+          "ametheus_gamer_identity",
+          JSON.stringify({
+            gamerTag: updated.display_name,
+            avatarUrl: updated.avatar_url,
+            clanTag: "AMX",
+            isNew: false,
+          })
+        );
+        window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: updated }));
+      } catch {}
       setIsEditProfileOpen(false);
       showToast("Profile settings saved successfully!");
     } catch (e: any) {
@@ -1043,87 +1073,70 @@ export default function DashboardPage() {
                   </h3>
                 </div>
                 <span className="font-mono text-[11px] text-slate-500 uppercase font-bold">
-                  {teams.length || 2} Squads
+                  {teams.length} Squad{teams.length !== 1 ? "s" : ""}
                 </span>
               </div>
 
               {/* Squad List */}
               <div className="space-y-2.5">
-                {/* Squad 1 */}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-headline text-sm font-bold text-slate-900">
-                        {teams[0]?.name || "VORTEX SYNDICATE"}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-[#E56A10] text-white font-mono text-[9px] font-bold">
-                        CAPTAIN
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-slate-500">Valorant</span>
+                {teams.length > 0 ? (
+                  teams.map((squad) => {
+                    const rosterReq = getGameRosterRequirement(squad.game_slug);
+                    const memberCount = Array.isArray(squad.members) ? squad.members.length : 1;
+                    const isFull = memberCount >= rosterReq.max;
+                    const isCaptain = squad.captain_id === user?.id || squad.captain_username === (profile?.display_name || user?.username);
+
+                    return (
+                      <div key={squad.id || squad.invite_code} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-headline text-sm font-bold text-slate-900">
+                              {squad.name}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold ${
+                              isCaptain ? "bg-[#E56A10] text-white" : "bg-slate-200 text-slate-700"
+                            }`}>
+                              {isCaptain ? "CAPTAIN" : "MEMBER"}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-500 uppercase font-semibold">
+                            {squad.game_slug}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
+                            <span className={`w-2 h-2 rounded-full ${isFull ? "bg-emerald-500" : "bg-[#E56A10]"}`} />
+                            <span>
+                              {memberCount}/{rosterReq.max} {rosterReq.formatName} {isFull ? "• Full" : `• ${rosterReq.max - memberCount} Needed`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
+                            <span className="font-mono text-xs font-bold text-slate-900 tracking-wider">
+                              {squad.invite_code}
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(squad.invite_code, `Squad Code "${squad.invite_code}" copied!`)}
+                              className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title="Copy permanent squad code"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center space-y-2">
+                    <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                    <div className="text-xs font-bold text-slate-800 font-headline">No Active Squads</div>
+                    <p className="text-[11px] text-slate-500 font-mono">
+                      Create your own squad or join your friends using an invite code.
+                    </p>
                   </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center -space-x-1.5">
-                      {["VK", "RZ", "SG", "KG", "BV"].map((initials, idx) => (
-                        <span
-                          key={idx}
-                          className="w-6 h-6 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-white text-[10px] font-bold"
-                        >
-                          {initials}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
-                      <span className="font-mono text-xs font-bold text-slate-900">
-                        {teams[0]?.invite_code || "VTX882"}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(teams[0]?.invite_code || "VTX882", "Squad Code copied!")}
-                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
-                        title="Copy code"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Squad 2 */}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-headline text-sm font-bold text-slate-900">
-                        {teams[1]?.name || "MINI WARRIORS"}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[9px] font-bold">
-                        MEMBER
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-slate-500">Mini Militia</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-1 text-slate-500 font-mono text-[11px]">
-                      <span className="w-2 h-2 rounded-full bg-[#E56A10]" />
-                      <span>3/4 Filled • 1 Open</span>
-                    </div>
-
-                    <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
-                      <span className="font-mono text-xs font-bold text-slate-900">
-                        {teams[1]?.invite_code || "MM712P"}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(teams[1]?.invite_code || "MM712P", "Squad Code copied!")}
-                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
-                        title="Copy code"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Quick Squad Buttons */}
@@ -1335,6 +1348,63 @@ export default function DashboardPage() {
                   </button>
                 </div>
               )}
+
+              {/* Direct File Upload to DB */}
+              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 relative shrink-0 bg-white flex items-center justify-center">
+                    {profileForm.avatar_url ? (
+                      <Image
+                        src={profileForm.avatar_url}
+                        alt="Custom avatar"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <Upload className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 font-headline">Upload Custom Avatar</div>
+                    <div className="text-[10px] text-slate-500 font-mono">Upload image directly to DB (PNG, JPG, WEBP)</div>
+                  </div>
+                </div>
+                <label className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                  {isUploadingAvatar ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3 h-3" />
+                      <span>Upload File</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploadingAvatar}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setIsUploadingAvatar(true);
+                        try {
+                          const res = await uploadImageFile(file);
+                          setProfileForm((prev) => ({ ...prev, avatar_url: res.url }));
+                          showToast("Avatar uploaded and saved to DB!");
+                        } catch {
+                          showToast("Failed to upload image");
+                        } finally {
+                          setIsUploadingAvatar(false);
+                        }
+                      }
+                    }}
+                  />
+                </label>
+              </div>
 
               {/* Avatar Preset Selection */}
               <div>
@@ -1617,6 +1687,17 @@ export default function DashboardPage() {
                   />
                 </div>
               </div>
+
+              {/* Dynamic Game Roster Info */}
+              {(() => {
+                const req = getGameRosterRequirement(createSquadForm.game_slug);
+                return (
+                  <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-800 border border-slate-200 flex items-center justify-between">
+                    <span className="text-slate-500">Required Squad Lineup:</span>
+                    <span className="font-bold text-[#E56A10] bg-[#E56A10]/10 px-2 py-0.5 rounded border border-[#E56A10]/30">{req.label}</span>
+                  </div>
+                );
+              })()}
 
               <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
                 You will be assigned as Squad Captain and receive a unique invite code to share with teammates.

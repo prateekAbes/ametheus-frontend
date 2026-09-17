@@ -212,9 +212,10 @@ export default function GamesDirectoryPage() {
                   {/* Thumbnail Header */}
                   <div className="relative w-full h-44 overflow-hidden bg-[#0B0E16]">
                     <Image
-                      src={game.bannerUrl}
+                      src={game.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"}
                       alt={game.name}
                       fill
+                      unoptimized
                       className="object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

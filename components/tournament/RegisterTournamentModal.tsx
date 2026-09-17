@@ -23,6 +23,8 @@ interface Props {
   onRegistrationSuccess: () => void;
 }
 
+import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
+
 export default function RegisterTournamentModal({
   isOpen,
   onClose,
@@ -43,6 +45,7 @@ export default function RegisterTournamentModal({
 
   const selectedTeam = userTeams.find((t) => t.id === selectedTeamId);
   const gameSlug = (tournament.gameSlug || tournament.game_slug || "").toLowerCase();
+  const rosterReq = getGameRosterRequirement(gameSlug || tournament.title);
 
   // Dynamic game identifier labels
   let gameIdLabel = "In-Game Gamer Tag / Handle";
@@ -72,8 +75,8 @@ export default function RegisterTournamentModal({
       setError("Please select a squad to register.");
       return;
     }
-    if (selectedTeam.members.length < (gameSlug === "chess" ? 1 : 3)) {
-      setError(`Your squad needs at least 3 players to enter this tournament (Current: ${selectedTeam.members.length}).`);
+    if (selectedTeam.members.length < rosterReq.min) {
+      setError(`Your squad requires ${rosterReq.min} player${rosterReq.min > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length} players).`);
       return;
     }
     if (!inGameId.trim()) {
@@ -238,43 +241,60 @@ export default function RegisterTournamentModal({
 
             {/* Squad Selection */}
             <div>
-              <label className="block text-xs font-mono uppercase text-slate-700 mb-2 font-semibold">
-                1. Select Your Squad / Team
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-mono uppercase text-slate-700 font-semibold">
+                  1. Select Your Squad / Team
+                </label>
+                <span className="text-[11px] font-mono font-bold text-[#E56A10] bg-[#E56A10]/10 border border-[#E56A10]/30 px-2 py-0.5 rounded">
+                  {rosterReq.label}
+                </span>
+              </div>
               {userTeams.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {userTeams.map((team) => (
-                    <label
-                      key={team.id}
-                      className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-colors ${
-                        selectedTeamId === team.id
-                          ? "bg-[#EFF4FF] border-[#E56A10]"
-                          : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="team_select"
-                          value={team.id}
-                          checked={selectedTeamId === team.id}
-                          onChange={() => setSelectedTeamId(team.id)}
-                          className="text-[#E56A10] focus:ring-[#E56A10]"
-                        />
-                        <div>
-                          <div className="font-bold text-sm text-slate-900">
-                            {team.name} [{team.tag}]
-                          </div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            Captain: @{team.captainUsername} • {team.members.length} Players
+                  {userTeams.map((team) => {
+                    const isEligible = team.members.length >= rosterReq.min;
+                    return (
+                      <label
+                        key={team.id}
+                        className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-colors ${
+                          selectedTeamId === team.id
+                            ? "bg-[#EFF4FF] border-[#E56A10]"
+                            : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="team_select"
+                            value={team.id}
+                            checked={selectedTeamId === team.id}
+                            onChange={() => setSelectedTeamId(team.id)}
+                            className="text-[#E56A10] focus:ring-[#E56A10]"
+                          />
+                          <div>
+                            <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                              <span>{team.name} [{team.tag}]</span>
+                              {isEligible ? (
+                                <span className="text-[9px] text-emerald-700 bg-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded">
+                                  Eligible
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-rose-700 bg-rose-100 font-mono font-bold px-1.5 py-0.2 rounded">
+                                  {rosterReq.min - team.members.length} More Needed
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-mono">
+                              Captain: @{team.captainUsername} • {team.members.length}/{rosterReq.max} Players
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <span className="text-xs font-mono text-[#E56A10] font-bold">
-                        {team.inviteCode}
-                      </span>
-                    </label>
-                  ))}
+                        <span className="text-xs font-mono text-[#E56A10] font-bold">
+                          {team.inviteCode}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">

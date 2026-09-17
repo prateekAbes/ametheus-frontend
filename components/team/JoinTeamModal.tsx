@@ -62,7 +62,7 @@ export default function JoinTeamModal({
               gameSlug: apiTeam.game_slug,
               name: apiTeam.name,
               tag: apiTeam.tag,
-              logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAeg153AQRoWxf_C4tvPxgy_F_YdO12nXK5KTCbYUnWKjveVie8pJQjlkS-8zuRuVhogG2TnA_LGFPtFUW9fN56GgNg8gDKa9NXkuez2KYYovOAKih13Kndl-CwXzATSiZaVMOTR-MQ-lqfCBRjQm1mC6tSGObC3b5pJOI38baTrU_V5Te3avoZNetINTZ9m3JQoD3PsswXw01PQrW3q99oq48iT8lINbKMm4w1ItY_fU5uLaligoZm",
+              logoUrl: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
               inviteCode: apiTeam.invite_code,
               captainUserId: apiTeam.captain_id,
               captainUsername: apiTeam.captain_username,

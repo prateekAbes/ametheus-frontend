@@ -53,8 +53,20 @@ export function normalizeGame(g: any): NormalizedGame {
     isTeamGame: g.is_team_game !== undefined ? Boolean(g.is_team_game) : (g.isTeamGame ?? true),
     minTeamSize: g.min_team_size !== undefined ? Number(g.min_team_size) : (g.minTeamSize ?? 1),
     maxTeamSize: g.max_team_size !== undefined ? Number(g.max_team_size) : (g.maxTeamSize ?? 5),
-    bannerUrl: g.banner_url || g.bannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuD-g0bK72p2tQe7b3Z3F5WzX8oV0h4vM1bX2m9x_banner",
-    logoUrl: g.logo_url || g.logoUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuD-g0bK72p2tQe7b3Z3F5WzX8oV0h4vM1bX2m9x_banner",
+    bannerUrl: (() => {
+      const b = g.banner_url || g.bannerUrl;
+      if (!b || b.includes("aida-public") || b.includes("googleusercontent.com")) {
+        return "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+      }
+      return b;
+    })(),
+    logoUrl: (() => {
+      const l = g.logo_url || g.logoUrl;
+      if (!l || l.includes("aida-public") || l.includes("googleusercontent.com")) {
+        return "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop";
+      }
+      return l;
+    })(),
     description: g.description || "",
     serverRegion: g.server_region || g.serverRegion || "AWS Mumbai (ap-south-1)",
     antiCheat: g.anti_cheat || g.antiCheat || "Hardware Vanguard TPM 2.0",
