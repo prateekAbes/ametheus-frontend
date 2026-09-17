@@ -17,6 +17,26 @@ import {
   X,
 } from "lucide-react";
 
+const DEFAULT_TOURNAMENT_BANNER = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+
+function TournamentBanner({ src, alt }: { src: string; alt: string }) {
+  const [imgSrc, setImgSrc] = useState(src || DEFAULT_TOURNAMENT_BANNER);
+
+  useEffect(() => {
+    if (src) setImgSrc(src);
+  }, [src]);
+
+  return (
+    <Image
+      src={imgSrc}
+      alt={alt}
+      fill
+      className="object-cover group-hover:scale-105 transition-transform duration-500"
+      onError={() => setImgSrc(DEFAULT_TOURNAMENT_BANNER)}
+    />
+  );
+}
+
 function TournamentsContent() {
   const searchParams = useSearchParams();
   const searchFromUrl = searchParams.get("search") || "";
@@ -238,11 +258,9 @@ function TournamentsContent() {
                 <div>
                   {/* Banner & Header */}
                   <div className="relative w-full h-44 overflow-hidden bg-slate-100">
-                    <Image
+                    <TournamentBanner
                       src={tournament.bannerUrl}
                       alt={tournament.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">

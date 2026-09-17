@@ -10,9 +10,15 @@ import {
   getLeaderboardCategories,
   createLeaderboardCategory,
   deleteLeaderboardCategory,
+  getLeaderboardStats,
+  updateLeaderboardStats,
+  createLeaderboardEntry,
+  removeLeaderboardEntry,
   LeaderboardEntry,
   LeaderboardCategory,
   LeaderboardCategoryCreatePayload,
+  LeaderboardStats,
+  CustomLeaderboardEntryPayload,
 } from "@/lib/api/leaderboard";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 import {
@@ -38,6 +44,8 @@ import {
   UserX,
   RotateCcw,
   AlertTriangle,
+  Settings,
+  Save,
 } from "lucide-react";
 import {
   getDisqualifiedEntries,
@@ -76,6 +84,41 @@ export default function LeaderboardPage() {
     min_matches: 0,
     description: "",
   });
+
+  const [stats, setStats] = useState<LeaderboardStats>({
+    total_awarded_prizes: "₹14,50,000+",
+    active_contenders: "24,800+",
+    verified_squads: "1,120+",
+    top_team_earnings: "₹1,85,000",
+    top_team_name: "Team Solaris X",
+  });
+  const [isEditingStats, setIsEditingStats] = useState(false);
+  const [statsForm, setStatsForm] = useState<LeaderboardStats>({
+    total_awarded_prizes: "₹14,50,000+",
+    active_contenders: "24,800+",
+    verified_squads: "1,120+",
+    top_team_earnings: "₹1,85,000",
+    top_team_name: "Team Solaris X",
+  });
+  const [isSubmittingStats, setIsSubmittingStats] = useState(false);
+
+  const [isAddingEntry, setIsAddingEntry] = useState(false);
+  const [entryForm, setEntryForm] = useState<CustomLeaderboardEntryPayload>({
+    name: "",
+    tag: "",
+    type: "team",
+    game_slug: "valorant",
+    game_name: "Valorant",
+    captain: "",
+    rating: 2000,
+    wins: 8,
+    losses: 2,
+    matches_played: 10,
+    win_rate: 80.0,
+    earnings: 25000,
+    category: "pc",
+  });
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
 
   const userEmail = (user?.primaryEmailAddress?.emailAddress || profile?.email || "").toLowerCase();
   const isSuperAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg" || profile?.role === "SUPER_ADMIN";
@@ -143,6 +186,15 @@ export default function LeaderboardPage() {
         }
       })
       .catch((err) => console.warn("Failed to load categories:", err));
+
+    getLeaderboardStats()
+      .then((st) => {
+        if (st) {
+          setStats(st);
+          setStatsForm(st);
+        }
+      })
+      .catch((err) => console.warn("Failed to load leaderboard stats:", err));
 
     getCurrentUserProfile()
       .then((p) => setProfile(p))
@@ -226,6 +278,66 @@ export default function LeaderboardPage() {
     }
   };
 
+  const handleUpdateStats = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingStats(true);
+    try {
+      const updated = await updateLeaderboardStats(statsForm);
+      setStats(updated);
+      setIsEditingStats(false);
+      setCatActionMsg("Leaderboard overview metrics updated successfully!");
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to update overview metrics");
+    } finally {
+      setIsSubmittingStats(false);
+    }
+  };
+
+  const handleCreateEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!entryForm.name.trim() || !entryForm.tag.trim()) return;
+    setIsSubmittingEntry(true);
+    try {
+      await createLeaderboardEntry(entryForm);
+      setCatActionMsg(`"${entryForm.name}" successfully added to leaderboard standings!`);
+      setIsAddingEntry(false);
+      setEntryForm({
+        name: "",
+        tag: "",
+        type: "team",
+        game_slug: "valorant",
+        game_name: "Valorant",
+        captain: "",
+        rating: 2000,
+        wins: 8,
+        losses: 2,
+        matches_played: 10,
+        win_rate: 80.0,
+        earnings: 25000,
+        category: "pc",
+      });
+      await fetchEntries();
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to add contender");
+    } finally {
+      setIsSubmittingEntry(false);
+    }
+  };
+
+  const handleDirectRemove = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove "${name}" from the leaderboard?`)) return;
+    try {
+      await removeLeaderboardEntry(id);
+      setCatActionMsg(`"${name}" removed from leaderboard.`);
+      await Promise.all([fetchEntries(), loadDisqualified()]);
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to remove entry");
+    }
+  };
+
   const disciplines = [
     { id: "all", name: "All Games" },
     { id: "valorant", name: "Valorant" },
@@ -292,15 +404,34 @@ export default function LeaderboardPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {isSuperAdmin && (
-                <button
-                  onClick={() => setIsAddingCategory(true)}
-                  className="px-4 py-2.5 bg-white border border-slate-300 hover:border-[#E56A10] text-slate-800 hover:text-[#E56A10] rounded font-headline font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <Plus className="w-4 h-4 text-[#E56A10]" />
-                  Add Category
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      setStatsForm(stats);
+                      setIsEditingStats(true);
+                    }}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded font-headline font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Settings className="w-4 h-4 text-[#E56A10]" />
+                    Edit Stats
+                  </button>
+                  <button
+                    onClick={() => setIsAddingEntry(true)}
+                    className="px-4 py-2.5 bg-white border border-slate-300 hover:border-[#E56A10] text-slate-800 hover:text-[#E56A10] rounded font-headline font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Plus className="w-4 h-4 text-[#E56A10]" />
+                    Add Contender
+                  </button>
+                  <button
+                    onClick={() => setIsAddingCategory(true)}
+                    className="px-4 py-2.5 bg-white border border-slate-300 hover:border-[#E56A10] text-slate-800 hover:text-[#E56A10] rounded font-headline font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Filter className="w-4 h-4 text-[#E56A10]" />
+                    Add Category
+                  </button>
+                </>
               )}
               <button
                 onClick={exportCsv}
@@ -326,7 +457,7 @@ export default function LeaderboardPage() {
                 <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mb-1 font-bold">
                   Total Awarded Prizes
                 </div>
-                <div className="text-2xl font-bold font-headline text-slate-900">₹14,50,000+</div>
+                <div className="text-2xl font-bold font-headline text-slate-900">{stats.total_awarded_prizes}</div>
                 <span className="text-[11px] text-[#E56A10] font-mono flex items-center gap-1 mt-1 font-bold">
                   <Shield className="w-3.5 h-3.5" /> Prize Vault Verified
                 </span>
@@ -341,7 +472,7 @@ export default function LeaderboardPage() {
                 <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mb-1 font-bold">
                   Active Contenders
                 </div>
-                <div className="text-2xl font-bold font-headline text-slate-900">24,800+</div>
+                <div className="text-2xl font-bold font-headline text-slate-900">{stats.active_contenders}</div>
                 <span className="text-[11px] text-emerald-600 font-mono flex items-center gap-1 mt-1 font-bold">
                   <TrendingUp className="w-3.5 h-3.5" /> +3,120 This Month
                 </span>
@@ -356,7 +487,7 @@ export default function LeaderboardPage() {
                 <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mb-1 font-bold">
                   Verified Squads
                 </div>
-                <div className="text-2xl font-bold font-headline text-slate-900">1,120+</div>
+                <div className="text-2xl font-bold font-headline text-slate-900">{stats.verified_squads}</div>
                 <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-1 font-bold">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Verified &amp; Squad Locked
                 </span>
@@ -371,9 +502,9 @@ export default function LeaderboardPage() {
                 <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mb-1 font-bold">
                   Top Team Earnings
                 </div>
-                <div className="text-2xl font-bold font-headline text-[#E56A10]">₹1,85,000</div>
+                <div className="text-2xl font-bold font-headline text-[#E56A10]">{stats.top_team_earnings}</div>
                 <span className="text-[11px] text-amber-600 font-mono flex items-center gap-1 mt-1 font-bold">
-                  <Trophy className="w-3.5 h-3.5" /> Team Solaris X
+                  <Trophy className="w-3.5 h-3.5" /> {stats.top_team_name}
                 </span>
               </div>
               <div className="w-12 h-12 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
@@ -1108,6 +1239,324 @@ export default function LeaderboardPage() {
                 >
                   {isSubmittingCat ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   Create &amp; Calculate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Edit Overview Stats Modal (Admin Privileges) */}
+      {isEditingStats && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Edit Leaderboard Overview Stats
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditingStats(false)}
+                className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStats} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                  Total Awarded Prizes *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={statsForm.total_awarded_prizes}
+                  onChange={(e) => setStatsForm({ ...statsForm, total_awarded_prizes: e.target.value })}
+                  placeholder="e.g. ₹15,00,000+"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Active Contenders *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={statsForm.active_contenders}
+                    onChange={(e) => setStatsForm({ ...statsForm, active_contenders: e.target.value })}
+                    placeholder="e.g. 25,000+"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Verified Squads *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={statsForm.verified_squads}
+                    onChange={(e) => setStatsForm({ ...statsForm, verified_squads: e.target.value })}
+                    placeholder="e.g. 1,250+"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Top Team Earnings *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={statsForm.top_team_earnings}
+                    onChange={(e) => setStatsForm({ ...statsForm, top_team_earnings: e.target.value })}
+                    placeholder="e.g. ₹2,10,000"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Top Team Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={statsForm.top_team_name}
+                    onChange={(e) => setStatsForm({ ...statsForm, top_team_name: e.target.value })}
+                    placeholder="e.g. Team Solaris X"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingStats(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingStats}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {isSubmittingStats ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Add Contender Modal (Admin Privileges) */}
+      {isAddingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl text-slate-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Add Contender to Standings
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddingEntry(false)}
+                className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEntry} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Entry Type *
+                  </label>
+                  <select
+                    value={entryForm.type}
+                    onChange={(e) => setEntryForm({ ...entryForm, type: e.target.value as "team" | "player" })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="team">Franchise Squad</option>
+                    <option value="player">Individual Athlete</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Game Discipline *
+                  </label>
+                  <select
+                    value={entryForm.game_slug}
+                    onChange={(e) => {
+                      const slug = e.target.value;
+                      const gMap: Record<string, string> = {
+                        valorant: "Valorant",
+                        "counter-strike-2": "CS2",
+                        bgmi: "BGMI",
+                        chess: "Chess",
+                        "smash-karts": "Smash Karts",
+                        "mini-militia": "Mini Militia",
+                      };
+                      setEntryForm({
+                        ...entryForm,
+                        game_slug: slug,
+                        game_name: gMap[slug] || slug,
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="valorant">Valorant</option>
+                    <option value="counter-strike-2">Counter-Strike 2</option>
+                    <option value="bgmi">BGMI</option>
+                    <option value="chess">Chess</option>
+                    <option value="smash-karts">Smash Karts</option>
+                    <option value="mini-militia">Mini Militia</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Squad / Contender Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. S8UL Esports"
+                    value={entryForm.name}
+                    onChange={(e) => setEntryForm({ ...entryForm, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Tag *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. S8UL"
+                    value={entryForm.tag}
+                    onChange={(e) => setEntryForm({ ...entryForm, tag: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Captain / Handle *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Mortal"
+                    value={entryForm.captain}
+                    onChange={(e) => setEntryForm({ ...entryForm, captain: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Initial ELO Rating
+                  </label>
+                  <input
+                    type="number"
+                    value={entryForm.rating}
+                    onChange={(e) => setEntryForm({ ...entryForm, rating: parseInt(e.target.value) || 1000 })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Wins
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entryForm.wins}
+                    onChange={(e) => {
+                      const w = parseInt(e.target.value) || 0;
+                      const l = entryForm.losses ?? 0;
+                      const total = w + l;
+                      const rate = total > 0 ? Math.round((w / total) * 100) : 0;
+                      setEntryForm({ ...entryForm, wins: w, matches_played: total, win_rate: rate });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Losses
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entryForm.losses}
+                    onChange={(e) => {
+                      const l = parseInt(e.target.value) || 0;
+                      const w = entryForm.wins ?? 0;
+                      const total = w + l;
+                      const rate = total > 0 ? Math.round((w / total) * 100) : 0;
+                      setEntryForm({ ...entryForm, losses: l, matches_played: total, win_rate: rate });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-900 uppercase font-bold mb-1">
+                    Prize Earnings (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entryForm.earnings}
+                    onChange={(e) => setEntryForm({ ...entryForm, earnings: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingEntry(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEntry}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {isSubmittingEntry ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Add to Standings
                 </button>
               </div>
             </form>

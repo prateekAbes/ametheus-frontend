@@ -100,3 +100,52 @@ export async function reinstateLeaderboardEntry(entityId: string): Promise<{ sta
     method: "DELETE",
   });
 }
+
+export interface LeaderboardStats {
+  total_awarded_prizes: string;
+  active_contenders: string;
+  verified_squads: string;
+  top_team_earnings: string;
+  top_team_name: string;
+}
+
+export interface CustomLeaderboardEntryPayload {
+  name: string;
+  tag: string;
+  type?: string;
+  game_slug?: string;
+  game_name?: string;
+  captain?: string;
+  logo_url?: string;
+  win_rate?: number;
+  matches_played?: number;
+  wins?: number;
+  losses?: number;
+  rating?: number;
+  earnings?: number;
+  category?: string;
+}
+
+export async function getLeaderboardStats(): Promise<LeaderboardStats> {
+  return apiClient<LeaderboardStats>("/leaderboard/stats");
+}
+
+export async function updateLeaderboardStats(payload: Partial<LeaderboardStats>): Promise<LeaderboardStats> {
+  return apiClient<LeaderboardStats>("/leaderboard/stats", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createLeaderboardEntry(payload: CustomLeaderboardEntryPayload): Promise<LeaderboardEntry> {
+  return apiClient<LeaderboardEntry>("/leaderboard/entries", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeLeaderboardEntry(entityId: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/leaderboard/entries/${entityId}`, {
+    method: "DELETE",
+  });
+}

@@ -37,6 +37,9 @@ import {
   BarChart3,
   ChevronRight,
   Hash,
+  Wallet,
+  CreditCard,
+  ArrowUpRight,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -79,12 +82,26 @@ import {
   LeaderboardCategory,
   LeaderboardCategoryCreatePayload,
 } from "@/lib/api/leaderboard";
+import {
+  getAdminWithdrawals,
+  approveWithdrawal,
+  rejectWithdrawal,
+  WithdrawalRequest,
+} from "@/lib/api/wallet";
+import {
+  getPersonaPool,
+  addPersonaName,
+  removePersonaName,
+  addPersonaAvatar,
+  removePersonaAvatar,
+  PersonaPool,
+} from "@/lib/api/persona";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "tournaments" | "queue" | "disputes" | "games" | "leaderboards" | "users" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "tournaments" | "queue" | "disputes" | "games" | "leaderboards" | "users" | "audit" | "withdrawals" | "personas">("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
@@ -201,10 +218,72 @@ export default function AdminCockpitPage() {
     description: "",
   });
 
+  // Withdrawals State (Payout Approvals)
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([
+    {
+      id: "wth_demo_01",
+      user_id: "usr_apex99",
+      user_name: "ApexPredator",
+      user_email: "apex@ametheus.gg",
+      amount: 4500,
+      upi_id: "apexpredator@okhdfcbank",
+      account_holder_name: "A. Predator",
+      notes: "Prize winnings withdrawal - Mumbai Masters QF",
+      status: "PENDING_APPROVAL",
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    },
+    {
+      id: "wth_demo_02",
+      user_id: "usr_valk",
+      user_name: "Valkyrie",
+      user_email: "valk@ametheus.gg",
+      amount: 15000,
+      upi_id: "valkyrie.strike@oksbi",
+      account_holder_name: "Valkyrie R.",
+      notes: "First place tournament prize withdrawal",
+      status: "COMPLETED",
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      reviewed_by: "pk.4081988@gmail.com",
+      reviewed_at: new Date(Date.now() - 43200000).toISOString(),
+      payout_reference: "UPI/2026/88491023",
+      admin_notes: "Certified & transferred via UPI gateway",
+    },
+  ]);
+  const [withdrawalFilter, setWithdrawalFilter] = useState<"ALL" | "PENDING_APPROVAL" | "COMPLETED" | "REJECTED">("ALL");
+  const [rejectingWithdrawal, setRejectingWithdrawal] = useState<WithdrawalRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState("UPI ID invalid or inactive with banking handle");
+  const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
+  const [approvingWithdrawal, setApprovingWithdrawal] = useState<WithdrawalRequest | null>(null);
+  const [payoutReference, setPayoutReference] = useState("");
+  const [approvalNotes, setApprovalNotes] = useState("Approved and disbursed via UPI escrow gateway");
+
+  // Persona & Avatar Pool State
+  const [personaPool, setPersonaPool] = useState<PersonaPool>({
+    names: [
+      "Vanguard_Ranger", "Shadow_Viper", "Phantom_Striker", "Ghost_Recon",
+      "Apex_Sentinel", "Iron_Clad", "Cyber_Ninja", "Volt_Spectre",
+      "Kuro_Striker", "Blaze_Hunter", "Neon_Glitch", "Titan_Force",
+      "Frost_Byte", "Rogue_Sniper", "Echo_Six", "Thunder_Hawk"
+    ],
+    avatars: [
+      { id: "av_1", name: "Cyber Samurai", url: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop" },
+      { id: "av_2", name: "Tactical Operative", url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop" },
+      { id: "av_3", name: "Shadow Assassin", url: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=200&auto=format&fit=crop" },
+      { id: "av_4", name: "Neon Valkyrie", url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop" },
+      { id: "av_5", name: "Vanguard Sentinel", url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=200&auto=format&fit=crop" },
+      { id: "av_6", name: "Mecha Pilot", url: "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?q=80&w=200&auto=format&fit=crop" },
+    ],
+  });
+  const [newPersonaName, setNewPersonaName] = useState("");
+  const [isSubmittingPersonaName, setIsSubmittingPersonaName] = useState(false);
+  const [newAvatarName, setNewAvatarName] = useState("");
+  const [newAvatarUrl, setNewAvatarUrl] = useState("");
+  const [isSubmittingAvatar, setIsSubmittingAvatar] = useState(false);
+
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes, tournRes, catsRes] = await Promise.allSettled([
+      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes, tournRes, catsRes, withdrawalsRes, personaRes] = await Promise.allSettled([
         getCurrentUserProfile(),
         getAuditLogs(),
         getAdminUsers(),
@@ -214,6 +293,8 @@ export default function AdminCockpitPage() {
         getGames(),
         getTournaments(),
         getLeaderboardCategories(),
+        getAdminWithdrawals(),
+        getPersonaPool(),
       ]);
 
       if (profileRes.status === "fulfilled") {
@@ -252,6 +333,12 @@ export default function AdminCockpitPage() {
       }
       if (catsRes.status === "fulfilled" && Array.isArray(catsRes.value)) {
         setLeaderboardCategories(catsRes.value);
+      }
+      if (withdrawalsRes.status === "fulfilled" && Array.isArray(withdrawalsRes.value)) {
+        setWithdrawals(withdrawalsRes.value);
+      }
+      if (personaRes.status === "fulfilled" && personaRes.value && Array.isArray(personaRes.value.names)) {
+        setPersonaPool(personaRes.value);
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -723,6 +810,115 @@ export default function AdminCockpitPage() {
     }
   };
 
+  // Withdrawal Payout Approval Handlers
+  const handleApprovePayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingWithdrawal) return;
+    setIsProcessingWithdrawal(true);
+    try {
+      await approveWithdrawal(approvingWithdrawal.id, {
+        payout_reference: payoutReference || `UPI/${Date.now().toString().slice(-8)}`,
+        admin_notes: approvalNotes,
+      });
+      setActionMessage(`Payout of ₹${approvingWithdrawal.amount.toLocaleString("en-IN")} to @${approvingWithdrawal.user_name} approved!`);
+      setApprovingWithdrawal(null);
+      setPayoutReference("");
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to approve payout.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingWithdrawal(false);
+    }
+  };
+
+  const handleRejectPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingWithdrawal) return;
+    setIsProcessingWithdrawal(true);
+    try {
+      await rejectWithdrawal(rejectingWithdrawal.id, {
+        admin_notes: rejectReason,
+      });
+      setActionMessage(`Withdrawal request rejected and ₹${rejectingWithdrawal.amount.toLocaleString("en-IN")} refunded to @${rejectingWithdrawal.user_name}'s wallet.`);
+      setRejectingWithdrawal(null);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to reject withdrawal.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingWithdrawal(false);
+    }
+  };
+
+  // Persona Pool Handlers
+  const handleAddName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPersonaName.trim()) return;
+    setIsSubmittingPersonaName(true);
+    try {
+      await addPersonaName(newPersonaName.trim());
+      setActionMessage(`Added "${newPersonaName.trim()}" to random persona name pool.`);
+      setNewPersonaName("");
+      const pool = await getPersonaPool();
+      setPersonaPool(pool);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to add name to pool.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsSubmittingPersonaName(false);
+    }
+  };
+
+  const handleRemoveName = async (name: string) => {
+    try {
+      await removePersonaName(name);
+      setActionMessage(`Removed "${name}" from random persona name pool.`);
+      const pool = await getPersonaPool();
+      setPersonaPool(pool);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to remove name from pool.");
+      setTimeout(() => setActionMessage(""), 6000);
+    }
+  };
+
+  const handleAddAvatar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAvatarName.trim() || !newAvatarUrl.trim()) return;
+    setIsSubmittingAvatar(true);
+    try {
+      await addPersonaAvatar(newAvatarName.trim(), newAvatarUrl.trim());
+      setActionMessage(`Added avatar "${newAvatarName.trim()}" to avatar pool.`);
+      setNewAvatarName("");
+      setNewAvatarUrl("");
+      const pool = await getPersonaPool();
+      setPersonaPool(pool);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to add avatar to pool.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsSubmittingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async (avatarId: string, avatarName: string) => {
+    try {
+      await removePersonaAvatar(avatarId);
+      setActionMessage(`Removed avatar "${avatarName}" from pool.`);
+      const pool = await getPersonaPool();
+      setPersonaPool(pool);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to remove avatar from pool.");
+      setTimeout(() => setActionMessage(""), 6000);
+    }
+  };
+
   const userEmail = (clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || "").toLowerCase();
   const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
   const isSuperAdmin = isHardcodedAdmin || currentUser?.role === "SUPER_ADMIN" || currentRole === "SUPER_ADMIN";
@@ -964,6 +1160,31 @@ export default function AdminCockpitPage() {
                 }`}
               >
                 <Users className="w-3.5 h-3.5" /> User RBAC ({users.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("withdrawals")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "withdrawals"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <DollarSign className="w-3.5 h-3.5" /> Payout Approvals
+                {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
+                    {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("personas")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "personas"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Persona & Avatar Pool
               </button>
               <button
                 onClick={() => setActiveTab("audit")}
@@ -1962,7 +2183,7 @@ export default function AdminCockpitPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl p-6 space-y-5 my-8 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-[#E56A10]" />
                 {editingGame ? `Edit Game: ${editingGame.name}` : "Register New Game Title"}
               </h3>
@@ -1977,7 +2198,7 @@ export default function AdminCockpitPage() {
             <form onSubmit={handleSaveGame} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Game Name *
                   </label>
                   <input
@@ -1994,12 +2215,12 @@ export default function AdminCockpitPage() {
                       }
                     }}
                     placeholder="e.g. Apex Legends"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     URL Slug *
                   </label>
                   <input
@@ -2009,12 +2230,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.slug}
                     onChange={(e) => setGameForm({ ...gameForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
                     placeholder="e.g. apex-legends"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono disabled:opacity-50"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono disabled:opacity-50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Platform *
                   </label>
                   <input
@@ -2023,12 +2244,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.platform}
                     onChange={(e) => setGameForm({ ...gameForm, platform: e.target.value })}
                     placeholder="e.g. PC, Mobile, Crossplay"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Tag / Genre *
                   </label>
                   <input
@@ -2037,12 +2258,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.tag}
                     onChange={(e) => setGameForm({ ...gameForm, tag: e.target.value })}
                     placeholder="e.g. BATTLE ROYALE, FPS, MOBA"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Min Team Size
                   </label>
                   <input
@@ -2051,12 +2272,12 @@ export default function AdminCockpitPage() {
                     max={10}
                     value={gameForm.min_team_size}
                     onChange={(e) => setGameForm({ ...gameForm, min_team_size: parseInt(e.target.value) || 1 })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Max Team Size
                   </label>
                   <input
@@ -2065,12 +2286,12 @@ export default function AdminCockpitPage() {
                     max={10}
                     value={gameForm.max_team_size}
                     onChange={(e) => setGameForm({ ...gameForm, max_team_size: parseInt(e.target.value) || 5 })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Server Region
                   </label>
                   <input
@@ -2078,12 +2299,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.server_region}
                     onChange={(e) => setGameForm({ ...gameForm, server_region: e.target.value })}
                     placeholder="e.g. AWS Mumbai (ap-south-1)"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Anti-Cheat Protocol
                   </label>
                   <input
@@ -2091,12 +2312,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.anti_cheat}
                     onChange={(e) => setGameForm({ ...gameForm, anti_cheat: e.target.value })}
                     placeholder="e.g. Hardware Vanguard TPM 2.0"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Banner URL *
                   </label>
                   <input
@@ -2105,12 +2326,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.banner_url}
                     onChange={(e) => setGameForm({ ...gameForm, banner_url: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Logo / Icon URL *
                   </label>
                   <input
@@ -2119,12 +2340,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.logo_url}
                     onChange={(e) => setGameForm({ ...gameForm, logo_url: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Description
                   </label>
                   <textarea
@@ -2132,7 +2353,7 @@ export default function AdminCockpitPage() {
                     value={gameForm.description}
                     onChange={(e) => setGameForm({ ...gameForm, description: e.target.value })}
                     placeholder="Brief description of competitive format and gameplay..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
@@ -2171,7 +2392,7 @@ export default function AdminCockpitPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#E56A10]" />
                 {editingTournament ? `Edit Tournament: ${editingTournament.title}` : "Create New Platform Tournament"}
               </h3>
@@ -2186,13 +2407,13 @@ export default function AdminCockpitPage() {
             <form onSubmit={handleSaveTournament} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Game Title *
                   </label>
                   <select
                     value={tournForm.game_id}
                     onChange={(e) => setTournForm({ ...tournForm, game_id: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     {games.map((g) => (
                       <option key={g.id} value={g.slug || g.id}>
@@ -2204,7 +2425,7 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Tournament Title *
                   </label>
                   <input
@@ -2213,18 +2434,18 @@ export default function AdminCockpitPage() {
                     value={tournForm.title}
                     onChange={(e) => setTournForm({ ...tournForm, title: e.target.value })}
                     placeholder="e.g. Mumbai Masters Champions Cup"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Tournament Status
                   </label>
                   <select
                     value={tournForm.status}
                     onChange={(e) => setTournForm({ ...tournForm, status: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="ONGOING">Ongoing (Live Matches)</option>
@@ -2234,7 +2455,7 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Tournament Format
                   </label>
                   <input
@@ -2242,12 +2463,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.format}
                     onChange={(e) => setTournForm({ ...tournForm, format: e.target.value })}
                     placeholder="e.g. Single Elimination Bracket"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Guaranteed Prize Vault (₹ INR) *
                   </label>
                   <input
@@ -2256,12 +2477,12 @@ export default function AdminCockpitPage() {
                     required
                     value={tournForm.prize_pool_inr}
                     onChange={(e) => setTournForm({ ...tournForm, prize_pool_inr: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Entry Fee (₹ INR)
                   </label>
                   <input
@@ -2270,12 +2491,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.entry_fee_inr}
                     onChange={(e) => setTournForm({ ...tournForm, entry_fee_inr: parseInt(e.target.value) || 0 })}
                     placeholder="0 for Free Entry"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Tournament Schedule (Starts At) *
                   </label>
                   <input
@@ -2284,12 +2505,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.starts_at}
                     onChange={(e) => setTournForm({ ...tournForm, starts_at: e.target.value })}
                     placeholder="e.g. Saturday, 8:00 PM IST"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Squad / Lineup Lock Time *
                   </label>
                   <input
@@ -2298,12 +2519,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.roster_lock_time}
                     onChange={(e) => setTournForm({ ...tournForm, roster_lock_time: e.target.value })}
                     placeholder="e.g. Saturday, 7:30 PM IST"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Server Region
                   </label>
                   <input
@@ -2311,12 +2532,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.server_region}
                     onChange={(e) => setTournForm({ ...tournForm, server_region: e.target.value })}
                     placeholder="e.g. AWS Mumbai (ap-south-1)"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Rank Requirement
                   </label>
                   <input
@@ -2324,13 +2545,13 @@ export default function AdminCockpitPage() {
                     value={tournForm.rank_requirement}
                     onChange={(e) => setTournForm({ ...tournForm, rank_requirement: e.target.value })}
                     placeholder="e.g. Open to All Ranks"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 sm:col-span-2">
                   <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                       Max Squads
                     </label>
                     <input
@@ -2339,11 +2560,11 @@ export default function AdminCockpitPage() {
                       max={128}
                       value={tournForm.max_teams}
                       onChange={(e) => setTournForm({ ...tournForm, max_teams: parseInt(e.target.value) || 16 })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                       Min Team Size
                     </label>
                     <input
@@ -2352,11 +2573,11 @@ export default function AdminCockpitPage() {
                       max={10}
                       value={tournForm.min_team_size}
                       onChange={(e) => setTournForm({ ...tournForm, min_team_size: parseInt(e.target.value) || 1 })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                       Max Team Size
                     </label>
                     <input
@@ -2365,13 +2586,13 @@ export default function AdminCockpitPage() {
                       max={10}
                       value={tournForm.max_team_size}
                       onChange={(e) => setTournForm({ ...tournForm, max_team_size: parseInt(e.target.value) || 5 })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Banner URL
                   </label>
                   <input
@@ -2379,12 +2600,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.banner_url}
                     onChange={(e) => setTournForm({ ...tournForm, banner_url: e.target.value })}
                     placeholder="https://images.unsplash.com/photo-..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Description & Overview
                   </label>
                   <textarea
@@ -2392,7 +2613,7 @@ export default function AdminCockpitPage() {
                     value={tournForm.description}
                     onChange={(e) => setTournForm({ ...tournForm, description: e.target.value })}
                     placeholder="Official sanctioned tournament rules, match server info, and schedule..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
@@ -2401,7 +2622,7 @@ export default function AdminCockpitPage() {
               <div className="border-t border-slate-200 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold font-mono text-slate-900 uppercase flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5 text-[#E56A10]" /> Tournament Rules & Regulations ({tournForm.rules.length})
                     </h4>
                     <p className="text-[11px] text-slate-500 font-mono">
@@ -2447,7 +2668,7 @@ export default function AdminCockpitPage() {
                       }
                     }}
                     placeholder="Enter rule (e.g. '15-minute grace check-in before match forfeit')"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <button
                     type="button"
@@ -2463,7 +2684,7 @@ export default function AdminCockpitPage() {
               <div className="border-t border-slate-200 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold font-mono text-slate-900 uppercase flex items-center gap-1.5">
                       <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Distribution Breakdown ({tournForm.prizes.length} Tiers)
                     </h4>
                     <p className="text-[11px] text-slate-500 font-mono">
@@ -2480,7 +2701,7 @@ export default function AdminCockpitPage() {
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-[#E56A10] font-bold">{pz.place}</span>
-                        <span className="text-white font-semibold">{pz.prize}</span>
+                        <span className="text-slate-900 font-bold">{pz.prize}</span>
                       </div>
                       <button
                         type="button"
@@ -2503,14 +2724,14 @@ export default function AdminCockpitPage() {
                     value={tournForm.newPrizePlace}
                     onChange={(e) => setTournForm({ ...tournForm, newPrizePlace: e.target.value })}
                     placeholder="Place (e.g. 4th Place)"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <input
                     type="text"
                     value={tournForm.newPrizeAmount}
                     onChange={(e) => setTournForm({ ...tournForm, newPrizeAmount: e.target.value })}
                     placeholder="Prize (e.g. ₹2,000)"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <button
                     type="button"
@@ -2558,7 +2779,7 @@ export default function AdminCockpitPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-[#E56A10]" />
                 Add Dynamic Leaderboard Category
               </h3>
@@ -2572,7 +2793,7 @@ export default function AdminCockpitPage() {
 
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                   Category Name *
                 </label>
                 <input
@@ -2581,19 +2802,19 @@ export default function AdminCockpitPage() {
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                   placeholder="e.g. Valorant Top Fraggers, Apex Predator Winrate"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Game Filter *
                   </label>
                   <select
                     value={categoryForm.game_slug}
                     onChange={(e) => setCategoryForm({ ...categoryForm, game_slug: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="all">All Games</option>
                     {games.map((g) => (
@@ -2605,13 +2826,13 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Sorting Metric *
                   </label>
                   <select
                     value={categoryForm.sort_metric}
                     onChange={(e) => setCategoryForm({ ...categoryForm, sort_metric: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="rating">Skill Rating (MMR / ELO)</option>
                     <option value="win_rate">Win Rate Percentage (%)</option>
@@ -2623,7 +2844,7 @@ export default function AdminCockpitPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                   Minimum Matches Required to Qualify
                 </label>
                 <input
@@ -2632,12 +2853,12 @@ export default function AdminCockpitPage() {
                   max={100}
                   value={categoryForm.min_matches}
                   onChange={(e) => setCategoryForm({ ...categoryForm, min_matches: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                   Description
                 </label>
                 <textarea
@@ -2645,7 +2866,7 @@ export default function AdminCockpitPage() {
                   value={categoryForm.description}
                   onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   placeholder="Official explanation of category ranking criteria..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
@@ -2704,25 +2925,25 @@ export default function AdminCockpitPage() {
                     {scoreOverrideMatch.team_a?.name || "Team A"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreA} onChange={(e) => setScoreA(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">
                     {scoreOverrideMatch.team_b?.name || "Team B"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreB} onChange={(e) => setScoreB(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Override Reason *</label>
                 <input type="text" required value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="e.g. Server crash — arbiter reconciled from replay"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 font-mono" />
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setScoreOverrideMatch(null)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingOverride}
                   className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingOverride ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5" />}
@@ -2753,7 +2974,7 @@ export default function AdminCockpitPage() {
               <div>
                 <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Rejection Reason *</label>
                 <select value={rejectProofReason} onChange={(e) => setRejectProofReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono">
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-medium focus:outline-none focus:border-rose-500 font-mono">
                   <option>Screenshot incomplete or unreadable</option>
                   <option>Score visible but timestamp missing</option>
                   <option>Wrong match — screenshot shows different game</option>
@@ -2767,7 +2988,7 @@ export default function AdminCockpitPage() {
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setRejectProofMatch(null)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingReject}
                   className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingReject ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
@@ -2778,6 +2999,167 @@ export default function AdminCockpitPage() {
           </div>
         </div>
       )}
+      {/* Approve Payout Modal */}
+      {approvingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white border border-emerald-600/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Authorize Payout Disbursal</h3>
+              </div>
+              <button onClick={() => setApprovingWithdrawal(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Player:</span>
+                <span className="text-slate-900 font-bold">@{approvingWithdrawal.user_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Amount:</span>
+                <span className="text-emerald-600 font-bold text-sm">₹{approvingWithdrawal.amount.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">UPI VPA:</span>
+                <span className="text-slate-900 font-bold">{approvingWithdrawal.upi_id}</span>
+              </div>
+              {approvingWithdrawal.account_holder_name && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Account Name:</span>
+                  <span className="text-slate-900">{approvingWithdrawal.account_holder_name}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleApprovePayout} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
+                  Payout Reference / UTR *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={payoutReference}
+                  onChange={(e) => setPayoutReference(e.target.value)}
+                  placeholder="e.g. UPI/2026/8912384"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
+                  Admin Audit Notes
+                </label>
+                <input
+                  type="text"
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] font-mono text-emerald-800">
+                Authorizing this payout records an irreversible financial transaction and notifies the player.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovingWithdrawal(null)}
+                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono uppercase font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingWithdrawal}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Confirm Disbursal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Withdrawal Modal */}
+      {rejectingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-white border border-rose-600/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 text-rose-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payout & Refund Balance</h3>
+              </div>
+              <button onClick={() => setRejectingWithdrawal(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Player:</span>
+                <span className="text-slate-900 font-bold">@{rejectingWithdrawal.user_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Refund Amount:</span>
+                <span className="text-rose-600 font-bold text-sm">₹{rejectingWithdrawal.amount.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Target VPA:</span>
+                <span className="text-slate-900 font-bold">{rejectingWithdrawal.upi_id}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleRejectPayout} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
+                  Rejection Reason *
+                </label>
+                <select
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-medium focus:outline-none focus:border-rose-500 font-mono"
+                >
+                  <option>UPI ID invalid or inactive with banking handle</option>
+                  <option>Beneficiary name mismatch with verified account</option>
+                  <option>Bank server declined UPI transaction request</option>
+                  <option>Duplicate withdrawal request detected</option>
+                  <option>User requested cancellation of withdrawal</option>
+                </select>
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-[11px] font-mono text-amber-900">
+                ₹{rejectingWithdrawal.amount.toLocaleString("en-IN")} will be instantly restored and credited back to @{rejectingWithdrawal.user_name}&apos;s wallet balance.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectingWithdrawal(null)}
+                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono uppercase font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingWithdrawal}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  Reject & Refund Balance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

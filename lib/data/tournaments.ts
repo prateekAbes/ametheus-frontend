@@ -19,9 +19,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
     registeredTeams: 18,
     maxTeams: 32,
     rankRequirement: "Rank: Gold to Diamond",
-    format: "5v5 Single Elimination Bracket • MR12",
-    bannerUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDnpKOX1Axwq8k1XMVIrK8LDFGqtVT3O8Yy2SOzfCuksxwUztVbMiyjPi59QyUmCCTAxT1auJ48qssyHeLP1X8MpX8I-OwuiRmmFBELtfK17maaI76gNHjdGBLNFIlx1h9lWVKOVmcnJB0Beoub95JhhBI05ORBOc7TUdI6zJ9EI02aERFwuIrbXsZXdL7NkFl8LYbJMl8h2l9CG8S0M9n9RdYZOgUp2Oh2iSLcJEbLTb3x7jx4sevH",
-    badgeColor: "bg-emerald-600 text-white",
+    bannerUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
     description: "Tier-3 Open Athletic Circuit // Mumbai AWS 128-tick Hosted Infrastructure // Zero-Substitute Protocol. Officially sanctioned grassroots tournament providing amateur and semi-professional rosters with tier-1 competitive scaffolding.",
     rules: [
       "Fixed 5-Player Rosters: Strictly zero substitutes permitted. All 5 participants must play all tournament matches.",
@@ -148,7 +146,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
     maxTeams: 32,
     rankRequirement: "Rank: Ascendant to Radiant",
     format: "5v5 Double Elimination (Upper/Lower) • Overtime Win-by-2",
-    bannerUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAMqeoWzypZXBOE408dH6-sGin25_u7-r3rWCFiaGYldik6x6-QTbOWhelg5NETwWHiD64-JcAtmcBbnuzejJVqUxs5SSKNRLPbPG7eIs4MjUnLNYf1X45laCHgVOIQqn_Xc9-XB9gokhk_Bk-zpsU9zX9Zq16CkXaP9lNseNfduwdFflVfr_l8ex2g0RrWXgnRS7N-Rj2vRUWm8YMlP44n-BPIY3KLvEgyYr95nkjcbWCPxqW8ZHxv",
+    bannerUrl: "https://images.unsplash.com/photo-1542751110-97427bbecf20?q=80&w=1200&auto=format&fit=crop",
     badgeColor: "bg-[#E56A10] text-white",
     description: "Tier-1 High-Stakes Championship for Ascendant and Radiant contenders across South Asia.",
     rules: [
@@ -190,7 +188,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
     maxTeams: 16,
     rankRequirement: "Rank: Unrated to Platinum",
     format: "5v5 Single Elimination • Fast Paced MR12",
-    bannerUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAhUxAQTQuZQya51e-q2KO5S3KtoQBa6dC-Q1peSNX2czmlic0W5z18APc4YfoMmyro_2rpS65GuluqqhpKWH2ltzYvX9QppfmAiwYQ3zN0vSLNuGWsSN2GGt-QhsPMHYGp8Lm4JHFZ7WaNtEIC1n8MyfjX14AuoLQripq9EztbTGgmYwnaKHV_vc6Jd9igRx4qcXglQTVr8UoTNpxRZedcDqSh10w1VzeePcOx0a8ze6VhOfAMY-Eb",
+    bannerUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
     badgeColor: "bg-[#F59E0B] text-slate-900 font-bold",
     description: "Fast-paced evening blitz cup designed for quick matches and instant ₹8,000 same-night payouts.",
     rules: [
@@ -230,7 +228,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
     maxTeams: 16,
     rankRequirement: "Rank: 10,000+ CS Rating",
     format: "5v5 Single Elimination MR12",
-    bannerUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDnpKOX1Axwq8k1XMVIrK8LDFGqtVT3O8Yy2SOzfCuksxwUztVbMiyjPi59QyUmCCTAxT1auJ48qssyHeLP1X8MpX8I-OwuiRmmFBELtfK17maaI76gNHjdGBLNFIlx1h9lWVKOVmcnJB0Beoub95JhhBI05ORBOc7TUdI6zJ9EI02aERFwuIrbXsZXdL7NkFl8LYbJMl8h2l9CG8S0M9n9RdYZOgUp2Oh2iSLcJEbLTb3x7jx4sevH",
+    bannerUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop",
     badgeColor: "bg-[#F59E0B] text-slate-900 font-bold",
     description: "Tactical CS2 5v5 competition with sub-tick precision and VAC Live anti-cheat screening.",
     rules: [
@@ -265,7 +263,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
     maxTeams: 32,
     rankRequirement: "Rank: Open Rating",
     format: "1v1 FIDE Blitz 3+2 Single Elimination",
-    bannerUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuAhUxAQTQuZQya51e-q2KO5S3KtoQBa6dC-Q1peSNX2czmlic0W5z18APc4YfoMmyro_2rpS65GuluqqhpKWH2ltzYvX9QppfmAiwYQ3zN0vSLNuGWsSN2GGt-QhsPMHYGp8Lm4JHFZ7WaNtEIC1n8MyfjX14AuoLQripq9EztbTGgmYwnaKHV_vc6Jd9igRx4qcXglQTVr8UoTNpxRZedcDqSh10w1VzeePcOx0a8ze6VhOfAMY-Eb",
+    bannerUrl: "https://images.unsplash.com/photo-1529699211952-734e80c4d42b?q=80&w=1200&auto=format&fit=crop",
     badgeColor: "bg-emerald-600 text-white font-bold",
     description: "Pure intellectual strategy. 1v1 FIDE Blitz 3 minutes + 2 seconds increment with Stockfish AI fair play engine.",
     rules: [

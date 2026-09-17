@@ -91,9 +91,9 @@ export interface Tournament {
   registeredTeams: number;
   maxTeams: number;
   rankRequirement: string;
-  format: string;
+  format?: string;
   bannerUrl: string;
-  badgeColor: string;
+  badgeColor?: string;
   description: string;
   rules: string[];
   schedule: Array<{ stage: string; time: string; details: string }>;

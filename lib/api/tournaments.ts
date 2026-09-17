@@ -91,7 +91,7 @@ export function normalizeTournament(t: any): NormalizedTournament {
     maxTeams: t.max_teams !== undefined ? Number(t.max_teams) : (t.maxTeams ?? 16),
     rankRequirement: t.rank_requirement || t.rankRequirement || "Open to All Ranks",
     format: t.format || "Single Elimination Bracket",
-    bannerUrl: t.banner_url || t.bannerUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuD-g0bK72p2tQe7b3Z3F5WzX8oV0h4vM1bX2m9x_banner",
+    bannerUrl: t.banner_url || t.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
     badgeColor: t.badge_color || t.badgeColor || "#E56A10",
     description: t.description || "Official Sanctioned Tournament",
     rules: t.rules || [],

@@ -42,23 +42,58 @@ export default function TournamentDetailPage({ params }: Props) {
   const [tournament, setTournament] = useState<NormalizedTournament | null>(() =>
     staticMatch ? normalizeTournament(staticMatch) : null
   );
+  const [isLoading, setIsLoading] = useState(!staticMatch);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     getTournamentBySlug(resolvedParams.slug)
       .then((data) => {
-        if (data) {
-          setTournament(normalizeTournament(data));
+        if (isMounted) {
+          if (data) {
+            setTournament(normalizeTournament(data));
+          }
+          setIsLoading(false);
+          setHasFetched(true);
         }
       })
       .catch(() => {
-        // Retain static fallback
+        if (isMounted) {
+          setIsLoading(false);
+          setHasFetched(true);
+        }
       });
+    return () => {
+      isMounted = false;
+    };
   }, [resolvedParams.slug]);
 
   const activeTourn = tournament || (staticMatch ? normalizeTournament(staticMatch) : null);
 
-  if (!activeTourn) {
+  if (isLoading && !activeTourn) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FF] flex flex-col items-center justify-center p-6 text-slate-800">
+        <div className="w-10 h-10 border-4 border-[#E56A10] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 font-bold">
+          Loading Tournament Arena Hub...
+        </p>
+      </div>
+    );
+  }
+
+  if (hasFetched && !activeTourn) {
     notFound();
+  }
+
+  if (!activeTourn) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FF] flex flex-col items-center justify-center p-6 text-slate-800">
+        <div className="w-10 h-10 border-4 border-[#E56A10] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 font-bold">
+          Loading Tournament Arena Hub...
+        </p>
+      </div>
+    );
   }
 
   // Narrowed non-null reference
@@ -111,7 +146,27 @@ export default function TournamentDetailPage({ params }: Props) {
   };
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full bg-[#F8F9FF]">
+      {/* Tournament Banner Hero Header */}
+      <div className="relative w-full h-52 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
+        <Image
+          src={currentTournament.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
+          alt={currentTournament.title}
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <div className="absolute bottom-4 left-4 md:left-8 flex flex-wrap items-center gap-2">
+          <span className="px-3 py-1 bg-black/80 backdrop-blur-md text-white border border-white/20 font-mono text-xs rounded font-bold uppercase">
+            {currentTournament.gameName}
+          </span>
+          <span className="px-3 py-1 bg-[#E56A10] text-white font-mono text-xs rounded font-bold uppercase shadow-sm">
+            {currentTournament.prizePool} PRIZE POOL
+          </span>
+        </div>
+      </div>
+
       {/* 1. Hero Summary (Stitch Screen 4 Spec) */}
       <section className="relative w-full overflow-hidden bg-white border-b border-[#E2E8F0] py-8">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8">

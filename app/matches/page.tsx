@@ -39,7 +39,7 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
       id: m.team_a?.tag || "t-a",
       name: m.team_a?.name || "TBD (Slot 1)",
       tag: m.team_a?.tag || "TBD",
-      logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDdPWn2ez9ufUiy3oobQMiyzKWPPQYVyngmyTfKqJMWwfmrnUALrqljOu3fdZn-93iR00dO8abRLetxpR3H_YY3Lw0kKtOiie2zXvcvZIFoaGNsiSwx85D3D6OxG0gHpFRiib2Ya4XvFEph7nC919c8zczdq9v32ddvS6lpbCcpe-vwqwPx1OMgEU1xRwlEmm5SIE6Rj7g-L0YKOPoAoiiNPDGGv944Lu6ZDoOPAhH3_SduIY6JiOlN",
+      logoUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200&auto=format&fit=crop",
       score: m.team_a?.score ?? undefined,
       isCheckedIn: true,
       roster: [
@@ -50,7 +50,7 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
       id: m.team_b?.tag || "t-b",
       name: m.team_b?.name || "TBD (Slot 2)",
       tag: m.team_b?.tag || "TBD",
-      logoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDMYikVhkT2cPuCcT6iHyvC8KRrGxi2uWjy_Yg4PRywCpZ0Qk_XuBVy-SRnVARKIhqdj-kgUgfYlRjv_KTabBT194pEvMHjgNWeddHSPbu6P_N7NZD2B8VX7etUUzxmFCcI_NOLjS7LndnhoB8Te6UWYv5FexbsBx1329LlvMT7RFsiQ8_LX9hHuWmyhH0syOHCVlI_t-LXya3oFvZnd1NPJyQz_IZjYv6PmnX97rPssU0Rf0xwleEz",
+      logoUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=200&auto=format&fit=crop",
       score: m.team_b?.score ?? undefined,
       isCheckedIn: true,
       roster: [

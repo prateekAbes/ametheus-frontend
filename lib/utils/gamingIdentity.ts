@@ -28,7 +28,7 @@ export const GAMING_AVATAR_PRESETS = [
   {
     id: "stitch-pro-vortex",
     name: "Pro Vortex Cyber",
-    url: "https://lh3.googleusercontent.com/aida-public/AB6AXuBEv4HdE7D1hZyIO3Pw9MguyRXklfNxcLqDwdaiFF6IiM7FAQ0Lm4SuZXcoeIDb0uWgjNTCaD8wb6eOYiB_AuEmZcyXvoMEki7WEGpki8vajX0cGlvo9JBRyWQZKUkraF7ZGtqDCU2BTSGvNw4ed68HohKm9sUYMZqdas96PkOzWvWqBvWE_OPtuQKcY07sOzsOlvkMVtdsPgUEcDtbyicbmc9oCY_HSQqsxuiWvqTbMeLx0BZHN0Ok",
+    url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=300&auto=format&fit=crop",
   },
   {
     id: "stitch-smash-neon",
