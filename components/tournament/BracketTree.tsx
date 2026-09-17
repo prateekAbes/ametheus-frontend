@@ -1,13 +1,14 @@
 "use client";
 
-import { BracketRound } from "@/types";
+import { BracketRound, BracketMatch } from "@/types";
 import { Trophy, Flame, Clock, CheckCircle } from "lucide-react";
 
 interface Props {
   rounds: BracketRound[];
+  onSelectMatch?: (match: BracketMatch) => void;
 }
 
-export default function BracketTree({ rounds }: Props) {
+export default function BracketTree({ rounds, onSelectMatch }: Props) {
   if (!rounds || rounds.length === 0) {
     return (
       <div className="p-12 text-center bg-[#F8F9FA] rounded-xl border border-dashed border-[#CBD5E1] text-[#64748B] text-xs">
@@ -38,10 +39,11 @@ export default function BracketTree({ rounds }: Props) {
                 return (
                   <div
                     key={match.id}
-                    className={`bg-white rounded-lg border shadow-xs transition-all overflow-hidden ${
+                    onClick={() => onSelectMatch?.(match)}
+                    className={`bg-white rounded-lg border shadow-xs transition-all overflow-hidden cursor-pointer group hover:shadow-md ${
                       isLive
                         ? "border-[#E56A10] ring-1 ring-[#E56A10]"
-                        : "border-[#E2E8F0] hover:border-[#CBD5E1]"
+                        : "border-[#E2E8F0] hover:border-[#E56A10]"
                     }`}
                   >
                     {/* Status header */}
@@ -75,9 +77,12 @@ export default function BracketTree({ rounds }: Props) {
                             #{match.teamA.seed}
                           </span>
                         )}
-                        <span className="text-xs text-[#0F172A] truncate max-w-[140px]">
+                        <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
                           {match.teamA.name}
                         </span>
+                        {match.teamA.isWinner && (
+                          <Trophy className="w-3 h-3 text-amber-500 shrink-0 inline" />
+                        )}
                       </div>
                       <span
                         className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
@@ -106,9 +111,12 @@ export default function BracketTree({ rounds }: Props) {
                             #{match.teamB.seed}
                           </span>
                         )}
-                        <span className="text-xs text-[#0F172A] truncate max-w-[140px]">
+                        <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
                           {match.teamB.name}
                         </span>
+                        {match.teamB.isWinner && (
+                          <Trophy className="w-3 h-3 text-amber-500 shrink-0 inline" />
+                        )}
                       </div>
                       <span
                         className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
@@ -119,6 +127,12 @@ export default function BracketTree({ rounds }: Props) {
                       >
                         {match.teamB.score ?? "-"}
                       </span>
+                    </div>
+
+                    {/* Quick Access Footer */}
+                    <div className="px-3 py-1 bg-[#F8F9FA] border-t border-[#F1F3F5] flex items-center justify-between text-[9px] font-mono text-[#64748B] group-hover:text-[#E56A10] transition-colors">
+                      <span>Click to view lobby</span>
+                      <span className="font-bold">→</span>
                     </div>
                   </div>
                 );

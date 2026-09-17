@@ -10,6 +10,9 @@ import { useTeamStore } from "@/lib/store/team-store";
 import BracketTree from "@/components/tournament/BracketTree";
 import RegisterTournamentModal from "@/components/tournament/RegisterTournamentModal";
 import JoinTeamModal from "@/components/team/JoinTeamModal";
+import MatchLobbyModal from "@/components/match/MatchLobbyModal";
+import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
+import { MatchLobbyInfo, BracketMatch } from "@/types";
 import {
   Shield,
   Trophy,
@@ -68,6 +71,44 @@ export default function TournamentDetailPage({ params }: Props) {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [selectedBracketMatch, setSelectedBracketMatch] = useState<MatchLobbyInfo | null>(null);
+  const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<MatchLobbyInfo | null>(null);
+
+  const handleSelectBracketMatch = (bm: BracketMatch) => {
+    const lobbyInfo: MatchLobbyInfo = {
+      id: bm.id,
+      tournamentId: currentTournament.id,
+      tournamentTitle: currentTournament.title,
+      gameSlug: currentTournament.gameSlug,
+      gameName: currentTournament.gameName,
+      stage: `Round ${bm.round} — Match #${bm.matchNumber}`,
+      format: currentTournament.format,
+      scheduledTime: bm.scheduledTime || "Scheduled Bracket Match",
+      status: (bm.status as any) || "CHECK_IN_OPEN",
+      serverRegion: currentTournament.serverRegion,
+      lobbyCode: `AMT-${bm.id.slice(0, 8).toUpperCase()}`,
+      lobbyPassword: "ESCROW_VANGUARD_99",
+      teamA: {
+        id: bm.teamA.tag || "t-a",
+        name: bm.teamA.name || "TBD (Slot 1)",
+        tag: bm.teamA.tag || "TBD",
+        logoUrl: "",
+        score: bm.teamA.score,
+        isCheckedIn: true,
+        roster: [{ username: `${bm.teamA.tag || "Player"}_1`, gameId: `${bm.teamA.tag || "P"}#1` }],
+      },
+      teamB: {
+        id: bm.teamB.tag || "t-b",
+        name: bm.teamB.name || "TBD (Slot 2)",
+        tag: bm.teamB.tag || "TBD",
+        logoUrl: "",
+        score: bm.teamB.score,
+        isCheckedIn: true,
+        roster: [{ username: `${bm.teamB.tag || "Player"}_1`, gameId: `${bm.teamB.tag || "P"}#1` }],
+      },
+    };
+    setSelectedBracketMatch(lobbyInfo);
+  };
 
   return (
     <div className="flex flex-col w-full">
@@ -376,7 +417,10 @@ export default function TournamentDetailPage({ params }: Props) {
               </span>
             </div>
 
-            <BracketTree rounds={currentTournament.bracketRounds} />
+            <BracketTree
+              rounds={currentTournament.bracketRounds}
+              onSelectMatch={handleSelectBracketMatch}
+            />
           </div>
         )}
 
@@ -450,6 +494,27 @@ export default function TournamentDetailPage({ params }: Props) {
         gameName={currentTournament.gameName}
         findTeamByCode={findTeamByCode}
         onTeamJoined={() => {}}
+      />
+
+      {/* Match Lobby Modal */}
+      <MatchLobbyModal
+        match={selectedBracketMatch}
+        isOpen={!!selectedBracketMatch}
+        onClose={() => setSelectedBracketMatch(null)}
+        onSubmitEvidence={(match) => {
+          setSelectedBracketMatch(null);
+          setActiveEvidenceMatch(match);
+        }}
+      />
+
+      {/* Evidence Submission Modal */}
+      <EvidenceSubmissionModal
+        match={activeEvidenceMatch}
+        isOpen={!!activeEvidenceMatch}
+        onClose={() => setActiveEvidenceMatch(null)}
+        onSuccess={() => {
+          setActiveEvidenceMatch(null);
+        }}
       />
     </div>
   );
