@@ -26,6 +26,11 @@ import {
   Scale,
   LogOut,
   Sparkles,
+  Gamepad2,
+  Plus,
+  Trash2,
+  Edit3,
+  Server,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -45,12 +50,20 @@ import {
 } from "@/lib/api/admin";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 import { getMatches, Match } from "@/lib/api/matches";
+import {
+  getGames,
+  createGame,
+  updateGame,
+  deleteGame,
+  Game,
+  GameCreatePayload,
+} from "@/lib/api/games";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "queue" | "disputes" | "users" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "queue" | "disputes" | "games" | "users" | "audit">("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
@@ -60,6 +73,29 @@ export default function AdminCockpitPage() {
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [inspectingEvidence, setInspectingEvidence] = useState<string | null>(null);
+
+  // Games CRUD State
+  const [games, setGames] = useState<Game[]>([]);
+  const [isGameModalOpen, setIsGameModalOpen] = useState(false);
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [isSubmittingGame, setIsSubmittingGame] = useState(false);
+  const [gameForm, setGameForm] = useState<GameCreatePayload>({
+    slug: "",
+    name: "",
+    category: "pc",
+    platform: "PC",
+    tag: "FPS",
+    is_team_game: true,
+    min_team_size: 1,
+    max_team_size: 5,
+    banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
+    logo_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop",
+    description: "",
+    server_region: "AWS Mumbai (ap-south-1)",
+    anti_cheat: "Hardware Vanguard TPM 2.0",
+    match_protocol: "Competitive Match",
+    accent_color: "#E56A10",
+  });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -72,13 +108,14 @@ export default function AdminCockpitPage() {
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes] = await Promise.allSettled([
+      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes] = await Promise.allSettled([
         getCurrentUserProfile(),
         getAuditLogs(),
         getAdminUsers(),
         getAdminStats(),
         getMatches(),
         getDisputes(),
+        getGames(),
       ]);
 
       if (profileRes.status === "fulfilled") {
@@ -108,6 +145,9 @@ export default function AdminCockpitPage() {
       }
       if (disputesRes.status === "fulfilled" && Array.isArray(disputesRes.value)) {
         setDisputes(disputesRes.value);
+      }
+      if (gamesRes.status === "fulfilled" && Array.isArray(gamesRes.value)) {
+        setGames(gamesRes.value);
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -194,6 +234,110 @@ export default function AdminCockpitPage() {
     }
   };
 
+  // Game CRUD Handlers
+  const handleOpenCreateGame = () => {
+    setEditingGame(null);
+    setGameForm({
+      slug: "",
+      name: "",
+      category: "pc",
+      platform: "PC",
+      tag: "FPS",
+      is_team_game: true,
+      min_team_size: 1,
+      max_team_size: 5,
+      banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
+      logo_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop",
+      description: "",
+      server_region: "AWS Mumbai (ap-south-1)",
+      anti_cheat: "Hardware Vanguard TPM 2.0",
+      match_protocol: "Competitive Match",
+      accent_color: "#E56A10",
+    });
+    setIsGameModalOpen(true);
+  };
+
+  const handleOpenEditGame = (game: Game) => {
+    setEditingGame(game);
+    setGameForm({
+      slug: game.slug,
+      name: game.name,
+      category: game.category || "pc",
+      platform: game.platform,
+      tag: game.tag,
+      is_team_game: game.is_team_game,
+      min_team_size: game.min_team_size,
+      max_team_size: game.max_team_size,
+      banner_url: game.banner_url,
+      logo_url: game.logo_url,
+      description: game.description || "",
+      server_region: game.server_region || "AWS Mumbai (ap-south-1)",
+      anti_cheat: game.anti_cheat || "Standard Protocol",
+      match_protocol: game.match_protocol || "Competitive Match",
+      accent_color: game.accent_color || "#E56A10",
+    });
+    setIsGameModalOpen(true);
+  };
+
+  const handleSaveGame = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingGame(true);
+    try {
+      if (editingGame) {
+        await updateGame(editingGame.id, {
+          name: gameForm.name,
+          category: gameForm.category,
+          platform: gameForm.platform,
+          tag: gameForm.tag,
+          is_team_game: gameForm.is_team_game,
+          min_team_size: Number(gameForm.min_team_size),
+          max_team_size: Number(gameForm.max_team_size),
+          banner_url: gameForm.banner_url,
+          logo_url: gameForm.logo_url,
+          description: gameForm.description,
+          server_region: gameForm.server_region,
+          anti_cheat: gameForm.anti_cheat,
+          match_protocol: gameForm.match_protocol,
+          accent_color: gameForm.accent_color,
+        });
+        setActionMessage(`Game "${gameForm.name}" updated successfully!`);
+      } else {
+        const slug = gameForm.slug.trim() || gameForm.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        await createGame({
+          ...gameForm,
+          slug,
+          min_team_size: Number(gameForm.min_team_size),
+          max_team_size: Number(gameForm.max_team_size),
+        });
+        setActionMessage(`Game "${gameForm.name}" registered into catalog!`);
+      }
+      setIsGameModalOpen(false);
+      setEditingGame(null);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to save game");
+      setTimeout(() => setActionMessage(""), 5000);
+    } finally {
+      setIsSubmittingGame(false);
+    }
+  };
+
+  const handleDeleteGame = async (gameId: string, gameName: string) => {
+    if (!confirm(`Are you sure you want to delete game "${gameName}" from the platform catalog? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteGame(gameId);
+      setActionMessage(`Game "${gameName}" successfully removed from catalog.`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || `Failed to delete game "${gameName}".`);
+      setTimeout(() => setActionMessage(""), 6000);
+    }
+  };
+
   // 1. Initial Authentication Loading State
   if (!isAuthLoaded || (isLoading && !currentUser)) {
     return (
@@ -249,8 +393,12 @@ export default function AdminCockpitPage() {
     );
   }
 
-  // 3. Authenticated but unauthorized (PLAYER role)
-  if (currentUser && currentUser.role === "PLAYER") {
+  const userEmail = (clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || "").toLowerCase();
+  const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
+  const isSuperAdmin = isHardcodedAdmin || currentUser?.role === "SUPER_ADMIN" || currentRole === "SUPER_ADMIN";
+
+  // 3. Authenticated but unauthorized (PLAYER role without hardcoded override)
+  if (!isHardcodedAdmin && currentUser && currentUser.role === "PLAYER") {
     return (
       <div className="max-w-2xl mx-auto my-16 p-8 bg-[#10141F] border border-rose-600/50 rounded-lg text-center space-y-6 shadow-2xl">
         <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/40 flex items-center justify-center mx-auto text-rose-500">
@@ -294,7 +442,6 @@ export default function AdminCockpitPage() {
   }
 
   // 4. Authorized Admin Cockpit
-  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
 
   return (
     <div className="flex flex-col w-full bg-[#0B0E16] min-h-screen text-[#F8FAFC]">
@@ -393,6 +540,16 @@ export default function AdminCockpitPage() {
           </button>
           {isSuperAdmin && (
             <>
+              <button
+                onClick={() => setActiveTab("games")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "games"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <Gamepad2 className="w-3.5 h-3.5" /> Games Catalog ({games.length})
+              </button>
               <button
                 onClick={() => setActiveTab("users")}
                 className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -778,7 +935,135 @@ export default function AdminCockpitPage() {
           </div>
         )}
 
-        {/* TAB 4: USER & RBAC MANAGEMENT */}
+        {/* TAB 4: GAMES CATALOG & CRUD */}
+        {activeTab === "games" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+              <div>
+                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-[#E56A10]" /> Sanctioned Esports Games Catalog
+                </h3>
+                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                  Register, configure, and manage authorized competitive titles, team configurations, and server rules.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreateGame}
+                className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Add New Game
+              </button>
+            </div>
+
+            {/* Games Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {games.map((game) => (
+                <div
+                  key={game.id}
+                  className="bg-[#10141F] border border-[#242C3D] rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                >
+                  {/* Banner & Logo */}
+                  <div>
+                    <div className="h-32 w-full relative bg-[#0B0E16] overflow-hidden">
+                      <img
+                        src={game.banner_url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
+                        alt={game.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#10141F] via-transparent to-transparent" />
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-[#0B0E16]/80 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                          {game.platform}
+                        </span>
+                        <span className="px-2 py-0.5 bg-[#0B0E16]/80 backdrop-blur-xs text-white border border-[#242C3D] text-[10px] font-mono font-bold uppercase rounded">
+                          {game.tag}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-2 left-4 flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-[#0B0E16] border-2 border-[#242C3D] overflow-hidden p-1 shadow-md shrink-0">
+                          <img
+                            src={game.logo_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300"}
+                            alt={game.name}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-headline font-bold text-base text-white">
+                            {game.name}
+                          </h4>
+                          <span className="text-[11px] font-mono text-[#94A3B8]">
+                            /{game.slug}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Metadata Specs */}
+                    <div className="p-4 space-y-3">
+                      <p className="text-xs text-[#94A3B8] line-clamp-2 leading-relaxed">
+                        {game.description || "Official sanctioned tournament title on AMETHEUS platform."}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-[#242C3D]">
+                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D]">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Roster Format</span>
+                          <span className="text-white font-bold">
+                            {game.is_team_game
+                              ? `${game.min_team_size}-${game.max_team_size} Athletes`
+                              : "1v1 Solo"}
+                          </span>
+                        </div>
+                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D]">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Tournaments</span>
+                          <span className="text-[#E56A10] font-bold">
+                            {game.active_tournaments_count || 0} Active
+                          </span>
+                        </div>
+                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D] col-span-2">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Server / Anti-Cheat</span>
+                          <span className="text-[#CBD5E1] truncate block">
+                            {game.server_region || "AWS Mumbai"} • {game.anti_cheat || "Standard"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions (Edit & Delete) */}
+                  <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t border-[#242C3D]/60 mt-2">
+                    <button
+                      onClick={() => handleOpenEditGame(game)}
+                      className="flex-1 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Game
+                    </button>
+                    <button
+                      onClick={() => handleDeleteGame(game.id, game.name)}
+                      className="p-2 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 rounded text-xs transition-colors cursor-pointer"
+                      title="Delete Game Title"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {games.length === 0 && (
+                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                  <Gamepad2 className="w-12 h-12 text-[#64748B] mx-auto" />
+                  <div className="space-y-1">
+                    <h4 className="font-headline font-bold text-white text-lg">No Games in Catalog</h4>
+                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                      Click &quot;Add New Game&quot; above or use the &quot;Seed Platform&quot; tool to populate standard competitive titles.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: USER & RBAC MANAGEMENT */}
         {activeTab === "users" && isSuperAdmin && (
           <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
             <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
@@ -955,6 +1240,216 @@ export default function AdminCockpitPage() {
                 Close Inspector
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Game Modal */}
+      {isGameModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-2xl p-6 space-y-5 my-8 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+                <Gamepad2 className="w-5 h-5 text-[#E56A10]" />
+                {editingGame ? `Edit Game: ${editingGame.name}` : "Register New Game Title"}
+              </h3>
+              <button
+                onClick={() => setIsGameModalOpen(false)}
+                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGame} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Game Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={gameForm.name}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      if (!editingGame) {
+                        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+                        setGameForm({ ...gameForm, name, slug });
+                      } else {
+                        setGameForm({ ...gameForm, name });
+                      }
+                    }}
+                    placeholder="e.g. Apex Legends"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    URL Slug *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={Boolean(editingGame)}
+                    value={gameForm.slug}
+                    onChange={(e) => setGameForm({ ...gameForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                    placeholder="e.g. apex-legends"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Platform *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={gameForm.platform}
+                    onChange={(e) => setGameForm({ ...gameForm, platform: e.target.value })}
+                    placeholder="e.g. PC, Mobile, Crossplay"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Tag / Genre *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={gameForm.tag}
+                    onChange={(e) => setGameForm({ ...gameForm, tag: e.target.value })}
+                    placeholder="e.g. BATTLE ROYALE, FPS, MOBA"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Min Team Size
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={gameForm.min_team_size}
+                    onChange={(e) => setGameForm({ ...gameForm, min_team_size: parseInt(e.target.value) || 1 })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Max Team Size
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={gameForm.max_team_size}
+                    onChange={(e) => setGameForm({ ...gameForm, max_team_size: parseInt(e.target.value) || 5 })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Server Region
+                  </label>
+                  <input
+                    type="text"
+                    value={gameForm.server_region}
+                    onChange={(e) => setGameForm({ ...gameForm, server_region: e.target.value })}
+                    placeholder="e.g. AWS Mumbai (ap-south-1)"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Anti-Cheat Protocol
+                  </label>
+                  <input
+                    type="text"
+                    value={gameForm.anti_cheat}
+                    onChange={(e) => setGameForm({ ...gameForm, anti_cheat: e.target.value })}
+                    placeholder="e.g. Hardware Vanguard TPM 2.0"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Banner URL *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={gameForm.banner_url}
+                    onChange={(e) => setGameForm({ ...gameForm, banner_url: e.target.value })}
+                    placeholder="https://images.unsplash.com/..."
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Logo / Icon URL *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={gameForm.logo_url}
+                    onChange={(e) => setGameForm({ ...gameForm, logo_url: e.target.value })}
+                    placeholder="https://images.unsplash.com/..."
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={gameForm.description}
+                    onChange={(e) => setGameForm({ ...gameForm, description: e.target.value })}
+                    placeholder="Brief description of competitive format and gameplay..."
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setIsGameModalOpen(false)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingGame}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingGame ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : editingGame ? (
+                    "Save Changes"
+                  ) : (
+                    "Create Game Title"
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

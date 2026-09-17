@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createEscrowOrder, verifyEscrowPayment } from "@/lib/api/payments";
 import { Tournament, Team } from "@/types";
-import { X, Shield, Check, AlertCircle, CreditCard, Lock } from "lucide-react";
+import { X, Shield, Check, AlertCircle, CreditCard, Lock, Sparkles, Loader2 } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -61,6 +61,31 @@ export default function RegisterTournamentModal({
         .finally(() => setIsProcessing(false));
     } else {
       setStep("CHECKOUT");
+    }
+  };
+
+  const handleSandboxPayment = async (simulateFailure = false) => {
+    if (!selectedTeam) return;
+    setIsProcessing(true);
+    setError("");
+
+    try {
+      if (simulateFailure) {
+        throw new Error("Sandbox payment simulated failure: Card declined / Insufficient test funds.");
+      }
+
+      const order = await createEscrowOrder(tournament.id, selectedTeam.id);
+      await verifyEscrowPayment({
+        razorpay_order_id: order.order_id || `order_${Date.now()}`,
+        razorpay_payment_id: `pay_sandbox_${Date.now()}`,
+        razorpay_signature: "mock_signature_verified",
+      });
+      setStep("SUCCESS");
+      onRegistrationSuccess();
+    } catch (err: any) {
+      setError(err.message || "Sandbox payment failed");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -123,14 +148,8 @@ export default function RegisterTournamentModal({
         });
         rzp.open();
       } else {
-        // Sandbox Escrow Flow
-        await verifyEscrowPayment({
-          razorpay_order_id: order.order_id || `order_${Date.now()}`,
-          razorpay_payment_id: `pay_mock_${Date.now()}`,
-          razorpay_signature: "mock_signature_verified",
-        });
-        setStep("SUCCESS");
-        onRegistrationSuccess();
+        // Fallback directly to sandbox verified payment
+        await handleSandboxPayment(false);
       }
     } catch (err: any) {
       setError(err.message || "Registration payment failed");
@@ -293,22 +312,58 @@ export default function RegisterTournamentModal({
               </div>
             </div>
 
-            {/* Escrow Payment Gateway Box */}
-            <div className="bg-[#0B0E16] border border-[#242C3D] rounded-lg p-4 flex flex-col items-center text-center gap-3">
+            {/* Sandbox Test System Box */}
+            <div className="bg-[#0B0E16] border border-amber-500/30 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400 uppercase">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Sandbox Escrow Simulation
+                </div>
+                <span className="px-1.5 py-0.5 bg-amber-950/60 text-amber-300 text-[10px] font-mono border border-amber-500/30 rounded font-bold">
+                  TEST MODE ACTIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                Test the end-to-end tournament registration and escrow ledger verification without entering real UPI/card details.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handleSandboxPayment(false)}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{isProcessing ? "Processing..." : "⚡ Instant Test Payment"}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handleSandboxPayment(true)}
+                  className="w-full py-2.5 bg-[#161A24] hover:bg-rose-950/40 text-rose-300 border border-rose-800/40 font-mono text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Simulate Failure</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Escrow Gateway Footer */}
+            <div className="bg-[#0B0E16] border border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-2">
               <div className="flex items-center gap-2 text-xs text-[#CBD5E1] font-mono">
                 <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
                 Razorpay Platform Escrow • UPI / NetBanking / Cards
               </div>
-              <p className="text-[11px] text-[#94A3B8]">
+              <p className="text-[10px] text-[#94A3B8]">
                 Funds are held in cryptographic SHA-256 escrow until tournament completion and match verification.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setStep("SELECT_TEAM")}
-                className="px-4 py-2 bg-transparent text-[#94A3B8] hover:text-white text-xs font-bold uppercase tracking-wider rounded"
+                className="px-4 py-2 bg-transparent text-[#94A3B8] hover:text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
               >
                 Back
               </button>
@@ -316,10 +371,10 @@ export default function RegisterTournamentModal({
                 type="button"
                 disabled={isProcessing}
                 onClick={handleRazorpayCheckout}
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
               >
                 <CreditCard className="w-4 h-4" />
-                <span>{isProcessing ? "Verifying Payment..." : `Pay ${tournament.entryFee}`}</span>
+                <span>{isProcessing ? "Verifying..." : `Launch Razorpay Gateway`}</span>
               </button>
             </div>
           </div>

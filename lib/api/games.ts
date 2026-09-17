@@ -73,3 +73,59 @@ export async function getGames(): Promise<Game[]> {
 export async function getGameBySlug(slug: string): Promise<Game> {
   return apiClient<Game>(`/games/${slug}`);
 }
+
+export interface GameCreatePayload {
+  slug: string;
+  name: string;
+  category?: string;
+  platform: string;
+  tag: string;
+  is_team_game?: boolean;
+  min_team_size?: number;
+  max_team_size?: number;
+  banner_url: string;
+  logo_url: string;
+  description?: string;
+  server_region?: string;
+  anti_cheat?: string;
+  match_protocol?: string;
+  accent_color?: string;
+}
+
+export interface GameUpdatePayload {
+  name?: string;
+  category?: string;
+  platform?: string;
+  tag?: string;
+  is_team_game?: boolean;
+  min_team_size?: number;
+  max_team_size?: number;
+  banner_url?: string;
+  logo_url?: string;
+  description?: string;
+  server_region?: string;
+  anti_cheat?: string;
+  match_protocol?: string;
+  accent_color?: string;
+}
+
+export async function createGame(payload: GameCreatePayload): Promise<Game> {
+  return apiClient<Game>("/games", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateGame(id: string, payload: GameUpdatePayload): Promise<Game> {
+  return apiClient<Game>(`/games/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteGame(id: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/games/${id}`, {
+    method: "DELETE",
+  });
+}
+

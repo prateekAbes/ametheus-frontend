@@ -76,9 +76,11 @@ export default function Header() {
     }
   };
 
-  const role = userProfile?.role || "PLAYER";
-  const isSuperAdmin = role === "SUPER_ADMIN";
-  const isOrganizer = role === "ORGANIZER" || isSuperAdmin;
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
+  const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
+  const role = isHardcodedAdmin ? "SUPER_ADMIN" : (userProfile?.role || "PLAYER");
+  const isSuperAdmin = isHardcodedAdmin || role === "SUPER_ADMIN";
+  const isOrganizer = isHardcodedAdmin || role === "ORGANIZER" || isSuperAdmin;
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
@@ -148,37 +150,37 @@ export default function Header() {
               </Link>
             </Show>
 
-            {/* Operations & Admin Badges */}
-            <div className="flex items-center gap-1 pl-2 border-l border-[#242C3D]/80">
-              <Link
-                href="/organizer"
-                className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
-                  isActive("/organizer")
-                    ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
-                    : isOrganizer
-                    ? "text-[#E56A10] hover:bg-[#161A24] font-semibold"
-                    : "text-[#94A3B8] hover:text-[#CBD5E1] hover:bg-[#161A24]"
-                }`}
-                title="Organizer Tournament Creator & Lifecycle Manager"
-              >
-                Organizer
-              </Link>
+            {/* Operations & Admin Badges - Strictly restricted to authorized users */}
+            {(isOrganizer || isSuperAdmin) && (
+              <div className="flex items-center gap-1 pl-2 border-l border-[#242C3D]/80">
+                <Link
+                  href="/organizer"
+                  className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    isActive("/organizer")
+                      ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
+                      : "text-[#E56A10] hover:bg-[#161A24] font-semibold"
+                  }`}
+                  title="Organizer Tournament Creator & Lifecycle Manager"
+                >
+                  Organizer
+                </Link>
 
-              <Link
-                href="/admin"
-                className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
-                  isActive("/admin")
-                    ? "bg-[#E56A10] text-white font-bold shadow-xs"
-                    : isSuperAdmin
-                    ? "bg-[#E56A10]/15 text-[#FFB68F] border border-[#E56A10]/40 font-bold hover:bg-[#E56A10]/25"
-                    : "text-[#94A3B8] hover:text-[#CBD5E1] hover:bg-[#161A24]"
-                }`}
-                title="Super Admin Cockpit & Match Arbitration"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Admin
-              </Link>
-            </div>
+                {isSuperAdmin && (
+                  <Link
+                    href="/admin"
+                    className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                      isActive("/admin")
+                        ? "bg-[#E56A10] text-white font-bold shadow-xs"
+                        : "bg-[#E56A10]/15 text-[#FFB68F] border border-[#E56A10]/40 font-bold hover:bg-[#E56A10]/25"
+                    }`}
+                    title="Super Admin Cockpit & Match Arbitration"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    Admin
+                  </Link>
+                )}
+              </div>
+            )}
           </nav>
 
           {/* Right Action Bar (Search, Notifications, Auth, Mobile Toggle) */}
@@ -332,43 +334,40 @@ export default function Header() {
                 </Show>
               </div>
 
-              {/* Operations & Administration */}
-              <div className="space-y-1 pt-3 border-t border-[#242C3D]">
-                <div className="text-[10px] font-mono uppercase text-[#64748B] px-3 py-1 font-bold">
-                  Operations &amp; Admin
+              {/* Operations & Administration - Only visible if authorized */}
+              {(isOrganizer || isSuperAdmin) && (
+                <div className="space-y-1 pt-3 border-t border-[#242C3D]">
+                  <div className="text-[10px] font-mono uppercase text-[#64748B] px-3 py-1 font-bold">
+                    Operations &amp; Admin
+                  </div>
+                  <Link
+                    href="/organizer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
+                      isActive("/organizer")
+                        ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
+                        : "text-[#CBD5E1] hover:bg-[#161A24]"
+                    }`}
+                  >
+                    <Trophy className="w-4 h-4 text-[#E56A10]" />
+                    Organizer Portal
+                  </Link>
+                  {isSuperAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
+                        isActive("/admin")
+                          ? "bg-[#E56A10] text-white font-bold"
+                          : "text-[#CBD5E1] hover:bg-[#161A24]"
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 text-[#E56A10]" />
+                      Admin Cockpit
+                    </Link>
+                  )}
                 </div>
-                <Link
-                  href="/organizer"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
-                    isActive("/organizer")
-                      ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
-                      : "text-[#CBD5E1] hover:bg-[#161A24]"
-                  }`}
-                >
-                  <Trophy className="w-4 h-4 text-[#E56A10]" />
-                  Organizer Portal
-                </Link>
-                <Link
-                  href="/admin"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
-                    isActive("/admin")
-                      ? "bg-[#E56A10] text-white font-bold"
-                      : "text-[#CBD5E1] hover:bg-[#161A24]"
-                  }`}
-                >
-                  <Shield className="w-4 h-4 text-[#E56A10]" />
-                  Admin Cockpit
-                </Link>
-                <Link
-                  href="/about"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded text-sm text-[#94A3B8] hover:text-white transition-colors"
-                >
-                  About AMETHEUS
-                </Link>
-              </div>
+              )}
             </div>
 
             {/* Mobile Footer Auth Section */}

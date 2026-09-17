@@ -1,7 +1,32 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useUser, useAuth } from "@clerk/nextjs";
+import { getCurrentUserProfile } from "@/lib/api/auth";
 
 export default function Footer() {
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      getCurrentUserProfile()
+        .then((profile) => setUserRole(profile.role))
+        .catch(() => {
+          // If network fails, keep null
+        });
+    } else {
+      setUserRole(null);
+    }
+  }, [isSignedIn]);
+
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
+  const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
+  const hasPrivileges = isHardcodedAdmin || userRole === "SUPER_ADMIN" || userRole === "ORGANIZER";
+
   return (
     <footer className="bg-[#0B0E16] text-[#F8FAFC] border-t border-[#242C3D] mt-auto">
       <div className="max-w-[1440px] mx-auto px-4 md:px-8 py-12 flex flex-col gap-10">
@@ -104,11 +129,14 @@ export default function Footer() {
                   Contact Support
                 </Link>
               </li>
-              <li>
-                <Link href="/admin" className="text-xs text-[#E56A10] hover:underline">
-                  Organizer / Admin Portal
-                </Link>
-              </li>
+              {/* Strictly hidden unless authorized */}
+              {hasPrivileges && (
+                <li>
+                  <Link href="/admin" className="text-xs text-[#E56A10] hover:underline font-mono font-medium">
+                    Organizer / Admin Portal →
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
         </div>
