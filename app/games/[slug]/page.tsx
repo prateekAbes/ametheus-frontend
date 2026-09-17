@@ -404,7 +404,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 <div className="flex items-center gap-4 text-xs font-mono text-[#64748B]">
                   <span>MAP: ASCENT</span>
                   <Link
-                    href="#"
+                    href="/tournaments"
                     className="px-3 py-1.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded font-bold uppercase tracking-wider text-[11px] transition-colors"
                   >
                     Watch Live Bracket
@@ -434,7 +434,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 <div className="flex items-center gap-4 text-xs font-mono text-[#64748B]">
                   <span>MAP: BIND</span>
                   <Link
-                    href="#"
+                    href="/tournaments"
                     className="px-3 py-1.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded font-bold uppercase tracking-wider text-[11px] transition-colors"
                   >
                     Watch Live Bracket
