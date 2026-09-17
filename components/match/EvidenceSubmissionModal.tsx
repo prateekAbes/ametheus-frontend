@@ -1,8 +1,7 @@
 'use client';
-
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { MatchLobbyInfo } from "@/types";
-import { X, UploadCloud, CheckCircle, ShieldAlert, FileText, Check } from "lucide-react";
+import { X, UploadCloud, CheckCircle, ShieldAlert, FileText, Check, Image as ImageIcon } from "lucide-react";
 import { submitMatchResult } from "@/lib/api/matches";
 
 interface Props {
@@ -16,9 +15,27 @@ export default function EvidenceSubmissionModal({ match, isOpen, onClose, onSucc
   const [scoreA, setScoreA] = useState("13");
   const [scoreB, setScoreB] = useState("9");
   const [notes, setNotes] = useState("Clean game, all players checked in on Mumbai AWS server.");
-  const [uploadedFile, setUploadedFile] = useState<string | null>("valorant_match_end_scoreboard.png");
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      alert("Screenshot exceeds 15MB limit.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setImagePreview(result);
+      setUploadedFile(`https://r2.ametheus.gg/evidence/${Date.now()}_${file.name.replace(/\s+/g, '_')}`);
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!isOpen || !match) return null;
 
@@ -113,23 +130,54 @@ export default function EvidenceSubmissionModal({ match, isOpen, onClose, onSucc
               </div>
             </div>
 
-            {/* Screenshot Evidence Upload Simulation */}
+            {/* Screenshot Evidence Upload */}
             <div>
               <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-2 font-bold">
                 Match End Scoreboard Screenshot (Cloudflare R2)
               </label>
-              <div className="border-2 border-dashed border-[#242C3D] hover:border-[#E56A10] bg-[#10141F] p-5 rounded text-center transition-colors">
-                <UploadCloud className="w-8 h-8 text-[#E56A10] mx-auto mb-2" />
-                <div className="text-xs font-bold text-white mb-1">
-                  {uploadedFile ? uploadedFile : "Click or drag match screenshot here"}
-                </div>
-                <div className="text-[11px] text-[#94A3B8] font-mono">
-                  PNG, JPG up to 15MB • Shows complete in-game scoreboard with final round score
-                </div>
-                {uploadedFile && (
-                  <span className="mt-2 inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/40 border border-emerald-800 px-2 py-0.5 rounded">
-                    <CheckCircle className="w-3 h-3" /> VERIFIED IMAGE ATTACHED
-                  </span>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-[#242C3D] hover:border-[#E56A10] bg-[#10141F] p-5 rounded text-center transition-colors cursor-pointer group"
+              >
+                {imagePreview ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <img
+                      src={imagePreview}
+                      alt="Match Scoreboard Evidence"
+                      className="max-h-36 rounded border border-[#242C3D] object-contain shadow-md"
+                    />
+                    <span className="text-xs text-emerald-400 font-mono font-bold flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> {uploadedFile?.split("/").pop()} Attached
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImagePreview(null);
+                        setUploadedFile(null);
+                      }}
+                      className="text-[10px] text-rose-400 font-mono hover:underline cursor-pointer"
+                    >
+                      Change Screenshot
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud className="w-8 h-8 text-[#E56A10] mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                    <div className="text-xs font-bold text-white mb-1">
+                      Click or drop match scoreboard screenshot here
+                    </div>
+                    <div className="text-[11px] text-[#94A3B8] font-mono">
+                      PNG, JPG, WEBP up to 15MB • Shows complete in-game scoreboard with final round score
+                    </div>
+                  </>
                 )}
               </div>
             </div>

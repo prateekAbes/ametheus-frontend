@@ -58,3 +58,22 @@ export async function getTeamByCode(code: string): Promise<Team> {
   return apiClient<Team>(`/teams/code/${encodeURIComponent(code)}`);
 }
 
+export async function leaveTeam(teamId: string): Promise<{ message: string }> {
+  return apiClient<{ message: string }>(`/teams/${teamId}/leave`, {
+    method: "POST",
+  });
+}
+
+export async function kickTeamMember(teamId: string, userId: string): Promise<{ message: string }> {
+  return apiClient<{ message: string }>(`/teams/${teamId}/kick/${userId}`, {
+    method: "POST",
+  });
+}
+
+export async function disbandTeam(teamId: string): Promise<{ message: string }> {
+  return apiClient<{ message: string }>(`/teams/${teamId}`, {
+    method: "DELETE",
+  });
+}
+
+

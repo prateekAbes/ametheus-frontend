@@ -31,3 +31,18 @@ export async function syncUser(payload: UserSyncPayload): Promise<UserProfile> {
 export async function getCurrentUserProfile(): Promise<UserProfile> {
   return apiClient<UserProfile>("/auth/me");
 }
+
+export interface UserProfileUpdatePayload {
+  display_name?: string;
+  riot_id?: string;
+  steam_id?: string;
+  avatar_url?: string;
+}
+
+export async function updateUserProfile(payload: UserProfileUpdatePayload): Promise<UserProfile> {
+  return apiClient<UserProfile>("/auth/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
