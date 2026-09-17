@@ -14,11 +14,12 @@ import {
   Shield,
   Gamepad2,
   Calendar,
+  X,
 } from "lucide-react";
 
 function TournamentsContent() {
   const searchParams = useSearchParams();
-  const initialSearch = searchParams.get("search") || "";
+  const searchFromUrl = searchParams.get("search") || "";
 
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>(() =>
     TOURNAMENTS_DATA.map(normalizeTournament)
@@ -26,13 +27,11 @@ function TournamentsContent() {
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState("all");
   const [selectedFee, setSelectedFee] = useState("all");
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [searchQuery, setSearchQuery] = useState(searchFromUrl);
 
   useEffect(() => {
-    if (initialSearch) {
-      setSearchQuery(initialSearch);
-    }
-  }, [initialSearch]);
+    setSearchQuery(searchFromUrl);
+  }, [searchFromUrl]);
 
   const fetchTournaments = async () => {
     setLoading(true);
@@ -60,17 +59,21 @@ function TournamentsContent() {
       selectedFee === "all" ||
       (selectedFee === "free" && t.entryFeeNum === 0) ||
       (selectedFee === "paid" && t.entryFeeNum > 0);
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.gameName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.serverRegion.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      t.title.toLowerCase().includes(q) ||
+      t.gameName.toLowerCase().includes(q) ||
+      t.gameSlug.toLowerCase().includes(q) ||
+      t.serverRegion.toLowerCase().includes(q) ||
+      (t.description && t.description.toLowerCase().includes(q));
     return matchesGame && matchesFee && matchesSearch;
   });
 
   return (
-    <div className="flex flex-col w-full bg-[#0B0E16] min-h-screen text-[#F8FAFC]">
+    <div className="flex flex-col w-full bg-[#0F172A] min-h-screen text-[#F8FAFC]">
       {/* Sub-Bar */}
-      <div className="w-full bg-[#10141F] py-2.5 px-4 md:px-8 border-b border-[#242C3D]">
+      <div className="w-full bg-[#1E293B] py-2.5 px-4 md:px-8 border-b border-[#334155]">
         <div className="max-w-[1440px] mx-auto flex items-center justify-between text-xs font-mono text-[#94A3B8]">
           <div className="flex items-center gap-2">
             <Link href="/" className="hover:text-[#E56A10] transition-colors">
@@ -170,9 +173,19 @@ function TournamentsContent() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tournament title..."
-                className="w-full pl-8 pr-3 py-1.5 bg-[#161A24] text-white placeholder-[#64748B] text-xs rounded-lg border border-[#242C3D] focus:outline-hidden focus:border-[#E56A10] font-mono"
+                placeholder="Search tournament title or game..."
+                className="w-full pl-8 pr-8 py-1.5 bg-[#161A24] text-white placeholder-[#64748B] text-xs rounded-lg border border-[#242C3D] focus:outline-hidden focus:border-[#E56A10] font-mono"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-white cursor-pointer"
+                  title="Clear Search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -185,17 +198,17 @@ function TournamentsContent() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="bg-[#10141F] rounded-xl border border-[#242C3D] h-96 animate-pulse p-4 space-y-4"
+                className="bg-[#1E293B] rounded-xl border border-[#334155] h-96 animate-pulse p-4 space-y-4"
               >
-                <div className="w-full h-40 bg-[#161A24] rounded-lg" />
-                <div className="h-6 bg-[#161A24] rounded w-3/4" />
-                <div className="h-4 bg-[#161A24] rounded w-full" />
-                <div className="h-10 bg-[#161A24] rounded mt-6" />
+                <div className="w-full h-40 bg-[#0F172A] rounded-lg" />
+                <div className="h-6 bg-[#0F172A] rounded w-3/4" />
+                <div className="h-4 bg-[#0F172A] rounded w-full" />
+                <div className="h-10 bg-[#0F172A] rounded mt-6" />
               </div>
             ))}
           </div>
         ) : filteredTournaments.length === 0 ? (
-          <div className="text-center py-16 bg-[#10141F] rounded-xl border border-[#242C3D] p-8 space-y-4">
+          <div className="text-center py-16 bg-[#1E293B] rounded-xl border border-[#334155] p-8 space-y-4">
             <Trophy className="w-12 h-12 text-[#64748B] mx-auto" />
             <h3 className="text-lg font-bold font-headline text-white">
               No Tournaments Found
@@ -219,23 +232,23 @@ function TournamentsContent() {
             {filteredTournaments.map((tournament) => (
               <article
                 key={tournament.id}
-                className="flex flex-col justify-between bg-[#10141F] rounded-xl border border-[#242C3D] hover:border-[#E56A10]/50 shadow-lg hover:shadow-xl transition-all overflow-hidden group"
+                className="flex flex-col justify-between bg-[#1E293B] rounded-xl border border-[#334155] hover:border-[#E56A10]/60 shadow-lg hover:shadow-xl transition-all overflow-hidden group"
               >
                 <div>
                   {/* Banner & Header */}
-                  <div className="relative w-full h-44 overflow-hidden bg-[#0B0E16]">
+                  <div className="relative w-full h-44 overflow-hidden bg-[#0F172A]">
                     <Image
                       src={tournament.bannerUrl}
                       alt={tournament.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#10141F] via-[#10141F]/40 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1E293B] via-[#1E293B]/40 to-transparent" />
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 bg-[#0B0E16]/80 text-[#E56A10] border border-[#E56A10]/40 font-mono text-[10px] rounded font-bold uppercase">
+                      <span className="px-2 py-0.5 bg-[#0F172A]/90 text-[#FFB68F] border border-[#E56A10]/40 font-mono text-[10px] rounded font-bold uppercase">
                         {tournament.gameName}
                       </span>
-                      <span className="px-2 py-0.5 bg-[#161A24] border border-[#242C3D] text-white font-mono text-[10px] rounded font-bold">
+                      <span className="px-2 py-0.5 bg-[#1E293B] border border-[#334155] text-white font-mono text-[10px] rounded font-bold">
                         {tournament.format}
                       </span>
                     </div>

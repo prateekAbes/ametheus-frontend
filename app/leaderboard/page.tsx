@@ -34,7 +34,17 @@ import {
   Gamepad2,
   X,
   Loader2,
+  Ban,
+  UserX,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  getDisqualifiedEntries,
+  disqualifyLeaderboardEntry,
+  reinstateLeaderboardEntry,
+  LeaderboardDisqualification,
+} from "@/lib/api/leaderboard";
 
 export default function LeaderboardPage() {
   const { user } = useUser();
@@ -51,6 +61,14 @@ export default function LeaderboardPage() {
   const [isSubmittingCat, setIsSubmittingCat] = useState<boolean>(false);
   const [catActionMsg, setCatActionMsg] = useState<string>("");
 
+  // Disqualification Management State
+  const [disqualifiedList, setDisqualifiedList] = useState<LeaderboardDisqualification[]>([]);
+  const [viewMode, setViewMode] = useState<"standings" | "disqualified">("standings");
+  const [disqualifyingEntry, setDisqualifyingEntry] = useState<any | null>(null);
+  const [dqReason, setDqReason] = useState("Cheating / Third-Party Tool Detected");
+  const [dqNotes, setDqNotes] = useState("");
+  const [isSubmittingDq, setIsSubmittingDq] = useState(false);
+
   const [categoryForm, setCategoryForm] = useState<LeaderboardCategoryCreatePayload>({
     name: "",
     game_slug: "all",
@@ -61,6 +79,60 @@ export default function LeaderboardPage() {
 
   const userEmail = (user?.primaryEmailAddress?.emailAddress || profile?.email || "").toLowerCase();
   const isSuperAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg" || profile?.role === "SUPER_ADMIN";
+
+  const loadDisqualified = useCallback(async () => {
+    try {
+      const list = await getDisqualifiedEntries();
+      if (Array.isArray(list)) {
+        setDisqualifiedList(list);
+      }
+    } catch (e) {
+      console.warn("Failed to load disqualified list", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      loadDisqualified();
+    }
+  }, [isSuperAdmin, loadDisqualified]);
+
+  const handleConfirmDisqualification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!disqualifyingEntry) return;
+    setIsSubmittingDq(true);
+    try {
+      await disqualifyLeaderboardEntry({
+        entity_id: disqualifyingEntry.id,
+        entity_name: disqualifyingEntry.name,
+        entity_tag: disqualifyingEntry.tag,
+        reason: dqReason,
+        notes: dqNotes,
+      });
+      setCatActionMsg(`"${disqualifyingEntry.name}" has been disqualified and removed.`);
+      setDisqualifyingEntry(null);
+      setDqNotes("");
+      await Promise.all([fetchEntries(), loadDisqualified()]);
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      setCatActionMsg(err?.message || "Failed to disqualify entry");
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } finally {
+      setIsSubmittingDq(false);
+    }
+  };
+
+  const handleReinstateEntry = async (entityId: string, name: string) => {
+    try {
+      await reinstateLeaderboardEntry(entityId);
+      setCatActionMsg(`"${name}" reinstated to leaderboard standings!`);
+      await Promise.all([fetchEntries(), loadDisqualified()]);
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      setCatActionMsg(err?.message || "Failed to reinstate entity");
+      setTimeout(() => setCatActionMsg(""), 4000);
+    }
+  };
 
   // Load Categories & User Profile
   useEffect(() => {
@@ -633,12 +705,70 @@ export default function LeaderboardPage() {
                 Competitive ranking and rating breakdown ({filteredEntries.length} squads matched)
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E56A10]" />}
+              {isSuperAdmin && (
+                <div className="flex items-center gap-0.5 bg-[#0B0E16] p-0.5 rounded-lg border border-[#242C3D]">
+                  <button
+                    onClick={() => setViewMode("standings")}
+                    className={`px-3 py-1.5 text-[11px] font-mono font-bold uppercase rounded-md transition-all cursor-pointer ${
+                      viewMode === "standings" ? "bg-[#E56A10] text-white" : "text-[#94A3B8] hover:text-white"
+                    }`}
+                  >
+                    Active Standings
+                  </button>
+                  <button
+                    onClick={() => setViewMode("disqualified")}
+                    className={`px-3 py-1.5 text-[11px] font-mono font-bold uppercase rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                      viewMode === "disqualified" ? "bg-rose-600 text-white" : "text-[#94A3B8] hover:text-rose-400"
+                    }`}
+                  >
+                    <Ban className="w-3 h-3" /> Banned ({disqualifiedList.length})
+                  </button>
+                </div>
+              )}
               <span className="text-[11px] font-mono text-[#94A3B8]">Live Rating Sync Active</span>
             </div>
           </div>
 
+          {/* DISQUALIFIED LIST VIEW */}
+          {isSuperAdmin && viewMode === "disqualified" ? (
+            <div className="divide-y divide-[#242C3D]">
+              {disqualifiedList.length === 0 ? (
+                <div className="py-10 text-center text-[#94A3B8] font-mono text-xs space-y-2">
+                  <Ban className="w-8 h-8 mx-auto text-[#64748B]" />
+                  <div className="text-white font-bold text-sm mt-2">No Disqualified Entries</div>
+                  <p>No squads or players have been removed from leaderboard standings.</p>
+                </div>
+              ) : (
+                disqualifiedList.map((dq) => (
+                  <div key={dq.entity_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-[#161A24]/50 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <UserX className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span className="font-bold text-white">{dq.entity_name}</span>
+                        {dq.entity_tag && <span className="text-[11px] font-mono text-[#94A3B8]">[{dq.entity_tag}]</span>}
+                        <span className="px-1.5 py-0.5 bg-rose-950/60 border border-rose-700 text-rose-400 text-[10px] font-mono rounded font-bold uppercase">DQ</span>
+                      </div>
+                      <p className="text-xs font-mono text-[#94A3B8]">
+                        <span className="text-rose-400 font-bold">Reason: </span>{dq.reason}
+                      </p>
+                      {dq.notes && <p className="text-xs font-mono text-[#64748B]">Arbiter Notes: {dq.notes}</p>}
+                      <p className="text-[11px] font-mono text-[#64748B]">
+                        Removed: {dq.disqualified_at ? new Date(dq.disqualified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleReinstateEntry(dq.entity_id, dq.entity_name)}
+                      className="shrink-0 px-4 py-2 bg-emerald-600/20 border border-emerald-600/50 hover:bg-emerald-600/40 text-emerald-400 hover:text-emerald-300 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reinstate to Standings
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -651,12 +781,13 @@ export default function LeaderboardPage() {
                   <th className="py-3 px-4 text-center">Form Streak</th>
                   <th className="py-3 px-4 text-right">Rating ELO</th>
                   <th className="py-3 px-4 text-right">Prize Earnings</th>
+                  {isSuperAdmin && <th className="py-3 px-4 text-center text-rose-400">Remove</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#242C3D]">
                 {filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-[#94A3B8] font-mono">
+                    <td colSpan={isSuperAdmin ? 9 : 8} className="py-8 text-center text-[#94A3B8] font-mono">
                       No squads matched your current criteria or game filter.
                     </td>
                   </tr>
@@ -756,14 +887,117 @@ export default function LeaderboardPage() {
                       <td className="py-3 px-4 text-right font-headline font-bold text-sm text-[#E56A10]">
                         ₹{entry.earnings.toLocaleString()}
                       </td>
+
+                      {/* Admin: Disqualify */}
+                      {isSuperAdmin && (
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => setDisqualifyingEntry(entry)}
+                            className="px-2.5 py-1.5 bg-rose-950/40 border border-rose-700/60 hover:bg-rose-900/60 text-rose-400 hover:text-rose-300 text-[10px] font-mono font-bold uppercase rounded flex items-center gap-1 transition-all cursor-pointer mx-auto"
+                            title={`Remove ${entry.name} from leaderboard`}
+                          >
+                            <Ban className="w-3 h-3" /> Remove
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </main>
+
+      {/* Disqualification Modal */}
+      {disqualifyingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#10141F] border border-rose-700/50 rounded-xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Ban className="w-5 h-5 text-rose-400" />
+                <h3 className="font-headline font-bold text-base text-white uppercase">
+                  Remove from Leaderboard
+                </h3>
+              </div>
+              <button
+                onClick={() => { setDisqualifyingEntry(null); setDqNotes(""); }}
+                className="text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <UserX className="w-4 h-4 text-rose-400" />
+                <span className="font-bold text-white">{disqualifyingEntry.name}</span>
+                <span className="text-[11px] font-mono text-[#94A3B8]">[{disqualifyingEntry.tag}]</span>
+              </div>
+              <p className="text-[11px] font-mono text-[#94A3B8] mt-1">
+                Rank #{disqualifyingEntry.rank} • {disqualifyingEntry.gameName} • Captain: {disqualifyingEntry.captain}
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmDisqualification} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  Removal Reason *
+                </label>
+                <select
+                  value={dqReason}
+                  onChange={(e) => setDqReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                >
+                  <option>Cheating / Third-Party Tool Detected</option>
+                  <option>Match Manipulation / Score Fixing</option>
+                  <option>Toxic Behavior / Code of Conduct Violation</option>
+                  <option>Smurf Account / Identity Fraud</option>
+                  <option>Disqualified by Tournament Arbitration</option>
+                  <option>Administrative Removal</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  Arbitrator Notes (Optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={dqNotes}
+                  onChange={(e) => setDqNotes(e.target.value)}
+                  placeholder="Additional context, evidence references, or ruling notes..."
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono resize-none"
+                />
+              </div>
+
+              <div className="p-2.5 bg-rose-950/30 border border-rose-700/40 rounded-lg text-[11px] font-mono text-rose-300 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                This will immediately remove the squad from all visible leaderboard standings. The record will be preserved in the Disqualified archive for auditing.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setDisqualifyingEntry(null); setDqNotes(""); }}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDq}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
+                >
+                  {isSubmittingDq ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                  Confirm Removal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 4. Add Leaderboard Category Modal (Admin Privileges) */}
       {isAddingCategory && (

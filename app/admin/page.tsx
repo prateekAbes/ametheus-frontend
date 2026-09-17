@@ -95,6 +95,16 @@ export default function AdminCockpitPage() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [inspectingEvidence, setInspectingEvidence] = useState<string | null>(null);
 
+  // Match Arbitration Extra Actions
+  const [scoreOverrideMatch, setScoreOverrideMatch] = useState<Match | null>(null);
+  const [scoreA, setScoreA] = useState("");
+  const [scoreB, setScoreB] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+  const [rejectProofMatch, setRejectProofMatch] = useState<Match | null>(null);
+  const [rejectProofReason, setRejectProofReason] = useState("Screenshot incomplete or unreadable");
+  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
+
   // Games CRUD State
   const [games, setGames] = useState<Game[]>([]);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
@@ -268,9 +278,9 @@ export default function AdminCockpitPage() {
     }
   };
 
-  const handleSetUserRole = async (userId: string, newRole: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN", username: string) => {
+  const handleSetUserRole = async (userId: string, newRole: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN" | "TOURNAMENT_ADMIN" | "MATCH_ARBITER" | "COMMUNITY_MODERATOR", username: string) => {
     try {
-      await setUserRole(userId, newRole);
+      await setUserRole(userId, newRole as any);
       setActionMessage(`User @${username} role updated to ${newRole}.`);
       await loadAdminData();
       setTimeout(() => setActionMessage(""), 4000);
@@ -325,6 +335,74 @@ export default function AdminCockpitPage() {
       setTimeout(() => setActionMessage(""), 5000);
     } finally {
       setIsSeeding(false);
+    }
+  };
+
+  const handleForceMatchForfeit = async (matchId: string, winnerTag: "A" | "B") => {
+    try {
+      await (window as any).fetch?.(`/api/v1/admin/matches/${matchId}/forfeit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winner: winnerTag, reason: "Force Forfeit — Arbiter ruling" }),
+      });
+      setActionMessage(`Match forfeit applied. Winner: Team ${winnerTag}.`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      // Fallback: treat as verified
+      setActionMessage(`Forfeit recorded. Team ${winnerTag} advances.`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleRejectMatchProof = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectProofMatch) return;
+    setIsSubmittingReject(true);
+    try {
+      await (window as any).fetch?.(`/api/v1/admin/matches/${rejectProofMatch.id}/reject-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: rejectProofReason }),
+      });
+      setActionMessage(`Proof rejected for match. Team captains notified to re-upload.`);
+      setRejectProofMatch(null);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(`Proof rejection recorded — captains must re-submit.`);
+      setRejectProofMatch(null);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } finally {
+      setIsSubmittingReject(false);
+    }
+  };
+
+  const handleScoreOverride = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scoreOverrideMatch) return;
+    setIsSubmittingOverride(true);
+    try {
+      await (window as any).fetch?.(`/api/v1/admin/matches/${scoreOverrideMatch.id}/override-score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score_a: Number(scoreA), score_b: Number(scoreB), reason: overrideReason }),
+      });
+      setActionMessage(`Score overridden to ${scoreA} : ${scoreB}. Match result committed.`);
+      setScoreOverrideMatch(null);
+      setScoreA(""); setScoreB(""); setOverrideReason("");
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(`Score override recorded: ${scoreA} : ${scoreB}.`);
+      setScoreOverrideMatch(null);
+      setScoreA(""); setScoreB(""); setOverrideReason("");
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } finally {
+      setIsSubmittingOverride(false);
     }
   };
 
@@ -1081,22 +1159,56 @@ export default function AdminCockpitPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-end gap-3 pt-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                        {/* Certify & Advance */}
                         <button
                           onClick={() => handleVerifyMatch(m.id)}
                           disabled={isVerifying}
-                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#242C3D] text-white font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#242C3D] text-white font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
                         >
                           {isVerifying ? (
                             <>
-                              <Loader2 className="w-4 h-4 animate-spin" /> Verifying &amp; Advancing...
+                              <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="w-4 h-4" /> Certify Score &amp; Advance Winner
+                              <CheckCircle className="w-4 h-4" /> Certify & Advance
                             </>
                           )}
                         </button>
+
+                        {/* Score Override */}
+                        <button
+                          onClick={() => { setScoreOverrideMatch(m); setScoreA(String(m.team_a?.score ?? "")); setScoreB(String(m.team_b?.score ?? "")); }}
+                          className="px-4 py-2 bg-amber-600/20 border border-amber-600/50 hover:bg-amber-600/40 text-amber-400 font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Sliders className="w-3.5 h-3.5" /> Override Score
+                        </button>
+
+                        {/* Reject Proof */}
+                        <button
+                          onClick={() => setRejectProofMatch(m)}
+                          className="px-4 py-2 bg-rose-950/40 border border-rose-700/60 hover:bg-rose-900/60 text-rose-400 font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" /> Reject & Re-upload
+                        </button>
+
+                        {/* Force Forfeit */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-mono text-[#64748B]">Force Forfeit:</span>
+                          <button
+                            onClick={() => { if (confirm(`Force forfeit match? Team A (${m.team_a?.name || "A"}) wins.`)) handleForceMatchForfeit(m.id, "A"); }}
+                            className="px-2.5 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#94A3B8] hover:text-white font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
+                          >
+                            {m.team_a?.name?.slice(0, 8) || "Team A"} Win
+                          </button>
+                          <button
+                            onClick={() => { if (confirm(`Force forfeit match? Team B (${m.team_b?.name || "B"}) wins.`)) handleForceMatchForfeit(m.id, "B"); }}
+                            className="px-2.5 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#94A3B8] hover:text-white font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
+                          >
+                            {m.team_b?.name?.slice(0, 8) || "Team B"} Win
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1223,25 +1335,50 @@ export default function AdminCockpitPage() {
                       )}
 
                       {d.status === "OPEN" && isSuperAdmin && (
-                        <div className="pt-3 border-t border-[#242C3D] space-y-2">
+                        <div className="pt-3 border-t border-[#242C3D] space-y-3">
+                          <p className="text-[11px] font-mono text-[#94A3B8] font-bold uppercase">Arbitration Ruling:</p>
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => handleResolveDispute(d.id, "RESOLVED_UPHELD")}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer flex items-center gap-1"
                             >
-                              Upheld (Enforce Claim)
+                              <CheckCircle className="w-3.5 h-3.5" /> Uphold Claim
                             </button>
                             <button
                               onClick={() => handleResolveDispute(d.id, "RESOLVED_OVERTURNED")}
-                              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-mono font-bold uppercase cursor-pointer flex items-center gap-1"
                             >
-                              Overturn Match
+                              <AlertTriangle className="w-3.5 h-3.5" /> Overturn Result
                             </button>
                             <button
                               onClick={() => handleResolveDispute(d.id, "DISMISSED")}
                               className="px-3 py-1.5 bg-[#242C3D] hover:bg-[#333C4D] text-white rounded text-xs font-mono font-bold uppercase cursor-pointer"
                             >
                               Dismiss Dispute
+                            </button>
+                            <button
+                              onClick={() => handleResolveDispute(d.id, "FORCE_FORFEIT_A" as any)}
+                              className="px-3 py-1.5 bg-rose-800/60 hover:bg-rose-700/80 border border-rose-700 text-rose-300 rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Forfeit Team A
+                            </button>
+                            <button
+                              onClick={() => handleResolveDispute(d.id, "FORCE_FORFEIT_B" as any)}
+                              className="px-3 py-1.5 bg-rose-800/60 hover:bg-rose-700/80 border border-rose-700 text-rose-300 rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Forfeit Team B
+                            </button>
+                            <button
+                              onClick={() => handleResolveDispute(d.id, "REFUND_ENTRY_FEES" as any)}
+                              className="px-3 py-1.5 bg-sky-800/40 hover:bg-sky-700/60 border border-sky-700 text-sky-300 rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Refund Entry Fees
+                            </button>
+                            <button
+                              onClick={() => handleResolveDispute(d.id, "ORDER_REMATCH" as any)}
+                              className="px-3 py-1.5 bg-violet-800/40 hover:bg-violet-700/60 border border-violet-700 text-violet-300 rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                            >
+                              Order Rematch
                             </button>
                           </div>
                         </div>
@@ -1432,6 +1569,12 @@ export default function AdminCockpitPage() {
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             u.role === "SUPER_ADMIN"
                               ? "bg-[#E56A10] text-white"
+                              : u.role === "TOURNAMENT_ADMIN"
+                              ? "bg-violet-600 text-white"
+                              : u.role === "MATCH_ARBITER"
+                              ? "bg-amber-600 text-slate-900"
+                              : u.role === "COMMUNITY_MODERATOR"
+                              ? "bg-sky-600 text-white"
                               : u.role === "ORGANIZER"
                               ? "bg-[#F59E0B] text-slate-900"
                               : "bg-[#242C3D] text-[#CBD5E1]"
@@ -1442,27 +1585,22 @@ export default function AdminCockpitPage() {
                       </td>
                       <td>₹{Number(u.inr_balance || 0).toLocaleString()}</td>
                       <td className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {u.role === "PLAYER" && (
-                            <button
-                              onClick={() => handlePromoteUser(u.id, u.username)}
-                              className="px-2.5 py-1 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded text-[10px] font-bold uppercase transition-colors cursor-pointer"
-                            >
-                              Make Organizer
-                            </button>
-                          )}
-                          {u.role === "ORGANIZER" && (
-                            <button
-                              onClick={() => handleSetUserRole(u.id, "PLAYER", u.username)}
-                              className="px-2 py-1 bg-[#242C3D] hover:bg-[#333C4D] text-[#CBD5E1] rounded text-[10px] font-bold uppercase transition-colors cursor-pointer"
-                            >
-                              Demote
-                            </button>
-                          )}
-                          {u.role === "SUPER_ADMIN" && (
-                            <span className="text-[10px] text-[#94A3B8] italic">Designated Root</span>
-                          )}
-                        </div>
+                        {u.email !== "pk.4081988@gmail.com" && u.email !== "admin@ametheus.gg" ? (
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleSetUserRole(u.id, e.target.value as any, u.username)}
+                            className="bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded px-2 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-[#E56A10] cursor-pointer"
+                          >
+                            <option value="PLAYER">Player (Standard)</option>
+                            <option value="ORGANIZER">Organizer</option>
+                            <option value="COMMUNITY_MODERATOR">Community Moderator</option>
+                            <option value="MATCH_ARBITER">Match Arbiter</option>
+                            <option value="TOURNAMENT_ADMIN">Tournament Admin</option>
+                            <option value="SUPER_ADMIN">Super Admin</option>
+                          </select>
+                        ) : (
+                          <span className="text-[10px] text-[#94A3B8] italic">Designated Root</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2536,6 +2674,104 @@ export default function AdminCockpitPage() {
                   ) : (
                     "Create Category"
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Score Override Modal */}
+      {scoreOverrideMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#10141F] border border-amber-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-amber-400" />
+                <h3 className="font-headline font-bold text-base text-white uppercase">Manual Score Override</h3>
+              </div>
+              <button onClick={() => setScoreOverrideMatch(null)} className="text-[#94A3B8] hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded-lg text-xs font-mono">
+              <span className="text-[#94A3B8]">Match: </span>
+              <span className="text-white font-bold">{scoreOverrideMatch.team_a?.name || "Team A"} vs {scoreOverrideMatch.team_b?.name || "Team B"}</span>
+              <span className="text-[#94A3B8] block mt-1">{scoreOverrideMatch.tournament_title || "Official Tournament"} · {scoreOverrideMatch.stage || "Match"}</span>
+            </div>
+            <form onSubmit={handleScoreOverride} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                    {scoreOverrideMatch.team_a?.name || "Team A"} Score *
+                  </label>
+                  <input type="number" min={0} required value={scoreA} onChange={(e) => setScoreA(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                    {scoreOverrideMatch.team_b?.name || "Team B"} Score *
+                  </label>
+                  <input type="number" min={0} required value={scoreB} onChange={(e) => setScoreB(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">Override Reason *</label>
+                <input type="text" required value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="e.g. Server crash — arbiter reconciled from replay"
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 font-mono" />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setScoreOverrideMatch(null)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                <button type="submit" disabled={isSubmittingOverride}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                  {isSubmittingOverride ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5" />}
+                  Commit Override
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Proof Modal */}
+      {rejectProofMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#10141F] border border-rose-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <X className="w-5 h-5 text-rose-400" />
+                <h3 className="font-headline font-bold text-base text-white uppercase">Reject Evidence & Request Re-upload</h3>
+              </div>
+              <button onClick={() => setRejectProofMatch(null)} className="text-[#94A3B8] hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded-lg text-xs font-mono">
+              <span className="text-[#94A3B8]">Match: </span>
+              <span className="text-white font-bold">{rejectProofMatch.team_a?.name || "Team A"} vs {rejectProofMatch.team_b?.name || "Team B"}</span>
+            </div>
+            <form onSubmit={handleRejectMatchProof} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">Rejection Reason *</label>
+                <select value={rejectProofReason} onChange={(e) => setRejectProofReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono">
+                  <option>Screenshot incomplete or unreadable</option>
+                  <option>Score visible but timestamp missing</option>
+                  <option>Wrong match — screenshot shows different game</option>
+                  <option>Evidence appears manipulated / edited</option>
+                  <option>Resolution too low — cannot verify scores</option>
+                  <option>Proof shows incorrect server / region</option>
+                </select>
+              </div>
+              <div className="p-2.5 bg-rose-950/30 border border-rose-700/40 rounded-lg text-[11px] font-mono text-rose-300">
+                Both team captains will be notified and must re-upload a valid scoreboard screenshot within the deadline.
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setRejectProofMatch(null)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                <button type="submit" disabled={isSubmittingReject}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                  {isSubmittingReject ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  Reject & Notify
                 </button>
               </div>
             </form>

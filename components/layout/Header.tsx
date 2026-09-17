@@ -27,7 +27,8 @@ import {
   useAuth,
 } from "@clerk/nextjs";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
-import { getTournaments, Tournament } from "@/lib/api/tournaments";
+import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
+import { TOURNAMENTS_DATA } from "@/lib/data/tournaments";
 
 export default function Header() {
   const pathname = usePathname();
@@ -37,7 +38,9 @@ export default function Header() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<NormalizedTournament[]>(() =>
+    TOURNAMENTS_DATA.map(normalizeTournament)
+  );
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
@@ -46,12 +49,12 @@ export default function Header() {
   useEffect(() => {
     getTournaments()
       .then((data) => {
-        if (Array.isArray(data)) {
-          setTournaments(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setTournaments(data.map(normalizeTournament));
         }
       })
       .catch(() => {
-        // Silent fallback without errors
+        // Keep initial normalized TOURNAMENTS_DATA
       });
   }, []);
 
@@ -243,18 +246,23 @@ export default function Header() {
               </form>
 
               {/* Autocomplete Dropdown */}
-              {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
-                <div className="absolute top-full right-0 mt-2 w-72 lg:w-80 bg-[#10141F] border border-[#242C3D] rounded-xl shadow-2xl overflow-hidden z-50 font-mono text-xs animate-in fade-in">
-                  <div className="p-2 bg-[#0B0E16] border-b border-[#242C3D] flex items-center justify-between text-[10px] text-[#94A3B8] uppercase">
-                    <span>Tournament Suggestions</span>
-                    <span className="text-[#E56A10] font-bold">{tournaments.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase()))).length} Results</span>
-                  </div>
+              {isSearchDropdownOpen && searchQuery.trim().length > 0 && (() => {
+                const q = searchQuery.toLowerCase().trim();
+                const matched = tournaments.filter(t =>
+                  t.title.toLowerCase().includes(q) ||
+                  t.gameName.toLowerCase().includes(q) ||
+                  t.gameSlug.toLowerCase().includes(q) ||
+                  t.serverRegion.toLowerCase().includes(q)
+                );
+                return (
+                  <div className="absolute top-full right-0 mt-2 w-72 lg:w-80 bg-[#1E293B] border border-[#334155] rounded-xl shadow-2xl overflow-hidden z-50 font-mono text-xs animate-in fade-in">
+                    <div className="p-2.5 bg-[#0F172A] border-b border-[#334155] flex items-center justify-between text-[10px] text-[#94A3B8] uppercase font-bold">
+                      <span>Tournament Suggestions</span>
+                      <span className="text-[#E56A10] font-bold">{matched.length} Results</span>
+                    </div>
 
-                  <div className="max-h-60 overflow-y-auto divide-y divide-[#242C3D]/50">
-                    {tournaments
-                      .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase())))
-                      .slice(0, 5)
-                      .map((t) => (
+                    <div className="max-h-64 overflow-y-auto divide-y divide-[#334155]/60">
+                      {matched.slice(0, 5).map((t) => (
                         <Link
                           key={t.id}
                           href={`/tournaments/${t.slug || t.id}`}
@@ -262,41 +270,42 @@ export default function Header() {
                             setIsSearchDropdownOpen(false);
                             setSearchQuery("");
                           }}
-                          className="p-3 hover:bg-[#161A24] transition-colors block group"
+                          className="p-3 hover:bg-[#334155]/60 transition-colors block group"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-white font-bold truncate group-hover:text-[#E56A10] transition-colors">
                               {t.title}
                             </span>
                             <span className="text-[10px] text-[#E56A10] font-bold shrink-0">
-                              ₹{t.prize_pool_inr?.toLocaleString()}
+                              ₹{t.prizePoolNum?.toLocaleString()}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-[10px] text-[#94A3B8]">
-                            <span className="px-1.5 py-0.2 bg-[#0B0E16] rounded border border-[#242C3D] uppercase">
-                              {t.game_slug || "ESPORTS"}
+                            <span className="px-1.5 py-0.5 bg-[#0F172A] rounded border border-[#334155] uppercase text-white font-semibold">
+                              {t.gameName}
                             </span>
-                            <span>{t.format || "Bracket"}</span>
+                            <span className="truncate">{t.serverRegion}</span>
                           </div>
                         </Link>
                       ))}
 
-                    {tournaments.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase()))).length === 0 && (
-                      <div className="p-4 text-center text-[#94A3B8] text-xs">
-                        No tournaments matching &quot;{searchQuery}&quot;
-                      </div>
-                    )}
-                  </div>
+                      {matched.length === 0 && (
+                        <div className="p-4 text-center text-[#94A3B8] text-xs">
+                          No tournaments matching &quot;{searchQuery}&quot;
+                        </div>
+                      )}
+                    </div>
 
-                  <button
-                    onClick={handleSearchSubmit}
-                    className="w-full p-2.5 bg-[#161A24] hover:bg-[#1F2636] text-[#E56A10] text-[11px] font-bold text-center border-t border-[#242C3D] flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <span>View all matching results</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
+                    <button
+                      onClick={handleSearchSubmit}
+                      className="w-full p-2.5 bg-[#0F172A] hover:bg-[#334155] text-[#E56A10] text-[11px] font-bold text-center border-t border-[#334155] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <span>View all {matched.length} matching tournaments</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Notifications Dropdown */}

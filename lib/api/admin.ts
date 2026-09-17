@@ -42,13 +42,21 @@ export async function promoteUserToOrganizer(
   });
 }
 
+export type PlatformRole =
+  | "PLAYER"
+  | "ORGANIZER"
+  | "SUPER_ADMIN"
+  | "TOURNAMENT_ADMIN"
+  | "MATCH_ARBITER"
+  | "COMMUNITY_MODERATOR";
+
 export interface AdminUser {
   id: string;
   clerk_user_id?: string;
   username: string;
   display_name?: string;
   email: string;
-  role: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN";
+  role: PlatformRole;
   inr_balance: string;
   created_at: string;
 }
@@ -88,9 +96,18 @@ export async function getDisputes(): Promise<Dispute[]> {
   return apiClient<Dispute[]>("/admin/disputes");
 }
 
+export type DisputeDecision =
+  | "RESOLVED_UPHELD"
+  | "RESOLVED_OVERTURNED"
+  | "DISMISSED"
+  | "FORCE_FORFEIT_A"
+  | "FORCE_FORFEIT_B"
+  | "REFUND_ENTRY_FEES"
+  | "ORDER_REMATCH";
+
 export async function resolveDispute(
   disputeId: string,
-  decision: "RESOLVED_UPHELD" | "RESOLVED_OVERTURNED" | "DISMISSED",
+  decision: DisputeDecision,
   resolutionNotes: string
 ): Promise<{ status: string; message: string }> {
   return apiClient(`/admin/disputes/${disputeId}/resolve`, {
@@ -104,11 +121,44 @@ export async function resolveDispute(
 
 export async function setUserRole(
   userId: string,
-  role: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN"
+  role: PlatformRole
 ): Promise<{ status: string; message: string }> {
   return apiClient(`/admin/users/${userId}/set-role`, {
     method: "POST",
     body: JSON.stringify({ role }),
+  });
+}
+
+export async function forceMatchForfeit(
+  matchId: string,
+  forfeitedTeamId: string,
+  reason: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/forfeit`, {
+    method: "POST",
+    body: JSON.stringify({ forfeited_team_id: forfeitedTeamId, reason }),
+  });
+}
+
+export async function overrideMatchScore(
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+  reason: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/override-score`, {
+    method: "POST",
+    body: JSON.stringify({ score_a: scoreA, score_b: scoreB, reason }),
+  });
+}
+
+export async function rejectMatchProof(
+  matchId: string,
+  reason: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/reject-proof`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 }
 

@@ -24,6 +24,8 @@ import {
   ExternalLink,
   AlertCircle,
   Sparkles,
+  Dices,
+  Shuffle,
 } from "lucide-react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { getCurrentUserProfile, updateUserProfile, UserProfile } from "@/lib/api/auth";
@@ -37,6 +39,12 @@ import {
 } from "@/lib/api/teams";
 import { getTournaments, Tournament } from "@/lib/api/tournaments";
 import { getMatches, Match } from "@/lib/api/matches";
+import {
+  generateRandomGamingIdentity,
+  generateRandomGamingTag,
+  generateRandomGamingAvatar,
+  GAMING_AVATAR_PRESETS,
+} from "@/lib/utils/gamingIdentity";
 
 export default function DashboardPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -48,12 +56,18 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Gamer Persona Generator State
+  const [randomPersona, setRandomPersona] = useState<{ gamerTag: string; avatarUrl: string; clanTag: string } | null>(null);
+  const [isApplyingPersona, setIsApplyingPersona] = useState(false);
+  const [personaMessage, setPersonaMessage] = useState("");
+
   // Profile Edit Modal State
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     display_name: "",
     riot_id: "",
     steam_id: "",
+    avatar_url: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
@@ -73,6 +87,36 @@ export default function DashboardPage() {
   const isSuperAdmin = isHardcodedAdmin || effectiveRole === "SUPER_ADMIN";
   const isOrganizer = isHardcodedAdmin || effectiveRole === "ORGANIZER" || isSuperAdmin;
 
+  const handleRollRandomPersona = () => {
+    const p = generateRandomGamingIdentity();
+    setRandomPersona(p);
+  };
+
+  const handleApplyRandomPersona = async () => {
+    if (!randomPersona) return;
+    setIsApplyingPersona(true);
+    try {
+      const updated = await updateUserProfile({
+        display_name: randomPersona.gamerTag,
+        avatar_url: randomPersona.avatarUrl,
+      });
+      setProfile(updated);
+      setProfileForm((prev) => ({
+        ...prev,
+        display_name: randomPersona.gamerTag,
+        avatar_url: randomPersona.avatarUrl,
+      }));
+      setPersonaMessage(`Gamer persona applied: ${randomPersona.gamerTag}!`);
+      setRandomPersona(null);
+      setTimeout(() => setPersonaMessage(""), 4000);
+    } catch (e: any) {
+      setPersonaMessage(e?.message || "Failed to apply persona");
+      setTimeout(() => setPersonaMessage(""), 4000);
+    } finally {
+      setIsApplyingPersona(false);
+    }
+  };
+
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
@@ -89,6 +133,7 @@ export default function DashboardPage() {
           display_name: profileRes.value.display_name || "",
           riot_id: profileRes.value.riot_id || "",
           steam_id: profileRes.value.steam_id || "",
+          avatar_url: profileRes.value.avatar_url || "",
         });
       }
       if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value)) {
@@ -196,13 +241,22 @@ export default function DashboardPage() {
   const nextMatch = matches.length > 0 ? matches[0] : null;
   const isCaptain = activeTeam && profile && activeTeam.captain_id === profile.id;
 
-  // Real user display names without mock fallbacks
+  // Real user display names or gaming-themed identity fallback
   const displayName = profile?.display_name || user?.fullName || user?.username || "Athlete";
   const username = profile?.username || user?.username || (userEmail ? userEmail.split("@")[0] : "player");
   const inrBalance = profile?.inr_balance != null ? Number(profile.inr_balance).toLocaleString("en-IN") : "0";
+  const effectiveAvatar = profile?.avatar_url || user?.imageUrl || generateRandomGamingAvatar(username);
 
   return (
-    <div className="flex flex-col w-full bg-[#0B0E16] min-h-screen text-[#F8FAFC]">
+    <div className="flex flex-col w-full bg-[#0F172A] min-h-screen text-[#F8FAFC]">
+      {/* Toast Notification */}
+      {personaMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#1E293B] border border-[#E56A10] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2 font-mono text-xs animate-bounce">
+          <Sparkles className="w-4 h-4 text-[#E56A10]" />
+          <span>{personaMessage}</span>
+        </div>
+      )}
+
       {/* Super Admin Notice Banner (for pk.4081988@gmail.com and SUPER_ADMIN) */}
       {isSuperAdmin && (
         <div className="w-full bg-[#E56A10]/15 border-b border-[#E56A10]/30 px-4 md:px-8 py-3">
@@ -224,23 +278,19 @@ export default function DashboardPage() {
       )}
 
       {/* 1. Header Profile Banner */}
-      <section className="w-full bg-[#10141F] py-8 md:py-10 border-b border-[#242C3D]">
+      <section className="w-full bg-[#1E293B] py-8 md:py-10 border-b border-[#334155]">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-start sm:items-center gap-4">
               {/* User Avatar */}
-              <div className="w-16 h-16 rounded-xl bg-[#161A24] border-2 border-[#E56A10] flex items-center justify-center font-bold text-xl text-[#FFB68F] font-mono shrink-0 overflow-hidden shadow-md">
-                {user?.imageUrl ? (
-                  <Image
-                    src={user.imageUrl}
-                    alt={displayName}
-                    width={64}
-                    height={64}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  displayName.slice(0, 2).toUpperCase()
-                )}
+              <div className="w-16 h-16 rounded-xl bg-[#0F172A] border-2 border-[#E56A10] flex items-center justify-center font-bold text-xl text-[#FFB68F] font-mono shrink-0 overflow-hidden shadow-md relative">
+                <Image
+                  src={effectiveAvatar}
+                  alt={displayName}
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               {/* Profile Details */}
@@ -255,17 +305,27 @@ export default function DashboardPage() {
                         ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
                         : effectiveRole === "ORGANIZER"
                         ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
-                        : "bg-[#161A24] text-[#94A3B8] border-[#242C3D]"
+                        : "bg-[#0F172A] text-[#94A3B8] border-[#334155]"
                     }`}
                   >
                     {isSuperAdmin ? "SUPER ADMIN" : effectiveRole}
                   </span>
+
                   <button
                     onClick={() => setIsEditProfileOpen(true)}
-                    className="p-1.5 text-[#94A3B8] hover:text-[#E56A10] hover:bg-[#161A24] transition-colors rounded cursor-pointer"
+                    className="p-1.5 text-[#94A3B8] hover:text-[#E56A10] hover:bg-[#0F172A] transition-colors rounded cursor-pointer"
                     title="Edit Competitive Profile & Game Handles"
                   >
                     <Edit3 className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={handleRollRandomPersona}
+                    className="px-2.5 py-1 bg-[#E56A10]/15 hover:bg-[#E56A10]/25 border border-[#E56A10]/40 text-[#FFB68F] hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ml-1"
+                    title="Generate Random Gaming Tag & Avatar"
+                  >
+                    <Dices className="w-3.5 h-3.5 text-[#E56A10]" />
+                    <span>🎲 Randomize Persona</span>
                   </button>
                 </div>
 
@@ -304,7 +364,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Wallet Quick Balance Card */}
-            <div className="flex items-center gap-4 bg-[#161A24] p-4 rounded-xl border border-[#242C3D] shadow-xs">
+            <div className="flex items-center gap-4 bg-[#0F172A] p-4 rounded-xl border border-[#334155] shadow-xs">
               <div>
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold tracking-wider">
                   Wallet Balance
@@ -318,6 +378,72 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Interactive Rolled Gaming Persona Preview Card */}
+          {randomPersona && (
+            <div className="mt-6 p-4 bg-[#0F172A] border-2 border-[#E56A10] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl animate-in fade-in">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-xl bg-[#1E293B] border-2 border-[#E56A10] overflow-hidden shrink-0 shadow-md relative">
+                  <Image
+                    src={randomPersona.avatarUrl}
+                    alt={randomPersona.gamerTag}
+                    width={56}
+                    height={56}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#E56A10] font-bold uppercase">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>New Gamer Persona Generated!</span>
+                  </div>
+                  <div className="text-lg font-bold text-white font-headline flex items-center gap-2">
+                    <span>{randomPersona.gamerTag}</span>
+                    <span className="px-2 py-0.5 bg-[#1E293B] border border-[#334155] rounded text-[10px] text-[#94A3B8] font-mono">
+                      [{randomPersona.clanTag}]
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRollRandomPersona}
+                  className="px-3 py-1.5 bg-[#1E293B] hover:bg-[#334155] border border-[#334155] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Shuffle className="w-3.5 h-3.5 text-[#E56A10]" />
+                  <span>Roll Another</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyRandomPersona}
+                  disabled={isApplyingPersona}
+                  className="px-4 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {isApplyingPersona ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Apply to Profile</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRandomPersona(null)}
+                  className="p-1.5 text-[#94A3B8] hover:text-white rounded transition-colors cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -683,9 +809,9 @@ export default function DashboardPage() {
 
       {/* Edit Profile Modal */}
       {isEditProfileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#10141F] text-white border border-[#242C3D] rounded-xl w-full max-w-md p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-[#1E293B] text-white border border-[#334155] rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-[#E56A10]" /> Edit Competitive Profile
               </h3>
@@ -704,18 +830,97 @@ export default function DashboardPage() {
               </div>
             ) : (
               <form onSubmit={handleSaveProfile} className="space-y-4">
+                {/* Gaming Avatar Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-mono uppercase text-[#CBD5E1]">
+                      Esports Avatar
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProfileForm({
+                          ...profileForm,
+                          avatar_url: generateRandomGamingAvatar(),
+                        })
+                      }
+                      className="text-[11px] font-mono text-[#FFB68F] hover:text-white flex items-center gap-1 cursor-pointer"
+                    >
+                      <Dices className="w-3 h-3 text-[#E56A10]" />
+                      <span>Roll Random Avatar</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-[#0F172A] border border-[#334155] rounded-xl">
+                    <div className="w-14 h-14 rounded-xl bg-[#1E293B] border-2 border-[#E56A10] overflow-hidden shrink-0 shadow-md relative">
+                      <Image
+                        src={profileForm.avatar_url || effectiveAvatar}
+                        alt="Avatar Preview"
+                        width={56}
+                        height={56}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="text-[10px] font-mono text-[#94A3B8] uppercase">
+                        Select a Preset or Roll Random:
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {GAMING_AVATAR_PRESETS.slice(0, 6).map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() =>
+                              setProfileForm({ ...profileForm, avatar_url: preset.url })
+                            }
+                            className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-transform hover:scale-110 cursor-pointer ${
+                              profileForm.avatar_url === preset.url
+                                ? "border-[#E56A10] scale-105"
+                                : "border-[#334155]"
+                            }`}
+                            title={preset.name}
+                          >
+                            <Image
+                              src={preset.url}
+                              alt={preset.name}
+                              width={28}
+                              height={28}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
-                    Display Name
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-mono uppercase text-[#CBD5E1]">
+                      Display Name / Gamer Tag
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProfileForm({
+                          ...profileForm,
+                          display_name: generateRandomGamingTag(),
+                        })
+                      }
+                      className="text-[11px] font-mono text-[#FFB68F] hover:text-white flex items-center gap-1 cursor-pointer"
+                    >
+                      <Dices className="w-3 h-3 text-[#E56A10]" />
+                      <span>Roll Gamer Tag</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={profileForm.display_name}
                     onChange={(e) =>
                       setProfileForm({ ...profileForm, display_name: e.target.value })
                     }
-                    placeholder="e.g. Phoenix Ace"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    placeholder="e.g. ShadowViper_99"
+                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
@@ -730,7 +935,7 @@ export default function DashboardPage() {
                       setProfileForm({ ...profileForm, riot_id: e.target.value })
                     }
                     placeholder="Player#REGION"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
@@ -745,15 +950,15 @@ export default function DashboardPage() {
                       setProfileForm({ ...profileForm, steam_id: e.target.value })
                     }
                     placeholder="STEAM_0:X:XXXXXX"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#242C3D]">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
                   <button
                     type="button"
                     onClick={() => setIsEditProfileOpen(false)}
-                    className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                    className="px-4 py-2 bg-[#0F172A] border border-[#334155] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -774,8 +979,8 @@ export default function DashboardPage() {
       {/* Join Squad Modal */}
       {isJoinSquadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#10141F] text-white border border-[#242C3D] rounded-xl w-full max-w-md p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-[#1E293B] text-white border border-[#334155] rounded-xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#E56A10]" /> Join Squad with Invite Code
               </h3>
@@ -807,7 +1012,7 @@ export default function DashboardPage() {
                     setJoinForm({ ...joinForm, invite_code: e.target.value.toUpperCase() })
                   }
                   placeholder="e.g. 8A3F9X"
-                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2.5 text-base font-mono font-bold tracking-widest text-center text-[#E56A10] focus:border-[#E56A10] focus:outline-hidden uppercase"
+                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2.5 text-base font-mono font-bold tracking-widest text-center text-[#E56A10] focus:border-[#E56A10] focus:outline-hidden uppercase"
                 />
               </div>
 
@@ -823,15 +1028,15 @@ export default function DashboardPage() {
                     setJoinForm({ ...joinForm, player_handle: e.target.value })
                   }
                   placeholder="Player#TAG"
-                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#242C3D]">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
                 <button
                   type="button"
                   onClick={() => setIsJoinSquadOpen(false)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="px-4 py-2 bg-[#0F172A] border border-[#334155] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>

@@ -7,7 +7,7 @@ export interface UserProfile {
   username: string;
   display_name?: string;
   avatar_url?: string;
-  role: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN";
+  role: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN" | "TOURNAMENT_ADMIN" | "MATCH_ARBITER" | "COMMUNITY_MODERATOR";
   inr_balance: string;
   riot_id?: string;
   steam_id?: string;

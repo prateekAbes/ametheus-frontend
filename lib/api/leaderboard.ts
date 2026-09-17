@@ -66,3 +66,37 @@ export async function deleteLeaderboardCategory(slug: string): Promise<{ status:
     method: "DELETE",
   });
 }
+
+export interface LeaderboardDisqualification {
+  id: string;
+  entity_id: string;
+  entity_name: string;
+  entity_tag?: string;
+  reason: string;
+  notes?: string;
+  disqualified_by: string;
+  disqualified_at: string;
+}
+
+export async function getDisqualifiedEntries(): Promise<LeaderboardDisqualification[]> {
+  return apiClient<LeaderboardDisqualification[]>("/leaderboard/disqualifications");
+}
+
+export async function disqualifyLeaderboardEntry(payload: {
+  entity_id: string;
+  entity_name: string;
+  entity_tag?: string;
+  reason: string;
+  notes?: string;
+}): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>("/leaderboard/disqualify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reinstateLeaderboardEntry(entityId: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/leaderboard/disqualify/${entityId}`, {
+    method: "DELETE",
+  });
+}
