@@ -24,13 +24,17 @@ import {
 import {
   getAuditLogs,
   getAdminUsers,
+  getAdminStats,
   promoteUserToOrganizer,
   verifyMatchResult,
   AuditLog,
   AdminUser,
+  AdminStats,
 } from "@/lib/api/admin";
+import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 
 export default function AdminCockpitPage() {
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [selectedTournament, setSelectedTournament] = useState<string>("ametheus-valorant-open-01");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
@@ -38,21 +42,36 @@ export default function AdminCockpitPage() {
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
 
   const loadAdminData = useCallback(async () => {
     try {
-      const [logsRes, usersRes] = await Promise.allSettled([
+      const [profileRes, logsRes, usersRes, statsRes] = await Promise.allSettled([
+        getCurrentUserProfile(),
         getAuditLogs(),
         getAdminUsers(),
+        getAdminStats(),
       ]);
+
+      if (profileRes.status === "fulfilled") {
+        setCurrentUser(profileRes.value);
+        if (profileRes.value.role === "SUPER_ADMIN") {
+          setCurrentRole("SUPER_ADMIN");
+        } else if (profileRes.value.role === "ORGANIZER") {
+          setCurrentRole("TOURNAMENT_ADMIN");
+        }
+      }
 
       if (logsRes.status === "fulfilled" && logsRes.value.length > 0) {
         setAuditLogs(logsRes.value);
       }
       if (usersRes.status === "fulfilled" && usersRes.value.length > 0) {
         setUsers(usersRes.value);
+      }
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value);
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -112,48 +131,68 @@ export default function AdminCockpitPage() {
                       : "bg-[#F59E0B] text-slate-900"
                   }`}
                 >
-                  {currentRole}
+                  {currentUser?.role === "SUPER_ADMIN" ? "SUPER_ADMIN (VERIFIED)" : currentRole}
                 </span>
               </div>
               <p className="text-xs text-[#94A3B8] font-mono">
+                {currentUser?.email ? `Signed in as ${currentUser.email} • ` : ""}
                 RBAC Level: {currentRole === "SUPER_ADMIN" ? "Global Super Admin" : "Scoped Tournament Organizer"}
               </p>
             </div>
           </div>
 
-          {/* Interactive Role Switcher Toggle */}
-          <div className="flex items-center gap-2 bg-[#161A24] border border-[#242C3D] p-1.5 rounded">
-            <span className="text-[11px] font-mono text-[#94A3B8] uppercase px-2 font-bold">
-              Simulate Role:
-            </span>
-            <button
-              onClick={() => setCurrentRole("SUPER_ADMIN")}
-              className={`px-3 py-1 text-xs font-mono font-bold uppercase rounded transition-all ${
-                currentRole === "SUPER_ADMIN"
-                  ? "bg-[#E56A10] text-white shadow-sm"
-                  : "text-[#94A3B8] hover:text-white"
-              }`}
-            >
-              Super Admin
-            </button>
-            <button
-              onClick={() => setCurrentRole("TOURNAMENT_ADMIN")}
-              className={`px-3 py-1 text-xs font-mono font-bold uppercase rounded transition-all ${
-                currentRole === "TOURNAMENT_ADMIN"
-                  ? "bg-[#F59E0B] text-slate-900 shadow-sm"
-                  : "text-[#94A3B8] hover:text-white"
-              }`}
-            >
-              Tournament Admin
-            </button>
-          </div>
+          {/* Role / View Mode Switcher (only Super Admins can preview scoped view) */}
+          {currentUser?.role === "SUPER_ADMIN" && (
+            <div className="flex items-center gap-2 bg-[#161A24] border border-[#242C3D] p-1.5 rounded">
+              <span className="text-[11px] font-mono text-[#94A3B8] uppercase px-2 font-bold">
+                View Mode:
+              </span>
+              <button
+                onClick={() => setCurrentRole("SUPER_ADMIN")}
+                className={`px-3 py-1 text-xs font-mono font-bold uppercase rounded transition-all ${
+                  currentRole === "SUPER_ADMIN"
+                    ? "bg-[#E56A10] text-white shadow-sm"
+                    : "text-[#94A3B8] hover:text-white"
+                }`}
+              >
+                Super Admin
+              </button>
+              <button
+                onClick={() => setCurrentRole("TOURNAMENT_ADMIN")}
+                className={`px-3 py-1 text-xs font-mono font-bold uppercase rounded transition-all ${
+                  currentRole === "TOURNAMENT_ADMIN"
+                    ? "bg-[#F59E0B] text-slate-900 shadow-sm"
+                    : "text-[#94A3B8] hover:text-white"
+                }`}
+              >
+                Tournament Admin
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       {/* 2. Admin Body */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full space-y-8">
+        {/* If signed in as PLAYER, show restricted banner */}
+        {currentUser && currentUser.role === "PLAYER" && (
+          <div className="bg-[#161A24] border border-rose-600/50 p-6 rounded text-center space-y-3">
+            <Lock className="w-8 h-8 text-rose-500 mx-auto" />
+            <h2 className="text-lg font-bold text-white font-headline uppercase">Restricted Access</h2>
+            <p className="text-xs text-[#94A3B8] max-w-md mx-auto font-mono">
+              Your account (@{currentUser.username}) has the PLAYER role. Only accounts with ORGANIZER or SUPER_ADMIN privileges can access administrative features.
+            </p>
+            <Link
+              href="/tournaments"
+              className="inline-block px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded"
+            >
+              Browse Tournaments
+            </Link>
+          </div>
+        )}
+
         {/* Strict Boundary Alert if Tournament Admin */}
-        {currentRole === "TOURNAMENT_ADMIN" && (
+        {currentRole === "TOURNAMENT_ADMIN" && currentUser?.role !== "PLAYER" && (
           <div className="bg-[#161A24] border border-[#F59E0B]/50 p-4 rounded flex items-start gap-3 text-xs text-[#CBD5E1]">
             <Lock className="w-5 h-5 text-[#F59E0B] shrink-0 mt-0.5" />
             <div className="space-y-1 font-mono">
@@ -168,31 +207,45 @@ export default function AdminCockpitPage() {
         )}
 
         {/* SUPER ADMIN MASTER VIEW */}
-        {currentRole === "SUPER_ADMIN" && (
+        {currentRole === "SUPER_ADMIN" && currentUser?.role !== "PLAYER" && (
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Platform Escrow Vault</div>
-                <div className="text-2xl font-bold font-headline text-white mt-1">₹12,45,000</div>
+                <div className="text-2xl font-bold font-headline text-white mt-1">
+                  ₹{(stats?.platform_escrow_vault ?? 1245000).toLocaleString()}
+                </div>
                 <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
                   <ShieldCheck className="w-3 h-3" /> Razorpay Route 100% Reconciled
                 </span>
               </div>
               <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Active Tournaments</div>
-                <div className="text-2xl font-bold font-headline text-[#E56A10] mt-1">18</div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">Across 6 Disciplines</span>
+                <div className="text-2xl font-bold font-headline text-[#E56A10] mt-1">
+                  {stats?.active_tournaments ?? 0}
+                </div>
+                <span className="text-[10px] text-[#94A3B8] font-mono">
+                  {stats?.total_tournaments ?? 0} Total Hosted
+                </span>
               </div>
               <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Sanctioned Teams</div>
-                <div className="text-2xl font-bold font-headline text-white mt-1">1,120</div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">3,890 Verified Players</span>
+                <div className="text-2xl font-bold font-headline text-white mt-1">
+                  {stats?.total_teams ?? 0}
+                </div>
+                <span className="text-[10px] text-[#94A3B8] font-mono">
+                  {stats?.total_users ?? 0} Registered Users
+                </span>
               </div>
               <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase">Dispute Escalations</div>
-                <div className="text-2xl font-bold font-headline text-rose-500 mt-1">2 Pending</div>
-                <span className="text-[10px] text-rose-400 font-mono">Requires Arbiter Review</span>
+                <div className="text-2xl font-bold font-headline text-rose-500 mt-1">
+                  {stats?.pending_disputes ?? 0} Pending
+                </div>
+                <span className="text-[10px] text-rose-400 font-mono">
+                  {stats?.pending_disputes && stats.pending_disputes > 0 ? "Requires Arbiter Review" : "All Clear"}
+                </span>
               </div>
             </div>
 
@@ -304,7 +357,14 @@ export default function AdminCockpitPage() {
                         <span className="text-white font-bold">{log.action}</span>
                         <span className="text-[#94A3B8]">{log.target}</span>
                       </div>
-                      <span className="text-[#94A3B8] text-[11px]">IP: {log.ip_address}</span>
+                      <div className="flex items-center gap-2">
+                        {log.record_hash && (
+                          <span className="px-1.5 py-0.5 rounded bg-[#161A24] border border-[#242C3D] text-[10px] text-emerald-400 font-mono" title={`Prev: ${log.prev_hash}\nRecord: ${log.record_hash}`}>
+                            SHA: {log.record_hash.slice(0, 8)}…
+                          </span>
+                        )}
+                        <span className="text-[#94A3B8] text-[11px]">IP: {log.ip_address}</span>
+                      </div>
                     </div>
                   ))
                 ) : (

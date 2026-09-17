@@ -7,6 +7,8 @@ import { MatchLobbyInfo } from "@/types";
 import { getMatches, Match as ApiMatch } from "@/lib/api/matches";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
 import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
+import LiveTickerBar from "@/components/match/LiveTickerBar";
+import { useMatchTicker, TickerEvent } from "@/lib/hooks/useMatchTicker";
 import {
   Gamepad2,
   Clock,
@@ -87,6 +89,20 @@ export default function MatchesPage() {
     return () => clearInterval(interval);
   }, [fetchMatchesData]);
 
+  const handleTickerEvent = useCallback(
+    (event: TickerEvent) => {
+      if (
+        event.event === "MATCH_SCORE_SUBMITTED" ||
+        event.event === "MATCH_VERIFIED"
+      ) {
+        fetchMatchesData();
+      }
+    },
+    [fetchMatchesData]
+  );
+
+  const { isConnected, events, latestEvent } = useMatchTicker(handleTickerEvent);
+
   const filteredMatches = matches.filter((m) => {
     if (filterStatus === "all") return true;
     if (filterStatus === "live") return m.status === "LIVE";
@@ -112,6 +128,13 @@ export default function MatchesPage() {
           </p>
         </div>
       </section>
+
+      {/* Live WebSocket Telemetry Ticker */}
+      <LiveTickerBar
+        isConnected={isConnected}
+        events={events}
+        latestEvent={latestEvent}
+      />
 
       {/* 2. Matches Canvas */}
       <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full">

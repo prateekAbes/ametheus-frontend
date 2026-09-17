@@ -8,6 +8,8 @@ export interface AuditLog {
   action: string;
   target: string;
   ip_address: string;
+  prev_hash?: string;
+  record_hash?: string;
 }
 
 export async function getAuditLogs(): Promise<AuditLog[]> {
@@ -53,5 +55,20 @@ export interface AdminUser {
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
   return apiClient<AdminUser[]>("/admin/users");
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_tournaments: number;
+  active_tournaments: number;
+  total_teams: number;
+  total_games: number;
+  pending_disputes: number;
+  active_matches: number;
+  platform_escrow_vault: number;
+}
+
+export async function getAdminStats(): Promise<AdminStats> {
+  return apiClient<AdminStats>("/admin/stats");
 }
 

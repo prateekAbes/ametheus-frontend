@@ -7,3 +7,4 @@ export * from "./leaderboard";
 export * from "./auth";
 export * from "./organizer";
 export * from "./admin";
+export * from "./payments";

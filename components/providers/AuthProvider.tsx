@@ -45,15 +45,10 @@ function TokenAndProfileSync() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  if (!CLERK_KEY) {
-    // Graceful fallback for preview / build environments without live Clerk keys
-    return <>{children}</>;
-  }
-
   return (
-    <ClerkProvider publishableKey={CLERK_KEY}>
+    <>
       <TokenAndProfileSync />
       {children}
-    </ClerkProvider>
+    </>
   );
 }
