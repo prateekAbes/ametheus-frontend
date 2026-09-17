@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Bell, Shield, User as UserIcon } from "lucide-react";
+import { Search, Shield, User as UserIcon } from "lucide-react";
+import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 import {
   Show,
   SignInButton,
@@ -71,6 +72,12 @@ export default function Header() {
             Organizer
           </Link>
           <Link
+            href="/about"
+            className="px-3 py-1.5 rounded transition-colors hover:text-white hover:bg-[#161A24]"
+          >
+            About
+          </Link>
+          <Link
             href="/admin"
             className="px-3 py-1.5 rounded transition-colors text-[#E56A10] hover:text-[#FFB68F] hover:bg-[#161A24] font-mono text-xs font-bold"
           >
@@ -89,17 +96,8 @@ export default function Header() {
             </kbd>
           </div>
 
-          {/* Notifications */}
-          <button
-            type="button"
-            className="relative p-2 bg-[#161A24] border border-[#242C3D] rounded text-[#CBD5E1] hover:text-white hover:border-[#CBD5E1] transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 bg-[#E56A10] text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
-              3
-            </span>
-          </button>
+          {/* Notifications Dropdown */}
+          <NotificationsDropdown />
 
           {/* Clerk Auth Controls */}
           <Show when="signed-out">
