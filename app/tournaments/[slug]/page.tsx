@@ -145,7 +145,7 @@ export default function TournamentDetailPage({ params }: Props) {
                   <strong className="text-[#0F172A]">Discipline:</strong> {currentTournament.gameName}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A]">Roster Lock:</strong> {currentTournament.rosterLockTime}
+                  <strong className="text-[#0F172A]">Squad Lock:</strong> {currentTournament.rosterLockTime}
                 </div>
                 <div>
                   <strong className="text-[#0F172A]">Launch:</strong> {currentTournament.startsAt}
@@ -294,7 +294,7 @@ export default function TournamentDetailPage({ params }: Props) {
               { id: "schedule", label: "Schedule & Timeline" },
               { id: "prizes", label: "Prize Distribution" },
               { id: "bracket", label: "Live Bracket" },
-              { id: "rosters", label: `Rosters (${currentTournament.registeredRosters.length})` },
+              { id: "rosters", label: `Squads (${currentTournament.registeredRosters.length})` },
             ].map((t) => (
               <button
                 key={t.id}
@@ -427,7 +427,7 @@ export default function TournamentDetailPage({ params }: Props) {
         {activeTab === "rosters" && (
           <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
             <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-4">
-              Confirmed Squad Rosters ({currentTournament.registeredRosters.length})
+              Confirmed Squad Lineups ({currentTournament.registeredRosters.length})
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

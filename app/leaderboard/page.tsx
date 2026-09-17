@@ -1,11 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { LEADERBOARD_ENTRIES } from "@/lib/data/leaderboard";
-import { LeaderboardEntry } from "@/types";
-import { getLeaderboard } from "@/lib/api/leaderboard";
+import {
+  getLeaderboard,
+  getLeaderboardCategories,
+  createLeaderboardCategory,
+  deleteLeaderboardCategory,
+  LeaderboardEntry,
+  LeaderboardCategory,
+  LeaderboardCategoryCreatePayload,
+} from "@/lib/api/leaderboard";
+import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 import {
   Trophy,
   Shield,
@@ -18,48 +27,132 @@ import {
   Users,
   Wallet,
   ArrowRight,
+  Plus,
+  Trash2,
+  Filter,
+  Sparkles,
+  Gamepad2,
+  X,
+  Loader2,
 } from "lucide-react";
 
 export default function LeaderboardPage() {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>(LEADERBOARD_ENTRIES);
+  const { user } = useUser();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [entries, setEntries] = useState<any[]>(LEADERBOARD_ENTRIES);
+  const [categories, setCategories] = useState<LeaderboardCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("overall");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<"teams" | "players">("teams");
   const [searchQuery, setSearchQuery] = useState("");
   const [timeframe, setTimeframe] = useState<"all" | "season" | "month" | "weekly">("all");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isAddingCategory, setIsAddingCategory] = useState<boolean>(false);
+  const [isSubmittingCat, setIsSubmittingCat] = useState<boolean>(false);
+  const [catActionMsg, setCatActionMsg] = useState<string>("");
+
+  const [categoryForm, setCategoryForm] = useState<LeaderboardCategoryCreatePayload>({
+    name: "",
+    game_slug: "all",
+    sort_metric: "rating",
+    min_matches: 0,
+    description: "",
+  });
+
+  const userEmail = (user?.primaryEmailAddress?.emailAddress || profile?.email || "").toLowerCase();
+  const isSuperAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg" || profile?.role === "SUPER_ADMIN";
+
+  // Load Categories & User Profile
+  useEffect(() => {
+    getLeaderboardCategories()
+      .then((cats) => {
+        if (cats && cats.length > 0) {
+          setCategories(cats);
+        }
+      })
+      .catch((err) => console.warn("Failed to load categories:", err));
+
+    getCurrentUserProfile()
+      .then((p) => setProfile(p))
+      .catch(() => {});
+  }, []);
+
+  // Fetch Leaderboard Entries based on active category & discipline
+  const fetchEntries = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await getLeaderboard(selectedCategory, selectedDiscipline);
+      if (data && data.length > 0) {
+        const mapped = data.map((d) => ({
+          rank: d.rank,
+          id: d.id,
+          name: d.name,
+          tag: d.tag,
+          type: d.type || "team",
+          gameSlug: d.game_slug,
+          gameName: d.game_name,
+          captain: d.captain,
+          logoUrl: d.logo_url,
+          winRate: d.win_rate,
+          matchesPlayed: d.matches_played,
+          wins: d.wins,
+          losses: d.losses,
+          rating: d.rating,
+          earnings: d.earnings,
+          form: d.form || ["W", "W", "W", "W", "W"],
+          isVerified: d.is_verified,
+          category: d.category || "pc",
+        }));
+        setEntries(mapped);
+      }
+    } catch (e) {
+      console.warn("Leaderboard live API fetch fallback:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCategory, selectedDiscipline]);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const data = await getLeaderboard();
-        if (data && data.length > 0) {
-          const mapped: LeaderboardEntry[] = data.map((d) => ({
-            rank: d.rank,
-            id: d.id,
-            name: d.name,
-            tag: d.tag,
-            type: (d.type as any) || "team",
-            gameSlug: d.game_slug,
-            gameName: d.game_name,
-            captain: d.captain,
-            logoUrl: d.logo_url,
-            winRate: d.win_rate,
-            matchesPlayed: d.matches_played,
-            wins: d.wins,
-            losses: d.losses,
-            rating: d.rating,
-            earnings: d.earnings,
-            form: (d.form as any) || ["W", "W", "W", "W", "W"],
-            isVerified: d.is_verified,
-            category: (d.category as any) || "pc",
-          }));
-          setEntries(mapped);
-        }
-      } catch (e) {
-        console.warn("Leaderboard live API fetch fallback:", e);
-      }
+    fetchEntries();
+  }, [fetchEntries]);
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) return;
+    setIsSubmittingCat(true);
+    try {
+      const created = await createLeaderboardCategory(categoryForm);
+      setCatActionMsg(`Category "${created.name}" created and standings calculated!`);
+      const cats = await getLeaderboardCategories();
+      setCategories(cats);
+      setSelectedCategory(created.slug);
+      setIsAddingCategory(false);
+      setCategoryForm({ name: "", game_slug: "all", sort_metric: "rating", min_matches: 0, description: "" });
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      setCatActionMsg(err?.message || "Failed to create category");
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } finally {
+      setIsSubmittingCat(false);
     }
-    loadData();
-  }, []);
+  };
+
+  const handleDeleteCategory = async (slug: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete category "${name}"?`)) return;
+    try {
+      await deleteLeaderboardCategory(slug);
+      setCatActionMsg(`Category "${name}" deleted.`);
+      const cats = await getLeaderboardCategories();
+      setCategories(cats);
+      if (selectedCategory === slug) {
+        setSelectedCategory("overall");
+      }
+      setTimeout(() => setCatActionMsg(""), 4000);
+    } catch (err: any) {
+      setCatActionMsg(err?.message || "Failed to delete category");
+      setTimeout(() => setCatActionMsg(""), 4000);
+    }
+  };
 
   const disciplines = [
     { id: "all", name: "All Games" },
@@ -82,8 +175,7 @@ export default function LeaderboardPage() {
     return matchesDiscipline && matchesType && matchesSearch;
   });
 
-  const topThree = entries.filter((e) => e.rank <= 3);
-  const matrixEntries = filteredEntries.filter((e) => e.rank > 3);
+  const topThree = entries.slice(0, 3);
 
   const exportCsv = () => {
     const header = "Rank,Team,Tag,Game,WinRate,Wins,Losses,Rating,Earnings\n";
@@ -102,35 +194,52 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#F8F9FA] min-h-screen">
-      {/* 1. Metric Header Bar */}
-      <section className="w-full bg-[#EFF4FF] py-10 md:py-12 border-b border-[#D3E4FE]">
+    <div className="flex flex-col w-full bg-[#0B0E16] min-h-screen text-white">
+      {/* Action Notification Toast */}
+      {catActionMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#161A24] border border-[#E56A10] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2 font-mono text-xs animate-bounce">
+          <Sparkles className="w-4 h-4 text-[#E56A10]" />
+          <span>{catActionMsg}</span>
+        </div>
+      )}
+
+      {/* 1. Header Banner */}
+      <section className="w-full bg-[#10141F] py-10 md:py-12 border-b border-[#242C3D]">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#E5EEFF] border border-[#CBD5E1] rounded text-[#E56A10] text-xs font-bold font-mono tracking-wider uppercase mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#161A24] border border-[#242C3D] rounded text-[#E56A10] text-xs font-bold font-mono tracking-wider uppercase mb-3">
                 <span className="w-2 h-2 rounded-full bg-[#E56A10] animate-ping" />
-                SEASON 2026 // RATINGS AUDITED
+                SEASON 2026 // LIVE ARENA RATINGS
               </div>
-              <h1 className="text-3xl md:text-5xl font-bold font-headline text-[#0B1C30] tracking-tight uppercase">
+              <h1 className="text-3xl md:text-5xl font-bold font-headline text-white tracking-tight uppercase">
                 AMETHEUS Global Leaderboard
               </h1>
-              <p className="mt-2 text-sm md:text-base text-[#565E74] max-w-2xl leading-relaxed">
-                Track competitive performance, championship standings, and verified escrow earnings across all AMETHEUS sanctioned tournaments.
+              <p className="mt-2 text-sm md:text-base text-[#94A3B8] max-w-2xl leading-relaxed">
+                Track competitive performance, championship standings, and verified prize pool earnings across all sanctioned AMETHEUS tournaments.
               </p>
             </div>
 
             <div className="flex items-center gap-3">
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setIsAddingCategory(true)}
+                  className="px-4 py-2.5 bg-[#161A24] border border-[#E56A10]/50 hover:border-[#E56A10] text-[#FFB68F] hover:text-white rounded font-headline font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-[#E56A10]" />
+                  Add Category
+                </button>
+              )}
               <button
                 onClick={exportCsv}
-                className="px-4 py-2.5 bg-white border border-[#D3E4FE] shadow-sm rounded text-[#0B1C30] font-headline font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] rounded text-[#CBD5E1] font-headline font-bold text-xs uppercase tracking-wider hover:text-white transition-colors flex items-center gap-2 cursor-pointer"
               >
-                <Download className="w-4 h-4 text-[#565E74]" />
+                <Download className="w-4 h-4 text-[#94A3B8]" />
                 Export CSV
               </button>
               <Link
                 href="/tournaments"
-                className="px-4 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded font-headline font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white rounded font-headline font-bold text-xs uppercase tracking-wider shadow-sm transition-all flex items-center gap-2"
               >
                 <Trophy className="w-4 h-4" />
                 Join Tournaments
@@ -138,64 +247,64 @@ export default function LeaderboardPage() {
             </div>
           </div>
 
-          {/* Telemetry Stat Cards matching Stitch Screen 8 */}
+          {/* Telemetry Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded border border-[#D3E4FE] shadow-sm flex items-center justify-between">
+            <div className="bg-[#161A24] p-5 rounded-xl border border-[#242C3D] flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-mono text-[#565E74] uppercase tracking-wider mb-1 font-bold">
-                  Total Distributed Prizes
+                <div className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider mb-1 font-bold">
+                  Total Awarded Prizes
                 </div>
-                <div className="text-2xl font-bold font-headline text-[#0B1C30]">₹14,50,000+</div>
+                <div className="text-2xl font-bold font-headline text-white">₹14,50,000+</div>
                 <span className="text-[11px] text-[#E56A10] font-mono flex items-center gap-1 mt-1 font-bold">
-                  <Shield className="w-3.5 h-3.5" /> Escrow Verified
+                  <Shield className="w-3.5 h-3.5" /> Prize Vault Verified
                 </span>
               </div>
-              <div className="w-12 h-12 rounded bg-[#E5EEFF] flex items-center justify-center text-[#E56A10]">
+              <div className="w-12 h-12 rounded-lg bg-[#E56A10]/15 border border-[#E56A10]/30 flex items-center justify-center text-[#E56A10]">
                 <Wallet className="w-6 h-6" />
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded border border-[#D3E4FE] shadow-sm flex items-center justify-between">
+            <div className="bg-[#161A24] p-5 rounded-xl border border-[#242C3D] flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-mono text-[#565E74] uppercase tracking-wider mb-1 font-bold">
+                <div className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider mb-1 font-bold">
                   Active Contenders
                 </div>
-                <div className="text-2xl font-bold font-headline text-[#0B1C30]">24,800+</div>
-                <span className="text-[11px] text-[#565E74] font-mono flex items-center gap-1 mt-1 font-bold">
+                <div className="text-2xl font-bold font-headline text-white">24,800+</div>
+                <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 mt-1 font-bold">
                   <TrendingUp className="w-3.5 h-3.5" /> +3,120 This Month
                 </span>
               </div>
-              <div className="w-12 h-12 rounded bg-[#E5EEFF] flex items-center justify-center text-[#0B1C30]">
+              <div className="w-12 h-12 rounded-lg bg-[#10141F] border border-[#242C3D] flex items-center justify-center text-white">
                 <Users className="w-6 h-6" />
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded border border-[#D3E4FE] shadow-sm flex items-center justify-between">
+            <div className="bg-[#161A24] p-5 rounded-xl border border-[#242C3D] flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-mono text-[#565E74] uppercase tracking-wider mb-1 font-bold">
-                  Verified Teams
+                <div className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider mb-1 font-bold">
+                  Verified Squads
                 </div>
-                <div className="text-2xl font-bold font-headline text-[#0B1C30]">1,120+</div>
-                <span className="text-[11px] text-[#565E74] font-mono flex items-center gap-1 mt-1 font-bold">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> KYC & Roster Locked
+                <div className="text-2xl font-bold font-headline text-white">1,120+</div>
+                <span className="text-[11px] text-[#94A3B8] font-mono flex items-center gap-1 mt-1 font-bold">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Verified & Squad Locked
                 </span>
               </div>
-              <div className="w-12 h-12 rounded bg-[#E5EEFF] flex items-center justify-center text-[#0B1C30]">
+              <div className="w-12 h-12 rounded-lg bg-[#10141F] border border-[#242C3D] flex items-center justify-center text-white">
                 <Award className="w-6 h-6" />
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded border border-[#D3E4FE] shadow-sm flex items-center justify-between">
+            <div className="bg-[#161A24] p-5 rounded-xl border border-[#242C3D] flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-mono text-[#565E74] uppercase tracking-wider mb-1 font-bold">
+                <div className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider mb-1 font-bold">
                   Top Team Earnings
                 </div>
                 <div className="text-2xl font-bold font-headline text-[#E56A10]">₹1,85,000</div>
-                <span className="text-[11px] text-[#565E74] font-mono flex items-center gap-1 mt-1 font-bold">
-                  <Trophy className="w-3.5 h-3.5 text-[#F59E0B]" /> Team Solaris X
+                <span className="text-[11px] text-amber-400 font-mono flex items-center gap-1 mt-1 font-bold">
+                  <Trophy className="w-3.5 h-3.5" /> Team Solaris X
                 </span>
               </div>
-              <div className="w-12 h-12 rounded bg-[#FFDBCA] flex items-center justify-center text-[#E56A10]">
+              <div className="w-12 h-12 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
                 <Flame className="w-6 h-6" />
               </div>
             </div>
@@ -203,29 +312,86 @@ export default function LeaderboardPage() {
         </div>
       </section>
 
-      {/* 2. Main Content Canvas */}
-      <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full">
+      {/* 2. Main Content Area */}
+      <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full space-y-6">
+        {/* Dynamic Categories Tab Bar */}
+        <div className="bg-[#10141F] p-4 rounded-xl border border-[#242C3D] space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-[#E56A10]" />
+              <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                Leaderboard Criteria:
+              </span>
+            </div>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setIsAddingCategory(true)}
+                className="text-[11px] font-mono text-[#E56A10] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Criteria
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {categories.map((cat) => {
+              const active = selectedCategory === cat.slug;
+              return (
+                <div key={cat.slug} className="relative group flex items-center">
+                  <button
+                    onClick={() => setSelectedCategory(cat.slug)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                      active
+                        ? "bg-[#E56A10] text-white shadow-xs"
+                        : "bg-[#161A24] text-[#94A3B8] border border-[#242C3D] hover:text-white hover:border-[#333C4D]"
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    {cat.sort_metric !== "rating" && (
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded ${active ? "bg-black/25 text-white" : "bg-[#0B0E16] text-[#E56A10]"}`}>
+                        {cat.sort_metric.replace("_", " ")}
+                      </span>
+                    )}
+                  </button>
+                  {isSuperAdmin && !cat.is_system && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCategory(cat.slug, cat.name);
+                      }}
+                      className="ml-1 p-1 text-[#64748B] hover:text-rose-400 transition-colors cursor-pointer"
+                      title="Delete category"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Filter Controls Card */}
-        <div className="bg-white p-5 rounded border border-[#D3E4FE] shadow-sm mb-8 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#E5EEFF]">
+        <div className="bg-[#10141F] p-5 rounded-xl border border-[#242C3D] space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#242C3D]">
             {/* Teams vs Players */}
-            <div className="flex items-center gap-1 bg-[#EFF4FF] p-1 rounded">
+            <div className="flex items-center gap-1 bg-[#161A24] p-1 rounded-lg border border-[#242C3D]">
               <button
                 onClick={() => setSelectedType("teams")}
-                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded transition-all ${
+                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
                   selectedType === "teams"
-                    ? "bg-[#E56A10] text-white shadow-sm"
-                    : "text-[#565E74] hover:text-[#0B1C30]"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white"
                 }`}
               >
-                Franchise Teams
+                Franchise Squads
               </button>
               <button
                 onClick={() => setSelectedType("players")}
-                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded transition-all ${
+                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
                   selectedType === "players"
-                    ? "bg-[#E56A10] text-white shadow-sm"
-                    : "text-[#565E74] hover:text-[#0B1C30]"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white"
                 }`}
               >
                 Individual Soloists
@@ -243,10 +409,10 @@ export default function LeaderboardPage() {
                 <button
                   key={t.id}
                   onClick={() => setTimeframe(t.id as any)}
-                  className={`px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider rounded transition-colors ${
+                  className={`px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
                     timeframe === t.id
-                      ? "bg-[#0B1C30] text-white"
-                      : "text-[#565E74] hover:bg-[#E5EEFF]"
+                      ? "bg-[#E56A10]/20 text-[#FFB68F] border border-[#E56A10]/40"
+                      : "text-[#94A3B8] bg-[#161A24] border border-[#242C3D] hover:text-white"
                   }`}
                 >
                   {t.label}
@@ -256,30 +422,30 @@ export default function LeaderboardPage() {
 
             {/* Search */}
             <div className="relative w-full lg:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#565E74]" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search team tag, handle, player..."
-                className="w-full pl-9 pr-3 py-1.5 bg-[#EFF4FF] border border-[#D3E4FE] text-xs rounded text-[#0B1C30] placeholder:text-[#565E74] focus:outline-none focus:bg-white focus:border-[#E56A10]"
+                placeholder="Search squad tag, handle, player..."
+                className="w-full pl-9 pr-3 py-1.5 bg-[#161A24] border border-[#242C3D] text-xs rounded-lg text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#E56A10]"
               />
             </div>
           </div>
 
           {/* Discipline Selector Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] font-mono text-[#565E74] uppercase tracking-wider font-bold shrink-0 mr-1">
-              Discipline:
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-[11px] font-mono text-[#94A3B8] uppercase tracking-wider font-bold shrink-0 mr-1">
+              Game Title:
             </span>
             {disciplines.map((d) => (
               <button
                 key={d.id}
                 onClick={() => setSelectedDiscipline(d.id)}
-                className={`px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider rounded shrink-0 transition-all ${
+                className={`px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider rounded-md shrink-0 transition-all cursor-pointer ${
                   selectedDiscipline === d.id
-                    ? "bg-[#E56A10] text-white shadow-sm"
-                    : "bg-[#EFF4FF] text-[#565E74] hover:text-[#0B1C30] hover:bg-[#D3E4FE]"
+                    ? "bg-[#E56A10] text-white"
+                    : "bg-[#161A24] text-[#94A3B8] border border-[#242C3D] hover:text-white"
                 }`}
               >
                 {d.name}
@@ -289,167 +455,167 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Championship Podium (Top 3) */}
-        {selectedDiscipline === "all" && selectedType === "teams" && !searchQuery && (
+        {selectedDiscipline === "all" && selectedType === "teams" && !searchQuery && topThree.length >= 3 && (
           <div className="mb-10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-[#E56A10]" />
-                <h2 className="text-xl font-bold font-headline text-[#0B1C30] uppercase tracking-tight">
+                <h2 className="text-xl font-bold font-headline text-white uppercase tracking-tight">
                   Championship Podium
                 </h2>
               </div>
-              <span className="text-xs font-mono text-[#565E74] uppercase font-bold">
-                Top 3 Sanctioned Franchises
+              <span className="text-xs font-mono text-[#94A3B8] uppercase font-bold">
+                Top 3 Competitive Franchises
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              {/* #2 Titan Clash (CS2) */}
-              <div className="bg-white p-6 rounded border border-[#D3E4FE] shadow-sm relative overflow-hidden order-2 md:order-1 transform transition hover:-translate-y-1">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#BEC6E0]" />
+              {/* #2 Rank */}
+              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-lg relative overflow-hidden order-2 md:order-1 transform transition hover:-translate-y-1">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#94A3B8]" />
                 <div className="flex items-center justify-between mb-4">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded bg-[#DAE2FD] text-[#131B2E] font-headline font-bold text-base">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#161A24] border border-[#242C3D] text-white font-headline font-bold text-base">
                     #2
                   </span>
-                  <span className="px-2 py-0.5 bg-[#EFF4FF] rounded text-[10px] font-mono uppercase text-[#565E74] font-bold">
-                    CS2 PRO CIRCUIT
+                  <span className="px-2 py-0.5 bg-[#161A24] rounded text-[10px] font-mono uppercase text-[#94A3B8] font-bold border border-[#242C3D]">
+                    {topThree[1].gameName}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-16 h-16 rounded bg-[#EFF4FF] overflow-hidden shrink-0 border border-[#D3E4FE]">
+                  <div className="relative w-16 h-16 rounded-lg bg-[#161A24] overflow-hidden shrink-0 border border-[#242C3D]">
                     <Image
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMYikVhkT2cPuCcT6iHyvC8KRrGxi2uWjy_Yg4PRywCpZ0Qk_XuBVy-SRnVARKIhqdj-kgUgfYlRjv_KTabBT194pEvMHjgNWeddHSPbu6P_N7NZD2B8VX7etUUzxmFCcI_NOLjS7LndnhoB8Te6UWYv5FexbsBx1329LlvMT7RFsiQ8_LX9hHuWmyhH0syOHCVlI_t-LXya3oFvZnd1NPJyQz_IZjYv6PmnX97rPssU0Rf0xwleEz"
-                      alt="Titan Clash"
+                      src={topThree[1].logoUrl}
+                      alt={topThree[1].name}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div>
                     <div className="flex items-center gap-1">
-                      <h3 className="font-headline text-lg font-bold text-[#0B1C30]">Titan Clash</h3>
+                      <h3 className="font-headline text-lg font-bold text-white">{topThree[1].name}</h3>
                       <CheckCircle className="w-4 h-4 text-[#E56A10]" />
                     </div>
-                    <p className="text-xs text-[#565E74] font-mono">[TC-ELITE] • Captain: @reaper_cs</p>
+                    <p className="text-xs text-[#94A3B8] font-mono">[{topThree[1].tag}] • {topThree[1].captain}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 bg-[#EFF4FF] p-3 rounded mb-4 text-center font-mono">
+                <div className="grid grid-cols-3 gap-2 bg-[#161A24] p-3 rounded-lg mb-4 text-center font-mono border border-[#242C3D]">
                   <div>
-                    <div className="text-[10px] text-[#565E74]">WIN RATE</div>
-                    <div className="text-sm font-bold text-[#0B1C30] mt-0.5">89.1%</div>
+                    <div className="text-[10px] text-[#94A3B8]">WIN RATE</div>
+                    <div className="text-sm font-bold text-white mt-0.5">{topThree[1].winRate}%</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">W / L</div>
-                    <div className="text-sm font-bold text-[#0B1C30] mt-0.5">38 / 5</div>
+                    <div className="text-[10px] text-[#94A3B8]">W / L</div>
+                    <div className="text-sm font-bold text-white mt-0.5">{topThree[1].wins} / {topThree[1].losses}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">POINTS</div>
-                    <div className="text-sm font-bold text-[#E56A10] mt-0.5">3,420</div>
+                    <div className="text-[10px] text-[#94A3B8]">RATING</div>
+                    <div className="text-sm font-bold text-[#E56A10] mt-0.5">{topThree[1].rating}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-[#EFF4FF]">
-                  <span className="text-xs text-[#565E74] font-mono uppercase">Earnings</span>
-                  <span className="text-lg font-bold font-headline text-[#0B1C30]">₹1,20,000</span>
+                <div className="flex items-center justify-between pt-3 border-t border-[#242C3D]">
+                  <span className="text-xs text-[#94A3B8] font-mono uppercase">Prize Earnings</span>
+                  <span className="text-lg font-bold font-headline text-white">₹{topThree[1].earnings.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* #1 Solaris X (Valorant) */}
-              <div className="bg-white p-7 rounded border-2 border-[#E56A10] shadow-md relative overflow-hidden order-1 md:order-2 -mt-4 transform transition hover:-translate-y-1">
+              {/* #1 Rank (Center Champion) */}
+              <div className="bg-[#10141F] p-7 rounded-xl border-2 border-[#E56A10] shadow-2xl relative overflow-hidden order-1 md:order-2 -mt-4 transform transition hover:-translate-y-1">
                 <div className="absolute top-0 left-0 right-0 h-2 bg-[#E56A10]" />
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded bg-[#E56A10] text-white font-headline font-bold text-lg shadow-sm">
+                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[#E56A10] text-white font-headline font-bold text-lg shadow-sm">
                       #1
                     </span>
-                    <Trophy className="w-6 h-6 text-[#F59E0B]" />
+                    <Trophy className="w-6 h-6 text-amber-400" />
                   </div>
-                  <span className="px-2.5 py-1 bg-[#FFDBCA] text-[#331100] text-[10px] font-mono uppercase tracking-wider rounded font-bold">
-                    VALORANT PREMIER CHAMPION
+                  <span className="px-2.5 py-1 bg-[#E56A10]/20 border border-[#E56A10]/40 text-[#FFB68F] text-[10px] font-mono uppercase tracking-wider rounded font-bold">
+                    PREMIER CHAMPION
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-20 h-20 rounded bg-[#EFF4FF] overflow-hidden shrink-0 border border-[#D3E4FE] shadow-sm">
+                  <div className="relative w-20 h-20 rounded-lg bg-[#161A24] overflow-hidden shrink-0 border border-[#242C3D]">
                     <Image
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdPWn2ez9ufUiy3oobQMiyzKWPPQYVyngmyTfKqJMWwfmrnUALrqljOu3fdZn-93iR00dO8abRLetxpR3H_YY3Lw0kKtOiie2zXvcvZIFoaGNsiSwx85D3D6OxG0gHpFRiib2Ya4XvFEph7nC919c8zczdq9v32ddvS6lpbCcpe-vwqwPx1OMgEU1xRwlEmm5SIE6Rj7g-L0YKOPoAoiiNPDGGv944Lu6ZDoOPAhH3_SduIY6JiOlN"
-                      alt="Solaris X"
+                      src={topThree[0].logoUrl}
+                      alt={topThree[0].name}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <h3 className="font-headline text-2xl font-bold text-[#0B1C30] uppercase">
-                        Solaris X
+                      <h3 className="font-headline text-2xl font-bold text-white uppercase">
+                        {topThree[0].name}
                       </h3>
                       <CheckCircle className="w-5 h-5 text-[#E56A10]" />
                     </div>
-                    <p className="text-xs text-[#565E74] font-mono">[SLX] • Captain: @vortex_lead</p>
+                    <p className="text-xs text-[#94A3B8] font-mono">[{topThree[0].tag}] • {topThree[0].captain}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 bg-[#EFF4FF] p-3 rounded mb-4 text-center font-mono">
+                <div className="grid grid-cols-3 gap-2 bg-[#161A24] p-3 rounded-lg mb-4 text-center font-mono border border-[#242C3D]">
                   <div>
-                    <div className="text-[10px] text-[#565E74]">WIN RATE</div>
-                    <div className="text-lg font-bold text-[#E56A10] mt-0.5">94.2%</div>
+                    <div className="text-[10px] text-[#94A3B8]">WIN RATE</div>
+                    <div className="text-lg font-bold text-[#E56A10] mt-0.5">{topThree[0].winRate}%</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">W / L</div>
-                    <div className="text-lg font-bold text-[#0B1C30] mt-0.5">42 / 3</div>
+                    <div className="text-[10px] text-[#94A3B8]">W / L</div>
+                    <div className="text-lg font-bold text-white mt-0.5">{topThree[0].wins} / {topThree[0].losses}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">POINTS</div>
-                    <div className="text-lg font-bold text-[#0B1C30] mt-0.5">4,890</div>
+                    <div className="text-[10px] text-[#94A3B8]">RATING</div>
+                    <div className="text-lg font-bold text-white mt-0.5">{topThree[0].rating}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-[#EFF4FF]">
-                  <span className="text-xs text-[#565E74] font-mono uppercase">Escrow Payout</span>
-                  <span className="text-2xl font-bold font-headline text-[#E56A10]">₹1,85,000</span>
+                <div className="flex items-center justify-between pt-3 border-t border-[#242C3D]">
+                  <span className="text-xs text-[#94A3B8] font-mono uppercase">Prize Earnings</span>
+                  <span className="text-2xl font-bold font-headline text-[#E56A10]">₹{topThree[0].earnings.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* #3 Soul Cadets (BGMI) */}
-              <div className="bg-white p-6 rounded border border-[#D3E4FE] shadow-sm relative overflow-hidden order-3 transform transition hover:-translate-y-1">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#FFB95F]" />
+              {/* #3 Rank */}
+              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-lg relative overflow-hidden order-3 transform transition hover:-translate-y-1">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-amber-600" />
                 <div className="flex items-center justify-between mb-4">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded bg-[#FFDDB8] text-[#2A1700] font-headline font-bold text-base">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#161A24] border border-[#242C3D] text-white font-headline font-bold text-base">
                     #3
                   </span>
-                  <span className="px-2 py-0.5 bg-[#EFF4FF] rounded text-[10px] font-mono uppercase text-[#565E74] font-bold">
-                    BGMI SQUAD INVITATIONAL
+                  <span className="px-2 py-0.5 bg-[#161A24] rounded text-[10px] font-mono uppercase text-[#94A3B8] font-bold border border-[#242C3D]">
+                    {topThree[2].gameName}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-16 h-16 rounded bg-[#EFF4FF] overflow-hidden shrink-0 border border-[#D3E4FE]">
+                  <div className="relative w-16 h-16 rounded-lg bg-[#161A24] overflow-hidden shrink-0 border border-[#242C3D]">
                     <Image
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJyotics78wQBHUOgYaMmCce9e_DLqZgHGyJP2jKj3_xhVWvP8PhkqLa01gBm4tie9z2jbwUOwI2TSDd-1RCv9Yr1j_bUg4AMrX7V7fqg8mzDAOcz4eQg4ZNSNOcUWqG1PlAPqo4-G1Rvph-2LGIaj1bgttW-RenPdreK7vomeC4gDL4GXEwsIEcE6wVnBzjS3SFx5cbwTz8brPBmRLw8Ch6yloRusSeTA9UCmJGJDLMCmfMfSyONn"
-                      alt="Soul Cadets"
+                      src={topThree[2].logoUrl}
+                      alt={topThree[2].name}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div>
                     <div className="flex items-center gap-1">
-                      <h3 className="font-headline text-lg font-bold text-[#0B1C30]">Soul Cadets</h3>
+                      <h3 className="font-headline text-lg font-bold text-white">{topThree[2].name}</h3>
                       <CheckCircle className="w-4 h-4 text-[#E56A10]" />
                     </div>
-                    <p className="text-xs text-[#565E74] font-mono">[SOUL] • Captain: @ronin_bgmi</p>
+                    <p className="text-xs text-[#94A3B8] font-mono">[{topThree[2].tag}] • {topThree[2].captain}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 bg-[#EFF4FF] p-3 rounded mb-4 text-center font-mono">
+                <div className="grid grid-cols-3 gap-2 bg-[#161A24] p-3 rounded-lg mb-4 text-center font-mono border border-[#242C3D]">
                   <div>
-                    <div className="text-[10px] text-[#565E74]">WIN RATE</div>
-                    <div className="text-sm font-bold text-[#0B1C30] mt-0.5">86.4%</div>
+                    <div className="text-[10px] text-[#94A3B8]">WIN RATE</div>
+                    <div className="text-sm font-bold text-white mt-0.5">{topThree[2].winRate}%</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">W / L</div>
-                    <div className="text-sm font-bold text-[#0B1C30] mt-0.5">32 / 5</div>
+                    <div className="text-[10px] text-[#94A3B8]">W / L</div>
+                    <div className="text-sm font-bold text-white mt-0.5">{topThree[2].wins} / {topThree[2].losses}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#565E74]">POINTS</div>
-                    <div className="text-sm font-bold text-[#E56A10] mt-0.5">2,980</div>
+                    <div className="text-[10px] text-[#94A3B8]">RATING</div>
+                    <div className="text-sm font-bold text-[#E56A10] mt-0.5">{topThree[2].rating}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-[#EFF4FF]">
-                  <span className="text-xs text-[#565E74] font-mono uppercase">Earnings</span>
-                  <span className="text-lg font-bold font-headline text-[#0B1C30]">₹95,000</span>
+                <div className="flex items-center justify-between pt-3 border-t border-[#242C3D]">
+                  <span className="text-xs text-[#94A3B8] font-mono uppercase">Prize Earnings</span>
+                  <span className="text-lg font-bold font-headline text-white">₹{topThree[2].earnings.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -457,45 +623,48 @@ export default function LeaderboardPage() {
         )}
 
         {/* 3. Standings Matrix Table */}
-        <div className="bg-white rounded border border-[#D3E4FE] shadow-sm overflow-hidden mb-12">
-          <div className="p-4 bg-[#EFF4FF] border-b border-[#D3E4FE] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="bg-[#10141F] rounded-xl border border-[#242C3D] shadow-sm overflow-hidden mb-12">
+          <div className="p-4 bg-[#161A24] border-b border-[#242C3D] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="font-headline text-base font-bold text-[#0B1C30] uppercase tracking-tight">
+              <h3 className="font-headline text-base font-bold text-white uppercase tracking-tight">
                 Standings Matrix
               </h3>
-              <p className="text-xs text-[#565E74]">
-                Competitive ranking and rating breakdown ({filteredEntries.length} entries matched)
+              <p className="text-xs text-[#94A3B8]">
+                Competitive ranking and rating breakdown ({filteredEntries.length} squads matched)
               </p>
             </div>
-            <span className="text-[11px] font-mono text-[#565E74]">Live ELO sync active</span>
+            <div className="flex items-center gap-2">
+              {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E56A10]" />}
+              <span className="text-[11px] font-mono text-[#94A3B8]">Live Rating Sync Active</span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-[#D3E4FE] text-[#565E74] font-mono uppercase text-[11px]">
+                <tr className="bg-[#0B0E16] border-b border-[#242C3D] text-[#94A3B8] font-mono uppercase text-[11px]">
                   <th className="py-3 px-4 w-16">Rank</th>
-                  <th className="py-3 px-4">Franchise / Player</th>
-                  <th className="py-3 px-4">Discipline</th>
+                  <th className="py-3 px-4">Squad / Captain</th>
+                  <th className="py-3 px-4">Game Title</th>
                   <th className="py-3 px-4 text-center">Matches</th>
                   <th className="py-3 px-4 text-center">Win Rate</th>
                   <th className="py-3 px-4 text-center">Form Streak</th>
                   <th className="py-3 px-4 text-right">Rating ELO</th>
-                  <th className="py-3 px-4 text-right">Prized Pool</th>
+                  <th className="py-3 px-4 text-right">Prize Earnings</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5EEFF]">
+              <tbody className="divide-y divide-[#242C3D]">
                 {filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-[#565E74] font-mono">
-                      No franchises or players matched your current filter criteria.
+                    <td colSpan={8} className="py-8 text-center text-[#94A3B8] font-mono">
+                      No squads matched your current criteria or game filter.
                     </td>
                   </tr>
                 ) : (
                   filteredEntries.map((entry) => (
                     <tr
                       key={entry.id}
-                      className="hover:bg-[#EFF4FF]/60 transition-colors font-medium text-[#0B1C30]"
+                      className="hover:bg-[#161A24]/60 transition-colors font-medium text-white"
                     >
                       {/* Rank */}
                       <td className="py-3 px-4">
@@ -504,10 +673,10 @@ export default function LeaderboardPage() {
                             entry.rank === 1
                               ? "bg-[#E56A10] text-white"
                               : entry.rank === 2
-                              ? "bg-[#DAE2FD] text-[#131B2E]"
+                              ? "bg-[#242C3D] text-[#CBD5E1]"
                               : entry.rank === 3
-                              ? "bg-[#FFDDB8] text-[#2A1700]"
-                              : "bg-[#EFF4FF] text-[#565E74]"
+                              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                              : "bg-[#161A24] text-[#94A3B8] border border-[#242C3D]"
                           }`}
                         >
                           #{entry.rank}
@@ -517,7 +686,7 @@ export default function LeaderboardPage() {
                       {/* Team Info */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded bg-[#EFF4FF] border border-[#D3E4FE] flex items-center justify-center font-bold text-xs text-[#0B1C30] shrink-0 overflow-hidden relative">
+                          <div className="w-8 h-8 rounded bg-[#161A24] border border-[#242C3D] flex items-center justify-center font-bold text-xs text-white shrink-0 overflow-hidden relative">
                             {entry.logoUrl ? (
                               <Image
                                 src={entry.logoUrl}
@@ -536,7 +705,7 @@ export default function LeaderboardPage() {
                                 <CheckCircle className="w-3.5 h-3.5 text-[#E56A10]" />
                               )}
                             </div>
-                            <div className="text-[11px] text-[#565E74] font-mono">
+                            <div className="text-[11px] text-[#94A3B8] font-mono">
                               [{entry.tag}] • {entry.captain}
                             </div>
                           </div>
@@ -545,13 +714,13 @@ export default function LeaderboardPage() {
 
                       {/* Discipline */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 bg-[#EFF4FF] border border-[#D3E4FE] rounded text-[11px] font-mono text-[#565E74] uppercase">
+                        <span className="px-2 py-0.5 bg-[#161A24] border border-[#242C3D] rounded text-[11px] font-mono text-[#CBD5E1] uppercase">
                           {entry.gameName}
                         </span>
                       </td>
 
                       {/* Matches */}
-                      <td className="py-3 px-4 text-center font-mono text-[#565E74]">
+                      <td className="py-3 px-4 text-center font-mono text-[#94A3B8]">
                         {entry.matchesPlayed} ({entry.wins}W / {entry.losses}L)
                       </td>
 
@@ -563,13 +732,13 @@ export default function LeaderboardPage() {
                       {/* Form Streak */}
                       <td className="py-3 px-4 text-center">
                         <div className="inline-flex items-center gap-1 font-mono text-[10px] font-bold">
-                          {entry.form.map((res, i) => (
+                          {entry.form.map((res: string, i: number) => (
                             <span
                               key={i}
                               className={`w-4 h-4 rounded flex items-center justify-center ${
                                 res === "W"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-rose-100 text-rose-700"
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                  : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                               }`}
                             >
                               {res}
@@ -579,7 +748,7 @@ export default function LeaderboardPage() {
                       </td>
 
                       {/* Rating */}
-                      <td className="py-3 px-4 text-right font-mono font-bold text-sm text-[#0B1C30]">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-sm text-white">
                         {entry.rating.toLocaleString()}
                       </td>
 
@@ -595,6 +764,127 @@ export default function LeaderboardPage() {
           </div>
         </div>
       </main>
+
+      {/* 4. Add Leaderboard Category Modal (Admin Privileges) */}
+      {isAddingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-white uppercase">
+                  Add Leaderboard Category
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAddingCategory(false)}
+                className="text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Valorant Sharpshooters, Top Earners"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                    Target Game
+                  </label>
+                  <select
+                    value={categoryForm.game_slug}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, game_slug: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="all">All Games</option>
+                    <option value="valorant">Valorant</option>
+                    <option value="counter-strike-2">Counter-Strike 2</option>
+                    <option value="bgmi">BGMI</option>
+                    <option value="chess">Chess</option>
+                    <option value="smash-karts">Smash Karts</option>
+                    <option value="mini-militia">Mini Militia</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                    Ranking Metric *
+                  </label>
+                  <select
+                    value={categoryForm.sort_metric}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, sort_metric: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="rating">Rating / ELO</option>
+                    <option value="win_rate">Highest Win Rate %</option>
+                    <option value="earnings">Total Prize Earnings (₹)</option>
+                    <option value="wins">Total Match Wins</option>
+                    <option value="matches_played">Most Matches Played</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  Minimum Matches Threshold
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={categoryForm.min_matches}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, min_matches: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="Short description for leaderboard tooltip"
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCategory(false)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCat}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {isSubmittingCat ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Create &amp; Calculate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

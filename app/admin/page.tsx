@@ -31,6 +31,12 @@ import {
   Trash2,
   Edit3,
   Server,
+  Calendar,
+  Clock,
+  Filter,
+  BarChart3,
+  ChevronRight,
+  Hash,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -58,12 +64,27 @@ import {
   Game,
   GameCreatePayload,
 } from "@/lib/api/games";
+import { getTournaments, Tournament } from "@/lib/api/tournaments";
+import {
+  createTournament,
+  updateTournament,
+  deleteTournament,
+  CreateTournamentPayload,
+  UpdateTournamentPayload,
+} from "@/lib/api/organizer";
+import {
+  getLeaderboardCategories,
+  createLeaderboardCategory,
+  deleteLeaderboardCategory,
+  LeaderboardCategory,
+  LeaderboardCategoryCreatePayload,
+} from "@/lib/api/leaderboard";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "queue" | "disputes" | "games" | "users" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "tournaments" | "queue" | "disputes" | "games" | "leaderboards" | "users" | "audit">("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
@@ -105,10 +126,75 @@ export default function AdminCockpitPage() {
   const [resolvingDisputeId, setResolvingDisputeId] = useState<string | null>(null);
   const [disputeNotes, setDisputeNotes] = useState("");
 
+  // Tournaments CRUD State
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false);
+  const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
+  const [isSubmittingTourn, setIsSubmittingTourn] = useState(false);
+  const [tournForm, setTournForm] = useState<{
+    game_id: string;
+    title: string;
+    prize_pool_inr: number;
+    entry_fee_inr: number;
+    starts_at: string;
+    roster_lock_time: string;
+    server_region: string;
+    max_teams: number;
+    min_team_size: number;
+    max_team_size: number;
+    status: string;
+    rank_requirement: string;
+    format: string;
+    description: string;
+    banner_url: string;
+    rules: string[];
+    prizes: Array<{ place: string; prize: string }>;
+    newRule: string;
+    newPrizePlace: string;
+    newPrizeAmount: string;
+  }>({
+    game_id: "",
+    title: "",
+    prize_pool_inr: 25000,
+    entry_fee_inr: 0,
+    starts_at: "Saturday, 8:00 PM IST",
+    roster_lock_time: "Saturday, 7:30 PM IST",
+    server_region: "AWS Mumbai (ap-south-1)",
+    max_teams: 16,
+    min_team_size: 5,
+    max_team_size: 5,
+    status: "REGISTRATION_OPEN",
+    rank_requirement: "Open to All Ranks",
+    format: "Single Elimination Bracket",
+    description: "Sanctioned competitive esports tournament with strict anti-cheat and automated brackets.",
+    banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
+    rules: ["Competitive MR12 rulebook", "Anti-cheat verification mandatory", "15-minute grace check-in"],
+    prizes: [
+      { place: "1st Place", prize: "₹15,000" },
+      { place: "2nd Place", prize: "₹7,000" },
+      { place: "3rd Place", prize: "₹3,000" },
+    ],
+    newRule: "",
+    newPrizePlace: "",
+    newPrizeAmount: "",
+  });
+
+  // Leaderboard Categories State
+  const [leaderboardCategories, setLeaderboardCategories] = useState<LeaderboardCategory[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSubmittingCat, setIsSubmittingCat] = useState(false);
+  const [categoryForm, setCategoryForm] = useState<LeaderboardCategoryCreatePayload>({
+    name: "",
+    game_slug: "all",
+    sort_metric: "rating",
+    min_matches: 0,
+    description: "",
+  });
+
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes] = await Promise.allSettled([
+      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes, tournRes, catsRes] = await Promise.allSettled([
         getCurrentUserProfile(),
         getAuditLogs(),
         getAdminUsers(),
@@ -116,6 +202,8 @@ export default function AdminCockpitPage() {
         getMatches(),
         getDisputes(),
         getGames(),
+        getTournaments(),
+        getLeaderboardCategories(),
       ]);
 
       if (profileRes.status === "fulfilled") {
@@ -148,6 +236,12 @@ export default function AdminCockpitPage() {
       }
       if (gamesRes.status === "fulfilled" && Array.isArray(gamesRes.value)) {
         setGames(gamesRes.value);
+      }
+      if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
+        setTournaments(tournRes.value);
+      }
+      if (catsRes.status === "fulfilled" && Array.isArray(catsRes.value)) {
+        setLeaderboardCategories(catsRes.value);
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -338,26 +432,243 @@ export default function AdminCockpitPage() {
     }
   };
 
-  // 1. Initial Authentication Loading State
-  if (!isAuthLoaded || (isLoading && !currentUser)) {
+  // Tournament CRUD Handlers
+  const handleOpenCreateTournament = () => {
+    setEditingTournament(null);
+    setTournForm({
+      game_id: games[0]?.id || "",
+      title: "",
+      prize_pool_inr: 25000,
+      entry_fee_inr: 0,
+      starts_at: "Saturday, 8:00 PM IST",
+      roster_lock_time: "Saturday, 7:30 PM IST",
+      server_region: "AWS Mumbai (ap-south-1)",
+      max_teams: 16,
+      min_team_size: 5,
+      max_team_size: 5,
+      status: "REGISTRATION_OPEN",
+      rank_requirement: "Open to All Ranks",
+      format: "Single Elimination Bracket",
+      description: "Sanctioned competitive tournament with automated brackets.",
+      banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
+      rules: ["Competitive MR12 rulebook", "Anti-cheat verification mandatory", "15-minute grace check-in"],
+      prizes: [
+        { place: "1st Place", prize: "₹15,000" },
+        { place: "2nd Place", prize: "₹7,000" },
+        { place: "3rd Place", prize: "₹3,000" },
+      ],
+      newRule: "",
+      newPrizePlace: "",
+      newPrizeAmount: "",
+    });
+    setIsTournamentModalOpen(true);
+  };
+
+  const handleOpenEditTournament = (t: Tournament) => {
+    setEditingTournament(t);
+    const parsedRules = Array.isArray(t.rules) ? t.rules : [];
+    const parsedPrizes: Array<{ place: string; prize: string }> = Array.isArray(t.prizes)
+      ? t.prizes.map((p) => ({
+          place: p.place || p.rank || "Place",
+          prize: p.prize || p.amount || "₹0",
+        }))
+      : [];
+    setTournForm({
+      game_id: t.game_slug || "",
+      title: t.title,
+      prize_pool_inr: t.prize_pool_inr,
+      entry_fee_inr: t.entry_fee_inr,
+      starts_at: t.starts_at || "TBD",
+      roster_lock_time: t.roster_lock_time || "TBD",
+      server_region: t.server_region || "AWS Mumbai (ap-south-1)",
+      max_teams: t.max_teams || 16,
+      min_team_size: 5,
+      max_team_size: 5,
+      status: t.status,
+      rank_requirement: t.rank_requirement || "Open to All Ranks",
+      format: t.format || "Single Elimination Bracket",
+      description: t.description || "",
+      banner_url: t.banner_url || "",
+      rules: parsedRules.length > 0 ? parsedRules : ["Standard competitive rules apply"],
+      prizes: parsedPrizes.length > 0 ? parsedPrizes : [
+        { place: "1st Place", prize: `₹${Math.round(t.prize_pool_inr * 0.6).toLocaleString()}` },
+        { place: "2nd Place", prize: `₹${Math.round(t.prize_pool_inr * 0.3).toLocaleString()}` },
+        { place: "3rd Place", prize: `₹${Math.round(t.prize_pool_inr * 0.1).toLocaleString()}` },
+      ],
+      newRule: "",
+      newPrizePlace: "",
+      newPrizeAmount: "",
+    });
+    setIsTournamentModalOpen(true);
+  };
+
+  const handleAddRule = () => {
+    if (tournForm.newRule.trim()) {
+      setTournForm({
+        ...tournForm,
+        rules: [...tournForm.rules, tournForm.newRule.trim()],
+        newRule: "",
+      });
+    }
+  };
+
+  const handleRemoveRule = (index: number) => {
+    setTournForm({
+      ...tournForm,
+      rules: tournForm.rules.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleAddPrizeTier = () => {
+    if (tournForm.newPrizePlace.trim() && tournForm.newPrizeAmount.trim()) {
+      setTournForm({
+        ...tournForm,
+        prizes: [
+          ...tournForm.prizes,
+          { place: tournForm.newPrizePlace.trim(), prize: tournForm.newPrizeAmount.trim() },
+        ],
+        newPrizePlace: "",
+        newPrizeAmount: "",
+      });
+    }
+  };
+
+  const handleRemovePrizeTier = (index: number) => {
+    setTournForm({
+      ...tournForm,
+      prizes: tournForm.prizes.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleSaveTournament = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingTourn(true);
+    try {
+      if (editingTournament) {
+        await updateTournament(editingTournament.id, {
+          title: tournForm.title,
+          game_id: tournForm.game_id,
+          prize_pool_inr: Number(tournForm.prize_pool_inr),
+          entry_fee_inr: Number(tournForm.entry_fee_inr),
+          starts_at: tournForm.starts_at,
+          roster_lock_time: tournForm.roster_lock_time,
+          server_region: tournForm.server_region,
+          max_teams: Number(tournForm.max_teams),
+          min_team_size: Number(tournForm.min_team_size),
+          max_team_size: Number(tournForm.max_team_size),
+          status: tournForm.status,
+          rank_requirement: tournForm.rank_requirement,
+          format: tournForm.format,
+          description: tournForm.description,
+          banner_url: tournForm.banner_url,
+          rules: tournForm.rules,
+          prizes: tournForm.prizes,
+        });
+        setActionMessage(`Tournament "${tournForm.title}" updated successfully!`);
+      } else {
+        await createTournament({
+          game_id: tournForm.game_id || games[0]?.id || "valorant",
+          title: tournForm.title,
+          prize_pool_inr: Number(tournForm.prize_pool_inr),
+          entry_fee_inr: Number(tournForm.entry_fee_inr),
+          starts_at: tournForm.starts_at,
+          roster_lock_time: tournForm.roster_lock_time,
+          server_region: tournForm.server_region,
+          max_teams: Number(tournForm.max_teams),
+          min_team_size: Number(tournForm.min_team_size),
+          max_team_size: Number(tournForm.max_team_size),
+          rank_requirement: tournForm.rank_requirement,
+          format: tournForm.format,
+          description: tournForm.description,
+          banner_url: tournForm.banner_url,
+          rules: tournForm.rules,
+          prizes: tournForm.prizes,
+        });
+        setActionMessage(`Tournament "${tournForm.title}" created successfully!`);
+      }
+      setIsTournamentModalOpen(false);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to save tournament");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsSubmittingTourn(false);
+    }
+  };
+
+  const handleDeleteTournament = async (tournamentId: string, title: string) => {
+    if (!confirm(`Are you sure you want to permanently delete tournament "${title}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteTournament(tournamentId);
+      setActionMessage(`Tournament "${title}" deleted.`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || `Failed to delete tournament "${title}".`);
+      setTimeout(() => setActionMessage(""), 6000);
+    }
+  };
+
+  // Leaderboard Category Handlers
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) return;
+    setIsSubmittingCat(true);
+    try {
+      const created = await createLeaderboardCategory(categoryForm);
+      setActionMessage(`Leaderboard category "${created.name}" created!`);
+      setIsCategoryModalOpen(false);
+      setCategoryForm({ name: "", game_slug: "all", sort_metric: "rating", min_matches: 0, description: "" });
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to create leaderboard category");
+      setTimeout(() => setActionMessage(""), 4000);
+    } finally {
+      setIsSubmittingCat(false);
+    }
+  };
+
+  const handleDeleteCategory = async (slug: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete leaderboard category "${name}"?`)) return;
+    try {
+      await deleteLeaderboardCategory(slug);
+      setActionMessage(`Leaderboard category "${name}" deleted.`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to delete leaderboard category");
+      setTimeout(() => setActionMessage(""), 4000);
+    }
+  };
+
+  const userEmail = (clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || "").toLowerCase();
+  const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
+  const isSuperAdmin = isHardcodedAdmin || currentUser?.role === "SUPER_ADMIN" || currentRole === "SUPER_ADMIN";
+
+  // 1. Initial Authentication Loading State (Bypassed immediately for pk.4081988@gmail.com)
+  if (!isHardcodedAdmin && (!isAuthLoaded || (isLoading && !currentUser))) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] bg-[#0B0E16] text-white p-6">
         <div className="w-16 h-16 rounded-full bg-[#161A24] border border-[#242C3D] flex items-center justify-center mb-4 text-[#E56A10] animate-pulse">
           <Shield className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold font-headline uppercase tracking-wider mb-2">
-          Verifying AMETHEUS Security Clearance
+          Loading AMETHEUS Management Console
         </h2>
         <p className="text-xs text-[#94A3B8] font-mono flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin text-[#E56A10]" />
-          Connecting to MongoDB and evaluating cryptographic role credentials...
+          Loading administrator workspace...
         </p>
       </div>
     );
   }
 
   // 2. Unauthenticated State (Guest)
-  if (!isSignedIn) {
+  if (!isSignedIn && !isHardcodedAdmin) {
     return (
       <div className="max-w-2xl mx-auto my-16 p-8 bg-[#10141F] border border-[#242C3D] rounded-lg text-center space-y-6 shadow-2xl">
         <div className="w-16 h-16 rounded-full bg-[#E56A10]/10 border border-[#E56A10]/40 flex items-center justify-center mx-auto text-[#E56A10]">
@@ -368,7 +679,7 @@ export default function AdminCockpitPage() {
             Admin Console — Authentication Required
           </h1>
           <p className="text-sm text-[#94A3B8] max-w-md mx-auto">
-            This cockpit controls financial escrow reconciliation, bracket advancement, user roles, and platform arbitration.
+            This cockpit controls platform competitions, tournament rules, bracket progression, games catalog, and user roles.
           </p>
         </div>
 
@@ -376,11 +687,11 @@ export default function AdminCockpitPage() {
           <div className="text-[#94A3B8] font-bold uppercase tracking-wider">Required Privileges:</div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#E56A10]"></span>
-            <span><strong className="text-white">SUPER_ADMIN:</strong> Full platform ownership &amp; role allocation (e.g. pk.4081988@gmail.com)</span>
+            <span><strong className="text-white">SUPER_ADMIN:</strong> Full platform ownership &amp; configuration (e.g. pk.4081988@gmail.com)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span><strong className="text-white">ORGANIZER / TOURNAMENT_ADMIN:</strong> Scoped bracket management &amp; dispute review</span>
+            <span><strong className="text-white">ORGANIZER / TOURNAMENT_ADMIN:</strong> Tournament management &amp; dispute review</span>
           </div>
         </div>
 
@@ -392,10 +703,6 @@ export default function AdminCockpitPage() {
       </div>
     );
   }
-
-  const userEmail = (clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || "").toLowerCase();
-  const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
-  const isSuperAdmin = isHardcodedAdmin || currentUser?.role === "SUPER_ADMIN" || currentRole === "SUPER_ADMIN";
 
   // 3. Authenticated but unauthorized (PLAYER role without hardcoded override)
   if (!isHardcodedAdmin && currentUser && currentUser.role === "PLAYER") {
@@ -541,6 +848,26 @@ export default function AdminCockpitPage() {
           {isSuperAdmin && (
             <>
               <button
+                onClick={() => setActiveTab("tournaments")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "tournaments"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" /> Tournaments ({tournaments.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("leaderboards")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "leaderboards"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" /> Leaderboards ({leaderboardCategories.length})
+              </button>
+              <button
                 onClick={() => setActiveTab("games")}
                 className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === "games"
@@ -585,18 +912,18 @@ export default function AdminCockpitPage() {
           </div>
         )}
 
-        {/* TAB 1: OVERVIEW & ESCROW */}
+        {/* TAB 1: OVERVIEW & PRIZE VAULT */}
         {activeTab === "overview" && (
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Platform Escrow Vault</div>
+                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Platform Prize Vault</div>
                 <div className="text-2xl font-bold font-headline text-white mt-1">
                   ₹{(stats?.platform_escrow_vault ?? 1245000).toLocaleString()}
                 </div>
                 <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Razorpay Route Escrow Active
+                  <ShieldCheck className="w-3.5 h-3.5" /> Protected Prize Vault Active
                 </span>
               </div>
 
@@ -1006,7 +1333,7 @@ export default function AdminCockpitPage() {
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-[#242C3D]">
                         <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D]">
-                          <span className="text-[#64748B] block text-[9px] uppercase">Roster Format</span>
+                          <span className="text-[#64748B] block text-[9px] uppercase">Squad Format</span>
                           <span className="text-white font-bold">
                             {game.is_team_game
                               ? `${game.min_team_size}-${game.max_team_size} Athletes`
@@ -1194,6 +1521,254 @@ export default function AdminCockpitPage() {
               ) : (
                 <div className="bg-[#0B0E16] p-6 text-center text-[#94A3B8] rounded border border-[#242C3D]">
                   No audit logs recorded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: TOURNAMENTS MANAGEMENT & ABSOLUTE ADMIN CONTROL */}
+        {activeTab === "tournaments" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+              <div>
+                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#E56A10]" /> Platform Tournaments & Rules Suite
+                </h3>
+                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                  Host, configure, adjust prize distribution tiers, player limits, and competitive rules with immediate platform sync.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreateTournament}
+                className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Create Tournament
+              </button>
+            </div>
+
+            {/* Tournaments Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {tournaments.map((tourn) => {
+                const rulesCount = Array.isArray(tourn.rules) ? tourn.rules.length : 0;
+                const prizesCount = Array.isArray(tourn.prizes) ? tourn.prizes.length : 0;
+                const statusColor =
+                  tourn.status === "REGISTRATION_OPEN"
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : tourn.status === "ONGOING"
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    : tourn.status === "COMPLETED"
+                    ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                    : "bg-rose-500/10 text-rose-400 border-rose-500/30";
+
+                return (
+                  <div
+                    key={tourn.id}
+                    className="bg-[#10141F] border border-[#242C3D] rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                  >
+                    <div>
+                      {/* Banner & Badges */}
+                      <div className="h-36 w-full relative bg-[#0B0E16] overflow-hidden">
+                        <img
+                          src={tourn.banner_url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
+                          alt={tourn.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#10141F] via-[#10141F]/40 to-transparent" />
+                        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${statusColor}`}>
+                            {tourn.status.replace("_", " ")}
+                          </span>
+                          <span className="px-2 py-0.5 bg-[#0B0E16]/80 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                            {tourn.game_slug || "ESPORTS"}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-2 left-4 right-4">
+                          <h4 className="font-headline font-bold text-base text-white truncate">
+                            {tourn.title}
+                          </h4>
+                          <span className="text-[11px] font-mono text-[#94A3B8]">
+                            Format: {tourn.format || "Single Elimination"} • {tourn.rank_requirement || "Open Ranks"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Key Details */}
+                      <div className="p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                            <span className="text-[#64748B] block text-[9px] uppercase">Prize Vault</span>
+                            <span className="text-[#E56A10] font-bold text-sm">
+                              ₹{tourn.prize_pool_inr.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                            <span className="text-[#64748B] block text-[9px] uppercase">Entry Fee</span>
+                            <span className="text-white font-bold text-sm">
+                              {tourn.entry_fee_inr === 0 ? "Free Entry" : `₹${tourn.entry_fee_inr}`}
+                            </span>
+                          </div>
+                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                            <span className="text-[#64748B] block text-[9px] uppercase">Squad Capacity</span>
+                            <span className="text-[#CBD5E1] font-bold">
+                              {tourn.registered_teams || 0} / {tourn.max_teams} Squads
+                            </span>
+                          </div>
+                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                            <span className="text-[#64748B] block text-[9px] uppercase">Rules & Prizes</span>
+                            <span className="text-white font-bold">
+                              {rulesCount} Rules • {prizesCount} Tiers
+                            </span>
+                          </div>
+                          <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D] col-span-2">
+                            <span className="text-[#64748B] block text-[9px] uppercase">Starts At</span>
+                            <span className="text-[#CBD5E1] truncate block">
+                              {tourn.starts_at}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="p-4 pt-0 flex items-center gap-2 border-t border-[#242C3D]/60 mt-2">
+                      <button
+                        onClick={() => handleOpenEditTournament(tourn)}
+                        className="flex-1 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Rules & Config
+                      </button>
+                      <Link
+                        href={`/tournaments/${tourn.slug || tourn.id}`}
+                        target="_blank"
+                        className="p-2 bg-[#161A24] border border-[#242C3D] hover:text-white text-[#94A3B8] rounded transition-colors"
+                        title="View Public Tournament Page"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteTournament(tourn.id, tourn.title)}
+                        className="p-2 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 rounded text-xs transition-colors cursor-pointer"
+                        title="Delete Tournament"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {tournaments.length === 0 && (
+                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                  <Calendar className="w-12 h-12 text-[#64748B] mx-auto" />
+                  <div className="space-y-1">
+                    <h4 className="font-headline font-bold text-white text-lg">No Tournaments Hosted</h4>
+                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                      Click &quot;Create Tournament&quot; above to create a competition with custom rules, timing, prize breakdown, and player limits.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: DYNAMIC LEADERBOARD CATEGORIES */}
+        {activeTab === "leaderboards" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+              <div>
+                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-[#E56A10]" /> Leaderboard Categories & Dynamic Rankings
+                </h3>
+                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                  Configure custom ranking categories by game and metric. AMETHEUS automatically calculates live standings for all squads and athletes.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Add Category
+              </button>
+            </div>
+
+            {/* Categories Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {leaderboardCategories.map((cat) => {
+                const metricLabels: Record<string, string> = {
+                  rating: "Skill Rating (MMR / ELO)",
+                  win_rate: "Win Rate %",
+                  earnings: "Tournament Earnings (₹)",
+                  wins: "Total Match Wins",
+                  matches_played: "Activity (Matches Played)",
+                };
+
+                return (
+                  <div
+                    key={cat.slug}
+                    className="bg-[#10141F] border border-[#242C3D] rounded-xl p-5 hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 bg-[#0B0E16] text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                          {cat.game_slug === "all" ? "All Games" : cat.game_slug.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#64748B]">
+                          Min {cat.min_matches} matches
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-headline font-bold text-lg text-white group-hover:text-[#E56A10] transition-colors">
+                          {cat.name}
+                        </h4>
+                        <p className="text-xs text-[#94A3B8] font-mono mt-1">
+                          {cat.description || "Dynamic leaderboard category calculated automatically."}
+                        </p>
+                      </div>
+
+                      <div className="bg-[#0B0E16] p-3 rounded-lg border border-[#242C3D] space-y-1 text-xs font-mono">
+                        <div className="flex items-center justify-between text-[#94A3B8]">
+                          <span>Sorting Metric:</span>
+                          <span className="text-white font-bold">{metricLabels[cat.sort_metric] || cat.sort_metric}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#94A3B8]">
+                          <span>Engine Calculation:</span>
+                          <span className="text-emerald-400 font-bold">Auto-Calculated</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 mt-4 border-t border-[#242C3D] flex items-center justify-between gap-2">
+                      <Link
+                        href={`/leaderboard?cat=${cat.slug}`}
+                        target="_blank"
+                        className="flex-1 py-1.5 px-3 bg-[#161A24] border border-[#242C3D] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded text-center transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#E56A10]" /> View Live Board
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteCategory(cat.slug, cat.name)}
+                        className="p-1.5 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 rounded text-xs transition-colors cursor-pointer"
+                        title="Delete Category"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {leaderboardCategories.length === 0 && (
+                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                  <BarChart3 className="w-12 h-12 text-[#64748B] mx-auto" />
+                  <div className="space-y-1">
+                    <h4 className="font-headline font-bold text-white text-lg">No Categories Configured</h4>
+                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                      Click &quot;Add Category&quot; to configure custom leaderboard metrics.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1446,6 +2021,520 @@ export default function AdminCockpitPage() {
                     "Save Changes"
                   ) : (
                     "Create Game Title"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Tournament Editor Modal */}
+      {isTournamentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#E56A10]" />
+                {editingTournament ? `Edit Tournament: ${editingTournament.title}` : "Create New Platform Tournament"}
+              </h3>
+              <button
+                onClick={() => setIsTournamentModalOpen(false)}
+                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTournament} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Game Title *
+                  </label>
+                  <select
+                    value={tournForm.game_id}
+                    onChange={(e) => setTournForm({ ...tournForm, game_id: e.target.value })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  >
+                    {games.map((g) => (
+                      <option key={g.id} value={g.slug || g.id}>
+                        {g.name} ({g.platform})
+                      </option>
+                    ))}
+                    {games.length === 0 && <option value="valorant">Valorant (PC)</option>}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Tournament Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={tournForm.title}
+                    onChange={(e) => setTournForm({ ...tournForm, title: e.target.value })}
+                    placeholder="e.g. Mumbai Masters Champions Cup"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Tournament Status
+                  </label>
+                  <select
+                    value={tournForm.status}
+                    onChange={(e) => setTournForm({ ...tournForm, status: e.target.value })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  >
+                    <option value="REGISTRATION_OPEN">Registration Open</option>
+                    <option value="ONGOING">Ongoing (Live Matches)</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Tournament Format
+                  </label>
+                  <input
+                    type="text"
+                    value={tournForm.format}
+                    onChange={(e) => setTournForm({ ...tournForm, format: e.target.value })}
+                    placeholder="e.g. Single Elimination Bracket"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Guaranteed Prize Vault (₹ INR) *
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    value={tournForm.prize_pool_inr}
+                    onChange={(e) => setTournForm({ ...tournForm, prize_pool_inr: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Entry Fee (₹ INR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={tournForm.entry_fee_inr}
+                    onChange={(e) => setTournForm({ ...tournForm, entry_fee_inr: parseInt(e.target.value) || 0 })}
+                    placeholder="0 for Free Entry"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Tournament Schedule (Starts At) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={tournForm.starts_at}
+                    onChange={(e) => setTournForm({ ...tournForm, starts_at: e.target.value })}
+                    placeholder="e.g. Saturday, 8:00 PM IST"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Squad / Lineup Lock Time *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={tournForm.roster_lock_time}
+                    onChange={(e) => setTournForm({ ...tournForm, roster_lock_time: e.target.value })}
+                    placeholder="e.g. Saturday, 7:30 PM IST"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Server Region
+                  </label>
+                  <input
+                    type="text"
+                    value={tournForm.server_region}
+                    onChange={(e) => setTournForm({ ...tournForm, server_region: e.target.value })}
+                    placeholder="e.g. AWS Mumbai (ap-south-1)"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Rank Requirement
+                  </label>
+                  <input
+                    type="text"
+                    value={tournForm.rank_requirement}
+                    onChange={(e) => setTournForm({ ...tournForm, rank_requirement: e.target.value })}
+                    placeholder="e.g. Open to All Ranks"
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                      Max Squads
+                    </label>
+                    <input
+                      type="number"
+                      min={2}
+                      max={128}
+                      value={tournForm.max_teams}
+                      onChange={(e) => setTournForm({ ...tournForm, max_teams: parseInt(e.target.value) || 16 })}
+                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                      Min Team Size
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={tournForm.min_team_size}
+                      onChange={(e) => setTournForm({ ...tournForm, min_team_size: parseInt(e.target.value) || 1 })}
+                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                      Max Team Size
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={tournForm.max_team_size}
+                      onChange={(e) => setTournForm({ ...tournForm, max_team_size: parseInt(e.target.value) || 5 })}
+                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Banner URL
+                  </label>
+                  <input
+                    type="url"
+                    value={tournForm.banner_url}
+                    onChange={(e) => setTournForm({ ...tournForm, banner_url: e.target.value })}
+                    placeholder="https://images.unsplash.com/photo-..."
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Description & Overview
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={tournForm.description}
+                    onChange={(e) => setTournForm({ ...tournForm, description: e.target.value })}
+                    placeholder="Official sanctioned tournament rules, match server info, and schedule..."
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* DYNAMIC RULES SECTION */}
+              <div className="border-t border-[#242C3D] pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-[#E56A10]" /> Tournament Rules & Regulations ({tournForm.rules.length})
+                    </h4>
+                    <p className="text-[11px] text-[#94A3B8] font-mono">
+                      Add or delete official competitive rules enforced by match arbiters.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {tournForm.rules.map((rule, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-3 p-2 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="text-[#E56A10] font-bold shrink-0">#{idx + 1}</span>
+                        <span className="text-[#CBD5E1] truncate">{rule}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRule(idx)}
+                        className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded transition-colors shrink-0 cursor-pointer"
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {tournForm.rules.length === 0 && (
+                    <p className="text-xs text-[#64748B] font-mono italic">No specific rules configured. Standard competitive guidelines apply.</p>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tournForm.newRule}
+                    onChange={(e) => setTournForm({ ...tournForm, newRule: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddRule();
+                      }
+                    }}
+                    placeholder="Enter rule (e.g. '15-minute grace check-in before match forfeit')"
+                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddRule}
+                    className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Rule
+                  </button>
+                </div>
+              </div>
+
+              {/* DYNAMIC PRIZE DISTRIBUTION SECTION */}
+              <div className="border-t border-[#242C3D] pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Distribution Breakdown ({tournForm.prizes.length} Tiers)
+                    </h4>
+                    <p className="text-[11px] text-[#94A3B8] font-mono">
+                      Configure payout amounts for tournament placements.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                  {tournForm.prizes.map((pz, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#E56A10] font-bold">{pz.place}</span>
+                        <span className="text-white font-semibold">{pz.prize}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePrizeTier(idx)}
+                        className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded transition-colors cursor-pointer"
+                        title="Delete Tier"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {tournForm.prizes.length === 0 && (
+                    <p className="text-xs text-[#64748B] font-mono italic col-span-full">No prize tiers configured.</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={tournForm.newPrizePlace}
+                    onChange={(e) => setTournForm({ ...tournForm, newPrizePlace: e.target.value })}
+                    placeholder="Place (e.g. 4th Place)"
+                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={tournForm.newPrizeAmount}
+                    onChange={(e) => setTournForm({ ...tournForm, newPrizeAmount: e.target.value })}
+                    placeholder="Prize (e.g. ₹2,000)"
+                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddPrizeTier}
+                    className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Tier
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Footer */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setIsTournamentModalOpen(false)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingTourn}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingTourn ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : editingTournament ? (
+                    "Update Tournament & Rules"
+                  ) : (
+                    "Publish Tournament"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard Category Modal */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-[#E56A10]" />
+                Add Dynamic Leaderboard Category
+              </h3>
+              <button
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  placeholder="e.g. Valorant Top Fraggers, Apex Predator Winrate"
+                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Game Filter *
+                  </label>
+                  <select
+                    value={categoryForm.game_slug}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, game_slug: e.target.value })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  >
+                    <option value="all">All Games</option>
+                    {games.map((g) => (
+                      <option key={g.id} value={g.slug}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    Sorting Metric *
+                  </label>
+                  <select
+                    value={categoryForm.sort_metric}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, sort_metric: e.target.value as any })}
+                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  >
+                    <option value="rating">Skill Rating (MMR / ELO)</option>
+                    <option value="win_rate">Win Rate Percentage (%)</option>
+                    <option value="earnings">Tournament Earnings (₹)</option>
+                    <option value="wins">Total Match Wins</option>
+                    <option value="matches_played">Total Matches Played</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  Minimum Matches Required to Qualify
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={categoryForm.min_matches}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, min_matches: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={categoryForm.description}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  placeholder="Official explanation of category ranking criteria..."
+                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono text-[#94A3B8]">
+                <span className="text-[#E56A10] font-bold">Auto-Rank Calculation:</span> The leaderboard engine will automatically aggregate match results and rank all qualifying squads and players in real-time.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCat}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingCat ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Category"
                   )}
                 </button>
               </div>

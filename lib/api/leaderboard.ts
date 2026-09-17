@@ -21,7 +21,48 @@ export interface LeaderboardEntry {
   category: string;
 }
 
-export async function getLeaderboard(category?: string): Promise<LeaderboardEntry[]> {
-  const qs = category && category !== "all" ? `?category=${category}` : "";
+export interface LeaderboardCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  game_slug: string;
+  sort_metric: string;
+  min_matches: number;
+  is_system: boolean;
+  created_at: string;
+}
+
+export interface LeaderboardCategoryCreatePayload {
+  name: string;
+  slug?: string;
+  description?: string;
+  game_slug?: string;
+  sort_metric?: "rating" | "win_rate" | "earnings" | "wins" | "matches_played";
+  min_matches?: number;
+}
+
+export async function getLeaderboard(category?: string, game?: string): Promise<LeaderboardEntry[]> {
+  const params = new URLSearchParams();
+  if (category && category !== "all") params.append("category", category);
+  if (game && game !== "all") params.append("game", game);
+  const qs = params.toString() ? `?${params.toString()}` : "";
   return apiClient<LeaderboardEntry[]>(`/leaderboard${qs}`);
+}
+
+export async function getLeaderboardCategories(): Promise<LeaderboardCategory[]> {
+  return apiClient<LeaderboardCategory[]>("/leaderboard/categories");
+}
+
+export async function createLeaderboardCategory(payload: LeaderboardCategoryCreatePayload): Promise<LeaderboardCategory> {
+  return apiClient<LeaderboardCategory>("/leaderboard/categories", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteLeaderboardCategory(slug: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/leaderboard/categories/${slug}`, {
+    method: "DELETE",
+  });
 }

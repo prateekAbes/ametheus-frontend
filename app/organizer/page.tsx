@@ -124,7 +124,7 @@ export default function OrganizerCockpitPage() {
                 </span>
               </div>
               <p className="text-xs text-[#94A3B8] font-mono">
-                Rule 9 & 20: Scoped tournament lifecycle, bracket generation & registrations
+                Platform Tournament Operations, Bracket Arbitration & Live Registrations
               </p>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function OrganizerCockpitPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[#94A3B8] uppercase">Roster Lock Time</label>
+                <label className="text-[#94A3B8] uppercase">Squad Lock Time</label>
                 <input
                   type="text"
                   value={formData.roster_lock_time}
@@ -319,7 +319,7 @@ export default function OrganizerCockpitPage() {
                       <span className="text-white font-bold">{t.prize_pool}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-[#94A3B8] uppercase block">Teams Enrolled</span>
+                      <span className="text-[10px] text-[#94A3B8] uppercase block">Squads Enrolled</span>
                       <span className="text-white font-bold">
                         {t.registered_teams} / {t.max_teams}
                       </span>

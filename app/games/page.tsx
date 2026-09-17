@@ -63,9 +63,9 @@ export default function GamesDirectoryPage() {
           <div className="flex items-center gap-4">
             <span className="inline-flex items-center gap-1.5 text-[#0F172A]">
               <span className="w-2 h-2 rounded-full bg-[#E56A10] animate-pulse" />
-              ESCROW PROTOCOL ENGAGED
+              PRIZE VAULT PROTECTED
             </span>
-            <span className="hidden md:inline text-[#64748B]">FASTAPI LIVE NODE</span>
+            <span className="hidden md:inline text-[#64748B]">LIVE ARENA ENGINE</span>
           </div>
         </div>
       </div>
@@ -77,13 +77,13 @@ export default function GamesDirectoryPage() {
             <div className="lg:col-span-8 space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F1F3F5] rounded text-[#E56A10] text-xs font-bold tracking-widest uppercase font-mono">
                 <Shield className="w-3.5 h-3.5" />
-                OFFICIAL ESCROW-PROTECTED LEAGUES
+                OFFICIAL SANCTIONED COMPETITIONS
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold font-headline text-[#0F172A] uppercase tracking-tight">
                 SUPPORTED COMPETITIVE DISCIPLINES
               </h1>
               <p className="text-sm text-[#475569] max-w-3xl leading-relaxed">
-                Explore sanctioned esports tournaments across official competitive titles. Select your game to enter dedicated hubs, view rulebooks, deploy anti-cheat verifications, and manage verified squad rosters.
+                Explore sanctioned esports tournaments across official competitive titles. Select your game to enter dedicated hubs, view rulebooks, deploy anti-cheat verifications, and manage verified squad lineups.
               </p>
             </div>
 
@@ -103,13 +103,13 @@ export default function GamesDirectoryPage() {
                 </div>
                 <div className="p-3 bg-white rounded-lg border border-[#E2E8F0]">
                   <span className="text-[10px] font-mono text-[#64748B] uppercase block">
-                    Locked Escrow
+                    Prize Vault
                   </span>
                   <span className="text-2xl font-bold font-headline text-[#E56A10] block tabular-nums">
                     ₹12.5L+
                   </span>
                   <span className="text-[11px] text-[#64748B] font-mono">
-                    Razorpay Escrow
+                    Guaranteed Vault
                   </span>
                 </div>
               </div>
@@ -259,7 +259,7 @@ export default function GamesDirectoryPage() {
                       </div>
                       <div>
                         <span className="text-[10px] text-[#64748B] uppercase font-mono block">
-                          Roster Rule
+                          Squad Format
                         </span>
                         <span className="text-xs font-bold text-[#0F172A] font-mono block mt-0.5">
                           {game.isTeamGame ? `${game.minTeamSize} Players Fixed` : "Solo 1v1"}

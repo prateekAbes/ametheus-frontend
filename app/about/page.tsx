@@ -37,14 +37,14 @@ export default function AboutPage() {
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
             <div className="p-4 bg-[#10141F] border border-[#242C3D] rounded">
-              <span className="text-[10px] font-mono text-[#94A3B8] uppercase block">Platform Escrow Pool</span>
+              <span className="text-[10px] font-mono text-[#94A3B8] uppercase block">Platform Prize Vault</span>
               <span className="text-2xl font-bold font-headline text-white mt-1 block">₹14,50,000+</span>
               <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
                 <CheckCircle className="w-3 h-3" /> Razorpay Verified
               </span>
             </div>
             <div className="p-4 bg-[#10141F] border border-[#242C3D] rounded">
-              <span className="text-[10px] font-mono text-[#94A3B8] uppercase block">Contender Roster</span>
+              <span className="text-[10px] font-mono text-[#94A3B8] uppercase block">Contender Athletes</span>
               <span className="text-2xl font-bold font-headline text-[#E56A10] mt-1 block">24,800+</span>
               <span className="text-[10px] text-[#94A3B8] font-mono mt-1 block">Sanctioned Players</span>
             </div>
@@ -72,7 +72,7 @@ export default function AboutPage() {
             Four Pillars of the AMETHEUS Platform
           </h2>
           <p className="text-sm text-[#64748B] mt-1 max-w-2xl">
-            How our decoupled architecture guarantees zero-latency gameplay, fraud-proof payouts, and fair play.
+            How our platform guarantees zero-latency gameplay, fraud-proof payouts, and fair play.
           </p>
         </div>
 
@@ -83,10 +83,10 @@ export default function AboutPage() {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-bold font-headline text-[#0F172A] uppercase">
-              1. Razorpay Escrow Guarantee
+              1. Protected Prize Vault Guarantee
             </h3>
             <p className="text-xs text-[#475569] leading-relaxed">
-              Every tournament entry fee and prize pool is placed into bank-grade escrow prior to match commencement. Winners receive automated prize disbursals directly to their verified accounts within minutes of evidence certification.
+              Every tournament entry fee and prize pool is placed into our protected prize vault prior to match commencement. Winners receive automated prize disbursals directly to their verified accounts within minutes of evidence certification.
             </p>
             <div className="pt-2 border-t border-[#F1F3F5] text-[11px] font-mono text-[#E56A10] font-bold">
               100% Financial Reconciliation // Zero Default Risk
@@ -115,13 +115,13 @@ export default function AboutPage() {
               <FileCheck className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-bold font-headline text-[#0F172A] uppercase">
-              3. SHA-256 Tamper-Evident Ledger
+              3. Tamper-Evident Operational Audit Ledger
             </h3>
             <p className="text-xs text-[#475569] leading-relaxed">
-              All administrative operations, roster kicks, match score submissions, dispute arbitrations, and organizer promotions are hashed sequentially using SHA-256 cryptographic chaining, ensuring a permanent and immutable audit trail.
+              All administrative operations, squad lineup changes, match score submissions, dispute arbitrations, and organizer promotions are securely recorded, ensuring a permanent and transparent verification trail.
             </p>
             <div className="pt-2 border-t border-[#F1F3F5] text-[11px] font-mono text-emerald-700 font-bold">
-              Cryptographic Hash Ledger // Zero Impersonation
+              Transparent Audit Ledger // Zero Impersonation
             </div>
           </div>
 
@@ -172,21 +172,21 @@ export default function AboutPage() {
             <div className="space-y-2">
               <span className="font-bold text-[#0F172A] uppercase tracking-wider block">Backend Engine</span>
               <ul className="space-y-1 text-[#64748B] font-mono">
-                <li>• Python 3.12 &amp; FastAPI</li>
-                <li>• SQLAlchemy 2.0 (Asyncpg)</li>
-                <li>• PostgreSQL with Alembic</li>
-                <li>• RS256 JWKS Clerk Verification</li>
-                <li>• Deployed on Render Cloud</li>
+                <li>• Python 3.12 Competition Engine</li>
+                <li>• MongoDB High-Scale Document Store</li>
+                <li>• Fast Automated Bracket Arbitration</li>
+                <li>• Secure Clerk Authentication</li>
+                <li>• Deployed on Cloud Infrastructure</li>
               </ul>
             </div>
             <div className="space-y-2">
               <span className="font-bold text-[#0F172A] uppercase tracking-wider block">Game Infrastructure</span>
               <ul className="space-y-1 text-[#64748B] font-mono">
                 <li>• AWS Mumbai (ap-south-1)</li>
-                <li>• Riot Vanguard &amp; VAC Live</li>
+                <li>• Riot Vanguard &amp; Hardware Anti-Cheat</li>
                 <li>• 128-Tick Competitive Servers</li>
                 <li>• 15-Minute Check-in Forfeit Grace</li>
-                <li>• Real Roster Verification</li>
+                <li>• Verified Squad Eligibility</li>
               </ul>
             </div>
           </div>

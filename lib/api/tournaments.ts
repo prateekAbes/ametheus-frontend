@@ -24,7 +24,7 @@ export interface Tournament {
   description: string;
   rules: string[];
   schedule: Array<{ stage: string; time: string; details?: string }>;
-  prizes: Array<{ place?: string; rank?: string; badge?: string; share?: string; amount: string; distribution?: string }>;
+  prizes: Array<{ place?: string; rank?: string; badge?: string; share?: string; amount?: string; prize?: string; distribution?: string }>;
   bracket_rounds: Record<string, unknown>[];
   registered_rosters: Record<string, unknown>[];
 }

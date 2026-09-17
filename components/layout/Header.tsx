@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 import {
@@ -26,6 +27,7 @@ import {
   useAuth,
 } from "@clerk/nextjs";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
+import { getTournaments, Tournament } from "@/lib/api/tournaments";
 
 export default function Header() {
   const pathname = usePathname();
@@ -35,7 +37,37 @@ export default function Header() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Silently load tournament catalog for instant search autocomplete
+  useEffect(() => {
+    getTournaments()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTournaments(data);
+        }
+      })
+      .catch(() => {
+        // Silent fallback without errors
+      });
+  }, []);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchDropdownRef.current &&
+        !searchDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Sync / fetch current user's profile for authoritative role
   useEffect(() => {
@@ -50,9 +82,10 @@ export default function Header() {
     }
   }, [isSignedIn, user]);
 
-  // Close mobile menu on route change
+  // Close mobile menu and dropdown on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setIsSearchDropdownOpen(false);
   }, [pathname]);
 
   // Handle Ctrl+K shortcut for search focus
@@ -61,6 +94,7 @@ export default function Header() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         searchInputRef.current?.focus();
+        setIsSearchDropdownOpen(true);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -71,7 +105,7 @@ export default function Header() {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/tournaments?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery("");
+      setIsSearchDropdownOpen(false);
       setIsMobileMenuOpen(false);
     }
   };
@@ -185,23 +219,85 @@ export default function Header() {
 
           {/* Right Action Bar (Search, Notifications, Auth, Mobile Toggle) */}
           <div className="flex items-center gap-2 md:gap-3">
-            {/* Quick Search Bar */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative">
-              <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2.5 py-1.5 rounded text-xs text-[#94A3B8] w-44 lg:w-56 focus-within:w-64 focus-within:border-[#E56A10]/60">
-                <Search className="w-3.5 h-3.5 mr-2 text-[#94A3B8] shrink-0" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search tournaments..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent border-none outline-hidden text-xs text-white placeholder-[#64748B] w-full"
-                />
-                <kbd className="hidden lg:inline-block px-1 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[9px] font-mono text-[#94A3B8] rounded ml-1 shrink-0">
-                  Ctrl+K
-                </kbd>
-              </div>
-            </form>
+            {/* Quick Search Bar with Live Autocomplete */}
+            <div className="relative hidden md:block" ref={searchDropdownRef}>
+              <form onSubmit={handleSearchSubmit} className="flex items-center relative">
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2.5 py-1.5 rounded text-xs text-[#94A3B8] w-44 lg:w-56 focus-within:w-64 focus-within:border-[#E56A10]/60">
+                  <Search className="w-3.5 h-3.5 mr-2 text-[#94A3B8] shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search tournaments..."
+                    value={searchQuery}
+                    onFocus={() => setIsSearchDropdownOpen(true)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsSearchDropdownOpen(true);
+                    }}
+                    className="bg-transparent border-none outline-hidden text-xs text-white placeholder-[#64748B] w-full"
+                  />
+                  <kbd className="hidden lg:inline-block px-1 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[9px] font-mono text-[#94A3B8] rounded ml-1 shrink-0">
+                    Ctrl+K
+                  </kbd>
+                </div>
+              </form>
+
+              {/* Autocomplete Dropdown */}
+              {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
+                <div className="absolute top-full right-0 mt-2 w-72 lg:w-80 bg-[#10141F] border border-[#242C3D] rounded-xl shadow-2xl overflow-hidden z-50 font-mono text-xs animate-in fade-in">
+                  <div className="p-2 bg-[#0B0E16] border-b border-[#242C3D] flex items-center justify-between text-[10px] text-[#94A3B8] uppercase">
+                    <span>Tournament Suggestions</span>
+                    <span className="text-[#E56A10] font-bold">{tournaments.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase()))).length} Results</span>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto divide-y divide-[#242C3D]/50">
+                    {tournaments
+                      .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase())))
+                      .slice(0, 5)
+                      .map((t) => (
+                        <Link
+                          key={t.id}
+                          href={`/tournaments/${t.slug || t.id}`}
+                          onClick={() => {
+                            setIsSearchDropdownOpen(false);
+                            setSearchQuery("");
+                          }}
+                          className="p-3 hover:bg-[#161A24] transition-colors block group"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-white font-bold truncate group-hover:text-[#E56A10] transition-colors">
+                              {t.title}
+                            </span>
+                            <span className="text-[10px] text-[#E56A10] font-bold shrink-0">
+                              ₹{t.prize_pool_inr?.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-[#94A3B8]">
+                            <span className="px-1.5 py-0.2 bg-[#0B0E16] rounded border border-[#242C3D] uppercase">
+                              {t.game_slug || "ESPORTS"}
+                            </span>
+                            <span>{t.format || "Bracket"}</span>
+                          </div>
+                        </Link>
+                      ))}
+
+                    {tournaments.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.game_slug && t.game_slug.toLowerCase().includes(searchQuery.toLowerCase()))).length === 0 && (
+                      <div className="p-4 text-center text-[#94A3B8] text-xs">
+                        No tournaments matching &quot;{searchQuery}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSearchSubmit}
+                    className="w-full p-2.5 bg-[#161A24] hover:bg-[#1F2636] text-[#E56A10] text-[11px] font-bold text-center border-t border-[#242C3D] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>View all matching results</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Notifications Dropdown */}
             <NotificationsDropdown />

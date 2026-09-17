@@ -51,7 +51,7 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
         <div className="flex items-center justify-between p-5 border-b border-[#242C3D] bg-[#10141F]">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#161A24] border border-[#E56A10]/40 text-[#E56A10] text-[10px] font-mono font-bold rounded">
-              MATCH LOBBY // ESCROW PROTECTED
+              MATCH LOBBY // PRIZE VAULT PROTECTED
             </div>
             <h3 className="text-xl font-bold font-headline text-white mt-1 uppercase">
               {match.stage}

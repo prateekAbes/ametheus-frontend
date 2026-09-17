@@ -160,7 +160,7 @@ export default function DashboardPage() {
   };
 
   const handleKickMember = async (teamId: string, memberUserId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove @${memberName} from the roster?`)) return;
+    if (!confirm(`Are you sure you want to remove @${memberName} from the squad?`)) return;
     try {
       await kickTeamMember(teamId, memberUserId);
       const updatedTeams = await getMyTeams();
@@ -182,7 +182,7 @@ export default function DashboardPage() {
   };
 
   const handleDisbandSquad = async (teamId: string) => {
-    if (!confirm("Are you sure you want to permanently disband this squad roster?")) return;
+    if (!confirm("Are you sure you want to permanently disband this squad lineup?")) return;
     try {
       await disbandTeam(teamId);
       const updatedTeams = await getMyTeams();
@@ -307,7 +307,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4 bg-[#161A24] p-4 rounded-xl border border-[#242C3D] shadow-xs">
               <div>
                 <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold tracking-wider">
-                  Escrow Balance
+                  Wallet Balance
                 </div>
                 <div className="text-2xl font-bold font-mono text-[#E56A10]">
                   ₹{inrBalance}
@@ -330,8 +330,130 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* Active Squad Card */}
-            {activeTeam ? (
+            {/* Admin / Organizer Overseer Console OR Player Squad Card */}
+            {isSuperAdmin || isOrganizer ? (
+              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#242C3D] pb-4">
+                  <div>
+                    <div className="text-xs font-mono text-[#94A3B8] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
+                      {isSuperAdmin ? "Super Admin Operations & Overseer Console" : "Tournament Organizer Operations Console"}
+                    </div>
+                    <h2 className="text-xl font-bold font-headline text-white mt-1">
+                      Tournament Supervisory Command
+                    </h2>
+                    <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                      Monitor platform competitions, registered squads, match verification arbitrations, and prize distributions.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {isSuperAdmin && (
+                      <Link
+                        href="/admin"
+                        className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Shield className="w-3.5 h-3.5" /> Admin Cockpit
+                      </Link>
+                    )}
+                    <Link
+                      href="/organizer"
+                      className="px-4 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Organizer Portal
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Platform Overview Metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
+                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Platform Tournaments</span>
+                    <span className="text-white font-headline font-bold text-xl">{tournaments.length}</span>
+                    <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">Sanctioned & Active</span>
+                  </div>
+                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
+                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Registered Squads</span>
+                    <span className="text-[#E56A10] font-headline font-bold text-xl">
+                      {tournaments.reduce((acc, t) => acc + (t.registered_teams || 0), 0)}
+                    </span>
+                    <span className="text-[10px] text-[#94A3B8] font-mono block mt-0.5">Across All Brackets</span>
+                  </div>
+                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
+                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Total Protected Prizes</span>
+                    <span className="text-white font-headline font-bold text-xl">
+                      ₹{tournaments.reduce((acc, t) => acc + (t.prize_pool_inr || 0), 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">Guaranteed Vault</span>
+                  </div>
+                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
+                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Platform Matches</span>
+                    <span className="text-white font-headline font-bold text-xl">{matches.length}</span>
+                    <span className="text-[10px] text-amber-400 font-mono block mt-0.5">Live & Verification</span>
+                  </div>
+                </div>
+
+                {/* Tournaments Under Supervision */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-[#94A3B8] uppercase">
+                      Tournaments Under Platform Supervision
+                    </span>
+                    <Link href="/admin" className="text-xs text-[#E56A10] font-mono hover:underline">
+                      Manage All ({tournaments.length}) →
+                    </Link>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {tournaments.slice(0, 3).map((t) => (
+                      <div
+                        key={t.id}
+                        className="bg-[#161A24] p-4 rounded-lg border border-[#242C3D] hover:border-[#333C4D] transition-colors space-y-3 flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="px-2 py-0.5 bg-[#0B0E16] text-[#FFB68F] border border-[#E56A10]/30 text-[10px] font-mono font-bold rounded uppercase">
+                              {t.status.replace("_", " ")}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-[#E56A10]">
+                              ₹{t.prize_pool_inr?.toLocaleString()}
+                            </span>
+                          </div>
+                          <h4 className="font-headline font-bold text-sm text-white truncate">
+                            {t.title}
+                          </h4>
+                          <div className="text-[11px] text-[#94A3B8] font-mono mt-1">
+                            {t.game_slug?.toUpperCase()} • {t.registered_teams || 0} / {t.max_teams} Squads
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-[#242C3D] flex items-center justify-between text-xs font-mono">
+                          <span className="text-[#64748B] text-[10px]">{t.starts_at}</span>
+                          <Link
+                            href={isSuperAdmin ? "/admin" : `/tournaments/${t.slug || t.id}`}
+                            className="text-[#E56A10] font-bold hover:underline flex items-center gap-1"
+                          >
+                            Oversee <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* If the admin/organizer also happens to have a competitive squad, show it below as a compact card */}
+                {activeTeam && (
+                  <div className="pt-4 border-t border-[#242C3D] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-[#94A3B8] uppercase font-bold">
+                        Personal Squad: <strong className="text-white">{activeTeam.name} [{activeTeam.tag}]</strong> ({activeTeam.members?.length || 1} Athletes)
+                      </span>
+                      <span className="text-xs font-mono text-[#E56A10]">Invite: {activeTeam.invite_code}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : activeTeam ? (
               <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#242C3D] pb-4">
                   <div>
@@ -393,10 +515,10 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Roster Members with Kick Functionality */}
+                {/* Squad Lineup Members with Kick Functionality */}
                 <div>
                   <div className="text-xs font-mono font-bold text-[#94A3B8] uppercase mb-3">
-                    Squad Roster ({activeTeam.members?.length || 1} / {activeTeam.max_members} Athletes)
+                    Squad Lineup ({activeTeam.members?.length || 1} / {activeTeam.max_members} Athletes)
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {activeTeam.members && activeTeam.members.length > 0 ? (
@@ -442,7 +564,7 @@ export default function DashboardPage() {
                     No Active Tactical Squad
                   </h2>
                   <p className="text-xs text-[#94A3B8] mt-1.5 max-w-xl leading-relaxed">
-                    You haven&apos;t joined or created a squad yet. Create your roster to receive an exclusive 6-character squad code, or enter an invite code to join your team.
+                    You haven&apos;t joined or created a squad yet. Create your squad to receive an exclusive 6-character squad code, or enter an invite code to join your team.
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -718,7 +840,7 @@ export default function DashboardPage() {
                   disabled={isJoiningSquad}
                   className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer"
                 >
-                  {isJoiningSquad ? "Joining..." : "Join Squad Roster"}
+                  {isJoiningSquad ? "Joining..." : "Join Squad Lineup"}
                 </button>
               </div>
             </form>

@@ -250,7 +250,7 @@ export default function RegisterTournamentModal({
                 </span>
               </div>
               <span className="px-2 py-1 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] text-[10px] font-mono rounded">
-                100% SECURE ESCROW
+                100% GUARANTEED PRIZE VAULT
               </span>
             </div>
 
@@ -263,7 +263,7 @@ export default function RegisterTournamentModal({
                 className="mt-0.5 text-[#E56A10] focus:ring-[#E56A10] rounded"
               />
               <span>
-                I agree to the tournament regulations: fixed 5-man roster, zero substitutes, hardware Vanguard ID checks, and mandatory check-in 30 mins before match start.
+                I agree to the tournament regulations: fixed 5-player squad, zero substitutes, hardware Vanguard ID checks, and mandatory check-in 30 mins before match start.
               </span>
             </label>
 
@@ -316,14 +316,14 @@ export default function RegisterTournamentModal({
             <div className="bg-[#0B0E16] border border-amber-500/30 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400 uppercase">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Sandbox Escrow Simulation
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Quick Sandbox Test Payment
                 </div>
                 <span className="px-1.5 py-0.5 bg-amber-950/60 text-amber-300 text-[10px] font-mono border border-amber-500/30 rounded font-bold">
                   TEST MODE ACTIVE
                 </span>
               </div>
               <p className="text-[11px] text-[#94A3B8] leading-relaxed">
-                Test the end-to-end tournament registration and escrow ledger verification without entering real UPI/card details.
+                Test the end-to-end tournament registration and prize vault entry without entering real UPI/card details.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -348,14 +348,14 @@ export default function RegisterTournamentModal({
               </div>
             </div>
 
-            {/* Escrow Gateway Footer */}
+            {/* Payment Gateway Footer */}
             <div className="bg-[#0B0E16] border border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-2">
               <div className="flex items-center gap-2 text-xs text-[#CBD5E1] font-mono">
                 <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
-                Razorpay Platform Escrow • UPI / NetBanking / Cards
+                Razorpay Verified Checkout • UPI / NetBanking / Cards
               </div>
               <p className="text-[10px] text-[#94A3B8]">
-                Funds are held in cryptographic SHA-256 escrow until tournament completion and match verification.
+                Prize funds are guaranteed and held in the protected prize vault until tournament completion.
               </p>
             </div>
 
