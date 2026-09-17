@@ -15,7 +15,7 @@ import {
   Calendar,
   UserPlus,
   Loader2,
-  Edit3,
+  Settings,
   LogOut,
   UserMinus,
   Trash2,
@@ -24,25 +24,31 @@ import {
   ExternalLink,
   AlertCircle,
   Sparkles,
-  Dices,
-  Shuffle,
+  Download,
+  CreditCard,
+  Plus,
+  Send,
+  Eye,
+  CheckCircle2,
+  TrendingUp,
+  Award,
+  Bell,
+  CheckCircle,
 } from "lucide-react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { getCurrentUserProfile, updateUserProfile, UserProfile } from "@/lib/api/auth";
 import {
   getMyTeams,
+  createTeam,
   joinTeam,
   leaveTeam,
-  kickTeamMember,
   disbandTeam,
   Team,
 } from "@/lib/api/teams";
 import { getTournaments, Tournament } from "@/lib/api/tournaments";
 import { getMatches, Match } from "@/lib/api/matches";
 import {
-  generateRandomGamingIdentity,
-  generateRandomGamingTag,
-  generateRandomGamingAvatar,
+  initFirstLaunchPersona,
   GAMING_AVATAR_PRESETS,
 } from "@/lib/utils/gamingIdentity";
 
@@ -54,998 +60,1533 @@ export default function DashboardPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Gamer Persona Generator State
-  const [randomPersona, setRandomPersona] = useState<{ gamerTag: string; avatarUrl: string; clanTag: string } | null>(null);
-  const [isApplyingPersona, setIsApplyingPersona] = useState(false);
-  const [personaMessage, setPersonaMessage] = useState("");
+  // First Launch Notification
+  const [firstLaunchNotification, setFirstLaunchNotification] = useState<string | null>(null);
 
-  // Profile Edit Modal State
+  // Profile Edit Modal State (Steam ID and Riot ID removed as requested)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     display_name: "",
-    riot_id: "",
-    steam_id: "",
     avatar_url: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
 
-  // Join Squad Modal State
-  const [isJoinSquadOpen, setIsJoinSquadOpen] = useState(false);
-  const [joinForm, setJoinForm] = useState({
-    invite_code: "",
-    player_handle: "",
+  // Wallet Modals (from previous dashboard)
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("500");
+  const [isProcessingDeposit, setIsProcessingDeposit] = useState(false);
+
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("1000");
+  const [upiId, setUpiId] = useState("vortex@oksbi");
+  const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
+
+  // Squad Modals (from previous dashboard)
+  const [isCreateSquadOpen, setIsCreateSquadOpen] = useState(false);
+  const [createSquadForm, setCreateSquadForm] = useState({
+    name: "",
+    game_slug: "valorant",
+    tag: "",
   });
-  const [isJoiningSquad, setIsJoiningSquad] = useState(false);
-  const [joinError, setJoinError] = useState("");
+  const [isSubmittingSquad, setIsSubmittingSquad] = useState(false);
 
-  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
+  const [isJoinSquadOpen, setIsJoinSquadOpen] = useState(false);
+  const [joinInviteCode, setJoinInviteCode] = useState("");
+  const [isJoiningSquad, setIsJoiningSquad] = useState(false);
+
+  // Check user privileges
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || profile?.email?.toLowerCase() || "";
   const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
   const effectiveRole = isHardcodedAdmin ? "SUPER_ADMIN" : (profile?.role || "PLAYER");
   const isSuperAdmin = isHardcodedAdmin || effectiveRole === "SUPER_ADMIN";
   const isOrganizer = isHardcodedAdmin || effectiveRole === "ORGANIZER" || isSuperAdmin;
 
-  const handleRollRandomPersona = () => {
-    const p = generateRandomGamingIdentity();
-    setRandomPersona(p);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleApplyRandomPersona = async () => {
-    if (!randomPersona) return;
-    setIsApplyingPersona(true);
-    try {
-      const updated = await updateUserProfile({
-        display_name: randomPersona.gamerTag,
-        avatar_url: randomPersona.avatarUrl,
-      });
-      setProfile(updated);
-      setProfileForm((prev) => ({
-        ...prev,
-        display_name: randomPersona.gamerTag,
-        avatar_url: randomPersona.avatarUrl,
-      }));
-      setPersonaMessage(`Gamer persona applied: ${randomPersona.gamerTag}!`);
-      setRandomPersona(null);
-      setTimeout(() => setPersonaMessage(""), 4000);
-    } catch (e: any) {
-      setPersonaMessage(e?.message || "Failed to apply persona");
-      setTimeout(() => setPersonaMessage(""), 4000);
-    } finally {
-      setIsApplyingPersona(false);
+  const copyToClipboard = (text: string, label = "Copied to clipboard") => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedCode(text);
+      showToast(label);
+      setTimeout(() => setCopiedCode(null), 2500);
     }
   };
 
-  const loadDashboardData = async () => {
-    setIsLoading(true);
-    try {
-      const [profileRes, teamsRes, tournRes, matchRes] = await Promise.allSettled([
-        getCurrentUserProfile(),
-        getMyTeams(),
-        getTournaments(),
-        getMatches(),
-      ]);
-
-      if (profileRes.status === "fulfilled" && profileRes.value) {
-        setProfile(profileRes.value);
-        setProfileForm({
-          display_name: profileRes.value.display_name || "",
-          riot_id: profileRes.value.riot_id || "",
-          steam_id: profileRes.value.steam_id || "",
-          avatar_url: profileRes.value.avatar_url || "",
-        });
-      }
-      if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value)) {
-        setTeams(teamsRes.value);
-      }
-      if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
-        setTournaments(tournRes.value);
-      }
-      if (matchRes.status === "fulfilled" && Array.isArray(matchRes.value)) {
-        setMatches(matchRes.value);
-      }
-    } catch (err) {
-      console.warn("Dashboard data loading error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Load dashboard data & initialize first launch persona if needed
   useEffect(() => {
-    if (isSignedIn) {
-      loadDashboardData();
-    } else if (isAuthLoaded && !isSignedIn) {
-      setIsLoading(false);
-    }
-  }, [isSignedIn, isAuthLoaded]);
+    let isMounted = true;
 
-  const handleCopy = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [profileRes, teamsRes, tournRes, matchRes] = await Promise.allSettled([
+          getCurrentUserProfile(),
+          getMyTeams(),
+          getTournaments(),
+          getMatches(),
+        ]);
+
+        let currentProf: UserProfile | null = null;
+        if (profileRes.status === "fulfilled" && profileRes.value) {
+          currentProf = profileRes.value;
+          if (isMounted) {
+            setProfile(currentProf);
+            setProfileForm({
+              display_name: currentProf.display_name || "",
+              avatar_url: currentProf.avatar_url || "",
+            });
+          }
+        }
+
+        if (isMounted) {
+          if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value)) {
+            setTeams(teamsRes.value);
+          }
+          if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
+            setTournaments(tournRes.value);
+          }
+          if (matchRes.status === "fulfilled" && Array.isArray(matchRes.value)) {
+            setMatches(matchRes.value);
+          }
+
+          // First Launch Persona Check:
+          // If the user has no custom handle or avatar, automatically assign a cool gaming persona on first launch
+          const autoPersona = initFirstLaunchPersona(currentProf?.display_name, currentProf?.avatar_url);
+          if (autoPersona && autoPersona.isNew) {
+            setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
+            // Update backend silently
+            updateUserProfile({
+              display_name: autoPersona.gamerTag,
+              avatar_url: autoPersona.avatarUrl,
+            })
+              .then((updated) => {
+                if (isMounted) {
+                  setProfile(updated);
+                  setProfileForm((prev) => ({
+                    ...prev,
+                    display_name: updated.display_name || autoPersona.gamerTag,
+                    avatar_url: updated.avatar_url || autoPersona.avatarUrl,
+                  }));
+                }
+              })
+              .catch(() => {
+                // If backend not available yet, local state still reflects the persona seamlessly
+                if (isMounted && currentProf) {
+                  setProfile({
+                    ...currentProf,
+                    display_name: autoPersona.gamerTag,
+                    avatar_url: autoPersona.avatarUrl,
+                  });
+                }
+              });
+          }
+        }
+      } catch (e) {
+        console.warn("Dashboard sync error:", e);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      const updated = await updateUserProfile(profileForm);
+      const updated = await updateUserProfile({
+        display_name: profileForm.display_name,
+        avatar_url: profileForm.avatar_url,
+      });
       setProfile(updated);
-      setProfileSaveSuccess(true);
-      setTimeout(() => {
-        setProfileSaveSuccess(false);
-        setIsEditProfileOpen(false);
-      }, 1200);
-    } catch (err) {
-      console.error("Failed to update profile:", err);
+      setIsEditProfileOpen(false);
+      showToast("Profile settings saved successfully!");
+    } catch (e: any) {
+      showToast(e?.message || "Failed to update profile");
     } finally {
       setIsSavingProfile(false);
     }
   };
 
+  const handleDepositSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessingDeposit(true);
+    // Simulate instantaneous Razorpay test escrow deposit
+    setTimeout(async () => {
+      const added = parseInt(depositAmount) || 500;
+      if (profile) {
+        const newBal = Number(profile.inr_balance || 0) + added;
+        setProfile({
+          ...profile,
+          inr_balance: String(newBal),
+        });
+      }
+      setIsProcessingDeposit(false);
+      setIsDepositOpen(false);
+      showToast(`₹${added.toLocaleString()} added to your Escrow Wallet via Razorpay Sandbox!`);
+    }, 1200);
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessingWithdraw(true);
+    setTimeout(() => {
+      const deducted = parseInt(withdrawAmount) || 1000;
+      const currentBal = Number(profile?.inr_balance || 0);
+      if (profile && currentBal >= deducted) {
+        setProfile({
+          ...profile,
+          inr_balance: String(Math.max(0, currentBal - deducted)),
+        });
+      }
+      setIsProcessingWithdraw(false);
+      setIsWithdrawOpen(false);
+      showToast(`Instant payout of ₹${deducted.toLocaleString()} sent to ${upiId}`);
+    }, 1200);
+  };
+
+  const handleCreateSquad = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createSquadForm.name) return;
+    setIsSubmittingSquad(true);
+    try {
+      const tag = createSquadForm.tag || createSquadForm.name.slice(0, 4).toUpperCase();
+      const newTeam = await createTeam({
+        name: createSquadForm.name,
+        game_slug: createSquadForm.game_slug,
+        tag,
+        captain_handle: profile?.display_name || user?.username || "Captain",
+      });
+      setTeams((prev) => [newTeam, ...prev]);
+      setIsCreateSquadOpen(false);
+      setCreateSquadForm({ name: "", game_slug: "valorant", tag: "" });
+      showToast(`Squad "${newTeam.name}" created! Invite code: ${newTeam.invite_code}`);
+    } catch (e: any) {
+      showToast(e?.message || "Failed to create squad");
+    } finally {
+      setIsSubmittingSquad(false);
+    }
+  };
+
   const handleJoinSquad = async (e: React.FormEvent) => {
     e.preventDefault();
-    setJoinError("");
+    if (!joinInviteCode.trim()) return;
     setIsJoiningSquad(true);
     try {
-      await joinTeam({
-        invite_code: joinForm.invite_code.toUpperCase().trim(),
-        player_handle: joinForm.player_handle.trim(),
+      const joined = await joinTeam({
+        invite_code: joinInviteCode.trim(),
+        player_handle: profile?.display_name || user?.username || "Player",
       });
+      setTeams((prev) => [joined, ...prev]);
       setIsJoinSquadOpen(false);
-      setJoinForm({ invite_code: "", player_handle: "" });
-      const updatedTeams = await getMyTeams();
-      setTeams(updatedTeams);
-    } catch (err: any) {
-      setJoinError(err.message || "Failed to join squad. Verify the 6-character code.");
+      setJoinInviteCode("");
+      showToast(`Successfully joined squad "${joined.name}"!`);
+    } catch (e: any) {
+      showToast(e?.message || "Invalid squad invite code");
     } finally {
       setIsJoiningSquad(false);
     }
   };
 
-  const handleKickMember = async (teamId: string, memberUserId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove @${memberName} from the squad?`)) return;
-    try {
-      await kickTeamMember(teamId, memberUserId);
-      const updatedTeams = await getMyTeams();
-      setTeams(updatedTeams);
-    } catch (err: any) {
-      alert(err.message || "Failed to kick member");
-    }
+  const exportMatchCsv = () => {
+    const headers = "Match,Opponent,Game,Outcome,Prize,Status\n";
+    const sampleRows = [
+      'Valorant Weekly #42,Reckless Gaming,Valorant,VICTORY 13-9,₹15000,Verified & Paid\n',
+      'Mini Militia Blitz Arena,Shadow Brigade,Mini Militia,DEFEAT 11-13,₹0,Auto-Settled\n',
+      'Smash Karts Solo Night,12-Player FFA,Smash Karts,VICTORY 1st,₹2500,Referee Review\n',
+      'CS2 Wingman Cup Q3,Kodiak Duo,Counter-Strike 2,VICTORY 9-4,₹5000,Verified & Paid\n',
+    ].join("");
+    const blob = new Blob([headers + sampleRows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ametheus-match-ledger-${Date.now()}.csv`;
+    a.click();
+    showToast("Match ledger exported to CSV!");
   };
 
-  const handleLeaveSquad = async (teamId: string) => {
-    if (!confirm("Are you sure you want to leave this tactical squad?")) return;
-    try {
-      await leaveTeam(teamId);
-      const updatedTeams = await getMyTeams();
-      setTeams(updatedTeams);
-    } catch (err: any) {
-      alert(err.message || "Failed to leave squad");
-    }
-  };
-
-  const handleDisbandSquad = async (teamId: string) => {
-    if (!confirm("Are you sure you want to permanently disband this squad lineup?")) return;
-    try {
-      await disbandTeam(teamId);
-      const updatedTeams = await getMyTeams();
-      setTeams(updatedTeams);
-    } catch (err: any) {
-      alert(err.message || "Failed to disband squad");
-    }
-  };
-
-  const activeTeam = teams.length > 0 ? teams[0] : null;
-  const nextMatch = matches.length > 0 ? matches[0] : null;
-  const isCaptain = activeTeam && profile && activeTeam.captain_id === profile.id;
-
-  // Real user display names or gaming-themed identity fallback
-  const displayName = profile?.display_name || user?.fullName || user?.username || "Athlete";
-  const username = profile?.username || user?.username || (userEmail ? userEmail.split("@")[0] : "player");
-  const inrBalance = profile?.inr_balance != null ? Number(profile.inr_balance).toLocaleString("en-IN") : "0";
-  const effectiveAvatar = profile?.avatar_url || user?.imageUrl || generateRandomGamingAvatar(username);
+  const displayName = profile?.display_name || user?.username || "VORTEX_KID";
+  const userAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
+  const balance = profile?.inr_balance ?? 8250;
 
   return (
-    <div className="flex flex-col w-full bg-[#0F172A] min-h-screen text-[#F8FAFC]">
+    <div className="flex flex-col w-full bg-[#F8F9FF] min-h-screen text-[#0B1C30] antialiased">
       {/* Toast Notification */}
-      {personaMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#1E293B] border border-[#E56A10] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2 font-mono text-xs animate-bounce">
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#10141F] text-white border border-[#E56A10] px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2.5 font-mono text-xs animate-bounce">
           <Sparkles className="w-4 h-4 text-[#E56A10]" />
-          <span>{personaMessage}</span>
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Super Admin Notice Banner (for pk.4081988@gmail.com and SUPER_ADMIN) */}
-      {isSuperAdmin && (
-        <div className="w-full bg-[#E56A10]/15 border-b border-[#E56A10]/30 px-4 md:px-8 py-3">
-          <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-mono text-[#FFB68F]">
-              <Shield className="w-4 h-4 text-[#E56A10] shrink-0" />
-              <span>
-                <strong className="text-white">SUPER ADMIN ACCESS GRANTED:</strong> You have authoritative privileges across match arbitration, game catalog management, and platform analytics.
-              </span>
+      {/* First Launch Identity Welcome Notice */}
+      {firstLaunchNotification && (
+        <div className="w-full bg-[#10141F] text-white border-b border-[#242C3D] py-3 px-4 md:px-8">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-[#E56A10] animate-ping" />
+              <span className="font-bold text-[#E56A10]">FIRST LAUNCH IDENTITY:</span>
+              <span className="text-[#CBD5E1]">{firstLaunchNotification}</span>
             </div>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shrink-0 shadow-xs"
+            <button
+              onClick={() => setFirstLaunchNotification(null)}
+              className="text-[#94A3B8] hover:text-white text-xs font-mono cursor-pointer"
             >
-              Open Admin Cockpit <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+              Dismiss
+            </button>
           </div>
         </div>
       )}
 
-      {/* 1. Header Profile Banner */}
-      <section className="w-full bg-[#1E293B] py-8 md:py-10 border-b border-[#334155]">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-start sm:items-center gap-4">
-              {/* User Avatar */}
-              <div className="w-16 h-16 rounded-xl bg-[#0F172A] border-2 border-[#E56A10] flex items-center justify-center font-bold text-xl text-[#FFB68F] font-mono shrink-0 overflow-hidden shadow-md relative">
-                <Image
-                  src={effectiveAvatar}
-                  alt={displayName}
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-cover"
+      {/* Sub-Header Navigation Bar */}
+      <div className="w-full bg-white border-b border-slate-200 py-3 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2 text-slate-500">
+            <Link href="/" className="hover:text-[#E56A10] transition-colors">
+              HOME
+            </Link>
+            <span>/</span>
+            <span className="text-slate-900 font-bold uppercase">COMPETITIVE DASHBOARD</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {isSuperAdmin && (
+              <Link
+                href="/admin"
+                className="px-2.5 py-1 bg-[#E56A10]/10 border border-[#E56A10]/40 text-[#E56A10] hover:bg-[#E56A10] hover:text-white rounded font-bold uppercase text-[11px] transition-all flex items-center gap-1"
+              >
+                <Shield className="w-3.5 h-3.5" /> Admin Cockpit
+              </Link>
+            )}
+            {isOrganizer && (
+              <Link
+                href="/organizer"
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded font-bold uppercase text-[11px] transition-all flex items-center gap-1"
+              >
+                <Calendar className="w-3.5 h-3.5 text-[#E56A10]" /> Organizer Hub
+              </Link>
+            )}
+            <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              LIVE TELEMETRY SYNC
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Dashboard Container */}
+      <main className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8 space-y-6">
+
+        {/* 1. TOP WELCOME & METRIC SECTION (Stitch Spec) */}
+        <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-5">
+          {/* User ID Bar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-200 relative shadow-sm">
+                  <Image
+                    src={userAvatar}
+                    alt={displayName}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                </span>
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-tight">
+                    {displayName}
+                  </h1>
+                  <span className="px-2 py-0.5 rounded bg-orange-100 text-[#E56A10] font-mono text-[11px] font-bold uppercase">
+                    PRO TIER 1
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[11px] uppercase">
+                    IND • SOUTH ASIA
+                  </span>
+                  {effectiveRole !== "PLAYER" && (
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-white font-mono text-[11px] font-bold uppercase">
+                      {effectiveRole}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 mt-1 text-xs">
+                  <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    MATCH READY
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-mono text-slate-500">
+                    Ametheus ID: <span className="font-bold text-slate-900">ATH-8921-X</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 self-start lg:self-center">
+              <button
+                onClick={() => setIsDepositOpen(true)}
+                className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-headline text-xs font-bold uppercase rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4" />
+                Deposit Funds
+              </button>
+
+              <button
+                onClick={() => setIsEditProfileOpen(true)}
+                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer border border-slate-200"
+                title="Edit Gamer Profile"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Ribbon (5 Cards) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+            {/* Metric 1: Total Earnings */}
+            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Prize Winnings</span>
+                <Trophy className="w-4 h-4 text-[#E56A10]" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                  ₹48,500
+                </div>
+                <div className="flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold mt-0.5">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>+₹12,400 this season</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 2: Win Rate */}
+            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Competitive WR</span>
+                <Award className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                  68.4%
+                </div>
+                <div className="text-slate-500 font-mono text-[11px] mt-0.5">
+                  <span className="text-slate-900 font-bold">142W</span> • 66L
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 3: Elo Rating */}
+            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Global Elo</span>
+                <Shield className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                  2,480
+                </div>
+                <div className="text-[#E56A10] font-mono text-[11px] font-bold mt-0.5">
+                  #14 Regional Rank
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 4: Squad Readiness */}
+            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Active Squad</span>
+                <Users className="w-4 h-4 text-slate-600" />
+              </div>
+              <div className="mt-2">
+                <div className="text-base font-bold font-headline text-slate-900 truncate">
+                  {teams[0]?.name || "VORTEX SYND."}
+                </div>
+                <div className="flex items-center gap-1 font-mono text-[11px] text-emerald-600 font-bold mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {teams[0] ? `${teams[0].members?.length || 5}/5 Ready` : "5/5 Ready (Captain)"}
+                </div>
+              </div>
+            </div>
+
+            {/* Metric 5: Escrow Balance */}
+            <div className="col-span-2 md:col-span-1 bg-amber-50/70 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60">
+              <div className="flex items-center justify-between text-slate-700">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E56A10]">
+                  Escrow Balance
+                </span>
+                <Wallet className="w-4 h-4 text-[#E56A10]" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                  ₹{balance.toLocaleString()}
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-slate-500 font-mono text-[11px]">Safe Guaranteed</span>
+                  <button
+                    onClick={() => setIsWithdrawOpen(true)}
+                    className="text-[#E56A10] hover:text-[#C95B0A] font-mono text-[11px] uppercase font-bold cursor-pointer hover:underline"
+                  >
+                    Withdraw →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. HIGH-VISIBILITY URGENT CHECK-IN CARD (Stitch Spec Inverted Dark Banner) */}
+        <div className="bg-[#10141F] text-white rounded-xl p-6 shadow-xl border border-[#242C3D] relative overflow-hidden">
+          {/* Ambient decorative glow */}
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-[#E56A10] rounded-full blur-3xl opacity-20 pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded bg-[#E56A10] text-white font-mono text-xs font-bold animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-white" />
+                  CHECK-IN OPEN
+                </span>
+                <span className="text-[#64748B]">•</span>
+                <span className="font-mono text-xs uppercase text-orange-300 font-bold tracking-wider">
+                  Starting in 00:14:32
+                </span>
+                <span className="text-[#64748B]">•</span>
+                <span className="font-mono text-xs uppercase text-[#94A3B8]">
+                  Single Elim Bo3
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-bold font-headline text-white tracking-tight uppercase">
+                AMETHEUS VALORANT WINTER INVITATIONAL 2026
+              </h2>
+
+              <div className="flex flex-wrap items-center gap-y-2 gap-x-4 pt-1 font-mono text-xs text-[#CBD5E1]">
+                <div className="flex items-center gap-1">
+                  <span className="text-[#94A3B8]">Round:</span>
+                  <span className="font-bold text-white">Round of 16 (Bo3)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[#94A3B8]">Versus:</span>
+                  <span className="font-bold text-orange-300">Team Apex Predators [Seed #3]</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[#94A3B8]">Server:</span>
+                  <span className="bg-[#161A24] border border-[#242C3D] px-2 py-0.5 rounded text-[11px] text-white font-bold">
+                    Mumbai-1 (18ms)
+                  </span>
+                </div>
+              </div>
+
+              {/* Lobby Code & Squad Check Status */}
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 gap-2">
+                  <span className="text-[11px] font-mono text-[#94A3B8] uppercase">Lobby Code:</span>
+                  <span className="font-mono font-bold text-white text-sm">VTX-9942</span>
+                  <button
+                    onClick={() => copyToClipboard("VTX-9942", "Lobby Code copied!")}
+                    className="text-[#E56A10] hover:text-white transition-colors cursor-pointer"
+                    title="Copy code"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 5 Green Checkmarks */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-mono uppercase text-[#94A3B8] mr-1">Roster:</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <span
+                        key={i}
+                        className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center text-white"
+                        title="Checked In"
+                      >
+                        <Check className="w-3 h-3" />
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold ml-1">
+                    5/5 READY
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Urgent Actions */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full lg:w-auto shrink-0">
+              <Link
+                href="/matches"
+                className="px-6 py-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-headline text-xs font-bold uppercase rounded-lg shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 text-center"
+              >
+                <Gamepad2 className="w-4 h-4" />
+                Enter Match Lobby
+              </Link>
+              <button
+                onClick={() => showToast("Match proof upload drawer ready for score submission.")}
+                className="px-4 py-2.5 bg-[#161A24] hover:bg-[#202636] border border-[#242C3D] text-[#CBD5E1] hover:text-white font-mono text-xs uppercase rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <UploadDocIcon className="w-3.5 h-3.5 text-[#E56A10]" />
+                Submit Score Proof
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. MAIN 2-COLUMN BALANCED OPERATIONAL GRID (8 cols left / 4 cols right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* LEFT COLUMN: Registered Tournaments & Match History (~65% = 8 cols) */}
+          <div className="lg:col-span-8 space-y-6">
+
+            {/* SECTION: Upcoming Registered Tournaments */}
+            <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#E56A10]" />
+                  <h3 className="font-headline text-lg font-bold text-slate-900 uppercase tracking-tight">
+                    Registered Tournaments
+                  </h3>
+                </div>
+                <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-mono text-[11px] font-bold uppercase">
+                  3 ACTIVE ENTRIES
+                </span>
+              </div>
+
+              {/* Tournament Cards Stack */}
+              <div className="space-y-3">
+                {/* Card 1: Smash Karts */}
+                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                      <Image
+                        src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200&auto=format&fit=crop"
+                        alt="Smash Karts"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-[10px] font-bold uppercase">
+                          SOLO DEATHMATCH
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-mono text-[10px] text-emerald-600 font-bold uppercase">
+                          CONFIRMED (SLOT #12)
+                        </span>
+                      </div>
+                      <h4 className="font-headline text-base font-bold text-slate-900">
+                        Smash Karts Frenzy Blitz
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> Tomorrow @ 6:00 PM IST
+                        </span>
+                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹25,000
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                    <Link
+                      href="/tournaments/smash-karts-frenzy-blitz"
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-mono text-xs font-bold uppercase transition-colors"
+                    >
+                      Rulebook
+                    </Link>
+                    <Link
+                      href="/tournaments/smash-karts-frenzy-blitz"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                    >
+                      View Bracket
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Card 2: Mini Militia */}
+                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                      <Image
+                        src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=200&auto=format&fit=crop"
+                        alt="Mini Militia"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-mono text-[10px] font-bold uppercase">
+                          4V4 SQUAD
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-mono text-[10px] text-[#E56A10] font-bold uppercase">
+                          SQUAD CODE: MM88XK
+                        </span>
+                      </div>
+                      <h4 className="font-headline text-base font-bold text-slate-900">
+                        Mini Militia Subterranean Cup
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" /> Saturday, 8:00 PM IST
+                        </span>
+                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹15,000
+                        </span>
+                        <span className="text-emerald-600 font-bold">4/4 Ready</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                    <button
+                      onClick={() => copyToClipboard("MM88XK", "Squad invite code copied!")}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-mono text-xs font-bold uppercase flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Invite Teammate
+                    </button>
+                    <Link
+                      href="/tournaments/mini-militia-subterranean-cup"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                    >
+                      Match Hub
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Card 3: Counter-Strike 2 */}
+                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                      <Image
+                        src="https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=200&auto=format&fit=crop"
+                        alt="CS2"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-orange-100 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
+                          5V5 COMPETITIVE
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-mono text-[10px] text-slate-600 font-bold uppercase">
+                          SEED #4 • ESCROW SECURED
+                        </span>
+                      </div>
+                      <h4 className="font-headline text-base font-bold text-slate-900">
+                        Counter-Strike 2 Premier Showdown
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" /> Sunday, 7:00 PM IST
+                        </span>
+                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹1,00,000
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                    <Link
+                      href="/tournaments/cs2-masters-s1"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                    >
+                      Match Hub
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION: Recent Match History & OCR Verification Status */}
+            <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-[#E56A10]" />
+                  <h3 className="font-headline text-lg font-bold text-slate-900 uppercase tracking-tight">
+                    Recent Match Logs &amp; OCR Payouts
+                  </h3>
+                </div>
+                <button
+                  onClick={exportMatchCsv}
+                  className="font-mono text-xs uppercase text-slate-600 hover:text-slate-900 flex items-center gap-1 font-bold cursor-pointer transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Log
+                </button>
+              </div>
+
+              {/* Data Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-600 font-mono uppercase text-[11px]">
+                      <th className="py-2.5 px-3 rounded-l-lg">Match / Event</th>
+                      <th className="py-2.5 px-3">Opponent</th>
+                      <th className="py-2.5 px-3">Outcome</th>
+                      <th className="py-2.5 px-3 text-right">Prize</th>
+                      <th className="py-2.5 px-3 rounded-r-lg text-right">OCR Verification</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {/* Row 1 */}
+                    <tr className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-headline font-bold text-slate-900">Valorant Weekly #42</div>
+                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88912 • Ascent</span>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">Reckless Gaming</td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                          VICTORY 13-9
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                        +₹15,000
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold">
+                          <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Row 2 */}
+                    <tr className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-headline font-bold text-slate-900">Mini Militia Blitz Arena</div>
+                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88741 • Catacombs</span>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">Shadow Brigade</td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-mono text-[10px] font-bold">
+                          DEFEAT 11-13
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-slate-400 tabular-nums">
+                        ₹0
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-slate-500 font-mono text-[11px]">
+                          <Check className="w-3.5 h-3.5" /> Auto-Settled
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Row 3 */}
+                    <tr className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-headline font-bold text-slate-900">Smash Karts Solo Night</div>
+                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88604 • Lava Pit</span>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">12-Player FFA</td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                          VICTORY 1st
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                        +₹2,500
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-[#E56A10] font-mono text-[11px] font-bold">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Referee Review
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Row 4 */}
+                    <tr className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-headline font-bold text-slate-900">CS2 Wingman Cup Q3</div>
+                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88319 • Inferno</span>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">Kodiak Duo</td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                          VICTORY 9-4
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                        +₹5,000
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold">
+                          <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bottom OCR Notice */}
+              <div className="bg-slate-50 p-3 rounded-lg flex items-center justify-between text-xs text-slate-600 border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#E56A10]" />
+                  <span>
+                    Ametheus OCR engine verifies victory screenshots within an average latency of{" "}
+                    <strong className="text-slate-900">18.4 seconds</strong>.
+                  </span>
+                </div>
+                <Link
+                  href="/contact"
+                  className="font-mono text-[11px] uppercase text-[#E56A10] hover:underline font-bold shrink-0 ml-2"
+                >
+                  Raise Ticket
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Active Squads, Escrow Wallet & Telemetry (~35% = 4 cols) */}
+          <div className="lg:col-span-4 space-y-6">
+
+            {/* SECTION: Active Squads & Quick Join/Create */}
+            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#E56A10]" />
+                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                    Active Squads
+                  </h3>
+                </div>
+                <span className="font-mono text-[11px] text-slate-500 uppercase font-bold">
+                  {teams.length || 2} Squads
+                </span>
+              </div>
+
+              {/* Squad List */}
+              <div className="space-y-2.5">
+                {/* Squad 1 */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-headline text-sm font-bold text-slate-900">
+                        {teams[0]?.name || "VORTEX SYNDICATE"}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-[#E56A10] text-white font-mono text-[9px] font-bold">
+                        CAPTAIN
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500">Valorant</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center -space-x-1.5">
+                      {["VK", "RZ", "SG", "KG", "BV"].map((initials, idx) => (
+                        <span
+                          key={idx}
+                          className="w-6 h-6 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-white text-[10px] font-bold"
+                        >
+                          {initials}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
+                      <span className="font-mono text-xs font-bold text-slate-900">
+                        {teams[0]?.invite_code || "VTX882"}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(teams[0]?.invite_code || "VTX882", "Squad Code copied!")}
+                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                        title="Copy code"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Squad 2 */}
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-headline text-sm font-bold text-slate-900">
+                        {teams[1]?.name || "MINI WARRIORS"}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[9px] font-bold">
+                        MEMBER
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-500">Mini Militia</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-1 text-slate-500 font-mono text-[11px]">
+                      <span className="w-2 h-2 rounded-full bg-[#E56A10]" />
+                      <span>3/4 Filled • 1 Open</span>
+                    </div>
+
+                    <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
+                      <span className="font-mono text-xs font-bold text-slate-900">
+                        {teams[1]?.invite_code || "MM712P"}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(teams[1]?.invite_code || "MM712P", "Squad Code copied!")}
+                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                        title="Copy code"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Squad Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={() => setIsCreateSquadOpen(true)}
+                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Create Squad
+                </button>
+                <button
+                  onClick={() => setIsJoinSquadOpen(true)}
+                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Join via Code
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION: Escrow Wallet & Quick Payout */}
+            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-[#E56A10]" />
+                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                    Escrow Wallet
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                  100% SECURE
+                </span>
+              </div>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex justify-between items-baseline">
+                  <div>
+                    <span className="text-[11px] font-mono text-slate-500 uppercase">Available Balance</span>
+                    <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                      ₹{balance.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-mono text-slate-500 uppercase">Locked in Escrow</span>
+                    <div className="text-base font-bold font-headline text-[#E56A10] tabular-nums">
+                      ₹3,000
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    onClick={() => setIsWithdrawOpen(true)}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-headline text-xs font-bold uppercase rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5 text-[#E56A10]" />
+                    1-Click Instant Withdrawal
+                  </button>
+
+                  <div className="flex items-center justify-center gap-1 text-slate-500 font-mono text-[11px] mt-2">
+                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                    <span>Connected UPI: <strong className="text-slate-800">{upiId}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini Transaction Ledger */}
+              <div className="space-y-2 pt-1">
+                <span className="text-[11px] font-mono uppercase text-slate-500 font-bold">Recent Ledger</span>
+                <div className="space-y-1.5 text-xs font-mono divide-y divide-slate-100">
+                  <div className="flex items-center justify-between pt-1.5">
+                    <div>
+                      <div className="font-bold text-slate-800">Valorant Weekly Cup</div>
+                      <div className="text-[10px] text-slate-400">Today, 2:15 PM</div>
+                    </div>
+                    <span className="font-bold text-emerald-600 tabular-nums">+₹15,000</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1.5">
+                    <div>
+                      <div className="font-bold text-slate-800">Subterranean Cup Entry</div>
+                      <div className="text-[10px] text-slate-400">Yesterday</div>
+                    </div>
+                    <span className="font-bold text-slate-700 tabular-nums">-₹500</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1.5">
+                    <div>
+                      <div className="font-bold text-slate-800">Smash Karts Daily</div>
+                      <div className="text-[10px] text-slate-400">Nov 20, 2025</div>
+                    </div>
+                    <span className="font-bold text-emerald-600 tabular-nums">+₹2,500</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION: Platform Telemetry & Live Alerts */}
+            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-[#E56A10]" />
+                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                    Platform Telemetry
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-600 font-bold uppercase">Live</span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
+                  <Shield className="w-4 h-4 text-[#E56A10] shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-900">Referee match room assigned</p>
+                    <p className="text-slate-500 text-[11px]">Official referee @Kuro assigned to Room #VTX-9942.</p>
+                    <span className="text-[10px] font-mono text-slate-400">3 mins ago</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-900">Prize payout released</p>
+                    <p className="text-slate-500 text-[11px]">Escrow released for Valorant Weekly Cup 1st place.</p>
+                    <span className="text-[10px] font-mono text-slate-400">2 hours ago</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
+                  <Gamepad2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold text-slate-900">Mini Militia slot confirmed</p>
+                    <p className="text-slate-500 text-[11px]">Bracket seed locked in slot #8.</p>
+                    <span className="text-[10px] font-mono text-slate-400">Yesterday</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* MODAL 1: Edit Profile Modal (Steam ID and Riot ID removed as requested) */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Edit Gamer Identity
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditProfileOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Gamer Handle / Display Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.display_name}
+                  onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })}
+                  placeholder="e.g. VORTEX_KID"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#E56A10] font-mono"
                 />
               </div>
 
-              {/* Profile Details */}
+              {/* Avatar Preset Selection */}
               <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl md:text-3xl font-bold font-headline text-white">
-                    {displayName}
-                  </h1>
-                  <span
-                    className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded border ${
-                      isSuperAdmin
-                        ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
-                        : effectiveRole === "ORGANIZER"
-                        ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
-                        : "bg-[#0F172A] text-[#94A3B8] border-[#334155]"
-                    }`}
-                  >
-                    {isSuperAdmin ? "SUPER ADMIN" : effectiveRole}
-                  </span>
-
-                  <button
-                    onClick={() => setIsEditProfileOpen(true)}
-                    className="p-1.5 text-[#94A3B8] hover:text-[#E56A10] hover:bg-[#0F172A] transition-colors rounded cursor-pointer"
-                    title="Edit Competitive Profile & Game Handles"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={handleRollRandomPersona}
-                    className="px-2.5 py-1 bg-[#E56A10]/15 hover:bg-[#E56A10]/25 border border-[#E56A10]/40 text-[#FFB68F] hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ml-1"
-                    title="Generate Random Gaming Tag & Avatar"
-                  >
-                    <Dices className="w-3.5 h-3.5 text-[#E56A10]" />
-                    <span>🎲 Randomize Persona</span>
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[#94A3B8] font-mono mt-2">
-                  <span className="text-white">@{username}</span>
-                  <span>•</span>
-                  <div className="flex items-center gap-1.5">
-                    <span>Riot ID:</span>
-                    {profile?.riot_id ? (
-                      <span className="text-white font-semibold">{profile.riot_id}</span>
-                    ) : (
-                      <button
-                        onClick={() => setIsEditProfileOpen(true)}
-                        className="text-[11px] text-[#E56A10] hover:underline cursor-pointer flex items-center gap-0.5"
-                      >
-                        [+ Link Handle]
-                      </button>
-                    )}
-                  </div>
-                  <span>•</span>
-                  <div className="flex items-center gap-1.5">
-                    <span>Steam ID:</span>
-                    {profile?.steam_id ? (
-                      <span className="text-white font-semibold">{profile.steam_id}</span>
-                    ) : (
-                      <button
-                        onClick={() => setIsEditProfileOpen(true)}
-                        className="text-[11px] text-[#E56A10] hover:underline cursor-pointer flex items-center gap-0.5"
-                      >
-                        [+ Link Steam]
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Wallet Quick Balance Card */}
-            <div className="flex items-center gap-4 bg-[#0F172A] p-4 rounded-xl border border-[#334155] shadow-xs">
-              <div>
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold tracking-wider">
-                  Wallet Balance
-                </div>
-                <div className="text-2xl font-bold font-mono text-[#E56A10]">
-                  ₹{inrBalance}
-                </div>
-              </div>
-              <div className="w-11 h-11 rounded-lg bg-[#E56A10]/15 border border-[#E56A10]/30 flex items-center justify-center text-[#E56A10]">
-                <Wallet className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Rolled Gaming Persona Preview Card */}
-          {randomPersona && (
-            <div className="mt-6 p-4 bg-[#0F172A] border-2 border-[#E56A10] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl animate-in fade-in">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-xl bg-[#1E293B] border-2 border-[#E56A10] overflow-hidden shrink-0 shadow-md relative">
-                  <Image
-                    src={randomPersona.avatarUrl}
-                    alt={randomPersona.gamerTag}
-                    width={56}
-                    height={56}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#E56A10] font-bold uppercase">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>New Gamer Persona Generated!</span>
-                  </div>
-                  <div className="text-lg font-bold text-white font-headline flex items-center gap-2">
-                    <span>{randomPersona.gamerTag}</span>
-                    <span className="px-2 py-0.5 bg-[#1E293B] border border-[#334155] rounded text-[10px] text-[#94A3B8] font-mono">
-                      [{randomPersona.clanTag}]
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleRollRandomPersona}
-                  className="px-3 py-1.5 bg-[#1E293B] hover:bg-[#334155] border border-[#334155] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Shuffle className="w-3.5 h-3.5 text-[#E56A10]" />
-                  <span>Roll Another</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleApplyRandomPersona}
-                  disabled={isApplyingPersona}
-                  className="px-4 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {isApplyingPersona ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Apply to Profile</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRandomPersona(null)}
-                  className="p-1.5 text-[#94A3B8] hover:text-white rounded transition-colors cursor-pointer"
-                  title="Dismiss"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 2. Main Dashboard Content */}
-      <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full space-y-8">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-[#94A3B8] font-mono text-sm gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#E56A10]" />
-            <span>Loading competitive profile and telemetry...</span>
-          </div>
-        ) : (
-          <>
-            {/* Admin / Organizer Overseer Console OR Player Squad Card */}
-            {isSuperAdmin || isOrganizer ? (
-              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#242C3D] pb-4">
-                  <div>
-                    <div className="text-xs font-mono text-[#94A3B8] uppercase font-bold tracking-wider flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
-                      {isSuperAdmin ? "Super Admin Operations & Overseer Console" : "Tournament Organizer Operations Console"}
-                    </div>
-                    <h2 className="text-xl font-bold font-headline text-white mt-1">
-                      Tournament Supervisory Command
-                    </h2>
-                    <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
-                      Monitor platform competitions, registered squads, match verification arbitrations, and prize distributions.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {isSuperAdmin && (
-                      <Link
-                        href="/admin"
-                        className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 shadow-xs"
-                      >
-                        <Shield className="w-3.5 h-3.5" /> Admin Cockpit
-                      </Link>
-                    )}
-                    <Link
-                      href="/organizer"
-                      className="px-4 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5"
-                    >
-                      <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Organizer Portal
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Platform Overview Metrics */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
-                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Platform Tournaments</span>
-                    <span className="text-white font-headline font-bold text-xl">{tournaments.length}</span>
-                    <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">Sanctioned & Active</span>
-                  </div>
-                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
-                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Registered Squads</span>
-                    <span className="text-[#E56A10] font-headline font-bold text-xl">
-                      {tournaments.reduce((acc, t) => acc + (t.registered_teams || 0), 0)}
-                    </span>
-                    <span className="text-[10px] text-[#94A3B8] font-mono block mt-0.5">Across All Brackets</span>
-                  </div>
-                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
-                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Total Protected Prizes</span>
-                    <span className="text-white font-headline font-bold text-xl">
-                      ₹{tournaments.reduce((acc, t) => acc + (t.prize_pool_inr || 0), 0).toLocaleString()}
-                    </span>
-                    <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">Guaranteed Vault</span>
-                  </div>
-                  <div className="bg-[#0B0E16] p-3.5 rounded-lg border border-[#242C3D]">
-                    <span className="text-[#64748B] block text-[10px] uppercase font-mono">Platform Matches</span>
-                    <span className="text-white font-headline font-bold text-xl">{matches.length}</span>
-                    <span className="text-[10px] text-amber-400 font-mono block mt-0.5">Live & Verification</span>
-                  </div>
-                </div>
-
-                {/* Tournaments Under Supervision */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-[#94A3B8] uppercase">
-                      Tournaments Under Platform Supervision
-                    </span>
-                    <Link href="/admin" className="text-xs text-[#E56A10] font-mono hover:underline">
-                      Manage All ({tournaments.length}) →
-                    </Link>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {tournaments.slice(0, 3).map((t) => (
-                      <div
-                        key={t.id}
-                        className="bg-[#161A24] p-4 rounded-lg border border-[#242C3D] hover:border-[#333C4D] transition-colors space-y-3 flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="px-2 py-0.5 bg-[#0B0E16] text-[#FFB68F] border border-[#E56A10]/30 text-[10px] font-mono font-bold rounded uppercase">
-                              {t.status.replace("_", " ")}
-                            </span>
-                            <span className="text-xs font-mono font-bold text-[#E56A10]">
-                              ₹{t.prize_pool_inr?.toLocaleString()}
-                            </span>
-                          </div>
-                          <h4 className="font-headline font-bold text-sm text-white truncate">
-                            {t.title}
-                          </h4>
-                          <div className="text-[11px] text-[#94A3B8] font-mono mt-1">
-                            {t.game_slug?.toUpperCase()} • {t.registered_teams || 0} / {t.max_teams} Squads
-                          </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-[#242C3D] flex items-center justify-between text-xs font-mono">
-                          <span className="text-[#64748B] text-[10px]">{t.starts_at}</span>
-                          <Link
-                            href={isSuperAdmin ? "/admin" : `/tournaments/${t.slug || t.id}`}
-                            className="text-[#E56A10] font-bold hover:underline flex items-center gap-1"
-                          >
-                            Oversee <ArrowRight className="w-3 h-3" />
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* If the admin/organizer also happens to have a competitive squad, show it below as a compact card */}
-                {activeTeam && (
-                  <div className="pt-4 border-t border-[#242C3D] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-[#94A3B8] uppercase font-bold">
-                        Personal Squad: <strong className="text-white">{activeTeam.name} [{activeTeam.tag}]</strong> ({activeTeam.members?.length || 1} Athletes)
-                      </span>
-                      <span className="text-xs font-mono text-[#E56A10]">Invite: {activeTeam.invite_code}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : activeTeam ? (
-              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#242C3D] pb-4">
-                  <div>
-                    <div className="text-xs font-mono text-[#94A3B8] uppercase font-bold tracking-wider">
-                      Active Tactical Squad ({activeTeam.game_slug.toUpperCase()})
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <h2 className="text-xl font-bold font-headline text-white">
-                        {activeTeam.name} [{activeTeam.tag}]
-                      </h2>
-                      {isCaptain && (
-                        <span className="px-2 py-0.5 bg-[#E56A10]/20 text-[#FFB68F] border border-[#E56A10]/40 text-[10px] font-mono font-bold rounded">
-                          SQUAD CAPTAIN
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Invite Code & Action Controls */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-[#161A24] px-3 py-1.5 rounded-lg border border-[#242C3D]">
-                      <span className="text-xs text-[#94A3B8] font-mono">Invite Code:</span>
-                      <span className="font-mono text-sm font-bold text-[#E56A10] tracking-widest">
-                        {activeTeam.invite_code}
-                      </span>
-                      <button
-                        onClick={() => handleCopy(activeTeam.invite_code)}
-                        className="px-2 py-0.5 bg-[#0B0E16] border border-[#242C3D] rounded text-xs font-mono text-[#CBD5E1] hover:text-white hover:border-[#E56A10] flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <Copy className="w-3 h-3" />
-                        {copiedCode ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1.5">
+                  Select Esports Avatar
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {GAMING_AVATAR_PRESETS.map((preset) => (
                     <button
-                      onClick={() => setIsJoinSquadOpen(true)}
-                      className="px-3 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <UserPlus className="w-3.5 h-3.5 text-[#E56A10]" /> Join Squad
-                    </button>
-
-                    {isCaptain ? (
-                      <button
-                        onClick={() => handleDisbandSquad(activeTeam.id)}
-                        className="px-3 py-2 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer"
-                        title="Disband Squad"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Disband
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleLeaveSquad(activeTeam.id)}
-                        className="px-3 py-2 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer"
-                        title="Leave Squad"
-                      >
-                        <LogOut className="w-3.5 h-3.5" /> Leave
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Squad Lineup Members with Kick Functionality */}
-                <div>
-                  <div className="text-xs font-mono font-bold text-[#94A3B8] uppercase mb-3">
-                    Squad Lineup ({activeTeam.members?.length || 1} / {activeTeam.max_members} Athletes)
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {activeTeam.members && activeTeam.members.length > 0 ? (
-                      activeTeam.members.map((m, i) => (
-                        <div
-                          key={i}
-                          className="bg-[#161A24] p-3 rounded-lg border border-[#242C3D] text-xs font-mono flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-white">@{m.username}</span>
-                              {isCaptain && m.user_id !== profile?.id && (
-                                <button
-                                  onClick={() => handleKickMember(activeTeam.id, m.user_id, m.username)}
-                                  className="p-1 text-[#94A3B8] hover:text-rose-400 transition-colors cursor-pointer"
-                                  title={`Kick @${m.username}`}
-                                >
-                                  <UserMinus className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-[#E56A10] font-bold mt-1 uppercase">
-                              {m.role}
-                            </div>
-                            <div className="text-[11px] text-[#94A3B8] truncate mt-1">
-                              {m.game_handle || "Handle pending"}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-span-full text-xs text-[#94A3B8] font-mono">
-                        Captain: @{activeTeam.captain_username}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div>
-                  <h2 className="text-lg font-bold font-headline text-white">
-                    No Active Tactical Squad
-                  </h2>
-                  <p className="text-xs text-[#94A3B8] mt-1.5 max-w-xl leading-relaxed">
-                    You haven&apos;t joined or created a squad yet. Create your squad to receive an exclusive 6-character squad code, or enter an invite code to join your team.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => setIsJoinSquadOpen(true)}
-                    className="px-4 py-2.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white font-mono text-xs font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Users className="w-4 h-4 text-[#E56A10]" />
-                    Join with Invite Code
-                  </button>
-                  <Link
-                    href="/games"
-                    className="px-4 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono text-xs font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Create Squad
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Tournaments & Upcoming Match Lobby */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Tournaments Section */}
-              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
-                  <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-[#E56A10]" /> Competitive Tournaments
-                  </h3>
-                  <Link href="/tournaments" className="text-xs text-[#E56A10] font-mono hover:underline">
-                    Browse All →
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  {tournaments.slice(0, 3).map((t) => (
-                    <div
-                      key={t.id}
-                      className="p-4 bg-[#161A24] rounded-lg border border-[#242C3D] hover:border-[#333C4D] transition-colors space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 bg-[#0B0E16] text-[#FFB68F] border border-[#E56A10]/30 text-[10px] font-mono font-bold rounded uppercase">
-                          {t.status}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-[#E56A10]">
-                          {t.prize_pool}
-                        </span>
-                      </div>
-                      <h4 className="font-headline font-bold text-sm text-white">
-                        {t.title}
-                      </h4>
-                      <div className="flex items-center justify-between text-xs text-[#94A3B8] font-mono pt-2 border-t border-[#242C3D]">
-                        <span>Starts: {t.starts_at ? new Date(t.starts_at).toLocaleDateString() : "TBD"}</span>
-                        <Link
-                          href={`/tournaments/${t.slug || t.id}`}
-                          className="text-[#E56A10] font-bold hover:underline flex items-center gap-1"
-                        >
-                          View Details <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-
-                  {tournaments.length === 0 && (
-                    <div className="p-6 text-center text-xs text-[#94A3B8] font-mono bg-[#161A24] rounded-lg border border-[#242C3D]">
-                      No active tournaments scheduled. Check back shortly for new competitive brackets!
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Next Match Lobby */}
-              <div className="bg-[#10141F] p-6 rounded-xl border border-[#242C3D] shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
-                  <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
-                    <Gamepad2 className="w-4 h-4 text-[#E56A10]" /> Next Match Lobby
-                  </h3>
-                  <Link href="/matches" className="text-xs text-[#E56A10] font-mono hover:underline">
-                    Match Center →
-                  </Link>
-                </div>
-
-                {nextMatch ? (
-                  <div className="p-5 bg-[#161A24] text-white rounded-lg border border-[#242C3D] space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 bg-[#E56A10]/20 text-[#FFB68F] border border-[#E56A10]/40 text-[10px] font-mono font-bold rounded uppercase">
-                        {nextMatch.status}
-                      </span>
-                      <span className="text-xs font-mono text-[#94A3B8]">{nextMatch.stage}</span>
-                    </div>
-                    <div className="flex items-center justify-between font-headline font-bold text-base py-2">
-                      <span className="text-white">{nextMatch.team_a?.name || "Team Alpha"}</span>
-                      <span className="text-xs text-[#E56A10] font-mono px-2 py-1 bg-[#0B0E16] rounded border border-[#242C3D]">
-                        VS
-                      </span>
-                      <span className="text-white">{nextMatch.team_b?.name || "Team Bravo"}</span>
-                    </div>
-                    <Link
-                      href="/matches"
-                      className="w-full py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono text-xs font-bold uppercase rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
-                    >
-                      Enter Match Lobby
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center bg-[#161A24] border border-dashed border-[#242C3D] rounded-lg text-xs text-[#94A3B8] font-mono flex flex-col items-center gap-2">
-                    <Gamepad2 className="w-6 h-6 text-[#64748B]" />
-                    <span>No matches scheduled right now. Join a tournament to get seeded into a live bracket!</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </main>
-
-      {/* Edit Profile Modal */}
-      {isEditProfileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-[#1E293B] text-white border border-[#334155] rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl my-8">
-            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-[#E56A10]" /> Edit Competitive Profile
-              </h3>
-              <button
-                onClick={() => setIsEditProfileOpen(false)}
-                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {profileSaveSuccess ? (
-              <div className="p-6 text-center text-emerald-400 font-mono text-xs flex flex-col items-center gap-2">
-                <Check className="w-8 h-8 text-emerald-400" />
-                Profile updated successfully!
-              </div>
-            ) : (
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                {/* Gaming Avatar Selection */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-mono uppercase text-[#CBD5E1]">
-                      Esports Avatar
-                    </label>
-                    <button
+                      key={preset.id}
                       type="button"
-                      onClick={() =>
-                        setProfileForm({
-                          ...profileForm,
-                          avatar_url: generateRandomGamingAvatar(),
-                        })
-                      }
-                      className="text-[11px] font-mono text-[#FFB68F] hover:text-white flex items-center gap-1 cursor-pointer"
+                      onClick={() => setProfileForm({ ...profileForm, avatar_url: preset.url })}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        profileForm.avatar_url === preset.url
+                          ? "border-[#E56A10] ring-2 ring-[#E56A10]/30 scale-95"
+                          : "border-slate-200 hover:border-slate-400"
+                      }`}
                     >
-                      <Dices className="w-3 h-3 text-[#E56A10]" />
-                      <span>Roll Random Avatar</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 bg-[#0F172A] border border-[#334155] rounded-xl">
-                    <div className="w-14 h-14 rounded-xl bg-[#1E293B] border-2 border-[#E56A10] overflow-hidden shrink-0 shadow-md relative">
                       <Image
-                        src={profileForm.avatar_url || effectiveAvatar}
-                        alt="Avatar Preview"
-                        width={56}
-                        height={56}
-                        className="w-full h-full object-cover"
+                        src={preset.url}
+                        alt={preset.name}
+                        fill
+                        className="object-cover"
+                        unoptimized
                       />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="text-[10px] font-mono text-[#94A3B8] uppercase">
-                        Select a Preset or Roll Random:
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {GAMING_AVATAR_PRESETS.slice(0, 6).map((preset) => (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() =>
-                              setProfileForm({ ...profileForm, avatar_url: preset.url })
-                            }
-                            className={`w-7 h-7 rounded-lg overflow-hidden border-2 transition-transform hover:scale-110 cursor-pointer ${
-                              profileForm.avatar_url === preset.url
-                                ? "border-[#E56A10] scale-105"
-                                : "border-[#334155]"
-                            }`}
-                            title={preset.name}
-                          >
-                            <Image
-                              src={preset.url}
-                              alt={preset.name}
-                              width={28}
-                              height={28}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-mono uppercase text-[#CBD5E1]">
-                      Display Name / Gamer Tag
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setProfileForm({
-                          ...profileForm,
-                          display_name: generateRandomGamingTag(),
-                        })
-                      }
-                      className="text-[11px] font-mono text-[#FFB68F] hover:text-white flex items-center gap-1 cursor-pointer"
-                    >
-                      <Dices className="w-3 h-3 text-[#E56A10]" />
-                      <span>Roll Gamer Tag</span>
                     </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={profileForm.display_name}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, display_name: e.target.value })
-                    }
-                    placeholder="e.g. ShadowViper_99"
-                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
+                  ))}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
-                    Riot ID (Game Tag)
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.riot_id}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, riot_id: e.target.value })
-                    }
-                    placeholder="Player#REGION"
-                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
-                </div>
+              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-500 border border-slate-200">
+                <span className="text-[#E56A10] font-bold">Tournament Notice:</span> In-game credentials (Riot ID, Steam ID) are requested directly when registering for game tournaments.
+              </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
-                    Steam ID
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.steam_id}
-                    onChange={(e) =>
-                      setProfileForm({ ...profileForm, steam_id: e.target.value })
-                    }
-                    placeholder="STEAM_0:X:XXXXXX"
-                    className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditProfileOpen(false)}
-                    className="px-4 py-2 bg-[#0F172A] border border-[#334155] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSavingProfile}
-                    className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSavingProfile ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-            )}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Identity
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Join Squad Modal */}
-      {isJoinSquadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#1E293B] text-white border border-[#334155] rounded-xl w-full max-w-md p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#334155] pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#E56A10]" /> Join Squad with Invite Code
-              </h3>
+      {/* MODAL 2: Deposit Funds (Razorpay Sandbox) */}
+      {isDepositOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Deposit Funds
+                </h3>
+              </div>
               <button
-                onClick={() => setIsJoinSquadOpen(false)}
-                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+                onClick={() => setIsDepositOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {joinError && (
-              <div className="p-3 bg-rose-950/40 border border-rose-800 text-rose-300 rounded-lg text-xs font-mono">
-                {joinError}
+            <form onSubmit={handleDepositSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Select Amount (₹ INR)
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {["200", "500", "1000", "2500"].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setDepositAmount(amt)}
+                      className={`py-2 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
+                        depositAmount === amt
+                          ? "bg-[#E56A10] text-white border-[#E56A10]"
+                          : "bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100"
+                      }`}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min={50}
+                  max={50000}
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                />
               </div>
-            )}
+
+              <div className="p-3 bg-emerald-50 rounded-lg text-xs font-mono text-emerald-800 border border-emerald-200 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+                <span>Instant Razorpay Escrow gateway. Funds are immediately credited to your tournament balance.</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDepositOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingDeposit}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessingDeposit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                  Pay ₹{depositAmount} via Razorpay
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Instant Withdrawal */}
+      {isWithdrawOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Send className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  1-Click Instant Withdrawal
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsWithdrawOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Withdrawal Amount (Available: ₹{balance.toLocaleString()})
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  max={balance}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Destination UPI ID / VPA
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="e.g. user@oksbi"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
+                Direct IMPS / UPI payout. Zero transfer fee. Payouts processed within 60 seconds.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWithdrawOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingWithdraw}
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessingWithdraw ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-[#E56A10]" />}
+                  Confirm Instant Payout
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Create Squad */}
+      {isCreateSquadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Register Competitive Squad
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsCreateSquadOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSquad} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Squad Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Apex Predators"
+                  value={createSquadForm.name}
+                  onChange={(e) => setCreateSquadForm({ ...createSquadForm, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                    Game Discipline
+                  </label>
+                  <select
+                    value={createSquadForm.game_slug}
+                    onChange={(e) => setCreateSquadForm({ ...createSquadForm, game_slug: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="valorant">Valorant</option>
+                    <option value="counter-strike-2">Counter-Strike 2</option>
+                    <option value="bgmi">BGMI</option>
+                    <option value="smash-karts">Smash Karts</option>
+                    <option value="mini-militia">Mini Militia</option>
+                    <option value="chess">Chess</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                    Tag (3-4 chars)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="e.g. APEX"
+                    value={createSquadForm.tag}
+                    onChange={(e) => setCreateSquadForm({ ...createSquadForm, tag: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-500 border border-slate-200">
+                You will be assigned as Squad Captain and receive a unique invite code to share with teammates.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateSquadOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingSquad}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Create Squad
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Join Squad via Code */}
+      {isJoinSquadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                  Join Squad via Code
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsJoinSquadOpen(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <form onSubmit={handleJoinSquad} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
-                  6-Character Invite Code *
+                <label className="block text-xs font-mono uppercase font-bold text-slate-600 mb-1">
+                  Squad Invite Code *
                 </label>
                 <input
                   type="text"
                   required
-                  maxLength={6}
-                  value={joinForm.invite_code}
-                  onChange={(e) =>
-                    setJoinForm({ ...joinForm, invite_code: e.target.value.toUpperCase() })
-                  }
-                  placeholder="e.g. 8A3F9X"
-                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2.5 text-base font-mono font-bold tracking-widest text-center text-[#E56A10] focus:border-[#E56A10] focus:outline-hidden uppercase"
+                  placeholder="e.g. VTX882 or MM88XK"
+                  value={joinInviteCode}
+                  onChange={(e) => setJoinInviteCode(e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 font-mono uppercase focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
-                  Your In-Game Handle / Riot ID *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={joinForm.player_handle}
-                  onChange={(e) =>
-                    setJoinForm({ ...joinForm, player_handle: e.target.value })
-                  }
-                  placeholder="Player#TAG"
-                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
-                />
+              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-500 border border-slate-200">
+                Ask your squad captain for their 6-character squad code. Joining links your player profile to their competitive tournament roster.
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsJoinSquadOpen(false)}
-                  className="px-4 py-2 bg-[#0F172A] border border-[#334155] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isJoiningSquad}
-                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  {isJoiningSquad ? "Joining..." : "Join Squad Lineup"}
+                  {isJoiningSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
+                  Join Squad
                 </button>
               </div>
             </form>
@@ -1053,5 +1594,20 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function UploadDocIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
   );
 }

@@ -748,33 +748,33 @@ export default function AdminCockpitPage() {
   // 2. Unauthenticated State (Guest)
   if (!isSignedIn && !isHardcodedAdmin) {
     return (
-      <div className="max-w-2xl mx-auto my-16 p-8 bg-[#10141F] border border-[#242C3D] rounded-lg text-center space-y-6 shadow-2xl">
+      <div className="max-w-2xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-xl text-center space-y-6 shadow-xl text-slate-900">
         <div className="w-16 h-16 rounded-full bg-[#E56A10]/10 border border-[#E56A10]/40 flex items-center justify-center mx-auto text-[#E56A10]">
           <Lock className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold font-headline text-white uppercase tracking-wider">
+          <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-wider">
             Admin Console — Authentication Required
           </h1>
-          <p className="text-sm text-[#94A3B8] max-w-md mx-auto">
+          <p className="text-sm text-slate-600 max-w-md mx-auto">
             This cockpit controls platform competitions, tournament rules, bracket progression, games catalog, and user roles.
           </p>
         </div>
 
-        <div className="bg-[#0B0E16] border border-[#242C3D] p-4 rounded text-left text-xs font-mono space-y-2 text-[#CBD5E1]">
-          <div className="text-[#94A3B8] font-bold uppercase tracking-wider">Required Privileges:</div>
+        <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700">
+          <div className="text-slate-500 font-bold uppercase tracking-wider">Required Privileges:</div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#E56A10]"></span>
-            <span><strong className="text-white">SUPER_ADMIN:</strong> Full platform ownership &amp; configuration (e.g. pk.4081988@gmail.com)</span>
+            <span><strong className="text-slate-900">SUPER_ADMIN:</strong> Full platform ownership &amp; configuration (e.g. pk.4081988@gmail.com)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span><strong className="text-white">ORGANIZER / TOURNAMENT_ADMIN:</strong> Tournament management &amp; dispute review</span>
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span><strong className="text-slate-900">ORGANIZER / TOURNAMENT_ADMIN:</strong> Tournament management &amp; dispute review</span>
           </div>
         </div>
 
         <SignInButton mode="modal">
-          <button className="px-6 py-3 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 mx-auto">
+          <button className="px-6 py-3 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded-lg shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 mx-auto">
             <Shield className="w-4 h-4" /> Sign In to Admin Console
           </button>
         </SignInButton>
@@ -785,39 +785,39 @@ export default function AdminCockpitPage() {
   // 3. Authenticated but unauthorized (PLAYER role without hardcoded override)
   if (!isHardcodedAdmin && currentUser && currentUser.role === "PLAYER") {
     return (
-      <div className="max-w-2xl mx-auto my-16 p-8 bg-[#10141F] border border-rose-600/50 rounded-lg text-center space-y-6 shadow-2xl">
-        <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/40 flex items-center justify-center mx-auto text-rose-500">
+      <div className="max-w-2xl mx-auto my-16 p-8 bg-white border border-rose-200 rounded-xl text-center space-y-6 shadow-xl text-slate-900">
+        <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
           <Lock className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold font-headline text-white uppercase tracking-wider">
+          <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-wider">
             Restricted Clearance (PLAYER Role)
           </h1>
-          <p className="text-sm text-[#94A3B8] max-w-md mx-auto">
-            Your account <strong className="text-white">@{currentUser.username}</strong> ({currentUser.email}) is registered with standard competitive <strong className="text-amber-400">PLAYER</strong> status.
+          <p className="text-sm text-slate-600 max-w-md mx-auto">
+            Your account <strong className="text-slate-900">@{currentUser.username}</strong> ({currentUser.email}) is registered with standard competitive <strong className="text-amber-600">PLAYER</strong> status.
           </p>
         </div>
 
-        <div className="bg-[#0B0E16] border border-[#242C3D] p-4 rounded text-left text-xs font-mono space-y-2 text-[#CBD5E1]">
-          <div className="text-[#94A3B8] font-bold uppercase tracking-wider">Admin Elevation Note:</div>
-          <p className="text-[#94A3B8]">
-            To access this cockpit with <strong className="text-white">SUPER_ADMIN</strong> privileges, sign in with the platform owner email (<code className="text-[#E56A10]">pk.4081988@gmail.com</code> or <code className="text-[#E56A10]">admin@ametheus.gg</code>).
+        <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700">
+          <div className="text-slate-500 font-bold uppercase tracking-wider">Admin Elevation Note:</div>
+          <p className="text-slate-600">
+            To access this cockpit with <strong className="text-slate-900">SUPER_ADMIN</strong> privileges, sign in with the platform owner email (<code className="text-[#E56A10] font-semibold">pk.4081988@gmail.com</code> or <code className="text-[#E56A10] font-semibold">admin@ametheus.gg</code>).
           </p>
-          <p className="text-[#94A3B8]">
-            Existing Super Admins can also promote your username <strong className="text-white">@{currentUser.username}</strong> from the User Management console.
+          <p className="text-slate-600">
+            Existing Super Admins can also promote your username <strong className="text-slate-900">@{currentUser.username}</strong> from the User Management console.
           </p>
         </div>
 
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => loadAdminData()}
-            className="px-4 py-2 bg-[#161A24] border border-[#242C3D] hover:bg-[#202534] text-white text-xs font-mono font-bold uppercase rounded flex items-center gap-2"
+            className="px-4 py-2 bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Re-check Clearance
           </button>
           <Link
             href="/tournaments"
-            className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded"
+            className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm"
           >
             Browse Tournaments
           </Link>
@@ -829,9 +829,9 @@ export default function AdminCockpitPage() {
   // 4. Authorized Admin Cockpit
 
   return (
-    <div className="flex flex-col w-full bg-[#0B0E16] min-h-screen text-[#F8FAFC]">
+    <div className="flex flex-col w-full bg-[#F8F9FF] min-h-screen text-[#0B1C30]">
       {/* Console Top Bar */}
-      <header className="bg-[#10141F] border-b border-[#242C3D] px-4 md:px-8 py-4 sticky top-16 z-30 backdrop-blur-md">
+      <header className="bg-[#0B0E16] text-white border-b border-slate-800 px-4 md:px-8 py-4 sticky top-16 z-30">
         <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded bg-[#161A24] border border-[#242C3D] flex items-center justify-center text-[#E56A10]">
@@ -995,9 +995,9 @@ export default function AdminCockpitPage() {
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Platform Prize Vault</div>
-                <div className="text-2xl font-bold font-headline text-white mt-1">
+              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+                <div className="text-[11px] font-mono text-slate-500 uppercase font-bold">Platform Prize Vault</div>
+                <div className="text-2xl font-bold font-headline text-slate-900 mt-1">
                   ₹{(stats?.platform_escrow_vault ?? 1245000).toLocaleString()}
                 </div>
                 <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
@@ -1005,29 +1005,29 @@ export default function AdminCockpitPage() {
                 </span>
               </div>
 
-              <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Active Tournaments</div>
+              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+                <div className="text-[11px] font-mono text-slate-500 uppercase font-bold">Active Tournaments</div>
                 <div className="text-2xl font-bold font-headline text-[#E56A10] mt-1">
                   {stats?.active_tournaments ?? 0}
                 </div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">
+                <span className="text-[10px] text-slate-500 font-mono">
                   {stats?.total_tournaments ?? 0} Total Tournaments Hosted
                 </span>
               </div>
 
-              <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Sanctioned Teams</div>
-                <div className="text-2xl font-bold font-headline text-white mt-1">
+              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+                <div className="text-[11px] font-mono text-slate-500 uppercase font-bold">Sanctioned Teams</div>
+                <div className="text-2xl font-bold font-headline text-slate-900 mt-1">
                   {stats?.total_teams ?? 0}
                 </div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">
+                <span className="text-[10px] text-slate-500 font-mono">
                   {stats?.total_users ?? 0} Registered Competitive Users
                 </span>
               </div>
 
-              <div className="bg-[#10141F] border border-[#242C3D] p-5 rounded">
-                <div className="text-[11px] font-mono text-[#94A3B8] uppercase font-bold">Active Matches</div>
-                <div className="text-2xl font-bold font-headline text-white mt-1">
+              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+                <div className="text-[11px] font-mono text-slate-500 uppercase font-bold">Active Matches</div>
+                <div className="text-2xl font-bold font-headline text-slate-900 mt-1">
                   {stats?.active_matches ?? 0}
                 </div>
                 <span className="text-[10px] text-amber-400 font-mono">
@@ -1038,60 +1038,60 @@ export default function AdminCockpitPage() {
 
             {/* Quick Operations Matrix */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+              <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
                   <Trophy className="w-4 h-4 text-[#E56A10]" /> Fast Action Console
                 </h3>
-                <p className="text-xs text-[#94A3B8]">
+                <p className="text-xs text-slate-500">
                   Quickly jump into active administrative workflows:
                 </p>
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => setActiveTab("queue")}
-                    className="p-3 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded text-left transition-all cursor-pointer"
+                    className="p-3 bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded text-left transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-bold text-white uppercase">Match Queue</div>
-                    <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">{pendingMatches.length} pending review</div>
+                    <div className="text-xs font-bold text-slate-900 uppercase">Match Queue</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">{pendingMatches.length} pending review</div>
                   </button>
                   <button
                     onClick={() => setActiveTab("disputes")}
-                    className="p-3 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded text-left transition-all cursor-pointer"
+                    className="p-3 bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded text-left transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-bold text-white uppercase">Disputes</div>
-                    <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">{disputes.length} cases tracked</div>
+                    <div className="text-xs font-bold text-slate-900 uppercase">Disputes</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">{disputes.length} cases tracked</div>
                   </button>
                   <Link
                     href="/organizer"
-                    className="p-3 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded text-left transition-all block"
+                    className="p-3 bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded text-left transition-all block"
                   >
-                    <div className="text-xs font-bold text-white uppercase">Organizer Portal</div>
-                    <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">Create &amp; publish brackets</div>
+                    <div className="text-xs font-bold text-slate-900 uppercase">Organizer Portal</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">Create &amp; publish brackets</div>
                   </Link>
                   <Link
                     href="/tournaments"
-                    className="p-3 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded text-left transition-all block"
+                    className="p-3 bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded text-left transition-all block"
                   >
-                    <div className="text-xs font-bold text-white uppercase">Live Tournaments</div>
-                    <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">Public tournament discovery</div>
+                    <div className="text-xs font-bold text-slate-900 uppercase">Live Tournaments</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">Public tournament discovery</div>
                   </Link>
                 </div>
               </div>
 
-              <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-3">
-                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+              <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-3">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
                   <Shield className="w-4 h-4 text-emerald-400" /> Database &amp; System Health
                 </h3>
                 <div className="space-y-2 text-xs font-mono">
-                  <div className="flex items-center justify-between p-2.5 bg-[#0B0E16] rounded border border-[#242C3D]">
-                    <span className="text-[#94A3B8]">Primary Database Engine:</span>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
+                    <span className="text-slate-500">Primary Database Engine:</span>
                     <span className="text-emerald-400 font-bold">MongoDB Atlas (Async Motor Driver)</span>
                   </div>
-                  <div className="flex items-center justify-between p-2.5 bg-[#0B0E16] rounded border border-[#242C3D]">
-                    <span className="text-[#94A3B8]">Database Collections:</span>
-                    <span className="text-white font-bold">users, games, teams, tournaments, matches, disputes, audit_logs</span>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
+                    <span className="text-slate-500">Database Collections:</span>
+                    <span className="text-slate-900 font-bold">users, games, teams, tournaments, matches, disputes, audit_logs</span>
                   </div>
-                  <div className="flex items-center justify-between p-2.5 bg-[#0B0E16] rounded border border-[#242C3D]">
-                    <span className="text-[#94A3B8]">Cryptographic Audit Chaining:</span>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
+                    <span className="text-slate-500">Cryptographic Audit Chaining:</span>
                     <span className="text-emerald-400 font-bold">SHA-256 ACTIVE</span>
                   </div>
                 </div>
@@ -1103,13 +1103,13 @@ export default function AdminCockpitPage() {
         {/* TAB 2: MATCH VERIFICATION QUEUE */}
         {activeTab === "queue" && (
           <div className="space-y-6">
-            <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#242C3D] pb-4">
+            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
-                  <h3 className="font-headline font-bold text-base text-white uppercase">
+                  <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
                     Match Score &amp; Evidence Review Queue
                   </h3>
-                  <p className="text-xs text-[#94A3B8] font-mono">
+                  <p className="text-xs text-slate-500 font-mono">
                     Inspect captain-submitted scores and screenshot proofs before certifying bracket progression
                   </p>
                 </div>
@@ -1121,13 +1121,13 @@ export default function AdminCockpitPage() {
               {pendingMatches.length > 0 ? (
                 <div className="space-y-4">
                   {pendingMatches.map((m) => (
-                    <div key={m.id} className="bg-[#0B0E16] border border-[#242C3D] p-4 rounded space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#242C3D] pb-3">
+                    <div key={m.id} className="bg-slate-50 border border-slate-200 p-4 rounded space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
                         <div>
-                          <div className="font-bold text-white text-sm">
+                          <div className="font-bold text-slate-900 text-sm">
                             {m.stage || "Competitive Bracket Match"}
                           </div>
-                          <div className="text-xs text-[#94A3B8] font-mono">
+                          <div className="text-xs text-slate-500 font-mono">
                             {m.tournament_title || "Official Tournament"} • {m.team_a?.name || "Slot 1"} vs {m.team_b?.name || "Slot 2"}
                           </div>
                         </div>
@@ -1137,22 +1137,22 @@ export default function AdminCockpitPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                        <div className="bg-[#161A24] p-3 rounded space-y-1">
-                          <span className="text-[#94A3B8]">Captain Notes:</span>
+                        <div className="bg-slate-50 p-3 rounded space-y-1">
+                          <span className="text-slate-500">Captain Notes:</span>
                           <p className="text-white">
                             {m.dispute_notes || "Match concluded. Scoreboard proof attached."}
                           </p>
                         </div>
-                        <div className="bg-[#161A24] p-3 rounded flex items-center justify-between">
+                        <div className="bg-slate-50 p-3 rounded flex items-center justify-between">
                           <div>
-                            <span className="text-[#94A3B8]">Evidence Proof:</span>
-                            <div className="text-white font-bold truncate max-w-[200px]">
+                            <span className="text-slate-500">Evidence Proof:</span>
+                            <div className="text-slate-900 font-bold truncate max-w-[200px]">
                               {m.evidence_url || "Scoreboard Screenshot"}
                             </div>
                           </div>
                           <button
                             onClick={() => setInspectingEvidence(m.evidence_url || "valorant_match_end_scoreboard.png")}
-                            className="px-3 py-1 bg-[#242C3D] hover:bg-[#333C4D] text-white rounded text-xs flex items-center gap-1 cursor-pointer"
+                            className="px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded text-xs flex items-center gap-1 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" /> Inspect Proof
                           </button>
@@ -1164,7 +1164,7 @@ export default function AdminCockpitPage() {
                         <button
                           onClick={() => handleVerifyMatch(m.id)}
                           disabled={isVerifying}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#242C3D] text-white font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 disabled:text-slate-500 text-slate-900 font-mono text-xs font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
                         >
                           {isVerifying ? (
                             <>
@@ -1198,13 +1198,13 @@ export default function AdminCockpitPage() {
                           <span className="text-[10px] font-mono text-[#64748B]">Force Forfeit:</span>
                           <button
                             onClick={() => { if (confirm(`Force forfeit match? Team A (${m.team_a?.name || "A"}) wins.`)) handleForceMatchForfeit(m.id, "A"); }}
-                            className="px-2.5 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#94A3B8] hover:text-white font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
+                            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 hover:border-[#E56A10] text-slate-600 hover:text-slate-900 font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
                           >
                             {m.team_a?.name?.slice(0, 8) || "Team A"} Win
                           </button>
                           <button
                             onClick={() => { if (confirm(`Force forfeit match? Team B (${m.team_b?.name || "B"}) wins.`)) handleForceMatchForfeit(m.id, "B"); }}
-                            className="px-2.5 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#94A3B8] hover:text-white font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
+                            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 hover:border-[#E56A10] text-slate-600 hover:text-slate-900 font-mono text-[10px] font-bold uppercase rounded cursor-pointer"
                           >
                             {m.team_b?.name?.slice(0, 8) || "Team B"} Win
                           </button>
@@ -1214,9 +1214,9 @@ export default function AdminCockpitPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-[#0B0E16] p-8 text-center text-[#94A3B8] rounded border border-[#242C3D] space-y-3">
+                <div className="bg-slate-50 p-8 text-center text-slate-500 rounded border border-slate-200 space-y-3">
                   <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto" />
-                  <div className="text-white font-bold text-sm">Review Queue Clear</div>
+                  <div className="text-slate-900 font-bold text-sm">Review Queue Clear</div>
                   <p className="text-xs font-mono text-[#64748B] max-w-md mx-auto">
                     No competitive matches currently require arbitrator verification. When team captains submit scores in the Match Hub, they appear here.
                   </p>
@@ -1226,14 +1226,14 @@ export default function AdminCockpitPage() {
 
             {/* All Matches Overview */}
             {allMatches.length > 0 && (
-              <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-                <h4 className="font-headline font-bold text-sm text-white uppercase">
+              <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+                <h4 className="font-headline font-bold text-sm text-slate-900 uppercase">
                   All Tournament Matches ({allMatches.length})
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
                     <thead>
-                      <tr className="text-[#94A3B8] border-b border-[#242C3D]">
+                      <tr className="text-slate-500 border-b border-slate-200">
                         <th className="py-2">Stage</th>
                         <th className="py-2">Tournament</th>
                         <th className="py-2">Teams</th>
@@ -1242,15 +1242,15 @@ export default function AdminCockpitPage() {
                         <th className="py-2 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#242C3D]/60 text-white">
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
                       {allMatches.map((m) => (
                         <tr key={m.id}>
                           <td className="py-2.5">{m.stage || "Match"}</td>
-                          <td className="text-[#94A3B8]">{m.tournament_title || "Official"}</td>
+                          <td className="text-slate-500">{m.tournament_title || "Official"}</td>
                           <td>{m.team_a?.name || "TBD"} vs {m.team_b?.name || "TBD"}</td>
                           <td className="font-bold text-[#E56A10]">{m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}</td>
                           <td>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#161A24] border border-[#242C3D]">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 border border-slate-200">
                               {m.status}
                             </span>
                           </td>
@@ -1277,17 +1277,17 @@ export default function AdminCockpitPage() {
         {/* TAB 3: DISPUTES ARBITRATION */}
         {activeTab === "disputes" && (
           <div className="space-y-6">
-            <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-              <div className="flex items-center justify-between border-b border-[#242C3D] pb-4">
+            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                 <div>
-                  <h3 className="font-headline font-bold text-base text-white uppercase">
+                  <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
                     Tournament Dispute Arbitration Desk
                   </h3>
-                  <p className="text-xs text-[#94A3B8] font-mono">
+                  <p className="text-xs text-slate-500 font-mono">
                     Review and arbitrate rule violations, toxic behavior, server drops, and disputed scores
                   </p>
                 </div>
-                <span className="text-xs font-mono text-[#94A3B8]">
+                <span className="text-xs font-mono text-slate-500">
                   {disputes.length} Total Disputes
                 </span>
               </div>
@@ -1295,10 +1295,10 @@ export default function AdminCockpitPage() {
               {disputes.length > 0 ? (
                 <div className="space-y-4">
                   {disputes.map((d) => (
-                    <div key={d.id} className="bg-[#0B0E16] border border-[#242C3D] p-4 rounded space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#242C3D] pb-3">
+                    <div key={d.id} className="bg-slate-50 border border-slate-200 p-4 rounded space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
                         <div>
-                          <div className="text-sm font-bold text-white flex items-center gap-2">
+                          <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span>Reason: {d.reason}</span>
                             <span
                               className={`px-2 py-0.2 rounded text-[10px] font-mono uppercase font-bold ${
@@ -1310,16 +1310,16 @@ export default function AdminCockpitPage() {
                               {d.status}
                             </span>
                           </div>
-                          <div className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                          <div className="text-xs text-slate-500 font-mono mt-0.5">
                             Match: {d.match_id} • Filed by: {d.submitted_by}
                           </div>
                         </div>
-                        <div className="text-xs text-[#94A3B8] font-mono">
+                        <div className="text-xs text-slate-500 font-mono">
                           {d.created_at ? new Date(d.created_at).toLocaleString() : ""}
                         </div>
                       </div>
 
-                      <p className="text-xs text-[#CBD5E1] bg-[#161A24] p-3 rounded">
+                      <p className="text-xs text-slate-700 bg-slate-50 p-3 rounded">
                         {d.description}
                       </p>
 
@@ -1327,7 +1327,7 @@ export default function AdminCockpitPage() {
                         <div className="flex items-center gap-2 text-xs">
                           <button
                             onClick={() => setInspectingEvidence(d.evidence_url!)}
-                            className="px-3 py-1 bg-[#242C3D] hover:bg-[#333C4D] text-white rounded flex items-center gap-1 font-mono"
+                            className="px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded flex items-center gap-1 font-mono"
                           >
                             <Eye className="w-3.5 h-3.5" /> View Attached Evidence
                           </button>
@@ -1335,8 +1335,8 @@ export default function AdminCockpitPage() {
                       )}
 
                       {d.status === "OPEN" && isSuperAdmin && (
-                        <div className="pt-3 border-t border-[#242C3D] space-y-3">
-                          <p className="text-[11px] font-mono text-[#94A3B8] font-bold uppercase">Arbitration Ruling:</p>
+                        <div className="pt-3 border-t border-slate-200 space-y-3">
+                          <p className="text-[11px] font-mono text-slate-500 font-bold uppercase">Arbitration Ruling:</p>
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => handleResolveDispute(d.id, "RESOLVED_UPHELD")}
@@ -1352,7 +1352,7 @@ export default function AdminCockpitPage() {
                             </button>
                             <button
                               onClick={() => handleResolveDispute(d.id, "DISMISSED")}
-                              className="px-3 py-1.5 bg-[#242C3D] hover:bg-[#333C4D] text-white rounded text-xs font-mono font-bold uppercase cursor-pointer"
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded text-xs font-mono font-bold uppercase cursor-pointer"
                             >
                               Dismiss Dispute
                             </button>
@@ -1387,9 +1387,9 @@ export default function AdminCockpitPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-[#0B0E16] p-8 text-center text-[#94A3B8] rounded border border-[#242C3D] space-y-2">
+                <div className="bg-slate-50 p-8 text-center text-slate-500 rounded border border-slate-200 space-y-2">
                   <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
-                  <div className="text-white font-bold text-sm">No Active Disputes</div>
+                  <div className="text-slate-900 font-bold text-sm">No Active Disputes</div>
                   <p className="text-xs font-mono text-[#64748B]">
                     Fair play integrity verified. Disputed tournament matches will be listed here for arbitral ruling.
                   </p>
@@ -1402,12 +1402,12 @@ export default function AdminCockpitPage() {
         {/* TAB 4: GAMES CATALOG & CRUD */}
         {activeTab === "games" && isSuperAdmin && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs-lg">
               <div>
-                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
                   <Gamepad2 className="w-5 h-5 text-[#E56A10]" /> Sanctioned Esports Games Catalog
                 </h3>
-                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
                   Register, configure, and manage authorized competitive titles, team configurations, and server rules.
                 </p>
               </div>
@@ -1424,11 +1424,11 @@ export default function AdminCockpitPage() {
               {games.map((game) => (
                 <div
                   key={game.id}
-                  className="bg-[#10141F] border border-[#242C3D] rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                  className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
                 >
                   {/* Banner & Logo */}
                   <div>
-                    <div className="h-32 w-full relative bg-[#0B0E16] overflow-hidden">
+                    <div className="h-32 w-full relative bg-slate-50 overflow-hidden">
                       <img
                         src={game.banner_url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
                         alt={game.name}
@@ -1436,15 +1436,15 @@ export default function AdminCockpitPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#10141F] via-transparent to-transparent" />
                       <div className="absolute top-3 left-3 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-[#0B0E16]/80 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                        <span className="px-2 py-0.5 bg-slate-50/80 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
                           {game.platform}
                         </span>
-                        <span className="px-2 py-0.5 bg-[#0B0E16]/80 backdrop-blur-xs text-white border border-[#242C3D] text-[10px] font-mono font-bold uppercase rounded">
+                        <span className="px-2 py-0.5 bg-slate-50/80 backdrop-blur-xs text-white border border-slate-200 text-[10px] font-mono font-bold uppercase rounded">
                           {game.tag}
                         </span>
                       </div>
                       <div className="absolute bottom-2 left-4 flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-[#0B0E16] border-2 border-[#242C3D] overflow-hidden p-1 shadow-md shrink-0">
+                        <div className="w-12 h-12 rounded-lg bg-slate-50 border-2 border-slate-200 overflow-hidden p-1 shadow-md shrink-0">
                           <img
                             src={game.logo_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300"}
                             alt={game.name}
@@ -1452,10 +1452,10 @@ export default function AdminCockpitPage() {
                           />
                         </div>
                         <div>
-                          <h4 className="font-headline font-bold text-base text-white">
+                          <h4 className="font-headline font-bold text-base text-slate-900">
                             {game.name}
                           </h4>
-                          <span className="text-[11px] font-mono text-[#94A3B8]">
+                          <span className="text-[11px] font-mono text-slate-500">
                             /{game.slug}
                           </span>
                         </div>
@@ -1464,28 +1464,28 @@ export default function AdminCockpitPage() {
 
                     {/* Metadata Specs */}
                     <div className="p-4 space-y-3">
-                      <p className="text-xs text-[#94A3B8] line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                         {game.description || "Official sanctioned tournament title on AMETHEUS platform."}
                       </p>
 
-                      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-[#242C3D]">
-                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D]">
+                      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-slate-200">
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
                           <span className="text-[#64748B] block text-[9px] uppercase">Squad Format</span>
-                          <span className="text-white font-bold">
+                          <span className="text-slate-900 font-bold">
                             {game.is_team_game
                               ? `${game.min_team_size}-${game.max_team_size} Athletes`
                               : "1v1 Solo"}
                           </span>
                         </div>
-                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D]">
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
                           <span className="text-[#64748B] block text-[9px] uppercase">Tournaments</span>
                           <span className="text-[#E56A10] font-bold">
                             {game.active_tournaments_count || 0} Active
                           </span>
                         </div>
-                        <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D] col-span-2">
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200 col-span-2">
                           <span className="text-[#64748B] block text-[9px] uppercase">Server / Anti-Cheat</span>
-                          <span className="text-[#CBD5E1] truncate block">
+                          <span className="text-slate-700 truncate block">
                             {game.server_region || "AWS Mumbai"} • {game.anti_cheat || "Standard"}
                           </span>
                         </div>
@@ -1494,10 +1494,10 @@ export default function AdminCockpitPage() {
                   </div>
 
                   {/* Actions (Edit & Delete) */}
-                  <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t border-[#242C3D]/60 mt-2">
+                  <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t border-slate-100 mt-2">
                     <button
                       onClick={() => handleOpenEditGame(game)}
-                      className="flex-1 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Game
                     </button>
@@ -1513,11 +1513,11 @@ export default function AdminCockpitPage() {
               ))}
 
               {games.length === 0 && (
-                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                <div className="col-span-full bg-white border border-slate-200 p-12 rounded-xl text-center space-y-4">
                   <Gamepad2 className="w-12 h-12 text-[#64748B] mx-auto" />
                   <div className="space-y-1">
-                    <h4 className="font-headline font-bold text-white text-lg">No Games in Catalog</h4>
-                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                    <h4 className="font-headline font-bold text-slate-900 text-lg">No Games in Catalog</h4>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
                       Click &quot;Add New Game&quot; above or use the &quot;Seed Platform&quot; tool to populate standard competitive titles.
                     </p>
                   </div>
@@ -1529,24 +1529,24 @@ export default function AdminCockpitPage() {
 
         {/* TAB 5: USER & RBAC MANAGEMENT */}
         {activeTab === "users" && isSuperAdmin && (
-          <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-headline font-bold text-base text-white uppercase">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
                   Platform User Management &amp; Role Allocation
                 </h3>
-                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
                   Super Admin control: Assign roles, promote tournament organizers, and audit balances
                 </p>
               </div>
-              <span className="text-xs font-mono text-[#94A3B8]">
+              <span className="text-xs font-mono text-slate-500">
                 {users.length} Registered Accounts
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="text-[#94A3B8] border-b border-[#242C3D]">
+                  <tr className="text-slate-500 border-b border-slate-200">
                     <th className="py-2.5">User</th>
                     <th className="py-2.5">Email</th>
                     <th className="py-2.5">Current Role</th>
@@ -1554,16 +1554,16 @@ export default function AdminCockpitPage() {
                     <th className="py-2.5 text-right">RBAC Role Controls</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#242C3D]/60 text-white">
+                <tbody className="divide-y divide-slate-100 text-slate-800">
                   {users.map((u) => (
                     <tr key={u.id}>
                       <td className="py-3">
                         <span className="font-bold">@{u.username}</span>
                         {u.display_name && (
-                          <span className="text-[#94A3B8] text-[11px] block">{u.display_name}</span>
+                          <span className="text-slate-500 text-[11px] block">{u.display_name}</span>
                         )}
                       </td>
-                      <td className="text-[#94A3B8]">{u.email}</td>
+                      <td className="text-slate-500">{u.email}</td>
                       <td>
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -1577,7 +1577,7 @@ export default function AdminCockpitPage() {
                               ? "bg-sky-600 text-white"
                               : u.role === "ORGANIZER"
                               ? "bg-[#F59E0B] text-slate-900"
-                              : "bg-[#242C3D] text-[#CBD5E1]"
+                              : "bg-[#242C3D] text-slate-700"
                           }`}
                         >
                           {u.role}
@@ -1589,7 +1589,7 @@ export default function AdminCockpitPage() {
                           <select
                             value={u.role}
                             onChange={(e) => handleSetUserRole(u.id, e.target.value as any, u.username)}
-                            className="bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] rounded px-2 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-[#E56A10] cursor-pointer"
+                            className="bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded px-2 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-[#E56A10] cursor-pointer"
                           >
                             <option value="PLAYER">Player (Standard)</option>
                             <option value="ORGANIZER">Organizer</option>
@@ -1599,14 +1599,14 @@ export default function AdminCockpitPage() {
                             <option value="SUPER_ADMIN">Super Admin</option>
                           </select>
                         ) : (
-                          <span className="text-[10px] text-[#94A3B8] italic">Designated Root</span>
+                          <span className="text-[10px] text-slate-500 italic">Designated Root</span>
                         )}
                       </td>
                     </tr>
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-[#94A3B8]">
+                      <td colSpan={5} className="py-6 text-center text-slate-500">
                         No platform users registered yet.
                       </td>
                     </tr>
@@ -1619,13 +1619,13 @@ export default function AdminCockpitPage() {
 
         {/* TAB 5: CRYPTOGRAPHIC AUDIT LOGS */}
         {activeTab === "audit" && isSuperAdmin && (
-          <div className="bg-[#10141F] border border-[#242C3D] p-6 rounded space-y-4">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-headline font-bold text-base text-white uppercase">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
                   Tamper-Evident Operational Audit Log
                 </h3>
-                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
                   Every administrative action is stored in MongoDB with SHA-256 hash chains
                 </p>
               </div>
@@ -1638,26 +1638,26 @@ export default function AdminCockpitPage() {
                 auditLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="bg-[#0B0E16] p-3 rounded border border-[#242C3D] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    className="bg-slate-50 p-3 rounded border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-[#94A3B8] text-[11px]">{log.timestamp ? log.timestamp.slice(11, 19) : ""} IST</span>
+                      <span className="text-slate-500 text-[11px]">{log.timestamp ? log.timestamp.slice(11, 19) : ""} IST</span>
                       <span className="text-[#E56A10] font-bold">@{log.operator}</span>
-                      <span className="text-white font-bold">{log.action}</span>
-                      <span className="text-[#94A3B8]">{log.target}</span>
+                      <span className="text-slate-900 font-bold">{log.action}</span>
+                      <span className="text-slate-500">{log.target}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {log.record_hash && (
-                        <span className="px-1.5 py-0.5 rounded bg-[#161A24] border border-[#242C3D] text-[10px] text-emerald-400 font-mono" title={`Prev: ${log.prev_hash}\nRecord: ${log.record_hash}`}>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-[10px] text-emerald-400 font-mono" title={`Prev: ${log.prev_hash}\nRecord: ${log.record_hash}`}>
                           SHA: {log.record_hash.slice(0, 8)}…
                         </span>
                       )}
-                      <span className="text-[#94A3B8] text-[11px]">IP: {log.ip_address}</span>
+                      <span className="text-slate-500 text-[11px]">IP: {log.ip_address}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="bg-[#0B0E16] p-6 text-center text-[#94A3B8] rounded border border-[#242C3D]">
+                <div className="bg-slate-50 p-6 text-center text-slate-500 rounded border border-slate-200">
                   No audit logs recorded yet.
                 </div>
               )}
@@ -1668,12 +1668,12 @@ export default function AdminCockpitPage() {
         {/* TAB: TOURNAMENTS MANAGEMENT & ABSOLUTE ADMIN CONTROL */}
         {activeTab === "tournaments" && isSuperAdmin && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs-lg">
               <div>
-                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-[#E56A10]" /> Platform Tournaments & Rules Suite
                 </h3>
-                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
                   Host, configure, adjust prize distribution tiers, player limits, and competitive rules with immediate platform sync.
                 </p>
               </div>
@@ -1702,11 +1702,11 @@ export default function AdminCockpitPage() {
                 return (
                   <div
                     key={tourn.id}
-                    className="bg-[#10141F] border border-[#242C3D] rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                    className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
                   >
                     <div>
                       {/* Banner & Badges */}
-                      <div className="h-36 w-full relative bg-[#0B0E16] overflow-hidden">
+                      <div className="h-36 w-full relative bg-slate-50 overflow-hidden">
                         <img
                           src={tourn.banner_url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
                           alt={tourn.title}
@@ -1717,15 +1717,15 @@ export default function AdminCockpitPage() {
                           <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${statusColor}`}>
                             {tourn.status.replace("_", " ")}
                           </span>
-                          <span className="px-2 py-0.5 bg-[#0B0E16]/80 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                          <span className="px-2 py-0.5 bg-slate-50/80 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
                             {tourn.game_slug || "ESPORTS"}
                           </span>
                         </div>
                         <div className="absolute bottom-2 left-4 right-4">
-                          <h4 className="font-headline font-bold text-base text-white truncate">
+                          <h4 className="font-headline font-bold text-base text-slate-900 truncate">
                             {tourn.title}
                           </h4>
-                          <span className="text-[11px] font-mono text-[#94A3B8]">
+                          <span className="text-[11px] font-mono text-slate-500">
                             Format: {tourn.format || "Single Elimination"} • {tourn.rank_requirement || "Open Ranks"}
                           </span>
                         </div>
@@ -1734,33 +1734,33 @@ export default function AdminCockpitPage() {
                       {/* Key Details */}
                       <div className="p-4 space-y-3">
                         <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                          <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                             <span className="text-[#64748B] block text-[9px] uppercase">Prize Vault</span>
                             <span className="text-[#E56A10] font-bold text-sm">
                               ₹{tourn.prize_pool_inr.toLocaleString()}
                             </span>
                           </div>
-                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                          <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                             <span className="text-[#64748B] block text-[9px] uppercase">Entry Fee</span>
-                            <span className="text-white font-bold text-sm">
+                            <span className="text-slate-900 font-bold text-sm">
                               {tourn.entry_fee_inr === 0 ? "Free Entry" : `₹${tourn.entry_fee_inr}`}
                             </span>
                           </div>
-                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                          <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                             <span className="text-[#64748B] block text-[9px] uppercase">Squad Capacity</span>
-                            <span className="text-[#CBD5E1] font-bold">
+                            <span className="text-slate-700 font-bold">
                               {tourn.registered_teams || 0} / {tourn.max_teams} Squads
                             </span>
                           </div>
-                          <div className="bg-[#0B0E16] p-2.5 rounded border border-[#242C3D]">
+                          <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
                             <span className="text-[#64748B] block text-[9px] uppercase">Rules & Prizes</span>
-                            <span className="text-white font-bold">
+                            <span className="text-slate-900 font-bold">
                               {rulesCount} Rules • {prizesCount} Tiers
                             </span>
                           </div>
-                          <div className="bg-[#0B0E16] p-2 rounded border border-[#242C3D] col-span-2">
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200 col-span-2">
                             <span className="text-[#64748B] block text-[9px] uppercase">Starts At</span>
-                            <span className="text-[#CBD5E1] truncate block">
+                            <span className="text-slate-700 truncate block">
                               {tourn.starts_at}
                             </span>
                           </div>
@@ -1769,17 +1769,17 @@ export default function AdminCockpitPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="p-4 pt-0 flex items-center gap-2 border-t border-[#242C3D]/60 mt-2">
+                    <div className="p-4 pt-0 flex items-center gap-2 border-t border-slate-100 mt-2">
                       <button
                         onClick={() => handleOpenEditTournament(tourn)}
-                        className="flex-1 py-2 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Rules & Config
                       </button>
                       <Link
                         href={`/tournaments/${tourn.slug || tourn.id}`}
                         target="_blank"
-                        className="p-2 bg-[#161A24] border border-[#242C3D] hover:text-white text-[#94A3B8] rounded transition-colors"
+                        className="p-2 bg-slate-50 border border-slate-200 hover:text-white text-slate-500 rounded transition-colors"
                         title="View Public Tournament Page"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -1797,11 +1797,11 @@ export default function AdminCockpitPage() {
               })}
 
               {tournaments.length === 0 && (
-                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                <div className="col-span-full bg-white border border-slate-200 p-12 rounded-xl text-center space-y-4">
                   <Calendar className="w-12 h-12 text-[#64748B] mx-auto" />
                   <div className="space-y-1">
-                    <h4 className="font-headline font-bold text-white text-lg">No Tournaments Hosted</h4>
-                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                    <h4 className="font-headline font-bold text-slate-900 text-lg">No Tournaments Hosted</h4>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
                       Click &quot;Create Tournament&quot; above to create a competition with custom rules, timing, prize breakdown, and player limits.
                     </p>
                   </div>
@@ -1814,12 +1814,12 @@ export default function AdminCockpitPage() {
         {/* TAB: DYNAMIC LEADERBOARD CATEGORIES */}
         {activeTab === "leaderboards" && isSuperAdmin && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#10141F] border border-[#242C3D] p-5 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs-lg">
               <div>
-                <h3 className="font-headline font-bold text-base text-white uppercase flex items-center gap-2">
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-[#E56A10]" /> Leaderboard Categories & Dynamic Rankings
                 </h3>
-                <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
                   Configure custom ranking categories by game and metric. AMETHEUS automatically calculates live standings for all squads and athletes.
                 </p>
               </div>
@@ -1845,11 +1845,11 @@ export default function AdminCockpitPage() {
                 return (
                   <div
                     key={cat.slug}
-                    className="bg-[#10141F] border border-[#242C3D] rounded-xl p-5 hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
+                    className="bg-white border border-slate-200 rounded-xl p-5 hover:border-[#E56A10]/50 transition-all flex flex-col justify-between shadow-lg group"
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 bg-[#0B0E16] text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
+                        <span className="px-2 py-0.5 bg-slate-50 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
                           {cat.game_slug === "all" ? "All Games" : cat.game_slug.toUpperCase()}
                         </span>
                         <span className="text-[10px] font-mono text-[#64748B]">
@@ -1858,31 +1858,31 @@ export default function AdminCockpitPage() {
                       </div>
 
                       <div>
-                        <h4 className="font-headline font-bold text-lg text-white group-hover:text-[#E56A10] transition-colors">
+                        <h4 className="font-headline font-bold text-lg text-slate-900 group-hover:text-[#E56A10] transition-colors">
                           {cat.name}
                         </h4>
-                        <p className="text-xs text-[#94A3B8] font-mono mt-1">
+                        <p className="text-xs text-slate-500 font-mono mt-1">
                           {cat.description || "Dynamic leaderboard category calculated automatically."}
                         </p>
                       </div>
 
-                      <div className="bg-[#0B0E16] p-3 rounded-lg border border-[#242C3D] space-y-1 text-xs font-mono">
-                        <div className="flex items-center justify-between text-[#94A3B8]">
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1 text-xs font-mono">
+                        <div className="flex items-center justify-between text-slate-500">
                           <span>Sorting Metric:</span>
-                          <span className="text-white font-bold">{metricLabels[cat.sort_metric] || cat.sort_metric}</span>
+                          <span className="text-slate-900 font-bold">{metricLabels[cat.sort_metric] || cat.sort_metric}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[#94A3B8]">
+                        <div className="flex items-center justify-between text-slate-500">
                           <span>Engine Calculation:</span>
                           <span className="text-emerald-400 font-bold">Auto-Calculated</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-4 mt-4 border-t border-[#242C3D] flex items-center justify-between gap-2">
+                    <div className="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between gap-2">
                       <Link
                         href={`/leaderboard?cat=${cat.slug}`}
                         target="_blank"
-                        className="flex-1 py-1.5 px-3 bg-[#161A24] border border-[#242C3D] hover:text-white text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded text-center transition-colors flex items-center justify-center gap-1.5"
+                        className="flex-1 py-1.5 px-3 bg-slate-50 border border-slate-200 hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded text-center transition-colors flex items-center justify-center gap-1.5"
                       >
                         <Eye className="w-3.5 h-3.5 text-[#E56A10]" /> View Live Board
                       </Link>
@@ -1899,11 +1899,11 @@ export default function AdminCockpitPage() {
               })}
 
               {leaderboardCategories.length === 0 && (
-                <div className="col-span-full bg-[#10141F] border border-[#242C3D] p-12 rounded-xl text-center space-y-4">
+                <div className="col-span-full bg-white border border-slate-200 p-12 rounded-xl text-center space-y-4">
                   <BarChart3 className="w-12 h-12 text-[#64748B] mx-auto" />
                   <div className="space-y-1">
-                    <h4 className="font-headline font-bold text-white text-lg">No Categories Configured</h4>
-                    <p className="text-xs text-[#94A3B8] font-mono max-w-md mx-auto">
+                    <h4 className="font-headline font-bold text-slate-900 text-lg">No Categories Configured</h4>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
                       Click &quot;Add Category&quot; to configure custom leaderboard metrics.
                     </p>
                   </div>
@@ -1917,38 +1917,38 @@ export default function AdminCockpitPage() {
       {/* Screenshot Evidence Inspection Modal */}
       {inspectingEvidence && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#10141F] border border-[#242C3D] max-w-3xl w-full rounded overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-[#242C3D]">
+          <div className="bg-white border border-slate-200 max-w-3xl w-full rounded overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-[#E56A10]" />
-                <span className="font-headline font-bold text-sm text-white uppercase">Match Scoreboard Evidence</span>
+                <span className="font-headline font-bold text-sm text-slate-900 uppercase">Match Scoreboard Evidence</span>
               </div>
               <button
                 onClick={() => setInspectingEvidence(null)}
-                className="p-1 text-[#94A3B8] hover:text-white rounded cursor-pointer"
+                className="p-1 text-slate-600 hover:text-slate-900 rounded cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 flex items-center justify-center bg-[#0B0E16] min-h-[300px]">
+            <div className="p-4 flex items-center justify-center bg-slate-50 min-h-[300px]">
               {inspectingEvidence.startsWith("data:") || inspectingEvidence.startsWith("http") ? (
                 <img
                   src={inspectingEvidence}
                   alt="Evidence Screenshot"
-                  className="max-h-[60vh] object-contain rounded border border-[#242C3D]"
+                  className="max-h-[60vh] object-contain rounded border border-slate-200"
                 />
               ) : (
-                <div className="text-center p-8 text-[#94A3B8] font-mono text-xs">
+                <div className="text-center p-8 text-slate-500 font-mono text-xs">
                   <FileCheck className="w-12 h-12 text-[#E56A10] mx-auto mb-2 opacity-50" />
-                  Evidence File: <span className="text-white font-bold">{inspectingEvidence}</span>
+                  Evidence File: <span className="text-slate-900 font-bold">{inspectingEvidence}</span>
                   <p className="text-[11px] text-[#64748B] mt-1">Uploaded and certified by squad captain.</p>
                 </div>
               )}
             </div>
-            <div className="p-3 bg-[#10141F] border-t border-[#242C3D] flex justify-end">
+            <div className="p-3 bg-white border-t border-slate-200 flex justify-end">
               <button
                 onClick={() => setInspectingEvidence(null)}
-                className="px-4 py-1.5 bg-[#242C3D] hover:bg-[#333C4D] text-white rounded text-xs font-mono font-bold cursor-pointer"
+                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded text-xs font-mono font-bold cursor-pointer"
               >
                 Close Inspector
               </button>
@@ -1960,15 +1960,15 @@ export default function AdminCockpitPage() {
       {/* Add / Edit Game Modal */}
       {isGameModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-2xl p-6 space-y-5 my-8 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl p-6 space-y-5 my-8 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-[#E56A10]" />
                 {editingGame ? `Edit Game: ${editingGame.name}` : "Register New Game Title"}
               </h3>
               <button
                 onClick={() => setIsGameModalOpen(false)}
-                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1977,7 +1977,7 @@ export default function AdminCockpitPage() {
             <form onSubmit={handleSaveGame} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Game Name *
                   </label>
                   <input
@@ -1994,12 +1994,12 @@ export default function AdminCockpitPage() {
                       }
                     }}
                     placeholder="e.g. Apex Legends"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     URL Slug *
                   </label>
                   <input
@@ -2009,12 +2009,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.slug}
                     onChange={(e) => setGameForm({ ...gameForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
                     placeholder="e.g. apex-legends"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono disabled:opacity-50"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono disabled:opacity-50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Platform *
                   </label>
                   <input
@@ -2023,12 +2023,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.platform}
                     onChange={(e) => setGameForm({ ...gameForm, platform: e.target.value })}
                     placeholder="e.g. PC, Mobile, Crossplay"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Tag / Genre *
                   </label>
                   <input
@@ -2037,12 +2037,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.tag}
                     onChange={(e) => setGameForm({ ...gameForm, tag: e.target.value })}
                     placeholder="e.g. BATTLE ROYALE, FPS, MOBA"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Min Team Size
                   </label>
                   <input
@@ -2051,12 +2051,12 @@ export default function AdminCockpitPage() {
                     max={10}
                     value={gameForm.min_team_size}
                     onChange={(e) => setGameForm({ ...gameForm, min_team_size: parseInt(e.target.value) || 1 })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Max Team Size
                   </label>
                   <input
@@ -2065,12 +2065,12 @@ export default function AdminCockpitPage() {
                     max={10}
                     value={gameForm.max_team_size}
                     onChange={(e) => setGameForm({ ...gameForm, max_team_size: parseInt(e.target.value) || 5 })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Server Region
                   </label>
                   <input
@@ -2078,12 +2078,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.server_region}
                     onChange={(e) => setGameForm({ ...gameForm, server_region: e.target.value })}
                     placeholder="e.g. AWS Mumbai (ap-south-1)"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Anti-Cheat Protocol
                   </label>
                   <input
@@ -2091,12 +2091,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.anti_cheat}
                     onChange={(e) => setGameForm({ ...gameForm, anti_cheat: e.target.value })}
                     placeholder="e.g. Hardware Vanguard TPM 2.0"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Banner URL *
                   </label>
                   <input
@@ -2105,12 +2105,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.banner_url}
                     onChange={(e) => setGameForm({ ...gameForm, banner_url: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Logo / Icon URL *
                   </label>
                   <input
@@ -2119,12 +2119,12 @@ export default function AdminCockpitPage() {
                     value={gameForm.logo_url}
                     onChange={(e) => setGameForm({ ...gameForm, logo_url: e.target.value })}
                     placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Description
                   </label>
                   <textarea
@@ -2132,16 +2132,16 @@ export default function AdminCockpitPage() {
                     value={gameForm.description}
                     onChange={(e) => setGameForm({ ...gameForm, description: e.target.value })}
                     placeholder="Brief description of competitive format and gameplay..."
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsGameModalOpen(false)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2169,15 +2169,15 @@ export default function AdminCockpitPage() {
       {/* Tournament Editor Modal */}
       {isTournamentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#E56A10]" />
                 {editingTournament ? `Edit Tournament: ${editingTournament.title}` : "Create New Platform Tournament"}
               </h3>
               <button
                 onClick={() => setIsTournamentModalOpen(false)}
-                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2186,13 +2186,13 @@ export default function AdminCockpitPage() {
             <form onSubmit={handleSaveTournament} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Game Title *
                   </label>
                   <select
                     value={tournForm.game_id}
                     onChange={(e) => setTournForm({ ...tournForm, game_id: e.target.value })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     {games.map((g) => (
                       <option key={g.id} value={g.slug || g.id}>
@@ -2204,7 +2204,7 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Tournament Title *
                   </label>
                   <input
@@ -2213,18 +2213,18 @@ export default function AdminCockpitPage() {
                     value={tournForm.title}
                     onChange={(e) => setTournForm({ ...tournForm, title: e.target.value })}
                     placeholder="e.g. Mumbai Masters Champions Cup"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Tournament Status
                   </label>
                   <select
                     value={tournForm.status}
                     onChange={(e) => setTournForm({ ...tournForm, status: e.target.value })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="ONGOING">Ongoing (Live Matches)</option>
@@ -2234,7 +2234,7 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Tournament Format
                   </label>
                   <input
@@ -2242,12 +2242,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.format}
                     onChange={(e) => setTournForm({ ...tournForm, format: e.target.value })}
                     placeholder="e.g. Single Elimination Bracket"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Guaranteed Prize Vault (₹ INR) *
                   </label>
                   <input
@@ -2256,12 +2256,12 @@ export default function AdminCockpitPage() {
                     required
                     value={tournForm.prize_pool_inr}
                     onChange={(e) => setTournForm({ ...tournForm, prize_pool_inr: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Entry Fee (₹ INR)
                   </label>
                   <input
@@ -2270,12 +2270,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.entry_fee_inr}
                     onChange={(e) => setTournForm({ ...tournForm, entry_fee_inr: parseInt(e.target.value) || 0 })}
                     placeholder="0 for Free Entry"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Tournament Schedule (Starts At) *
                   </label>
                   <input
@@ -2284,12 +2284,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.starts_at}
                     onChange={(e) => setTournForm({ ...tournForm, starts_at: e.target.value })}
                     placeholder="e.g. Saturday, 8:00 PM IST"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Squad / Lineup Lock Time *
                   </label>
                   <input
@@ -2298,12 +2298,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.roster_lock_time}
                     onChange={(e) => setTournForm({ ...tournForm, roster_lock_time: e.target.value })}
                     placeholder="e.g. Saturday, 7:30 PM IST"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Server Region
                   </label>
                   <input
@@ -2311,12 +2311,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.server_region}
                     onChange={(e) => setTournForm({ ...tournForm, server_region: e.target.value })}
                     placeholder="e.g. AWS Mumbai (ap-south-1)"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Rank Requirement
                   </label>
                   <input
@@ -2324,13 +2324,13 @@ export default function AdminCockpitPage() {
                     value={tournForm.rank_requirement}
                     onChange={(e) => setTournForm({ ...tournForm, rank_requirement: e.target.value })}
                     placeholder="e.g. Open to All Ranks"
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 sm:col-span-2">
                   <div>
-                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                       Max Squads
                     </label>
                     <input
@@ -2339,11 +2339,11 @@ export default function AdminCockpitPage() {
                       max={128}
                       value={tournForm.max_teams}
                       onChange={(e) => setTournForm({ ...tournForm, max_teams: parseInt(e.target.value) || 16 })}
-                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                       Min Team Size
                     </label>
                     <input
@@ -2352,11 +2352,11 @@ export default function AdminCockpitPage() {
                       max={10}
                       value={tournForm.min_team_size}
                       onChange={(e) => setTournForm({ ...tournForm, min_team_size: parseInt(e.target.value) || 1 })}
-                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                    <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                       Max Team Size
                     </label>
                     <input
@@ -2365,13 +2365,13 @@ export default function AdminCockpitPage() {
                       max={10}
                       value={tournForm.max_team_size}
                       onChange={(e) => setTournForm({ ...tournForm, max_team_size: parseInt(e.target.value) || 5 })}
-                      className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Banner URL
                   </label>
                   <input
@@ -2379,12 +2379,12 @@ export default function AdminCockpitPage() {
                     value={tournForm.banner_url}
                     onChange={(e) => setTournForm({ ...tournForm, banner_url: e.target.value })}
                     placeholder="https://images.unsplash.com/photo-..."
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Description & Overview
                   </label>
                   <textarea
@@ -2392,19 +2392,19 @@ export default function AdminCockpitPage() {
                     value={tournForm.description}
                     onChange={(e) => setTournForm({ ...tournForm, description: e.target.value })}
                     placeholder="Official sanctioned tournament rules, match server info, and schedule..."
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
 
               {/* DYNAMIC RULES SECTION */}
-              <div className="border-t border-[#242C3D] pt-4 space-y-3">
+              <div className="border-t border-slate-200 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5 text-[#E56A10]" /> Tournament Rules & Regulations ({tournForm.rules.length})
                     </h4>
-                    <p className="text-[11px] text-[#94A3B8] font-mono">
+                    <p className="text-[11px] text-slate-500 font-mono">
                       Add or delete official competitive rules enforced by match arbiters.
                     </p>
                   </div>
@@ -2414,11 +2414,11 @@ export default function AdminCockpitPage() {
                   {tournForm.rules.map((rule, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between gap-3 p-2 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono"
+                      className="flex items-center justify-between gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
                         <span className="text-[#E56A10] font-bold shrink-0">#{idx + 1}</span>
-                        <span className="text-[#CBD5E1] truncate">{rule}</span>
+                        <span className="text-slate-700 truncate">{rule}</span>
                       </div>
                       <button
                         type="button"
@@ -2447,12 +2447,12 @@ export default function AdminCockpitPage() {
                       }
                     }}
                     placeholder="Enter rule (e.g. '15-minute grace check-in before match forfeit')"
-                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <button
                     type="button"
                     onClick={handleAddRule}
-                    className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1 cursor-pointer shrink-0"
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1 cursor-pointer shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Rule
                   </button>
@@ -2460,13 +2460,13 @@ export default function AdminCockpitPage() {
               </div>
 
               {/* DYNAMIC PRIZE DISTRIBUTION SECTION */}
-              <div className="border-t border-[#242C3D] pt-4 space-y-3">
+              <div className="border-t border-slate-200 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-bold font-mono text-white uppercase flex items-center gap-1.5">
                       <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Distribution Breakdown ({tournForm.prizes.length} Tiers)
                     </h4>
-                    <p className="text-[11px] text-[#94A3B8] font-mono">
+                    <p className="text-[11px] text-slate-500 font-mono">
                       Configure payout amounts for tournament placements.
                     </p>
                   </div>
@@ -2476,7 +2476,7 @@ export default function AdminCockpitPage() {
                   {tournForm.prizes.map((pz, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between p-2 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono"
+                      className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-[#E56A10] font-bold">{pz.place}</span>
@@ -2503,19 +2503,19 @@ export default function AdminCockpitPage() {
                     value={tournForm.newPrizePlace}
                     onChange={(e) => setTournForm({ ...tournForm, newPrizePlace: e.target.value })}
                     placeholder="Place (e.g. 4th Place)"
-                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <input
                     type="text"
                     value={tournForm.newPrizeAmount}
                     onChange={(e) => setTournForm({ ...tournForm, newPrizeAmount: e.target.value })}
                     placeholder="Prize (e.g. ₹2,000)"
-                    className="flex-1 bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                   <button
                     type="button"
                     onClick={handleAddPrizeTier}
-                    className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-[#202534] text-[#E56A10] text-xs font-mono font-bold uppercase rounded-lg flex items-center justify-center gap-1 cursor-pointer shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Tier
                   </button>
@@ -2523,11 +2523,11 @@ export default function AdminCockpitPage() {
               </div>
 
               {/* Form Footer */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsTournamentModalOpen(false)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2556,15 +2556,15 @@ export default function AdminCockpitPage() {
       {/* Leaderboard Category Modal */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-[#10141F] border border-[#242C3D] rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-[#E56A10]" />
                 Add Dynamic Leaderboard Category
               </h3>
               <button
                 onClick={() => setIsCategoryModalOpen(false)}
-                className="text-[#94A3B8] hover:text-white p-1 cursor-pointer"
+                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2572,7 +2572,7 @@ export default function AdminCockpitPage() {
 
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                   Category Name *
                 </label>
                 <input
@@ -2581,19 +2581,19 @@ export default function AdminCockpitPage() {
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                   placeholder="e.g. Valorant Top Fraggers, Apex Predator Winrate"
-                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Game Filter *
                   </label>
                   <select
                     value={categoryForm.game_slug}
                     onChange={(e) => setCategoryForm({ ...categoryForm, game_slug: e.target.value })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="all">All Games</option>
                     {games.map((g) => (
@@ -2605,13 +2605,13 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                     Sorting Metric *
                   </label>
                   <select
                     value={categoryForm.sort_metric}
                     onChange={(e) => setCategoryForm({ ...categoryForm, sort_metric: e.target.value as any })}
-                    className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="rating">Skill Rating (MMR / ELO)</option>
                     <option value="win_rate">Win Rate Percentage (%)</option>
@@ -2623,7 +2623,7 @@ export default function AdminCockpitPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                   Minimum Matches Required to Qualify
                 </label>
                 <input
@@ -2632,12 +2632,12 @@ export default function AdminCockpitPage() {
                   max={100}
                   value={categoryForm.min_matches}
                   onChange={(e) => setCategoryForm({ ...categoryForm, min_matches: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-700 mb-1">
                   Description
                 </label>
                 <textarea
@@ -2645,19 +2645,19 @@ export default function AdminCockpitPage() {
                   value={categoryForm.description}
                   onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   placeholder="Official explanation of category ranking criteria..."
-                  className="w-full bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-white focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
-              <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono text-[#94A3B8]">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-500">
                 <span className="text-[#E56A10] font-bold">Auto-Rank Calculation:</span> The leaderboard engine will automatically aggregate match results and rank all qualifying squads and players in real-time.
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-xs font-mono uppercase rounded-lg text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2684,45 +2684,45 @@ export default function AdminCockpitPage() {
       {/* Score Override Modal */}
       {scoreOverrideMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#10141F] border border-amber-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-amber-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-amber-400" />
-                <h3 className="font-headline font-bold text-base text-white uppercase">Manual Score Override</h3>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Manual Score Override</h3>
               </div>
-              <button onClick={() => setScoreOverrideMatch(null)} className="text-[#94A3B8] hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+              <button onClick={() => setScoreOverrideMatch(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
-            <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded-lg text-xs font-mono">
-              <span className="text-[#94A3B8]">Match: </span>
-              <span className="text-white font-bold">{scoreOverrideMatch.team_a?.name || "Team A"} vs {scoreOverrideMatch.team_b?.name || "Team B"}</span>
-              <span className="text-[#94A3B8] block mt-1">{scoreOverrideMatch.tournament_title || "Official Tournament"} · {scoreOverrideMatch.stage || "Match"}</span>
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono">
+              <span className="text-slate-500">Match: </span>
+              <span className="text-slate-900 font-bold">{scoreOverrideMatch.team_a?.name || "Team A"} vs {scoreOverrideMatch.team_b?.name || "Team B"}</span>
+              <span className="text-slate-500 block mt-1">{scoreOverrideMatch.tournament_title || "Official Tournament"} · {scoreOverrideMatch.stage || "Match"}</span>
             </div>
             <form onSubmit={handleScoreOverride} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">
                     {scoreOverrideMatch.team_a?.name || "Team A"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreA} onChange={(e) => setScoreA(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">
+                  <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">
                     {scoreOverrideMatch.team_b?.name || "Team B"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreB} onChange={(e) => setScoreB(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">Override Reason *</label>
+                <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Override Reason *</label>
                 <input type="text" required value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="e.g. Server crash — arbiter reconciled from replay"
-                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 font-mono" />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 font-mono" />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setScoreOverrideMatch(null)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingOverride}
                   className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingOverride ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5" />}
@@ -2737,23 +2737,23 @@ export default function AdminCockpitPage() {
       {/* Reject Proof Modal */}
       {rejectProofMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#10141F] border border-rose-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#242C3D] pb-3">
+          <div className="bg-white border border-rose-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
                 <X className="w-5 h-5 text-rose-400" />
-                <h3 className="font-headline font-bold text-base text-white uppercase">Reject Evidence & Request Re-upload</h3>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Evidence & Request Re-upload</h3>
               </div>
-              <button onClick={() => setRejectProofMatch(null)} className="text-[#94A3B8] hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+              <button onClick={() => setRejectProofMatch(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
-            <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded-lg text-xs font-mono">
-              <span className="text-[#94A3B8]">Match: </span>
-              <span className="text-white font-bold">{rejectProofMatch.team_a?.name || "Team A"} vs {rejectProofMatch.team_b?.name || "Team B"}</span>
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono">
+              <span className="text-slate-500">Match: </span>
+              <span className="text-slate-900 font-bold">{rejectProofMatch.team_a?.name || "Team A"} vs {rejectProofMatch.team_b?.name || "Team B"}</span>
             </div>
             <form onSubmit={handleRejectMatchProof} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-[#94A3B8] uppercase font-bold mb-1">Rejection Reason *</label>
+                <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Rejection Reason *</label>
                 <select value={rejectProofReason} onChange={(e) => setRejectProofReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#161A24] border border-[#242C3D] rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono">
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 font-mono">
                   <option>Screenshot incomplete or unreadable</option>
                   <option>Score visible but timestamp missing</option>
                   <option>Wrong match — screenshot shows different game</option>
@@ -2767,7 +2767,7 @@ export default function AdminCockpitPage() {
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setRejectProofMatch(null)}
-                  className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#CBD5E1] hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 hover:text-white rounded-lg text-xs font-mono uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingReject}
                   className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingReject ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}

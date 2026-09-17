@@ -46,21 +46,21 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#0B0E16] text-[#F8FAFC] border border-[#242C3D] w-full max-w-2xl rounded shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-white text-[#0B1C30] border border-slate-200 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#242C3D] bg-[#10141F]">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#161A24] border border-[#E56A10]/40 text-[#E56A10] text-[10px] font-mono font-bold rounded">
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#EFF4FF] border border-[#CBD5E1] text-[#E56A10] text-[10px] font-mono font-bold rounded">
               MATCH LOBBY // PRIZE VAULT PROTECTED
             </div>
-            <h3 className="text-xl font-bold font-headline text-white mt-1 uppercase">
+            <h3 className="text-xl font-bold font-headline text-slate-900 mt-1 uppercase">
               {match.stage}
             </h3>
-            <p className="text-xs text-[#94A3B8] font-mono">{match.tournamentTitle}</p>
+            <p className="text-xs text-slate-500 font-mono">{match.tournamentTitle}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-[#94A3B8] hover:text-white hover:bg-[#161A24] rounded transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -69,74 +69,74 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
         {/* Modal Body */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
           {/* Teams Confrontation Strip */}
-          <div className="grid grid-cols-3 items-center bg-[#161A24] border border-[#242C3D] p-4 rounded text-center">
+          <div className="grid grid-cols-3 items-center bg-[#EFF4FF] border border-[#CBD5E1] p-4 rounded-xl text-center">
             {/* Team A */}
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded bg-[#0B0E16] border border-[#242C3D] flex items-center justify-center font-headline font-bold text-white text-base">
+              <div className="w-12 h-12 rounded-lg bg-white border border-slate-300 flex items-center justify-center font-headline font-bold text-slate-900 text-base shadow-xs">
                 {match.teamA.tag}
               </div>
-              <span className="font-bold text-sm text-white mt-2">{match.teamA.name}</span>
-              <span className="text-[11px] text-[#94A3B8] font-mono">[{match.teamA.tag}]</span>
+              <span className="font-bold text-sm text-slate-900 mt-2">{match.teamA.name}</span>
+              <span className="text-[11px] text-slate-500 font-mono">[{match.teamA.tag}]</span>
               {match.teamA.isCheckedIn || isCheckedIn ? (
-                <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-700 font-mono font-bold bg-emerald-100 px-2 py-0.5 rounded">
                   <CheckCircle className="w-3 h-3" /> CHECKED IN
                 </span>
               ) : (
-                <span className="mt-1.5 text-[10px] text-[#F59E0B] font-mono">PENDING CHECK-IN</span>
+                <span className="mt-1.5 text-[10px] text-amber-700 font-mono font-semibold">PENDING CHECK-IN</span>
               )}
             </div>
 
             {/* Versus & Score */}
             <div className="flex flex-col items-center justify-center">
-              <span className="px-2 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[10px] font-mono font-bold text-[#E56A10] rounded uppercase mb-2">
+              <span className="px-2.5 py-0.5 bg-white border border-slate-300 text-[10px] font-mono font-bold text-[#E56A10] rounded uppercase mb-2 shadow-xs">
                 {match.status}
               </span>
               {match.teamA.score !== undefined && match.teamB.score !== undefined ? (
-                <div className="text-3xl font-bold font-mono text-white tabular-nums">
+                <div className="text-3xl font-bold font-mono text-slate-900 tabular-nums">
                   {match.teamA.score} : {match.teamB.score}
                 </div>
               ) : (
-                <div className="text-xl font-bold font-headline text-[#94A3B8]">VS</div>
+                <div className="text-xl font-bold font-headline text-slate-400">VS</div>
               )}
-              <span className="text-[11px] text-[#94A3B8] font-mono mt-1">{match.format}</span>
+              <span className="text-[11px] text-slate-500 font-mono mt-1">{match.format}</span>
             </div>
 
             {/* Team B */}
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 rounded bg-[#0B0E16] border border-[#242C3D] flex items-center justify-center font-headline font-bold text-white text-base">
+              <div className="w-12 h-12 rounded-lg bg-white border border-slate-300 flex items-center justify-center font-headline font-bold text-slate-900 text-base shadow-xs">
                 {match.teamB.tag}
               </div>
-              <span className="font-bold text-sm text-white mt-2">{match.teamB.name}</span>
-              <span className="text-[11px] text-[#94A3B8] font-mono">[{match.teamB.tag}]</span>
+              <span className="font-bold text-sm text-slate-900 mt-2">{match.teamB.name}</span>
+              <span className="text-[11px] text-slate-500 font-mono">[{match.teamB.tag}]</span>
               {match.teamB.isCheckedIn ? (
-                <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-700 font-mono font-bold bg-emerald-100 px-2 py-0.5 rounded">
                   <CheckCircle className="w-3 h-3" /> CHECKED IN
                 </span>
               ) : (
-                <span className="mt-1.5 text-[10px] text-[#F59E0B] font-mono">PENDING CHECK-IN</span>
+                <span className="mt-1.5 text-[10px] text-amber-700 font-mono font-semibold">PENDING CHECK-IN</span>
               )}
             </div>
           </div>
 
           {/* Dedicated Server Credentials */}
-          <div className="bg-[#10141F] border border-[#242C3D] p-4 rounded space-y-3">
-            <div className="flex items-center justify-between text-xs text-[#94A3B8] font-mono">
-              <span className="flex items-center gap-1 text-white font-bold">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-600 font-mono">
+              <span className="flex items-center gap-1 text-slate-900 font-bold">
                 <Server className="w-4 h-4 text-[#E56A10]" /> DEDICATED SERVER PROTOCOL
               </span>
               <span>{match.serverRegion}</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#242C3D]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
               {/* Lobby Code */}
-              <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded flex items-center justify-between">
+              <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
                 <div>
-                  <div className="text-[10px] text-[#94A3B8] font-mono uppercase">LOBBY / ROOM ID</div>
-                  <div className="font-mono text-sm font-bold text-white">{match.lobbyCode}</div>
+                  <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY / ROOM ID</div>
+                  <div className="font-mono text-sm font-bold text-slate-900">{match.lobbyCode}</div>
                 </div>
                 <button
                   onClick={() => handleCopy(match.lobbyCode, "lobby")}
-                  className="p-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white rounded text-xs flex items-center gap-1"
+                  className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   {copiedLobby ? "Copied" : "Copy"}
@@ -144,14 +144,14 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
               </div>
 
               {/* Lobby Password */}
-              <div className="bg-[#0B0E16] border border-[#242C3D] p-3 rounded flex items-center justify-between">
+              <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
                 <div>
-                  <div className="text-[10px] text-[#94A3B8] font-mono uppercase">LOBBY PASSWORD</div>
-                  <div className="font-mono text-sm font-bold text-[#F59E0B]">{match.lobbyPassword}</div>
+                  <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY PASSWORD</div>
+                  <div className="font-mono text-sm font-bold text-amber-600">{match.lobbyPassword}</div>
                 </div>
                 <button
                   onClick={() => handleCopy(match.lobbyPassword, "pass")}
-                  className="p-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10] text-[#CBD5E1] hover:text-white rounded text-xs flex items-center gap-1"
+                  className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   {copiedPassword ? "Copied" : "Copy"}
@@ -162,32 +162,32 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
 
           {/* Roster & In-Game IDs */}
           <div>
-            <div className="text-xs font-mono font-bold text-[#94A3B8] uppercase tracking-wider mb-2">
+            <div className="text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-2">
               Verified In-Game Handles (Anti-Smurf Protection)
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-[#10141F] border border-[#242C3D] p-3 rounded text-xs space-y-1.5">
-                <div className="font-bold text-white border-b border-[#242C3D] pb-1 font-mono">
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs space-y-1.5">
+                <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 font-mono">
                   {match.teamA.name}
                 </div>
                 {match.teamA.roster.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-[#94A3B8]">
+                  <div key={i} className="flex items-center justify-between text-slate-600">
                     <span>@{p.username}</span>
-                    <span className="font-mono text-white bg-[#161A24] px-1.5 py-0.5 rounded text-[11px]">
+                    <span className="font-mono text-slate-900 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[11px]">
                       {p.gameId}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="bg-[#10141F] border border-[#242C3D] p-3 rounded text-xs space-y-1.5">
-                <div className="font-bold text-white border-b border-[#242C3D] pb-1 font-mono">
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs space-y-1.5">
+                <div className="font-bold text-slate-900 border-b border-slate-200 pb-1 font-mono">
                   {match.teamB.name}
                 </div>
                 {match.teamB.roster.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-[#94A3B8]">
+                  <div key={i} className="flex items-center justify-between text-slate-600">
                     <span>@{p.username}</span>
-                    <span className="font-mono text-white bg-[#161A24] px-1.5 py-0.5 rounded text-[11px]">
+                    <span className="font-mono text-slate-900 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[11px]">
                       {p.gameId}
                     </span>
                   </div>
@@ -198,13 +198,13 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="p-4 bg-[#10141F] border-t border-[#242C3D] flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {!isCheckedIn ? (
               <button
                 onClick={handleCheckIn}
                 disabled={isCheckingIn}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#242C3D] text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5 transition-all"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
                 {isCheckingIn ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -214,8 +214,8 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
                 <span>{isCheckingIn ? "Checking In..." : "Captain Check-In (10m left)"}</span>
               </button>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800 px-3 py-1.5 rounded">
-                <CheckCircle className="w-4 h-4" /> Ready for Match
+              <span className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-800 font-bold bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded">
+                <CheckCircle className="w-4 h-4 text-emerald-600" /> Ready for Match
               </span>
             )}
           </div>
@@ -226,13 +226,13 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
                 onClose();
                 onSubmitEvidence(match);
               }}
-              className="px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5"
+              className="px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs rounded uppercase tracking-wider font-mono flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               Submit Score & Evidence
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] hover:text-white rounded text-xs font-mono uppercase"
+              className="px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:text-slate-900 rounded text-xs font-mono uppercase cursor-pointer"
             >
               Close
             </button>

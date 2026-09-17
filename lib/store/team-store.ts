@@ -111,7 +111,7 @@ export function useTeamStore(gameSlug?: string) {
     } catch {
       setTimeout(() => setTeams(INITIAL_TEAMS), 0);
     }
-    setIsLoaded(true);
+    setTimeout(() => setIsLoaded(true), 0);
   }, []);
 
   const saveTeams = (newTeams: Team[]) => {

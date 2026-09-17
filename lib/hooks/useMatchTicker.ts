@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface TickerEvent {
+  id?: string;
   event: "CONNECTED" | "MATCH_SCORE_SUBMITTED" | "MATCH_VERIFIED" | string;
   match_id?: string;
   tournament_id?: string;
@@ -8,6 +9,7 @@ export interface TickerEvent {
   winner_id?: string;
   message?: string;
   timestamp: string;
+  data?: unknown;
 }
 
 function getWsUrl(): string {
@@ -23,6 +25,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -34,24 +37,26 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
 
       ws.onopen = () => {
         setIsConnected(true);
-        // Start keepalive ping every 25 seconds
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+
+        // Keepalive ping every 25s
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send("ping");
+            ws.send(JSON.stringify({ type: "ping" }));
           }
         }, 25000);
       };
 
-      ws.onmessage = (msgEvent) => {
+      ws.onmessage = (event) => {
         try {
-          if (msgEvent.data === "pong") return;
-          const parsed = JSON.parse(msgEvent.data);
+          const data = JSON.parse(event.data);
           const tickerItem: TickerEvent = {
-            ...parsed,
+            id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            event: data.event || "UNKNOWN",
             timestamp: new Date().toLocaleTimeString(),
+            data: data.data || data,
           };
-
-          setEvents((prev) => [tickerItem, ...prev].slice(0, 10));
+          setEvents((prev) => [tickerItem, ...prev.slice(0, 19)]);
           if (onEvent) {
             onEvent(tickerItem);
           }
@@ -65,7 +70,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         // Reconnect with 5 second delay
         reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
+          connectRef.current();
         }, 5000);
       };
 
@@ -78,6 +83,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
   }, [onEvent]);
 
   useEffect(() => {
+    connectRef.current = connect;
     connect();
 
     return () => {

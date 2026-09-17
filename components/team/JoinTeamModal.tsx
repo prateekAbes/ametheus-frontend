@@ -138,7 +138,7 @@ export default function JoinTeamModal({
       setMatchedTeam(updatedTeam);
       setJoinedSuccess(true);
       onTeamJoined(updatedTeam);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Backend API join failed, using local fallback:", err);
       const fallbackTeam: Team = {
         ...matchedTeam,
@@ -165,25 +165,25 @@ export default function JoinTeamModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-[#10131B] text-[#F8FAFC] border border-[#242C3D] rounded-xl shadow-2xl p-6 flex flex-col">
+      <div className="relative w-full max-w-lg bg-white text-[#0B1C30] border border-slate-200 rounded-xl shadow-2xl p-6 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#242C3D] pb-4 mb-4">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded bg-[#F59E0B]/10 border border-[#F59E0B] flex items-center justify-center text-[#F59E0B]">
               <Users className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-headline font-bold text-lg text-white">
+              <h3 className="font-headline font-bold text-lg text-slate-900">
                 Join {gameName} Squad
               </h3>
-              <span className="font-mono text-[10px] text-[#94A3B8] uppercase">
+              <span className="font-mono text-[10px] text-slate-500 uppercase">
                 6-Character Invite Code • ₹0 Fee
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-[#94A3B8] hover:text-white hover:bg-[#161A24] transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,20 +192,20 @@ export default function JoinTeamModal({
         {joinedSuccess && matchedTeam ? (
           /* Success State */
           <div className="flex flex-col items-center text-center py-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500 flex items-center justify-center text-emerald-500 mb-4">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-300 flex items-center justify-center text-emerald-600 mb-4 shadow-sm">
               <Check className="w-8 h-8" />
             </div>
 
-            <h4 className="font-headline font-bold text-xl text-white mb-1">
+            <h4 className="font-headline font-bold text-xl text-slate-900 mb-1">
               Joined {matchedTeam.name}!
             </h4>
-            <p className="text-xs text-[#94A3B8] max-w-sm mb-6">
-              You are now locked into the squad roster. Your verified Riot ID has been bound for upcoming tournament brackets.
+            <p className="text-xs text-slate-600 max-w-sm mb-6 leading-relaxed">
+              You are now locked into the squad roster. Your verified player ID has been bound for upcoming tournament brackets.
             </p>
 
             <button
               onClick={onClose}
-              className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors"
+              className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-sm cursor-pointer"
             >
               Continue to Game Hub
             </button>
@@ -214,14 +214,14 @@ export default function JoinTeamModal({
           /* Input & Preview State */
           <form onSubmit={handleJoin} className="flex flex-col gap-4">
             {error && (
-              <div className="p-3 bg-red-950/40 border border-red-800/80 rounded text-red-400 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
                 <span>{error}</span>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1.5 font-semibold">
+              <label className="block text-xs font-mono uppercase text-slate-700 mb-1.5 font-semibold">
                 Enter 6-Character Squad Code
               </label>
               <input
@@ -230,72 +230,72 @@ export default function JoinTeamModal({
                 value={code}
                 onChange={handleCodeChange}
                 placeholder="e.g. SR7X4K"
-                className="w-full px-4 py-3 bg-[#0B0E16] border border-[#242C3D] rounded text-xl text-center text-[#E56A10] font-mono font-bold tracking-widest placeholder-[#64748B] focus:outline-none focus:border-[#E56A10]"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg text-xl text-center text-[#E56A10] font-mono font-bold tracking-widest placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#E56A10] transition-colors shadow-xs"
                 required
               />
-              <span className="text-[11px] text-[#94A3B8] mt-1 block">
+              <span className="text-[11px] text-slate-500 mt-1 block">
                 Ask your squad captain for their 6-character team invite code.
               </span>
             </div>
 
             {/* Live Squad Preview Card */}
             {matchedTeam && (
-              <div className="bg-[#161A24] border border-[#242C3D] rounded-lg p-4 flex flex-col gap-3">
+              <div className="bg-[#EFF4FF] border border-[#CBD5E1] rounded-lg p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded bg-[#0B0E16] border border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#F59E0B]">
+                    <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-sm text-[#0B1C30] shadow-xs">
                       {matchedTeam.tag}
                     </div>
                     <div>
-                      <h4 className="font-headline font-bold text-sm text-white">
+                      <h4 className="font-headline font-bold text-sm text-slate-900">
                         {matchedTeam.name}
                       </h4>
-                      <span className="text-[11px] text-[#94A3B8] font-mono">
+                      <span className="text-[11px] text-slate-500 font-mono">
                         Captain: @{matchedTeam.captainUsername}
                       </span>
                     </div>
                   </div>
-                  <div className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500 text-emerald-400 text-xs font-bold rounded font-mono">
-                    ₹0 JOIN FEE
+                  <div className="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-700 text-xs font-bold rounded font-mono shadow-xs">
+                    ₹0 FREE JOIN
                   </div>
                 </div>
 
-                <div className="border-t border-[#242C3D] pt-3 flex items-center justify-between text-xs">
-                  <span className="text-[#94A3B8]">Roster Fill:</span>
-                  <span className="font-mono font-bold text-white">
+                <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-xs">
+                  <span className="text-slate-600">Roster Fill:</span>
+                  <span className="font-mono font-bold text-slate-900">
                     {matchedTeam.members.length} / {matchedTeam.maxMembers} Players
                   </span>
                 </div>
 
                 {/* In-Game ID prompt */}
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#CBD5E1] mb-1.5 font-semibold">
-                    Your In-Game / Riot ID
+                  <label className="block text-xs font-mono uppercase text-slate-700 mb-1.5 font-semibold">
+                    Your In-Game Handle / Player ID
                   </label>
                   <input
                     type="text"
                     value={inGameId}
                     onChange={(e) => setInGameId(e.target.value)}
                     placeholder="e.g. shadow#IND"
-                    className="w-full px-3 py-2 bg-[#0B0E16] border border-[#242C3D] rounded text-sm text-white placeholder-[#64748B] font-mono focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-hidden focus:border-[#E56A10] transition-colors"
                     required
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-transparent text-[#94A3B8] hover:text-white text-xs font-bold uppercase tracking-wider rounded"
+                className="px-4 py-2 bg-transparent text-slate-600 hover:text-slate-900 text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!matchedTeam || isJoining}
-                className="px-5 py-2.5 bg-[#E56A10] disabled:bg-[#242C3D] disabled:text-[#64748B] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 bg-[#E56A10] disabled:bg-slate-300 disabled:text-slate-500 hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 {isJoining && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>{isJoining ? "Joining Squad..." : "Join Squad (₹0)"}</span>
