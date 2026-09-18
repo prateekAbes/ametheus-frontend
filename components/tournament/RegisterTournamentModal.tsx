@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { createEscrowOrder, verifyEscrowPayment } from "@/lib/api/payments";
 import { Team } from "@/types";
-import { X, Shield, Check, AlertCircle, CreditCard, Lock, Sparkles, Gamepad2 } from "lucide-react";
+import { X, Shield, Check, AlertCircle, CreditCard, Lock, Sparkles, Gamepad2, UserCheck } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 interface TournamentModalData {
   id: string;
@@ -13,6 +15,8 @@ interface TournamentModalData {
   gameName?: string;
   entryFee?: string;
   entryFeeNum?: number;
+  minTeamSize?: number;
+  min_team_size?: number;
 }
 
 interface Props {
@@ -23,8 +27,6 @@ interface Props {
   onRegistrationSuccess: () => void;
 }
 
-import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
-
 export default function RegisterTournamentModal({
   isOpen,
   onClose,
@@ -32,6 +34,7 @@ export default function RegisterTournamentModal({
   userTeams,
   onRegistrationSuccess,
 }: Props) {
+  const { user } = useUser();
   const [selectedTeamId, setSelectedTeamId] = useState(
     userTeams.length > 0 ? userTeams[0].id : ""
   );
@@ -43,9 +46,11 @@ export default function RegisterTournamentModal({
 
   if (!isOpen) return null;
 
-  const selectedTeam = userTeams.find((t) => t.id === selectedTeamId);
   const gameSlug = (tournament.gameSlug || tournament.game_slug || "").toLowerCase();
   const rosterReq = getGameRosterRequirement(gameSlug || tournament.title);
+  const isSolo = !rosterReq.requiresTeam || rosterReq.min === 1 || tournament.minTeamSize === 1 || tournament.min_team_size === 1;
+
+  const selectedTeam = isSolo ? null : userTeams.find((t) => t.id === selectedTeamId);
 
   // Dynamic game identifier labels
   let gameIdLabel = "In-Game Gamer Tag / Handle";
@@ -71,20 +76,22 @@ export default function RegisterTournamentModal({
   }
 
   const handleProceedToCheckout = () => {
-    if (!selectedTeam) {
-      setError("Please select a squad to register.");
-      return;
-    }
-    if (selectedTeam.members.length < rosterReq.min) {
-      setError(`Your squad requires ${rosterReq.min} player${rosterReq.min > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length} players).`);
-      return;
+    if (!isSolo) {
+      if (!selectedTeam) {
+        setError("Please select a squad to register.");
+        return;
+      }
+      if (selectedTeam.members.length < rosterReq.min) {
+        setError(`Your squad requires ${rosterReq.min} player${rosterReq.min > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length} players).`);
+        return;
+      }
     }
     if (!inGameId.trim()) {
       setError(`Please provide your ${gameIdLabel.split("(")[0].trim()} to participate.`);
       return;
     }
     if (!acceptedRules) {
-      setError("You must accept the tournament fair play rules and zero-substitute policy.");
+      setError("You must accept the tournament fair play rules.");
       return;
     }
 
@@ -92,7 +99,7 @@ export default function RegisterTournamentModal({
     if (tournament.entryFeeNum === 0) {
       // Free tournament
       setIsProcessing(true);
-      createEscrowOrder(tournament.id, selectedTeam.id)
+      createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id)
         .then(() => {
           setStep("SUCCESS");
           onRegistrationSuccess();
@@ -107,7 +114,7 @@ export default function RegisterTournamentModal({
   };
 
   const handleSandboxPayment = async (simulateFailure = false) => {
-    if (!selectedTeam) return;
+    if (!isSolo && !selectedTeam) return;
     setIsProcessing(true);
     setError("");
 
@@ -116,7 +123,7 @@ export default function RegisterTournamentModal({
         throw new Error("Sandbox payment simulated failure: Card declined / Insufficient test funds.");
       }
 
-      const order = await createEscrowOrder(tournament.id, selectedTeam.id);
+      const order = await createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id);
       await verifyEscrowPayment({
         razorpay_order_id: order.order_id || `order_${Date.now()}`,
         razorpay_payment_id: `pay_sandbox_${Date.now()}`,
@@ -133,12 +140,12 @@ export default function RegisterTournamentModal({
   };
 
   const handleRazorpayCheckout = async () => {
-    if (!selectedTeam) return;
+    if (!isSolo && !selectedTeam) return;
     setIsProcessing(true);
     setError("");
 
     try {
-      const order = await createEscrowOrder(tournament.id, selectedTeam.id);
+      const order = await createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id);
 
       const rzpWindow = typeof window !== "undefined" ? (window as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { on: (evt: string, cb: (res: { error?: { description?: string } }) => void) => void; open: () => void } }) : {};
       const hasRazorpayScript = !!rzpWindow.Razorpay;
@@ -174,7 +181,7 @@ export default function RegisterTournamentModal({
             }
           },
           prefill: {
-            name: selectedTeam.name,
+            name: isSolo ? (user?.fullName || user?.username || "Gamer") : selectedTeam?.name,
           },
           theme: {
             color: "#E56A10",
@@ -239,69 +246,100 @@ export default function RegisterTournamentModal({
               </div>
             )}
 
-            {/* Squad Selection */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-mono uppercase text-slate-700 font-semibold">
-                  1. Select Your Squad / Team
-                </label>
-                <span className="text-[11px] font-mono font-bold text-[#E56A10] bg-[#E56A10]/10 border border-[#E56A10]/30 px-2 py-0.5 rounded">
-                  {rosterReq.label}
-                </span>
+            {/* Squad Selection (or Solo Contender Card) */}
+            {isSolo ? (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase text-slate-800 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                    1. Solo Athlete Contender
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
+                    SOLO (1v1) FORMAT
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 border border-slate-300 shrink-0">
+                    <img
+                      src={user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">
+                      {user?.fullName || user?.username || "Individual Athlete"}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      Competing solo • No squad or teammates required
+                    </span>
+                  </div>
+                </div>
               </div>
-              {userTeams.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {userTeams.map((team) => {
-                    const isEligible = team.members.length >= rosterReq.min;
-                    return (
-                      <label
-                        key={team.id}
-                        className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-colors ${
-                          selectedTeamId === team.id
-                            ? "bg-[#EFF4FF] border-[#E56A10]"
-                            : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="team_select"
-                            value={team.id}
-                            checked={selectedTeamId === team.id}
-                            onChange={() => setSelectedTeamId(team.id)}
-                            className="text-[#E56A10] focus:ring-[#E56A10]"
-                          />
-                          <div>
-                            <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                              <span>{team.name} [{team.tag}]</span>
-                              {isEligible ? (
-                                <span className="text-[9px] text-emerald-700 bg-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded">
-                                  Eligible
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-rose-700 bg-rose-100 font-mono font-bold px-1.5 py-0.2 rounded">
-                                  {rosterReq.min - team.members.length} More Needed
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-mono">
-                              Captain: @{team.captainUsername} • {team.members.length}/{rosterReq.max} Players
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-mono uppercase text-slate-700 font-semibold">
+                    1. Select Your Squad / Team
+                  </label>
+                  <span className="text-[11px] font-mono font-bold text-[#E56A10] bg-[#E56A10]/10 border border-[#E56A10]/30 px-2 py-0.5 rounded">
+                    {rosterReq.label}
+                  </span>
+                </div>
+                {userTeams.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {userTeams.map((team) => {
+                      const isEligible = team.members.length >= rosterReq.min;
+                      return (
+                        <label
+                          key={team.id}
+                          className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer transition-colors ${
+                            selectedTeamId === team.id
+                              ? "bg-[#EFF4FF] border-[#E56A10]"
+                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="team_select"
+                              value={team.id}
+                              checked={selectedTeamId === team.id}
+                              onChange={() => setSelectedTeamId(team.id)}
+                              className="text-[#E56A10] focus:ring-[#E56A10]"
+                            />
+                            <div>
+                              <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                <span>{team.name} [{team.tag}]</span>
+                                {isEligible ? (
+                                  <span className="text-[9px] text-emerald-700 bg-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded">
+                                    Eligible
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] text-rose-700 bg-rose-100 font-mono font-bold px-1.5 py-0.2 rounded">
+                                    {rosterReq.min - team.members.length} More Needed
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-mono">
+                                Captain: @{team.captainUsername} • {team.members.length}/{rosterReq.max} Players
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <span className="text-xs font-mono text-[#E56A10] font-bold">
-                          {team.inviteCode}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
-                  No active squads found for this title. Please create a squad on the game hub first.
-                </div>
-              )}
-            </div>
+                          <span className="text-xs font-mono text-[#E56A10] font-bold">
+                            {team.inviteCode}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
+                    No active squads found for this title. Please create a squad on the game hub first.
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* In-Game ID Input (Player Credentials required per prompt) */}
             <div className="space-y-1.5 pt-1">
@@ -326,7 +364,7 @@ export default function RegisterTournamentModal({
             <div className="bg-[#EFF4FF] border border-[#CBD5E1] rounded-lg p-3.5 flex items-center justify-between">
               <div>
                 <span className="text-[10px] text-slate-500 uppercase font-mono block">
-                  Team Entry Pass (Covers Entire Squad)
+                  {isSolo ? "Solo Contender Pass (1 Player)" : "Team Entry Pass (Covers Entire Squad)"}
                 </span>
                 <span className="text-xl font-bold font-headline text-slate-900">
                   {tournament.entryFee}
@@ -346,7 +384,7 @@ export default function RegisterTournamentModal({
                 className="mt-0.5 text-[#E56A10] focus:ring-[#E56A10] rounded"
               />
               <span>
-                I agree to tournament regulations: fixed roster, anti-cheat validation, and mandatory match lobby check-in 15 mins prior to start.
+                I agree to tournament regulations: fair play rules, anti-cheat validation, and mandatory match lobby check-in 15 mins prior to start.
               </span>
             </label>
 
@@ -384,8 +422,10 @@ export default function RegisterTournamentModal({
                 <span className="font-bold text-slate-900">{tournament.title}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Registering Squad:</span>
-                <span className="font-bold text-slate-900">{selectedTeam?.name}</span>
+                <span className="text-slate-500">{isSolo ? "Contender:" : "Registering Squad:"}</span>
+                <span className="font-bold text-slate-900">
+                  {isSolo ? (user?.fullName || user?.username || "Solo Athlete") : selectedTeam?.name}
+                </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">Player In-Game Handle:</span>
@@ -477,7 +517,11 @@ export default function RegisterTournamentModal({
               Registration Confirmed!
             </h4>
             <p className="text-xs text-slate-600 max-w-sm mb-6 leading-relaxed">
-              Your squad <strong className="text-slate-900">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.
+              {isSolo ? (
+                <>You have been confirmed as a solo contender for <strong className="text-slate-900">{tournament.title}</strong> with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+              ) : (
+                <>Your squad <strong className="text-slate-900">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+              )}
             </p>
 
             <button

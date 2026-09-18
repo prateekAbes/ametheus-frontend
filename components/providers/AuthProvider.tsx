@@ -35,9 +35,25 @@ function TokenAndProfileSync() {
         username,
         display_name: displayName,
         avatar_url: avatarUrl,
-      }).catch((err) => {
-        console.warn("[AMETHEUS] Background user sync notice:", err);
-      });
+      })
+        .then((synced) => {
+          try {
+            localStorage.setItem("ametheus_user_profile", JSON.stringify(synced));
+            localStorage.setItem(
+              "ametheus_gamer_identity",
+              JSON.stringify({
+                gamerTag: synced.display_name || displayName,
+                avatarUrl: synced.avatar_url || avatarUrl,
+                clanTag: "AMX",
+                isNew: false,
+              })
+            );
+            window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: synced }));
+          } catch {}
+        })
+        .catch((err) => {
+          console.warn("[AMETHEUS] Background user sync notice:", err);
+        });
     }
   }, [isSignedIn, user, getToken]);
 

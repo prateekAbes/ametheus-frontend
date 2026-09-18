@@ -20,6 +20,7 @@ export interface CreateTournamentPayload {
   rules?: string[];
   schedule?: Array<{ stage: string; time: string; details?: string }>;
   prizes?: Array<{ place: string; prize: string; amount?: number }>;
+  status?: string;
 }
 
 export interface UpdateTournamentPayload {

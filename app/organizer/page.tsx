@@ -6,6 +6,7 @@ import {
   Trophy,
   Plus,
   Layers,
+  User,
   Users,
   Shield,
   Clock,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/api/organizer";
 import { getGames, Game } from "@/lib/api/games";
 import { Tournament } from "@/lib/api/tournaments";
+import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 export default function OrganizerCockpitPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -43,6 +45,8 @@ export default function OrganizerCockpitPage() {
     roster_lock_time: "Saturday, 7:30 PM IST",
     server_region: "AWS Mumbai (ap-south-1)",
     max_teams: 16,
+    min_team_size: 5,
+    max_team_size: 5,
     rank_requirement: "Open to All Ranks",
     format: "Single Elimination Bracket",
     description: "Sanctioned competitive esports tournament. Strict anti-cheat verification and automated brackets.",
@@ -59,7 +63,16 @@ export default function OrganizerCockpitPage() {
       setTournaments(tournData);
       setGames(gamesData);
       if (gamesData.length > 0 && !formData.game_id) {
-        setFormData((prev) => ({ ...prev, game_id: gamesData[0].id }));
+        const firstGame = gamesData[0];
+        const req = getGameRosterRequirement(firstGame.tag || firstGame.name || firstGame.id);
+        const isSolo = req.min === 1 && req.max === 1;
+        setFormData((prev) => ({
+          ...prev,
+          game_id: firstGame.id,
+          min_team_size: isSolo ? 1 : req.min,
+          max_team_size: isSolo ? 1 : req.max,
+          format: isSolo ? "1v1 Solo Championship" : prev.format,
+        }));
       }
     } finally {
       setLoading(false);
@@ -165,7 +178,19 @@ export default function OrganizerCockpitPage() {
                 <label className="text-slate-700 uppercase font-semibold">Discipline / Game Title</label>
                 <select
                   value={formData.game_id}
-                  onChange={(e) => setFormData({ ...formData, game_id: e.target.value })}
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    const selectedGame = games.find((g) => g.id === selectedVal || g.tag === selectedVal);
+                    const req = getGameRosterRequirement(selectedGame?.tag || selectedGame?.name || selectedVal);
+                    const isSolo = req.min === 1 && req.max === 1;
+                    setFormData((prev) => ({
+                      ...prev,
+                      game_id: selectedVal,
+                      min_team_size: isSolo ? 1 : req.min,
+                      max_team_size: isSolo ? 1 : req.max,
+                      format: isSolo ? "1v1 Solo Championship" : (prev.format?.includes("Solo") ? "Single Elimination Bracket" : prev.format),
+                    }));
+                  }}
                   className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
                   required
                 >
@@ -189,6 +214,93 @@ export default function OrganizerCockpitPage() {
                 />
               </div>
 
+              {/* Competition Format Selector: Solo vs Squad */}
+              <div className="md:col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
+                    Registration &amp; Competition Format *
+                  </label>
+                  <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
+                    Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1
+                      ? "bg-amber-100 text-amber-900 border border-amber-300"
+                      : "bg-blue-100 text-blue-900 border border-blue-300"
+                  }`}>
+                    {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1
+                      ? "SOLO CONTENDER (1v1)"
+                      : `SQUAD / CLAN (${formData.min_team_size}v${formData.max_team_size})`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        min_team_size: 1,
+                        max_team_size: 1,
+                        format: prev.format?.includes("Bracket") ? "1v1 Solo Championship" : prev.format,
+                      }));
+                    }}
+                    className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                      Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1
+                        ? "bg-amber-500/10 border-[#E56A10] ring-1 ring-[#E56A10]"
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${
+                      Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1
+                        ? "bg-[#E56A10] text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 font-mono">Solo Contender (1v1 Individual)</div>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                        For 1v1 titles (Chess, FIFA). Players register directly with their in-game handle without a team.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selectedGame = games.find((g) => g.id === formData.game_id || g.tag === formData.game_id);
+                      const req = getGameRosterRequirement(selectedGame?.tag || selectedGame?.name || formData.game_id || "");
+                      const fallbackMin = req.min > 1 ? req.min : 5;
+                      const fallbackMax = req.max > 1 ? req.max : 5;
+                      setFormData((prev) => ({
+                        ...prev,
+                        min_team_size: fallbackMin,
+                        max_team_size: fallbackMax,
+                        format: prev.format?.includes("Solo") ? "Single Elimination Bracket" : prev.format,
+                      }));
+                    }}
+                    className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                      Number(formData.min_team_size) > 1 || Number(formData.max_team_size) > 1
+                        ? "bg-blue-500/10 border-blue-600 ring-1 ring-blue-600"
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${
+                      Number(formData.min_team_size) > 1 || Number(formData.max_team_size) > 1
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 font-mono">Team / Squad Tournament</div>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                        For squad games (Valorant 5v5, BGMI 4v4). Captain registers squad and invites teammates.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-slate-700 uppercase font-semibold">Prize Pool (INR ₹)</label>
                 <input
@@ -201,7 +313,9 @@ export default function OrganizerCockpitPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-slate-700 uppercase font-semibold">Entry Fee (INR ₹ / Team)</label>
+                <label className="text-slate-700 uppercase font-semibold">
+                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Entry Fee (INR ₹ / Player)" : "Entry Fee (INR ₹ / Team)"}
+                </label>
                 <input
                   type="number"
                   value={formData.entry_fee_inr}
@@ -223,7 +337,9 @@ export default function OrganizerCockpitPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-slate-700 uppercase font-semibold">Squad Lock Time</label>
+                <label className="text-slate-700 uppercase font-semibold">
+                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Registration Lock Time" : "Squad Lock Time"}
+                </label>
                 <input
                   type="text"
                   value={formData.roster_lock_time}
@@ -231,6 +347,48 @@ export default function OrganizerCockpitPage() {
                   className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
                   required
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-700 uppercase font-semibold">
+                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Max Contenders" : "Max Squads"}
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={128}
+                  value={formData.max_teams}
+                  onChange={(e) => setFormData({ ...formData, max_teams: Number(e.target.value) || 16 })}
+                  className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-slate-700 uppercase font-semibold">Min Team Size</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formData.min_team_size}
+                    onChange={(e) => setFormData({ ...formData, min_team_size: Number(e.target.value) || 1 })}
+                    className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-700 uppercase font-semibold">Max Team Size</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formData.max_team_size}
+                    onChange={(e) => setFormData({ ...formData, max_team_size: Number(e.target.value) || 5 })}
+                    className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-1 md:col-span-2">

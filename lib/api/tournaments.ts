@@ -17,6 +17,10 @@ export interface Tournament {
   server_region: string;
   registered_teams: number;
   max_teams: number;
+  min_team_size?: number;
+  max_team_size?: number;
+  minTeamSize?: number;
+  maxTeamSize?: number;
   rank_requirement: string;
   format: string;
   banner_url: string;
@@ -47,6 +51,8 @@ export interface NormalizedTournament {
   serverRegion: string;
   registeredTeams: number;
   maxTeams: number;
+  minTeamSize: number;
+  maxTeamSize: number;
   rankRequirement: string;
   format: string;
   bannerUrl: string;
@@ -54,7 +60,7 @@ export interface NormalizedTournament {
   description: string;
   rules: string[];
   schedule: Array<{ stage: string; time: string; details?: string }>;
-  prizes: Array<{ place?: string; rank?: string; badge?: string; share?: string; amount: string; distribution?: string }>;
+  prizes: Array<{ place?: string; rank: string; badge: string; share: string; amount: string; distribution?: string }>;
   bracketRounds: any[];
   registeredRosters: Array<{ tag: string; name: string; captain: string; members: string[] }>;
 }
@@ -71,15 +77,72 @@ export function normalizeTournament(t: any): NormalizedTournament {
       ? "DRAFT MODE"
       : t.statusLabel || t.status || "UPCOMING";
 
+  const rawRules = t.rules || [];
+  const rules = Array.isArray(rawRules)
+    ? rawRules
+    : typeof rawRules === "string"
+    ? [rawRules]
+    : ["Official platform tournament regulations apply"];
+
+  const rawSchedule = t.schedule || [];
+  const schedule = Array.isArray(rawSchedule) && rawSchedule.length > 0
+    ? rawSchedule
+    : [
+        { stage: "Check-in Phase", time: t.roster_lock_time || t.rosterLockTime || "TBD", details: "Lobby check-in & ID verification" },
+        { stage: "Opening Round", time: t.starts_at || t.startsAt || "TBD", details: "Single Elimination progression" },
+      ];
+
+  const rawPrizes = t.prizes || [];
+  const prizePoolNum = t.prize_pool_inr !== undefined ? Number(t.prize_pool_inr) : (t.prizePoolNum ?? 50000);
+  const prizes = Array.isArray(rawPrizes) && rawPrizes.length > 0
+    ? rawPrizes.map((p: any, idx: number) => ({
+        rank: p.rank || p.place || (idx === 0 ? "1st Place" : idx === 1 ? "2nd Place" : `${idx + 1}th Place`),
+        amount: p.amount || p.prize || `₹${p.prize_pool || "0"}`,
+        share: p.share || (idx === 0 ? "60%" : idx === 1 ? "30%" : "10%"),
+        badge: p.badge || (idx === 0 ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-slate-100 text-slate-800 border border-slate-200"),
+      }))
+    : [
+        { rank: "1st Place", amount: `₹${Math.round(prizePoolNum * 0.6).toLocaleString()}`, share: "60%", badge: "bg-amber-100 text-amber-900 border border-amber-300" },
+        { rank: "2nd Place", amount: `₹${Math.round(prizePoolNum * 0.3).toLocaleString()}`, share: "30%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
+        { rank: "3rd Place", amount: `₹${Math.round(prizePoolNum * 0.1).toLocaleString()}`, share: "10%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
+      ];
+
+  const rawRounds = Array.isArray(t.bracket_rounds) ? t.bracket_rounds : Array.isArray(t.bracketRounds) ? t.bracketRounds : [];
+  const bracketRounds = rawRounds.map((round: any, rIdx: number) => ({
+    name: round.name || round.round_name || `Round ${rIdx + 1}`,
+    matches: Array.isArray(round.matches)
+      ? round.matches.map((m: any, mIdx: number) => ({
+          id: m.id || `match_${rIdx}_${mIdx}`,
+          matchNumber: m.matchNumber ?? m.match_number ?? (mIdx + 1),
+          scheduledTime: m.scheduledTime || m.scheduled_time || "TBD",
+          status: m.status || "UPCOMING",
+          teamA: {
+            name: m.teamA?.name || m.team_a_name || "TBD",
+            tag: m.teamA?.tag || m.team_a_tag || "TBD",
+            score: m.teamA?.score ?? m.team_a_score ?? "-",
+            isWinner: Boolean(m.teamA?.isWinner || m.team_a_winner),
+            seed: m.teamA?.seed ?? m.team_a_seed,
+          },
+          teamB: {
+            name: m.teamB?.name || m.team_b_name || "TBD",
+            tag: m.teamB?.tag || m.team_b_tag || "TBD",
+            score: m.teamB?.score ?? m.team_b_score ?? "-",
+            isWinner: Boolean(m.teamB?.isWinner || m.team_b_winner),
+            seed: m.teamB?.seed ?? m.team_b_seed,
+          },
+        }))
+      : [],
+  }));
+
   return {
-    id: t.id || t.slug,
-    slug: t.slug,
+    id: t.id || t.slug || "tournament",
+    slug: t.slug || t.id || "tournament",
     organizerId: t.organizer_id || t.organizerId,
-    title: t.title,
+    title: t.title || "Championship Tournament",
     gameSlug: t.game_slug || t.gameSlug || "valorant",
     gameName: t.game_name || t.gameName || "Valorant",
-    prizePool: t.prize_pool || t.prizePool || "₹50,000",
-    prizePoolNum: t.prize_pool_inr !== undefined ? Number(t.prize_pool_inr) : (t.prizePoolNum ?? 50000),
+    prizePool: t.prize_pool || t.prizePool || `₹${prizePoolNum.toLocaleString()}`,
+    prizePoolNum,
     entryFee: t.entry_fee || t.entryFee || "Free Entry",
     entryFeeNum: t.entry_fee_inr !== undefined ? Number(t.entry_fee_inr) : (t.entryFeeNum ?? 0),
     status: t.status || "REGISTRATION_OPEN",
@@ -89,15 +152,17 @@ export function normalizeTournament(t: any): NormalizedTournament {
     serverRegion: t.server_region || t.serverRegion || "AWS Mumbai (ap-south-1)",
     registeredTeams: t.registered_teams !== undefined ? Number(t.registered_teams) : (t.registeredTeams ?? 0),
     maxTeams: t.max_teams !== undefined ? Number(t.max_teams) : (t.maxTeams ?? 16),
+    minTeamSize: t.min_team_size !== undefined ? Number(t.min_team_size) : (t.minTeamSize ?? 1),
+    maxTeamSize: t.max_team_size !== undefined ? Number(t.max_team_size) : (t.maxTeamSize ?? 5),
     rankRequirement: t.rank_requirement || t.rankRequirement || "Open to All Ranks",
     format: t.format || "Single Elimination Bracket",
     bannerUrl: t.banner_url || t.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
     badgeColor: t.badge_color || t.badgeColor || "#E56A10",
     description: t.description || "Official Sanctioned Tournament",
-    rules: t.rules || [],
-    schedule: t.schedule || [],
-    prizes: t.prizes || [],
-    bracketRounds: t.bracket_rounds || t.bracketRounds || [],
+    rules,
+    schedule,
+    prizes,
+    bracketRounds,
     registeredRosters: t.registered_rosters || t.registeredRosters || [],
   };
 }
@@ -119,10 +184,10 @@ export async function getTournamentBySlug(slug: string): Promise<Tournament> {
 
 export async function registerForTournament(
   tournamentId: string,
-  teamId: string
+  teamId?: string
 ): Promise<{ status: string; message: string; order_id?: string; entry_fee_inr?: number }> {
   return apiClient(`/tournaments/${tournamentId}/register`, {
     method: "POST",
-    body: JSON.stringify({ team_id: teamId }),
+    body: JSON.stringify(teamId ? { team_id: teamId } : {}),
   });
 }

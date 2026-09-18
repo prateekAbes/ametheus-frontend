@@ -64,68 +64,68 @@ export default function BracketTree({ rounds, onSelectMatch }: Props) {
                     {/* Team A */}
                     <div
                       className={`px-3 py-2 flex items-center justify-between border-b border-[#F1F3F5] ${
-                        match.teamA.isWinner
+                        match.teamA?.isWinner
                           ? "bg-emerald-50/40 font-bold"
-                          : match.teamB.isWinner
+                          : match.teamB?.isWinner
                           ? "text-[#64748B]"
                           : ""
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        {match.teamA.seed && (
+                        {match.teamA?.seed && (
                           <span className="font-mono text-[10px] text-[#94A3B8]">
                             #{match.teamA.seed}
                           </span>
                         )}
                         <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
-                          {match.teamA.name}
+                          {match.teamA?.name || "TBD"}
                         </span>
-                        {match.teamA.isWinner && (
+                        {match.teamA?.isWinner && (
                           <Trophy className="w-3 h-3 text-amber-500 shrink-0 inline" />
                         )}
                       </div>
                       <span
                         className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
-                          match.teamA.isWinner
+                          match.teamA?.isWinner
                             ? "bg-emerald-100 text-emerald-800"
                             : "bg-[#F1F3F5] text-[#0F172A]"
                         }`}
                       >
-                        {match.teamA.score ?? "-"}
+                        {match.teamA?.score ?? "-"}
                       </span>
                     </div>
 
                     {/* Team B */}
                     <div
                       className={`px-3 py-2 flex items-center justify-between ${
-                        match.teamB.isWinner
+                        match.teamB?.isWinner
                           ? "bg-emerald-50/40 font-bold"
-                          : match.teamA.isWinner
+                          : match.teamA?.isWinner
                           ? "text-[#64748B]"
                           : ""
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        {match.teamB.seed && (
+                        {match.teamB?.seed && (
                           <span className="font-mono text-[10px] text-[#94A3B8]">
                             #{match.teamB.seed}
                           </span>
                         )}
                         <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
-                          {match.teamB.name}
+                          {match.teamB?.name || "TBD"}
                         </span>
-                        {match.teamB.isWinner && (
+                        {match.teamB?.isWinner && (
                           <Trophy className="w-3 h-3 text-amber-500 shrink-0 inline" />
                         )}
                       </div>
                       <span
                         className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
-                          match.teamB.isWinner
+                          match.teamB?.isWinner
                             ? "bg-emerald-100 text-emerald-800"
                             : "bg-[#F1F3F5] text-[#0F172A]"
                         }`}
                       >
-                        {match.teamB.score ?? "-"}
+                        {match.teamB?.score ?? "-"}
                       </span>
                     </div>
 

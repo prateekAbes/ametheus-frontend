@@ -82,10 +82,10 @@ function TournamentsContent() {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
-      t.title.toLowerCase().includes(q) ||
-      t.gameName.toLowerCase().includes(q) ||
-      t.gameSlug.toLowerCase().includes(q) ||
-      t.serverRegion.toLowerCase().includes(q) ||
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      (t.gameName && t.gameName.toLowerCase().includes(q)) ||
+      (t.gameSlug && t.gameSlug.toLowerCase().includes(q)) ||
+      (t.serverRegion && t.serverRegion.toLowerCase().includes(q)) ||
       (t.description && t.description.toLowerCase().includes(q));
     return matchesGame && matchesFee && matchesSearch;
   });

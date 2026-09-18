@@ -123,21 +123,48 @@ export function useTeamStore(gameSlug?: string) {
     }
   };
 
+  const addExistingTeam = (team: Team): { success: boolean; team: Team } => {
+    const inviteCode = team.inviteCode || (team as any).invite_code || generateUniqueTeamCode();
+    const normalizedTeam: Team = {
+      ...team,
+      inviteCode,
+      ...({ invite_code: inviteCode } as any),
+    };
+
+    const existsIndex = teams.findIndex(
+      (t) => t.id === normalizedTeam.id || (t.name.toLowerCase() === normalizedTeam.name.toLowerCase() && t.gameSlug === normalizedTeam.gameSlug)
+    );
+
+    let updated: Team[];
+    if (existsIndex >= 0) {
+      updated = [...teams];
+      updated[existsIndex] = normalizedTeam;
+    } else {
+      updated = [normalizedTeam, ...teams];
+    }
+
+    saveTeams(updated);
+    return { success: true, team: normalizedTeam };
+  };
+
   const createTeam = (data: {
     gameSlug: string;
     name: string;
     tag: string;
     logoUrl?: string;
     captainGameId: string;
+    inviteCode?: string;
   }): { success: boolean; team?: Team; error?: string } => {
     const existingCode = teams.some((t) => t.name.toLowerCase() === data.name.toLowerCase());
     if (existingCode) {
       return { success: false, error: "A team with this name already exists." };
     }
 
-    let code = generateUniqueTeamCode();
-    while (teams.some((t) => t.inviteCode === code)) {
-      code = generateUniqueTeamCode();
+    let code = data.inviteCode || generateUniqueTeamCode();
+    if (!data.inviteCode) {
+      while (teams.some((t) => t.inviteCode === code)) {
+        code = generateUniqueTeamCode();
+      }
     }
 
     const newTeam: Team = {
@@ -147,6 +174,7 @@ export function useTeamStore(gameSlug?: string) {
       tag: data.tag.toUpperCase(),
       logoUrl: data.logoUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
       inviteCode: code,
+      ...({ invite_code: code } as any),
       captainUserId: "usr_vortex_lead",
       captainUsername: "vortex_lead",
       maxMembers: data.gameSlug === "chess" ? 1 : 5,
@@ -170,7 +198,7 @@ export function useTeamStore(gameSlug?: string) {
 
   const findTeamByCode = (code: string): Team | undefined => {
     const clean = code.trim().toUpperCase();
-    return teams.find((t) => t.inviteCode === clean);
+    return teams.find((t) => (t.inviteCode && t.inviteCode.toUpperCase() === clean) || ((t as any).invite_code && (t as any).invite_code.toUpperCase() === clean));
   };
 
   const joinTeam = (
@@ -226,6 +254,7 @@ export function useTeamStore(gameSlug?: string) {
     allTeams: teams,
     isLoaded,
     createTeam,
+    addExistingTeam,
     joinTeam,
     findTeamByCode,
   };

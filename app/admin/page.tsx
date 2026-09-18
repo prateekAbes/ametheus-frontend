@@ -6,6 +6,7 @@ import {
   Shield,
   ShieldCheck,
   Lock,
+  User,
   Users,
   Trophy,
   AlertTriangle,
@@ -99,6 +100,7 @@ import {
   PersonaPool,
 } from "@/lib/api/persona";
 import { uploadImageFile } from "@/lib/api/media";
+import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -607,8 +609,13 @@ export default function AdminCockpitPage() {
   // Tournament CRUD Handlers
   const handleOpenCreateTournament = () => {
     setEditingTournament(null);
+    const initialGame = games[0];
+    const initialGameSlug = initialGame?.slug || initialGame?.id || "valorant";
+    const initialReq = getGameRosterRequirement(initialGameSlug);
+    const isSoloInitial = initialReq.min === 1 && initialReq.max === 1;
+
     setTournForm({
-      game_id: games[0]?.id || "",
+      game_id: initialGame?.id || initialGameSlug,
       title: "",
       prize_pool_inr: 25000,
       entry_fee_inr: 0,
@@ -616,11 +623,11 @@ export default function AdminCockpitPage() {
       roster_lock_time: "Saturday, 7:30 PM IST",
       server_region: "AWS Mumbai (ap-south-1)",
       max_teams: 16,
-      min_team_size: 5,
-      max_team_size: 5,
+      min_team_size: isSoloInitial ? 1 : initialReq.min,
+      max_team_size: isSoloInitial ? 1 : initialReq.max,
       status: "REGISTRATION_OPEN",
       rank_requirement: "Open to All Ranks",
-      format: "Single Elimination Bracket",
+      format: isSoloInitial ? "1v1 Solo Championship" : "Single Elimination Bracket",
       description: "Sanctioned competitive tournament with automated brackets.",
       banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
       rules: ["Competitive MR12 rulebook", "Anti-cheat verification mandatory", "15-minute grace check-in"],
@@ -638,6 +645,11 @@ export default function AdminCockpitPage() {
 
   const handleOpenEditTournament = (t: Tournament) => {
     setEditingTournament(t);
+    const req = getGameRosterRequirement(t.game_slug || t.title);
+    const isSolo = (t.min_team_size === 1 && t.max_team_size === 1) || (t.minTeamSize === 1 && t.maxTeamSize === 1) || (req.min === 1 && req.max === 1);
+    const minTeamSize = t.min_team_size ?? t.minTeamSize ?? (isSolo ? 1 : req.min);
+    const maxTeamSize = t.max_team_size ?? t.maxTeamSize ?? (isSolo ? 1 : req.max);
+
     const parsedRules = Array.isArray(t.rules) ? t.rules : [];
     const parsedPrizes: Array<{ place: string; prize: string }> = Array.isArray(t.prizes)
       ? t.prizes.map((p) => ({
@@ -654,11 +666,11 @@ export default function AdminCockpitPage() {
       roster_lock_time: t.roster_lock_time || "TBD",
       server_region: t.server_region || "AWS Mumbai (ap-south-1)",
       max_teams: t.max_teams || 16,
-      min_team_size: 5,
-      max_team_size: 5,
-      status: t.status,
+      min_team_size: minTeamSize,
+      max_team_size: maxTeamSize,
+      status: t.status || "REGISTRATION_OPEN",
       rank_requirement: t.rank_requirement || "Open to All Ranks",
-      format: t.format || "Single Elimination Bracket",
+      format: t.format || (isSolo ? "1v1 Solo Championship" : "Single Elimination Bracket"),
       description: t.description || "",
       banner_url: t.banner_url || "",
       rules: parsedRules.length > 0 ? parsedRules : ["Standard competitive rules apply"],
@@ -749,6 +761,7 @@ export default function AdminCockpitPage() {
           max_teams: Number(tournForm.max_teams),
           min_team_size: Number(tournForm.min_team_size),
           max_team_size: Number(tournForm.max_team_size),
+          status: tournForm.status || "REGISTRATION_OPEN",
           rank_requirement: tournForm.rank_requirement,
           format: tournForm.format,
           description: tournForm.description,
@@ -3113,7 +3126,20 @@ export default function AdminCockpitPage() {
                   </label>
                   <select
                     value={tournForm.game_id}
-                    onChange={(e) => setTournForm({ ...tournForm, game_id: e.target.value })}
+                    onChange={(e) => {
+                      const selectedVal = e.target.value;
+                      const selectedGame = games.find((g) => (g.slug || g.id) === selectedVal || g.id === selectedVal);
+                      const slug = selectedGame?.slug || selectedVal;
+                      const req = getGameRosterRequirement(slug || selectedGame?.name || "");
+                      const isSolo = req.min === 1 && req.max === 1;
+                      setTournForm((prev) => ({
+                        ...prev,
+                        game_id: selectedVal,
+                        min_team_size: isSolo ? 1 : req.min,
+                        max_team_size: isSolo ? 1 : req.max,
+                        format: isSolo ? "1v1 Solo Championship" : (prev.format.includes("Solo") ? "Single Elimination Bracket" : prev.format),
+                      }));
+                    }}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     {games.map((g) => (
@@ -3137,6 +3163,93 @@ export default function AdminCockpitPage() {
                     placeholder="e.g. Mumbai Masters Champions Cup"
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
+                </div>
+
+                {/* Competition Format Selector: Solo vs Squad */}
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
+                      Registration &amp; Competition Format *
+                    </label>
+                    <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
+                      Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1
+                        ? "bg-amber-100 text-amber-900 border border-amber-300"
+                        : "bg-blue-100 text-blue-900 border border-blue-300"
+                    }`}>
+                      {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1
+                        ? "SOLO CONTENDER (1v1)"
+                        : `SQUAD / CLAN (${tournForm.min_team_size}v${tournForm.max_team_size})`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTournForm((prev) => ({
+                          ...prev,
+                          min_team_size: 1,
+                          max_team_size: 1,
+                          format: prev.format.includes("Bracket") ? "1v1 Solo Championship" : prev.format,
+                        }));
+                      }}
+                      className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                        Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1
+                          ? "bg-amber-500/10 border-[#E56A10] ring-1 ring-[#E56A10]"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${
+                        Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1
+                          ? "bg-[#E56A10] text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}>
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-slate-900 font-mono">Solo Contender (1v1 Individual)</div>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                          Designed for 1v1 titles (Chess, FIFA). Players register directly with their in-game handle without needing a team.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selectedGame = games.find((g) => (g.slug || g.id) === tournForm.game_id || g.id === tournForm.game_id);
+                        const req = getGameRosterRequirement(selectedGame?.slug || tournForm.game_id || "");
+                        const fallbackMin = req.min > 1 ? req.min : 5;
+                        const fallbackMax = req.max > 1 ? req.max : 5;
+                        setTournForm((prev) => ({
+                          ...prev,
+                          min_team_size: fallbackMin,
+                          max_team_size: fallbackMax,
+                          format: prev.format.includes("Solo") ? "Single Elimination Bracket" : prev.format,
+                        }));
+                      }}
+                      className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                        Number(tournForm.min_team_size) > 1 || Number(tournForm.max_team_size) > 1
+                          ? "bg-blue-500/10 border-blue-600 ring-1 ring-blue-600"
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${
+                        Number(tournForm.min_team_size) > 1 || Number(tournForm.max_team_size) > 1
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}>
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-slate-900 font-mono">Team / Squad Tournament</div>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                          Designed for squad games (Valorant 5v5, BGMI 4v4). Captain registers squad and invites teammates via invite code.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -3212,7 +3325,7 @@ export default function AdminCockpitPage() {
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Squad / Lineup Lock Time *
+                    {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Registration Lock Time *" : "Squad / Lineup Lock Time *"}
                   </label>
                   <input
                     type="text"
@@ -3253,7 +3366,7 @@ export default function AdminCockpitPage() {
                 <div className="grid grid-cols-3 gap-2 sm:col-span-2">
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      Max Squads
+                      {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Max Contenders" : "Max Squads"}
                     </label>
                     <input
                       type="number"

@@ -123,9 +123,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Load dashboard data & initialize first launch persona if needed
+  // Load dashboard data & initialize first launch persona deterministically
   useEffect(() => {
     let isMounted = true;
+    if (!isAuthLoaded) return;
 
     async function loadData() {
       setIsLoading(true);
@@ -140,19 +141,45 @@ export default function DashboardPage() {
         let currentProf: UserProfile | null = null;
         if (profileRes.status === "fulfilled" && profileRes.value) {
           currentProf = profileRes.value;
-          if (isMounted) {
-            setProfile(currentProf);
-            setProfileForm({
-              display_name: currentProf.display_name || "",
-              avatar_url: currentProf.avatar_url || "",
-            });
-            try {
-              localStorage.setItem("ametheus_user_profile", JSON.stringify(currentProf));
-            } catch {}
-          }
         }
 
+        // Establish authoritative identity prioritizing Clerk account details
+        const clerkDisplayName = user?.fullName || user?.username || (user?.primaryEmailAddress?.emailAddress ? user.primaryEmailAddress.emailAddress.split("@")[0] : "");
+        const clerkAvatar = user?.imageUrl || "";
+
+        const effectiveDisplayName = currentProf?.display_name || clerkDisplayName || "Gamer";
+        const effectiveAvatar = currentProf?.avatar_url || clerkAvatar || "";
+
         if (isMounted) {
+          const resolvedProfile: UserProfile = currentProf || {
+            id: user?.id || "usr_me",
+            email: user?.primaryEmailAddress?.emailAddress || "",
+            username: user?.username || effectiveDisplayName.toLowerCase().replace(/\s+/g, "_"),
+            display_name: effectiveDisplayName,
+            avatar_url: effectiveAvatar,
+            role: "PLAYER",
+            inr_balance: "0.00",
+          };
+
+          setProfile(resolvedProfile);
+          setProfileForm({
+            display_name: effectiveDisplayName,
+            avatar_url: effectiveAvatar,
+          });
+
+          try {
+            localStorage.setItem("ametheus_user_profile", JSON.stringify(resolvedProfile));
+            localStorage.setItem(
+              "ametheus_gamer_identity",
+              JSON.stringify({
+                gamerTag: effectiveDisplayName,
+                avatarUrl: effectiveAvatar,
+                clanTag: "AMX",
+                isNew: false,
+              })
+            );
+          } catch {}
+
           if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value) && teamsRes.value.length > 0) {
             setTeams(teamsRes.value);
             try {
@@ -169,6 +196,7 @@ export default function DashboardPage() {
               }
             } catch {}
           }
+
           if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
             setTournaments(tournRes.value);
           }
@@ -176,18 +204,18 @@ export default function DashboardPage() {
             setMatches(matchRes.value);
           }
 
-          // First Launch Persona Check:
-          // ONLY trigger if the user has NO configured display name and NO custom avatar
-          const hasExistingIdentity = Boolean(
+          // Persona check: ONLY trigger random persona if NO Clerk name, NO Clerk avatar, and NO user profile exists
+          const hasAuthoritativeIdentity = Boolean(
+            clerkDisplayName ||
+            clerkAvatar ||
             (currentProf?.display_name && !currentProf.display_name.includes("@")) ||
             currentProf?.avatar_url
           );
 
-          if (!hasExistingIdentity) {
-            const autoPersona = initFirstLaunchPersona(currentProf?.display_name, currentProf?.avatar_url);
+          if (!hasAuthoritativeIdentity) {
+            const autoPersona = initFirstLaunchPersona(undefined, undefined);
             if (autoPersona && autoPersona.isNew) {
               setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
-              // Update backend silently
               updateUserProfile({
                 display_name: autoPersona.gamerTag,
                 avatar_url: autoPersona.avatarUrl,
@@ -195,27 +223,24 @@ export default function DashboardPage() {
                 .then((updated) => {
                   if (isMounted) {
                     setProfile(updated);
-                    setProfileForm((prev) => ({
-                      ...prev,
+                    setProfileForm({
                       display_name: updated.display_name || autoPersona.gamerTag,
                       avatar_url: updated.avatar_url || autoPersona.avatarUrl,
-                    }));
+                    });
                     try {
                       localStorage.setItem("ametheus_user_profile", JSON.stringify(updated));
                       window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: updated }));
                     } catch {}
                   }
                 })
-                .catch(() => {
-                  if (isMounted && currentProf) {
-                    setProfile({
-                      ...currentProf,
-                      display_name: autoPersona.gamerTag,
-                      avatar_url: autoPersona.avatarUrl,
-                    });
-                  }
-                });
+                .catch(() => {});
             }
+          } else if (currentProf && (!currentProf.display_name || !currentProf.avatar_url)) {
+            // Silently backfill backend with Clerk details if missing
+            updateUserProfile({
+              display_name: effectiveDisplayName,
+              avatar_url: effectiveAvatar,
+            }).catch(() => {});
           }
         }
       } catch (e) {
@@ -230,7 +255,7 @@ export default function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAuthLoaded, isSignedIn, user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1081,13 +1106,15 @@ export default function DashboardPage() {
               <div className="space-y-2.5">
                 {teams.length > 0 ? (
                   teams.map((squad) => {
-                    const rosterReq = getGameRosterRequirement(squad.game_slug);
+                    const gameSlug = squad.game_slug || (squad as any).gameSlug || "valorant";
+                    const inviteCode = squad.invite_code || (squad as any).inviteCode || "AMX001";
+                    const rosterReq = getGameRosterRequirement(gameSlug);
                     const memberCount = Array.isArray(squad.members) ? squad.members.length : 1;
                     const isFull = memberCount >= rosterReq.max;
                     const isCaptain = squad.captain_id === user?.id || squad.captain_username === (profile?.display_name || user?.username);
 
                     return (
-                      <div key={squad.id || squad.invite_code} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                      <div key={squad.id || inviteCode} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <span className="font-headline text-sm font-bold text-slate-900">
@@ -1100,7 +1127,7 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           <span className="text-[11px] font-mono text-slate-500 uppercase font-semibold">
-                            {squad.game_slug}
+                            {gameSlug}
                           </span>
                         </div>
 
@@ -1114,10 +1141,10 @@ export default function DashboardPage() {
 
                           <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
                             <span className="font-mono text-xs font-bold text-slate-900 tracking-wider">
-                              {squad.invite_code}
+                              {inviteCode}
                             </span>
                             <button
-                              onClick={() => copyToClipboard(squad.invite_code, `Squad Code "${squad.invite_code}" copied!`)}
+                              onClick={() => copyToClipboard(inviteCode, `Squad Code "${inviteCode}" copied!`)}
                               className="text-slate-400 hover:text-slate-700 cursor-pointer"
                               title="Copy permanent squad code"
                             >

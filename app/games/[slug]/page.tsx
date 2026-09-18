@@ -38,7 +38,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
     notFound();
   }
 
-  const { teams, createTeam, joinTeam, findTeamByCode } = useTeamStore(game.slug);
+  const { teams, addExistingTeam, joinTeam, findTeamByCode } = useTeamStore(game.slug);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
@@ -590,12 +590,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
         gameSlug={game.slug}
         gameName={game.name}
         onTeamCreated={(newTeam) => {
-          createTeam({
-            gameSlug: newTeam.gameSlug,
-            name: newTeam.name,
-            tag: newTeam.tag,
-            captainGameId: newTeam.members[0].gameId,
-          });
+          addExistingTeam(newTeam);
         }}
       />
 

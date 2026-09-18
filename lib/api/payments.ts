@@ -27,11 +27,11 @@ export interface VerifyPaymentResponse {
 
 export async function createEscrowOrder(
   tournamentId: string,
-  teamId: string
+  teamId?: string
 ): Promise<CreateOrderResponse> {
   return apiClient<CreateOrderResponse>("/payments/create-order", {
     method: "POST",
-    body: JSON.stringify({ tournament_id: tournamentId, team_id: teamId }),
+    body: JSON.stringify(teamId ? { tournament_id: tournamentId, team_id: teamId } : { tournament_id: tournamentId }),
   });
 }
 

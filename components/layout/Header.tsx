@@ -174,33 +174,33 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
-        <div className="h-16 max-w-[1440px] mx-auto px-4 md:px-8 flex items-center justify-between gap-3">
+        <div className="h-16 max-w-[1440px] mx-auto px-3 sm:px-4 md:px-8 flex items-center justify-between gap-2 lg:gap-3">
           {/* Brand Logo (Enlarged Stitch Brandmark) */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <Link href="/" className="flex items-center gap-2 group py-1">
               <Image
                 src="/brand/ametheus-logo.svg"
                 alt="AMETHEUS"
                 width={175}
                 height={34}
-                className="h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]"
+                className="h-7 sm:h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]"
                 priority
               />
             </Link>
-            <span className="hidden xl:inline-flex px-2 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase">
+            <span className="hidden 2xl:inline-flex px-2 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase">
               PRO ARENA
             </span>
           </div>
 
           {/* Desktop Global Navigation */}
-          <nav className="hidden lg:flex items-center gap-1 text-[13px] font-medium text-[#CBD5E1]">
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 text-xs xl:text-[13px] font-medium text-[#CBD5E1]">
             {navLinks.map((item) => {
               const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                  className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
                     active
                       ? "text-white bg-[#161A24] border border-[#242C3D] shadow-xs font-semibold"
                       : "hover:text-white hover:bg-[#161A24]/60"
@@ -216,7 +216,7 @@ export default function Header() {
             <Show when="signed-in">
               <Link
                 href="/dashboard"
-                className={`px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
                   isActive("/dashboard")
                     ? "text-white bg-[#161A24] border border-[#242C3D] font-semibold"
                     : "hover:text-white hover:bg-[#161A24]/60"
@@ -229,10 +229,10 @@ export default function Header() {
 
             {/* Operations & Admin Badges - Strictly restricted to authorized users */}
             {(isOrganizer || isSuperAdmin) && (
-              <div className="flex items-center gap-1 pl-2 border-l border-[#242C3D]/80">
+              <div className="flex items-center gap-1 pl-1.5 xl:pl-2 border-l border-[#242C3D]/80">
                 <Link
                   href="/organizer"
-                  className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
                     isActive("/organizer")
                       ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
                       : "text-[#E56A10] hover:bg-[#161A24] font-semibold"
@@ -245,7 +245,7 @@ export default function Header() {
                 {isSuperAdmin && (
                   <Link
                     href="/admin"
-                    className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
                       isActive("/admin")
                         ? "bg-[#E56A10] text-white font-bold shadow-xs"
                         : "bg-[#E56A10]/15 text-[#FFB68F] border border-[#E56A10]/40 font-bold hover:bg-[#E56A10]/25"
@@ -261,12 +261,12 @@ export default function Header() {
           </nav>
 
           {/* Right Action Bar (Search, Notifications, Auth, Mobile Toggle) */}
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1.5 md:gap-2.5 shrink-0">
             {/* Quick Search Bar with Live Autocomplete */}
             <div className="relative hidden md:block" ref={searchDropdownRef}>
               <form onSubmit={handleSearchSubmit} className="flex items-center relative">
-                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2.5 py-1.5 rounded text-xs text-[#94A3B8] w-44 lg:w-56 focus-within:w-64 focus-within:border-[#E56A10]/60">
-                  <Search className="w-3.5 h-3.5 mr-2 text-[#94A3B8] shrink-0" />
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-32 lg:w-40 xl:w-52 focus-within:w-52 xl:focus-within:w-64 focus-within:border-[#E56A10]/60">
+                  <Search className="w-3.5 h-3.5 mr-1.5 text-[#94A3B8] shrink-0" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -279,7 +279,7 @@ export default function Header() {
                     }}
                     className="bg-transparent border-none outline-hidden text-xs text-white placeholder-[#64748B] w-full"
                   />
-                  <kbd className="hidden lg:inline-block px-1 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[9px] font-mono text-[#94A3B8] rounded ml-1 shrink-0">
+                  <kbd className="hidden xl:inline-block px-1 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[9px] font-mono text-[#94A3B8] rounded ml-1 shrink-0">
                     Ctrl+K
                   </kbd>
                 </div>
@@ -353,14 +353,14 @@ export default function Header() {
 
             {/* Clerk Auth Section */}
             <Show when="signed-out">
-              <div className="flex items-center gap-2 pl-2 border-l border-[#242C3D]">
+              <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-[#242C3D] shrink-0">
                 <SignInButton mode="modal">
-                  <button className="px-2.5 py-1.5 text-xs font-mono font-bold text-[#CBD5E1] hover:text-white transition-colors cursor-pointer">
+                  <button className="px-2 sm:px-2.5 py-1.5 text-xs font-mono font-bold text-[#CBD5E1] hover:text-white transition-colors cursor-pointer">
                     SIGN IN
                   </button>
                 </SignInButton>
                 <SignUpButton mode="modal">
-                  <button className="px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shadow-xs cursor-pointer flex items-center gap-1">
+                  <button className="px-2.5 sm:px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shadow-xs cursor-pointer flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
                     JOIN LEAGUE
                   </button>
@@ -369,15 +369,15 @@ export default function Header() {
             </Show>
 
             <Show when="signed-in">
-              <div className="flex items-center gap-3 pl-3 border-l border-[#242C3D]">
+              <div className="flex items-center gap-2 xl:gap-2.5 pl-2 sm:pl-2.5 border-l border-[#242C3D] shrink-0">
                 {/* Spacious, De-congested Esports User Identity Chip */}
                 <Link
                   href="/dashboard"
-                  className="flex items-center gap-2.5 px-2.5 py-1 rounded-lg bg-[#161A24]/60 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all group"
+                  className="flex items-center gap-2 px-2 xl:px-2.5 py-1 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all group shrink-0"
                   title="View Athlete Dashboard"
                 >
                   {/* Custom Esports Avatar */}
-                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#242C3D] group-hover:border-[#E56A10] bg-slate-900 shrink-0">
+                  <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden border border-[#242C3D] group-hover:border-[#E56A10] bg-slate-900 shrink-0">
                     <img
                       src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
                       alt="Avatar"
@@ -388,11 +388,11 @@ export default function Header() {
 
                   {/* Gamer Tag & Distinct Role Badge */}
                   <div className="hidden sm:flex flex-col text-left">
-                    <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[130px]">
+                    <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[100px] xl:max-w-[140px]">
                       {userProfile?.display_name || user?.username || "Gamer"}
                     </span>
                     <span
-                      className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit ${
+                      className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit whitespace-nowrap ${
                         isSuperAdmin
                           ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
                           : role === "ORGANIZER"
@@ -406,20 +406,22 @@ export default function Header() {
                 </Link>
 
                 {/* Account & Sign Out Control */}
-                <UserButton
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-7 h-7 border border-[#242C3D] hover:border-[#E56A10] transition-colors opacity-80 hover:opacity-100",
-                    },
-                  }}
-                />
+                <div className="shrink-0 flex items-center">
+                  <UserButton
+                    appearance={{
+                      elements: {
+                        avatarBox: "w-7 h-7 border border-[#242C3D] hover:border-[#E56A10] transition-colors opacity-80 hover:opacity-100",
+                      },
+                    }}
+                  />
+                </div>
               </div>
             </Show>
 
             {/* Mobile Hamburger Toggle Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 rounded text-[#CBD5E1] hover:text-white hover:bg-[#161A24] border border-[#242C3D]"
+              className="lg:hidden p-2 rounded text-[#CBD5E1] hover:text-white hover:bg-[#161A24] border border-[#242C3D] shrink-0"
               aria-label="Toggle navigation menu"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
