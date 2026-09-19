@@ -26,7 +26,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
       "Hardware Vanguard Binding: Every participant must have Riot Vanguard actively running with matching verified HWID.",
       "Custom Match Setup: Standard 5v5 Tactical with Tournament Mode toggled ON. Win-by-2 overtime active.",
       "Result Submission: Winning captain must upload full uncropped endgame scorecard screenshot within 15 minutes.",
-      "Escrow Payout: Prize disbursement automatically processed via Razorpay UPI within 30 minutes of grand final certification.",
+      "Escrow Payout: Prize disbursement automatically processed via platform escrow within 30 minutes of grand final certification.",
     ],
     schedule: [
       { stage: "Roster Lock & Verification", time: "24 Sep 2026, 18:00 IST", details: "All squad rosters frozen. HWID checks finalized." },
@@ -153,7 +153,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
       "Hardware Vanguard Strict Validation with active screen capture telemetry.",
       "Double elimination upper & lower bracket formats.",
       "Win-by-2 overtime rounds on Mumbai Core servers.",
-      "₹25,000 escrow disbursed via automated Razorpay split payout.",
+      "₹25,000 escrow disbursed via automated platform escrow split payout.",
     ],
     schedule: [
       { stage: "Roster Freeze", time: "27 Sep 2026, 20:00 IST", details: "All 32 seedings computed." },
@@ -306,7 +306,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
       "Fair-Play Protocol: Active webcam check and Stockfish algorithmic correlation screening.",
       "Solo Contenders Only: No teams required or allowed.",
       "Match Lobby: Participants receive private chess board link 5 minutes prior to round start.",
-      "Escrow Payout: Direct Razorpay UPI transfer within 30 minutes of final checkmate confirmation.",
+      "Escrow Payout: Direct platform escrow transfer within 30 minutes of final checkmate confirmation.",
     ],
     schedule: [
       { stage: "Participant Verification", time: "27 Sep 2026, 16:30 IST", details: "Lichess/Chess.com rating and fair-play validation." },
@@ -394,7 +394,7 @@ export const TOURNAMENTS_DATA: Tournament[] = [
       "4v4 Squad Deathmatch: 10-minute battle timer with 40-kill cap.",
       "Maps: Catacombs (Round 1), Outpost (Semi-Finals), So Long (Finals).",
       "Screen Recording: Captains must record last 60 seconds of victory scoreboard.",
-      "Fast Escrow: Razorpay payout to captain within 30 minutes.",
+      "Fast Escrow: Platform escrow payout to captain within 30 minutes.",
     ],
     schedule: [
       { stage: "Check-in Closes", time: "28 Sep 2026, 18:00 IST", details: "Lobby code verification in match hub." },

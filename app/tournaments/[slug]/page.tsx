@@ -406,7 +406,7 @@ export default function TournamentDetailPage({ params }: Props) {
           <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-[#64748B] dark:text-[#94A3B8]">
             <span>OFFICIAL ESCROW NODE:</span>
             <span className="px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] border dark:border-[#242C3D] text-[#0F172A] dark:text-[#E56A10] font-bold rounded">
-              RZP-PAID-SECURE
+              ESCROW-PAID-SECURE
             </span>
           </div>
         </div>
@@ -492,7 +492,7 @@ export default function TournamentDetailPage({ params }: Props) {
                     </span>
                   </div>
                   <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                    ✓ Instant Razorpay Disbursal
+                    ✓ Instant Escrow Disbursal
                   </span>
                 </div>
               ))}

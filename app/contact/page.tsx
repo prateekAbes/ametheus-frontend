@@ -77,7 +77,7 @@ export default function ContactPage() {
               Escrow &amp; Payment Vault
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Razorpay order verification, entry fee holding receipts, team cancellation refunds, and verified prize pool payout claims.
+              Platform escrow order verification, entry fee holding receipts, team cancellation refunds, and verified prize pool payout claims.
             </p>
             <div className="mt-auto flex items-center gap-2 text-xs text-slate-700 font-mono pt-3 border-t border-slate-100">
               <Clock className="w-3.5 h-3.5 text-[#E56A10]" /> Finance SLA: &lt; 2 hours

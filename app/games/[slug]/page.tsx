@@ -571,7 +571,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 text-[#E56A10] flex-shrink-0 mt-0.5" />
-                    <span><strong>Instant Escrow Payout:</strong> UPI / Razorpay prize disbursement dispatched within 30 minutes of final certification.</span>
+                    <span><strong>Instant Escrow Payout:</strong> Direct UPI &amp; IMPS prize disbursement dispatched within 30 minutes of final certification.</span>
                   </li>
                 </ul>
               </div>

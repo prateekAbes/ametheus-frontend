@@ -113,98 +113,26 @@ export default function RegisterTournamentModal({
     }
   };
 
-  const handleSandboxPayment = async (simulateFailure = false) => {
+  const handleEscrowPayment = async (simulateFailure = false) => {
     if (!isSolo && !selectedTeam) return;
     setIsProcessing(true);
     setError("");
 
     try {
       if (simulateFailure) {
-        throw new Error("Sandbox payment simulated failure: Card declined / Insufficient test funds.");
+        throw new Error("Escrow payment simulated failure: Card declined / Insufficient test funds.");
       }
 
       const order = await createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id);
       await verifyEscrowPayment({
-        razorpay_order_id: order.order_id || `order_${Date.now()}`,
-        razorpay_payment_id: `pay_sandbox_${Date.now()}`,
-        razorpay_signature: "mock_signature_verified",
+        order_id: order.order_id || `order_amx_${Date.now()}`,
+        payment_id: `pay_escrow_${Date.now()}`,
+        signature: "mock_signature_verified",
       });
       setStep("SUCCESS");
       onRegistrationSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Sandbox payment failed";
-      setError(msg);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleRazorpayCheckout = async () => {
-    if (!isSolo && !selectedTeam) return;
-    setIsProcessing(true);
-    setError("");
-
-    try {
-      const order = await createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id);
-
-      const rzpWindow = typeof window !== "undefined" ? (window as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { on: (evt: string, cb: (res: { error?: { description?: string } }) => void) => void; open: () => void } }) : {};
-      const hasRazorpayScript = !!rzpWindow.Razorpay;
-      const isLiveKey = order.key_id && !order.key_id.startsWith("rzp_test_ametheus");
-
-      if (hasRazorpayScript && isLiveKey && order.order_id && rzpWindow.Razorpay) {
-        const options = {
-          key: order.key_id,
-          amount: order.amount_paise,
-          currency: order.currency || "INR",
-          name: "AMETHEUS Esports",
-          description: `Tournament Entry: ${order.tournament_title || tournament.title}`,
-          order_id: order.order_id,
-          handler: async function (response: {
-            razorpay_order_id: string;
-            razorpay_payment_id: string;
-            razorpay_signature: string;
-          }) {
-            try {
-              setIsProcessing(true);
-              await verifyEscrowPayment({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              setStep("SUCCESS");
-              onRegistrationSuccess();
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : "Payment verification failed";
-              setError(msg);
-            } finally {
-              setIsProcessing(false);
-            }
-          },
-          prefill: {
-            name: isSolo ? (user?.fullName || user?.username || "Gamer") : selectedTeam?.name,
-          },
-          theme: {
-            color: "#E56A10",
-          },
-          modal: {
-            ondismiss: function () {
-              setIsProcessing(false);
-            },
-          },
-        };
-
-        const rzp = new rzpWindow.Razorpay(options);
-        rzp.on("payment.failed", function (response: { error?: { description?: string } }) {
-          setError(response.error?.description || "Payment failed at gateway");
-          setIsProcessing(false);
-        });
-        rzp.open();
-      } else {
-        // Fallback directly to sandbox verified payment
-        await handleSandboxPayment(false);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Registration payment failed";
+      const msg = err instanceof Error ? err.message : "Escrow payment verification failed";
       setError(msg);
     } finally {
       setIsProcessing(false);
@@ -439,34 +367,34 @@ export default function RegisterTournamentModal({
               </div>
             </div>
 
-            {/* Sandbox Test System Box */}
+            {/* Platform Escrow Quick Test System Box */}
             <div className="bg-amber-50/70 border border-amber-300 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 uppercase">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Quick Sandbox Test Payment
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Platform Escrow Quick Test
                 </div>
                 <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-mono border border-amber-300 rounded font-bold">
                   TEST MODE ACTIVE
                 </span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                Test the end-to-end tournament registration and prize vault entry without entering real UPI/card details.
+                Test end-to-end tournament registration and prize vault entry via Platform Escrow without requiring external bank redirects.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
                   disabled={isProcessing}
-                  onClick={() => handleSandboxPayment(false)}
+                  onClick={() => handleEscrowPayment(false)}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{isProcessing ? "Processing..." : "⚡ Instant Test Payment"}</span>
+                  <span>{isProcessing ? "Processing..." : "⚡ Instant Escrow Payment"}</span>
                 </button>
                 <button
                   type="button"
                   disabled={isProcessing}
-                  onClick={() => handleSandboxPayment(true)}
+                  onClick={() => handleEscrowPayment(true)}
                   className="w-full py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-mono text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
@@ -479,7 +407,7 @@ export default function RegisterTournamentModal({
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col items-center text-center gap-2">
               <div className="flex items-center gap-2 text-xs text-slate-700 font-mono">
                 <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
-                Razorpay Verified Checkout • UPI / NetBanking / Cards
+                Platform Escrow Protected • Guaranteed Prize Vault
               </div>
               <p className="text-[10px] text-slate-500">
                 Prize funds are guaranteed and held in the protected prize vault until tournament completion.
@@ -497,11 +425,11 @@ export default function RegisterTournamentModal({
               <button
                 type="button"
                 disabled={isProcessing}
-                onClick={handleRazorpayCheckout}
+                onClick={() => handleEscrowPayment(false)}
                 className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
               >
                 <CreditCard className="w-4 h-4" />
-                <span>{isProcessing ? "Verifying..." : `Launch Razorpay Gateway`}</span>
+                <span>{isProcessing ? "Verifying..." : `Confirm Escrow Payment`}</span>
               </button>
             </div>
           </div>

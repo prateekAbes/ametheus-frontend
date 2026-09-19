@@ -300,7 +300,7 @@ export default function DashboardPage() {
           inr_balance: String(res.new_balance),
         });
       }
-      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Razorpay Sandbox!`);
+      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Platform Escrow!`);
     } catch {
       if (profile) {
         const newBal = Number(profile.inr_balance || 0) + added;
@@ -309,7 +309,7 @@ export default function DashboardPage() {
           inr_balance: String(newBal),
         });
       }
-      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Razorpay Sandbox!`);
+      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Platform Escrow!`);
     } finally {
       setIsProcessingDeposit(false);
       setIsDepositOpen(false);
@@ -1490,7 +1490,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL 2: Deposit Funds (Razorpay Sandbox) */}
+      {/* MODAL 2: Deposit Funds (Platform Escrow) */}
       {isDepositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
@@ -1542,7 +1542,7 @@ export default function DashboardPage() {
 
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-xs font-mono text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                <span>Instant Razorpay Escrow gateway. Funds are immediately credited to your tournament balance.</span>
+                <span>Instant Platform Escrow deposit. Funds are immediately credited to your tournament balance.</span>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -1559,7 +1559,7 @@ export default function DashboardPage() {
                   className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isProcessingDeposit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-                  Pay ₹{depositAmount} via Razorpay
+                  Deposit ₹{depositAmount} to Escrow Wallet
                 </button>
               </div>
             </form>

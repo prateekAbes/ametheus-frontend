@@ -6,16 +6,15 @@ export interface CreateOrderResponse {
   amount_paise?: number;
   amount_inr?: number;
   currency?: string;
-  key_id?: string;
   tournament_title?: string;
   team_name?: string;
   message?: string;
 }
 
 export interface VerifyPaymentRequest {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
+  order_id: string;
+  payment_id?: string;
+  signature?: string;
 }
 
 export interface VerifyPaymentResponse {

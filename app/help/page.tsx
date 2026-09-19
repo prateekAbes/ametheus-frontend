@@ -46,9 +46,9 @@ const FAQS: FaqItem[] = [
     id: "faq-escrow-payout",
     category: "escrow",
     categoryLabel: "Escrow & Payments",
-    question: "How does the AMETHEUS Razorpay Escrow Guarantee operate?",
+    question: "How does the AMETHEUS Platform Escrow Guarantee operate?",
     answer:
-      "Every tournament entry fee is deposited into a bank-grade escrow holding vault before bracket generation. Upon final match verification by certified arbiters, prize pool funds disburse automatically via Razorpay Route directly to the registered winners' accounts within 30 minutes.",
+      "Every tournament entry fee is deposited into a secure escrow holding vault before bracket generation. Upon final match verification by certified arbiters, prize pool funds disburse automatically directly to the registered winners' escrow accounts within 30 minutes.",
   },
   {
     id: "faq-escrow-refund",
