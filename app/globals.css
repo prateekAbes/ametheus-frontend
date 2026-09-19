@@ -31,9 +31,16 @@
   --font-mono: var(--font-jetbrains-mono), monospace;
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8f9fa;
   --foreground: #0f172a;
+}
+
+.dark {
+  --background: #0b0e16;
+  --foreground: #f8fafc;
 }
 
 body {
@@ -44,6 +51,7 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Tabular numbers for competitive telemetry and match readouts */

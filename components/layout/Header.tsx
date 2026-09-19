@@ -16,8 +16,11 @@ import {
   X,
   Sparkles,
   ArrowRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
+import { useTheme } from "@/components/providers/ThemeProvider";
 import {
   Show,
   SignInButton,
@@ -35,6 +38,7 @@ export default function Header() {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const { user } = useUser();
+  const { theme, toggleTheme } = useTheme();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,7 +178,7 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
-        <div className="h-16 max-w-[1440px] mx-auto px-3 sm:px-4 md:px-8 flex items-center justify-between gap-2 lg:gap-3">
+        <div className="h-16 max-w-[1440px] mx-auto px-4 sm:px-6 md:pl-8 md:pr-10 lg:pr-14 xl:pr-16 flex items-center justify-between gap-2 lg:gap-3">
           {/* Brand Logo (Enlarged Stitch Brandmark) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <Link href="/" className="flex items-center gap-2 group py-1">
@@ -260,12 +264,12 @@ export default function Header() {
             )}
           </nav>
 
-          {/* Right Action Bar (Search, Notifications, Auth, Mobile Toggle) */}
-          <div className="flex items-center gap-1.5 md:gap-2.5 shrink-0">
+          {/* Right Action Bar (Search, Notifications, Theme Toggle, Auth, Mobile Toggle) */}
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 mr-1 sm:mr-2">
             {/* Quick Search Bar with Live Autocomplete */}
             <div className="relative hidden md:block" ref={searchDropdownRef}>
               <form onSubmit={handleSearchSubmit} className="flex items-center relative">
-                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-32 lg:w-40 xl:w-52 focus-within:w-52 xl:focus-within:w-64 focus-within:border-[#E56A10]/60">
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-28 lg:w-36 xl:w-44 focus-within:w-44 xl:focus-within:w-56 focus-within:border-[#E56A10]/60">
                   <Search className="w-3.5 h-3.5 mr-1.5 text-[#94A3B8] shrink-0" />
                   <input
                     ref={searchInputRef}
@@ -350,6 +354,21 @@ export default function Header() {
 
             {/* Notifications Dropdown */}
             <NotificationsDropdown />
+
+            {/* Theme Mode Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="p-1.5 rounded-lg border border-[#242C3D] bg-[#161A24]/70 hover:bg-[#161A24] text-[#CBD5E1] hover:text-white transition-all cursor-pointer shrink-0"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle Color Theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
+              ) : (
+                <Moon className="w-4 h-4 text-blue-400 hover:-rotate-12 transition-transform" />
+              )}
+            </button>
 
             {/* Clerk Auth Section */}
             <Show when="signed-out">
@@ -530,6 +549,27 @@ export default function Header() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Theme Toggle Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-[#161A24] border border-[#242C3D] text-xs font-mono text-[#CBD5E1] hover:text-white transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-2 font-bold">
+                  {theme === "dark" ? (
+                    <Sun className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-blue-400" />
+                  )}
+                  <span>THEME MODE</span>
+                </span>
+                <span className="text-[11px] font-bold uppercase text-[#E56A10] bg-[#E56A10]/10 px-2 py-0.5 rounded border border-[#E56A10]/30">
+                  {theme}
+                </span>
+              </button>
             </div>
 
             {/* Mobile Footer Auth Section */}

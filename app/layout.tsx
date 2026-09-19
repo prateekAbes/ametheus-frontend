@@ -5,6 +5,7 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import Script from "next/script";
 
 const spaceGrotesk = Space_Grotesk({
@@ -42,19 +43,42 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-[#F8F9FA] text-[#0F172A]">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function() {
+              try {
+                var t = localStorage.getItem('ametheus_theme') || 'dark';
+                if (t === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.setAttribute('data-theme', 'light');
+                }
+              } catch (e) {
+                document.documentElement.classList.add('dark');
+              }
+            })()`,
+          }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col bg-[#F8F9FA] dark:bg-[#0B0E16] text-[#0F172A] dark:text-[#F8FAFC] transition-colors duration-200">
         <ClerkProvider>
           <AuthProvider>
-          {/* Dark Arena Header */}
-          <Header />
+            <ThemeProvider>
+              {/* Dark Arena Header */}
+              <Header />
 
-          {/* Daylight Operational Canvas */}
-          <main className="flex-1 w-full pt-16">{children}</main>
+              {/* Operational Canvas */}
+              <main className="flex-1 w-full pt-16">{children}</main>
 
-          {/* Dark Arena Footer */}
-          <Footer />
+              {/* Dark Arena Footer */}
+              <Footer />
+            </ThemeProvider>
           </AuthProvider>
         </ClerkProvider>
         <Script

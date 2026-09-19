@@ -72,9 +72,9 @@ export default function TournamentDetailPage({ params }: Props) {
 
   if (isLoading && !activeTourn) {
     return (
-      <div className="min-h-screen bg-[#F8F9FF] flex flex-col items-center justify-center p-6 text-slate-800">
+      <div className="min-h-[75vh] bg-[#F8F9FF] dark:bg-[#0B0E16] flex flex-col items-center justify-center p-6 text-slate-800 dark:text-slate-200 transition-colors">
         <div className="w-10 h-10 border-4 border-[#E56A10] border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 font-bold">
+        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400 font-bold">
           Loading Tournament Arena Hub...
         </p>
       </div>
@@ -82,14 +82,43 @@ export default function TournamentDetailPage({ params }: Props) {
   }
 
   if (hasFetched && !activeTourn) {
-    notFound();
+    return (
+      <div className="min-h-[75vh] bg-[#F8F9FF] dark:bg-[#0B0E16] flex flex-col items-center justify-center p-6 text-center transition-colors">
+        <div className="w-16 h-16 rounded-2xl bg-[#E56A10]/10 border border-[#E56A10]/30 flex items-center justify-center text-[#E56A10] mb-4">
+          <Trophy className="w-8 h-8" />
+        </div>
+        <span className="text-xs font-mono font-bold text-[#E56A10] tracking-widest uppercase mb-1">
+          TOURNAMENT NOT FOUND
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-bold font-headline text-[#0F172A] dark:text-white mb-2">
+          Unable to locate &quot;{resolvedParams.slug}&quot;
+        </h1>
+        <p className="text-sm text-[#64748B] dark:text-[#94A3B8] max-w-md mb-6">
+          This tournament may have concluded, changed its identifier, or is still being configured by the organizer.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/tournaments"
+            className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shadow-xs"
+          >
+            Browse All Tournaments
+          </Link>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 bg-white dark:bg-[#161A24] border border-[#CBD5E1] dark:border-[#242C3D] text-[#0F172A] dark:text-white text-xs font-mono font-bold uppercase rounded hover:bg-[#F1F3F5] dark:hover:bg-[#202534] transition-colors cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!activeTourn) {
     return (
-      <div className="min-h-screen bg-[#F8F9FF] flex flex-col items-center justify-center p-6 text-slate-800">
+      <div className="min-h-[75vh] bg-[#F8F9FF] dark:bg-[#0B0E16] flex flex-col items-center justify-center p-6 text-slate-800 dark:text-slate-200 transition-colors">
         <div className="w-10 h-10 border-4 border-[#E56A10] border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 font-bold">
+        <p className="font-mono text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400 font-bold">
           Loading Tournament Arena Hub...
         </p>
       </div>
@@ -145,10 +174,19 @@ export default function TournamentDetailPage({ params }: Props) {
     setSelectedBracketMatch(lobbyInfo);
   };
 
+  const maxTeams = Math.max(1, currentTournament.maxTeams || 16);
+  const registeredTeams = currentTournament.registeredTeams || 0;
+  const fillPct = Math.min(100, Math.round((registeredTeams / maxTeams) * 100));
+  const safeRules = currentTournament.rules || [];
+  const safeSchedule = currentTournament.schedule || [];
+  const safePrizes = currentTournament.prizes || [];
+  const safeBracket = currentTournament.bracketRounds || [];
+  const safeRosters = currentTournament.registeredRosters || [];
+
   return (
-    <div className="flex flex-col w-full bg-[#F8F9FF]">
+    <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] text-[#0F172A] dark:text-[#F8FAFC] transition-colors">
       {/* Tournament Banner Hero Header */}
-      <div className="relative w-full h-52 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
+      <div className="relative w-full h-52 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200 dark:border-[#242C3D]">
         <Image
           src={currentTournament.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
           alt={currentTournament.title}
@@ -167,19 +205,19 @@ export default function TournamentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* 1. Hero Summary (Stitch Screen 4 Spec) */}
-      <section className="relative w-full overflow-hidden bg-white border-b border-[#E2E8F0] py-8">
+      {/* 1. Hero Summary */}
+      <section className="relative w-full overflow-hidden bg-white dark:bg-[#0B0E16] border-b border-[#E2E8F0] dark:border-[#242C3D] py-8 transition-colors">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#E56A10] text-white text-xs font-mono font-bold rounded uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               {currentTournament.statusLabel}
             </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F1F3F5] text-[#0F172A] text-xs font-mono rounded">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F1F3F5] dark:bg-[#161A24] text-[#0F172A] dark:text-slate-200 border dark:border-[#242C3D] text-xs font-mono rounded">
               <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
               AMETHEUS ESCROW GUARANTEED
             </span>
-            <span className="px-2.5 py-1 bg-[#F1F3F5] text-[#64748B] text-xs font-mono rounded">
+            <span className="px-2.5 py-1 bg-[#F1F3F5] dark:bg-[#161A24] text-[#64748B] dark:text-[#94A3B8] border dark:border-[#242C3D] text-xs font-mono rounded">
               SERVER: {currentTournament.serverRegion}
             </span>
           </div>
@@ -187,35 +225,35 @@ export default function TournamentDetailPage({ params }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8 flex flex-col justify-between">
               <div>
-                <h1 className="text-3xl sm:text-5xl font-bold font-headline uppercase tracking-tight text-[#0F172A]">
+                <h1 className="text-3xl sm:text-5xl font-bold font-headline uppercase tracking-tight text-[#0F172A] dark:text-white">
                   {currentTournament.title}
                 </h1>
-                <p className="text-sm sm:text-base text-[#475569] mt-2 max-w-2xl leading-relaxed">
+                <p className="text-sm sm:text-base text-[#475569] dark:text-[#94A3B8] mt-2 max-w-2xl leading-relaxed">
                   {currentTournament.description}
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-6 pt-6 text-xs text-[#64748B] font-mono">
+              <div className="flex flex-wrap items-center gap-6 pt-6 text-xs text-[#64748B] dark:text-[#94A3B8] font-mono">
                 <div>
-                  <strong className="text-[#0F172A]">Discipline:</strong> {currentTournament.gameName}
+                  <strong className="text-[#0F172A] dark:text-white">Discipline:</strong> {currentTournament.gameName}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A]">Squad Lock:</strong> {currentTournament.rosterLockTime}
+                  <strong className="text-[#0F172A] dark:text-white">Squad Lock:</strong> {currentTournament.rosterLockTime}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A]">Launch:</strong> {currentTournament.startsAt}
+                  <strong className="text-[#0F172A] dark:text-white">Launch:</strong> {currentTournament.startsAt}
                 </div>
               </div>
             </div>
 
             {/* Entry Fee Box & Direct Action */}
-            <div className="lg:col-span-4 bg-[#F8F9FA] p-5 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+            <div className="lg:col-span-4 bg-[#F8F9FA] dark:bg-[#121622] p-5 rounded-xl border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#242C3D]">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-mono text-[#64748B] uppercase">
+                  <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">
                     Entry Fee Structure
                   </span>
-                  <span className="font-bold text-sm text-[#0F172A]">
+                  <span className="font-bold text-sm text-[#0F172A] dark:text-white">
                     Squad Registration
                   </span>
                 </div>
@@ -225,7 +263,7 @@ export default function TournamentDetailPage({ params }: Props) {
               </div>
 
               <div className="my-3 space-y-2">
-                <div className="p-3 bg-white rounded border border-[#E56A10]/30">
+                <div className="p-3 bg-white dark:bg-[#161A24] rounded border border-[#E56A10]/30">
                   <div className="flex items-baseline justify-between">
                     <span className="text-[11px] font-mono font-bold text-[#E56A10] uppercase">
                       Captain Slot (Host)
@@ -234,21 +272,21 @@ export default function TournamentDetailPage({ params }: Props) {
                       {currentTournament.entryFee}
                     </span>
                   </div>
-                  <p className="text-[10px] text-[#64748B] mt-0.5">
+                  <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] mt-0.5">
                     Single payment pays for all 5 team seats.
                   </p>
                 </div>
 
-                <div className="p-3 bg-emerald-50 rounded border border-emerald-500/30">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded border border-emerald-500/30">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[11px] font-mono font-bold text-emerald-800 uppercase">
+                    <span className="text-[11px] font-mono font-bold text-emerald-800 dark:text-emerald-400 uppercase">
                       Teammate Slots (4 Players)
                     </span>
-                    <span className="font-headline font-bold text-lg text-emerald-700">
+                    <span className="font-headline font-bold text-lg text-emerald-700 dark:text-emerald-400">
                       ₹0 Free
                     </span>
                   </div>
-                  <p className="text-[10px] text-emerald-900 mt-0.5">
+                  <p className="text-[10px] text-emerald-900 dark:text-emerald-300 mt-0.5">
                     Join instantly using Captain&apos;s 6-character squad code.
                   </p>
                 </div>
@@ -256,20 +294,20 @@ export default function TournamentDetailPage({ params }: Props) {
 
               <div className="flex flex-col gap-2">
                 {isRegistered ? (
-                  <div className="p-3 bg-emerald-100 text-emerald-800 font-bold text-xs rounded text-center font-mono">
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 font-bold text-xs rounded text-center font-mono">
                     ✓ YOUR SQUAD IS REGISTERED &amp; SEEDED
                   </div>
                 ) : (
                   <>
                     <button
                       onClick={() => setIsRegisterModalOpen(true)}
-                      className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs"
+                      className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs cursor-pointer"
                     >
                       Register Squad — {currentTournament.entryFee}
                     </button>
                     <button
                       onClick={() => setIsJoinModalOpen(true)}
-                      className="w-full py-2 bg-white hover:bg-[#F1F3F5] border border-[#CBD5E1] text-[#0F172A] font-bold text-xs uppercase tracking-wider rounded transition-colors"
+                      className="w-full py-2 bg-white dark:bg-[#161A24] hover:bg-[#F1F3F5] dark:hover:bg-[#202534] border border-[#CBD5E1] dark:border-[#242C3D] text-[#0F172A] dark:text-white font-bold text-xs uppercase tracking-wider rounded transition-colors cursor-pointer"
                     >
                       Join Squad with Code — ₹0
                     </button>
@@ -281,58 +319,58 @@ export default function TournamentDetailPage({ params }: Props) {
 
           {/* Metric Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-            <div className="bg-[#F8F9FA] p-4 rounded-lg border border-[#E2E8F0]">
-              <span className="text-[10px] font-mono text-[#64748B] uppercase block">
+            <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
+              <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
                 Total Prize Escrow
               </span>
               <div className="text-2xl font-bold font-headline text-[#E56A10] mt-0.5 tabular-nums">
                 {currentTournament.prizePool}
               </div>
-              <span className="text-[11px] text-[#64748B] font-mono">
+              <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
                 100% Escrow Backed
               </span>
             </div>
 
-            <div className="bg-[#F8F9FA] p-4 rounded-lg border border-[#E2E8F0]">
-              <span className="text-[10px] font-mono text-[#64748B] uppercase block">
+            <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
+              <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
                 Squad Composition
               </span>
-              <div className="text-2xl font-bold font-headline text-[#0F172A] mt-0.5">
+              <div className="text-2xl font-bold font-headline text-[#0F172A] dark:text-white mt-0.5">
                 5 Players
               </div>
-              <span className="text-[11px] text-red-600 font-mono font-bold">
+              <span className="text-[11px] text-red-600 dark:text-red-400 font-mono font-bold">
                 Zero Substitutes Allowed
               </span>
             </div>
 
-            <div className="bg-[#F8F9FA] p-4 rounded-lg border border-[#E2E8F0]">
+            <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
               <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-[#64748B] uppercase">Tournament Bracket</span>
+                <span className="text-[#64748B] dark:text-[#94A3B8] uppercase">Tournament Bracket</span>
                 <span className="text-[#E56A10] font-bold">
-                  {currentTournament.registeredTeams} / {currentTournament.maxTeams} Teams
+                  {registeredTeams} / {maxTeams} Teams
                 </span>
               </div>
-              <div className="text-2xl font-bold font-headline text-[#0F172A] mt-0.5">
-                {Math.round((currentTournament.registeredTeams / currentTournament.maxTeams) * 100)}% Filled
+              <div className="text-2xl font-bold font-headline text-[#0F172A] dark:text-white mt-0.5">
+                {fillPct}% Filled
               </div>
-              <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full mt-1.5 overflow-hidden">
+              <div className="w-full bg-[#E2E8F0] dark:bg-[#242C3D] h-1.5 rounded-full mt-1.5 overflow-hidden">
                 <div
                   className="bg-[#E56A10] h-full rounded-full"
                   style={{
-                    width: `${(currentTournament.registeredTeams / currentTournament.maxTeams) * 100}%`,
+                    width: `${fillPct}%`,
                   }}
                 />
               </div>
             </div>
 
-            <div className="bg-[#F8F9FA] p-4 rounded-lg border border-[#E2E8F0]">
-              <span className="text-[10px] font-mono text-[#64748B] uppercase block">
+            <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
+              <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
                 Match Adjudication
               </span>
-              <div className="text-2xl font-bold font-headline text-[#0F172A] mt-0.5">
+              <div className="text-2xl font-bold font-headline text-[#0F172A] dark:text-white mt-0.5">
                 Single Elim
               </div>
-              <span className="text-[11px] text-[#64748B] font-mono">
+              <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
                 Bo1 Rounds // Bo3 Final
               </span>
             </div>
@@ -341,7 +379,7 @@ export default function TournamentDetailPage({ params }: Props) {
       </section>
 
       {/* 2. Sticky Tab Controls */}
-      <nav className="sticky top-16 z-40 bg-white border-b border-[#E2E8F0] shadow-xs">
+      <nav className="sticky top-16 z-40 bg-white dark:bg-[#0B0E16]/95 backdrop-blur-md border-b border-[#E2E8F0] dark:border-[#242C3D] shadow-xs transition-colors">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8 flex items-center justify-between overflow-x-auto py-2">
           <div className="flex items-center gap-2 font-mono text-xs whitespace-nowrap">
             {[
@@ -349,15 +387,15 @@ export default function TournamentDetailPage({ params }: Props) {
               { id: "schedule", label: "Schedule & Timeline" },
               { id: "prizes", label: "Prize Distribution" },
               { id: "bracket", label: "Live Bracket" },
-              { id: "rosters", label: `Squads (${currentTournament.registeredRosters.length})` },
+              { id: "rosters", label: `Squads (${safeRosters.length})` },
             ].map((t) => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id as any)}
-                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-colors ${
+                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-colors cursor-pointer ${
                   activeTab === t.id
-                    ? "bg-[#E56A10] text-white"
-                    : "bg-[#F1F3F5] text-[#475569] hover:text-[#0F172A]"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "bg-[#F1F3F5] dark:bg-[#161A24] text-[#475569] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white border border-transparent dark:border-[#242C3D]"
                 }`}
               >
                 {t.label}
@@ -365,9 +403,9 @@ export default function TournamentDetailPage({ params }: Props) {
             ))}
           </div>
 
-          <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-[#64748B]">
+          <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-[#64748B] dark:text-[#94A3B8]">
             <span>OFFICIAL ESCROW NODE:</span>
-            <span className="px-2 py-0.5 bg-[#F1F3F5] text-[#0F172A] font-bold rounded">
+            <span className="px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] border dark:border-[#242C3D] text-[#0F172A] dark:text-[#E56A10] font-bold rounded">
               RZP-PAID-SECURE
             </span>
           </div>
@@ -379,75 +417,81 @@ export default function TournamentDetailPage({ params }: Props) {
         {activeTab === "overview" && (
           <div className="flex flex-col gap-8">
             {/* Rules Matrix */}
-            <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
-              <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-4">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
+              <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-4">
                 Tournament Regulations &amp; Protocols
               </h2>
-              <ul className="space-y-3 text-xs text-[#475569]">
-                {currentTournament.rules.map((rule, idx) => (
+              <ul className="space-y-3 text-xs text-[#475569] dark:text-[#94A3B8]">
+                {safeRules.map((rule, idx) => (
                   <li key={idx} className="flex items-start gap-2.5">
                     <CheckCircle className="w-4 h-4 text-[#E56A10] flex-shrink-0 mt-0.5" />
                     <span className="leading-relaxed">{rule}</span>
                   </li>
                 ))}
+                {safeRules.length === 0 && (
+                  <li className="text-[#64748B] italic">Standard fair play and platform tournament regulations apply.</li>
+                )}
               </ul>
             </div>
           </div>
         )}
 
         {activeTab === "schedule" && (
-          <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
-            <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-4">
+          <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
+            <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-4">
               Schedule &amp; Match Progression
             </h2>
             <div className="space-y-4">
-              {currentTournament.schedule.map((item, idx) => (
+              {safeSchedule.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-[#F8F9FA] rounded-lg border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                  className="p-4 bg-[#F8F9FA] dark:bg-[#161A24] rounded-lg border border-[#E2E8F0] dark:border-[#242C3D] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
                   <div>
-                    <span className="font-bold text-sm text-[#0F172A] block">
+                    <span className="font-bold text-sm text-[#0F172A] dark:text-white block">
                       {item.stage}
                     </span>
-                    <span className="text-[#64748B] mt-0.5 block">{item.details}</span>
+                    <span className="text-[#64748B] dark:text-[#94A3B8] mt-0.5 block">{item.details}</span>
                   </div>
-                  <span className="px-3 py-1 bg-white border border-[#CBD5E1] rounded font-mono font-bold text-[#E56A10] whitespace-nowrap">
+                  <span className="px-3 py-1 bg-white dark:bg-[#0B0E16] border border-[#CBD5E1] dark:border-[#242C3D] rounded font-mono font-bold text-[#E56A10] whitespace-nowrap">
                     {item.time}
                   </span>
                 </div>
               ))}
+              {safeSchedule.length === 0 && (
+                <div className="text-[#64748B] text-xs py-4 text-center">Schedule details will be announced when bracket seeds lock.</div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === "prizes" && (
-          <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
-            <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-2">
+          <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
+            <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-2">
               Prize Pool Distribution
             </h2>
-            <p className="text-xs text-[#64748B] mb-6">
+            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mb-6">
               Total Escrow Backed: <strong className="text-[#E56A10]">{currentTournament.prizePool}</strong>. Payouts processed automatically within 30 minutes of final match verification.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {currentTournament.prizes.map((p, idx) => (
+              {safePrizes.map((p, idx) => (
                 <div
                   key={idx}
-                  className="p-5 bg-[#F8F9FA] rounded-xl border border-[#E2E8F0] flex flex-col justify-between"
+                  className="p-5 bg-[#F8F9FA] dark:bg-[#161A24] rounded-xl border border-[#E2E8F0] dark:border-[#242C3D] flex flex-col justify-between"
                 >
                   <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded self-start ${p.badge}`}>
                     {p.rank}
                   </span>
                   <div className="my-4">
-                    <span className="text-3xl font-bold font-headline text-[#0F172A] tabular-nums block">
+                    <span className="text-3xl font-bold font-headline text-[#0F172A] dark:text-white tabular-nums block">
                       {p.amount}
                     </span>
-                    <span className="text-xs text-[#64748B] font-mono">
+                    <span className="text-xs text-[#64748B] dark:text-[#94A3B8] font-mono">
                       {p.share} of total pool
                     </span>
                   </div>
-                  <span className="text-[11px] text-emerald-600 font-mono font-bold">
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
                     ✓ Instant Razorpay Disbursal
                   </span>
                 </div>
@@ -457,13 +501,13 @@ export default function TournamentDetailPage({ params }: Props) {
         )}
 
         {activeTab === "bracket" && (
-          <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-bold font-headline text-[#0F172A]">
+                <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white">
                   Tournament Single-Elimination Bracket
                 </h2>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
                   Live real-time match advancement. Winners auto-advance upon admin evidence certification.
                 </p>
               </div>
@@ -473,23 +517,23 @@ export default function TournamentDetailPage({ params }: Props) {
             </div>
 
             <BracketTree
-              rounds={currentTournament.bracketRounds}
+              rounds={safeBracket}
               onSelectMatch={handleSelectBracketMatch}
             />
           </div>
         )}
 
         {activeTab === "rosters" && (
-          <div className="bg-white rounded-xl p-6 border border-[#E2E8F0] shadow-xs">
-            <h2 className="text-xl font-bold font-headline text-[#0F172A] mb-4">
-              Confirmed Squad Lineups ({currentTournament.registeredRosters.length})
+          <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
+            <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-4">
+              Confirmed Squad Lineups ({safeRosters.length})
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {currentTournament.registeredRosters.map((roster, idx) => (
+              {safeRosters.map((roster, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E2E8F0] flex flex-col gap-3"
+                  className="p-4 bg-[#F8F9FA] dark:bg-[#161A24] rounded-xl border border-[#E2E8F0] dark:border-[#242C3D] flex flex-col gap-3"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -497,26 +541,26 @@ export default function TournamentDetailPage({ params }: Props) {
                         {roster.tag}
                       </div>
                       <div>
-                        <h4 className="font-headline font-bold text-sm text-[#0F172A]">
+                        <h4 className="font-headline font-bold text-sm text-[#0F172A] dark:text-white">
                           {roster.name}
                         </h4>
-                        <span className="text-[10px] text-[#64748B] font-mono">
+                        <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] font-mono">
                           Captain: @{roster.captain}
                         </span>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold rounded">
+                    <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border dark:border-emerald-500/30 text-[10px] font-mono font-bold rounded">
                       SEEDED
                     </span>
                   </div>
 
-                  <div className="text-[11px] font-mono text-[#475569] border-t border-[#E2E8F0] pt-2">
-                    <span className="text-[#64748B] block mb-1">Squad Members:</span>
+                  <div className="text-[11px] font-mono text-[#475569] dark:text-[#94A3B8] border-t border-[#E2E8F0] dark:border-[#242C3D] pt-2">
+                    <span className="text-[#64748B] dark:text-[#94A3B8] block mb-1">Squad Members:</span>
                     <div className="flex flex-wrap gap-1">
-                      {roster.members.map((m, mIdx) => (
+                      {(roster.members || []).map((m, mIdx) => (
                         <span
                           key={mIdx}
-                          className="px-2 py-0.5 bg-white border border-[#E2E8F0] rounded text-[10px]"
+                          className="px-2 py-0.5 bg-white dark:bg-[#0B0E16] border border-[#E2E8F0] dark:border-[#242C3D] text-slate-700 dark:text-slate-300 rounded text-[10px]"
                         >
                           @{m}
                         </span>
@@ -525,6 +569,11 @@ export default function TournamentDetailPage({ params }: Props) {
                   </div>
                 </div>
               ))}
+              {safeRosters.length === 0 && (
+                <div className="col-span-2 text-center text-[#64748B] py-8 text-xs font-mono">
+                  No confirmed squads yet. Be the first captain to register your roster!
+                </div>
+              )}
             </div>
           </div>
         )}

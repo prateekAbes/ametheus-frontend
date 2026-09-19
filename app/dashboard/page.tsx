@@ -450,7 +450,7 @@ export default function DashboardPage() {
   const balance = profile?.inr_balance ?? 8250;
 
   return (
-    <div className="flex flex-col w-full bg-[#F8F9FF] min-h-screen text-[#0B1C30] antialiased">
+    <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-slate-100 antialiased transition-colors">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#10141F] text-white border border-[#E56A10] px-5 py-3 rounded-lg shadow-2xl flex items-center gap-2.5 font-mono text-xs animate-bounce">
@@ -479,14 +479,14 @@ export default function DashboardPage() {
       )}
 
       {/* Sub-Header Navigation Bar */}
-      <div className="w-full bg-white border-b border-slate-200 py-3 px-4 md:px-8">
+      <div className="w-full bg-white dark:bg-[#0F131D] border-b border-slate-200 dark:border-[#242C3D] py-3 px-4 md:px-8 transition-colors">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2 text-slate-500">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
             <Link href="/" className="hover:text-[#E56A10] transition-colors">
               HOME
             </Link>
             <span>/</span>
-            <span className="text-slate-900 font-bold uppercase">COMPETITIVE DASHBOARD</span>
+            <span className="text-slate-900 dark:text-white font-bold uppercase">COMPETITIVE DASHBOARD</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -501,7 +501,7 @@ export default function DashboardPage() {
             {isOrganizer && (
               <Link
                 href="/organizer"
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded font-bold uppercase text-[11px] transition-all flex items-center gap-1"
+                className="px-2.5 py-1 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#1E2538] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#242C3D] rounded font-bold uppercase text-[11px] transition-all flex items-center gap-1"
               >
                 <Calendar className="w-3.5 h-3.5 text-[#E56A10]" /> Organizer Hub
               </Link>
@@ -514,12 +514,12 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto w-full px-4 md:px-8 py-8 space-y-6">
 
         {/* 1. TOP WELCOME & METRIC SECTION (Stitch Spec) */}
-        <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-5">
+        <div className="bg-white dark:bg-[#121622] rounded-xl p-6 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-5 transition-colors">
           {/* User ID Bar */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-[#242C3D]">
             <div className="flex items-center gap-4">
               <div className="relative shrink-0">
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-200 relative shadow-sm">
+                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-[#161A24] border-2 border-slate-200 dark:border-[#242C3D] relative shadow-sm">
                   <Image
                     src={userAvatar}
                     alt={displayName}
@@ -528,34 +528,34 @@ export default function DashboardPage() {
                     unoptimized
                   />
                 </div>
-                <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white dark:border-[#121622] flex items-center justify-center">
                   <span className="w-1.5 h-1.5 rounded-full bg-white" />
                 </span>
               </div>
 
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-tight">
+                  <h1 className="text-2xl font-bold font-headline text-slate-900 dark:text-white uppercase tracking-tight">
                     {displayName}
                   </h1>
-                  <span className="px-2 py-0.5 rounded bg-orange-100 text-[#E56A10] font-mono text-[11px] font-bold uppercase">
+                  <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[11px] font-bold uppercase">
                     PRO TIER 1
                   </span>
                   {effectiveRole !== "PLAYER" && (
-                    <span className="px-2 py-0.5 rounded bg-slate-900 text-white font-mono text-[11px] font-bold uppercase">
+                    <span className="px-2 py-0.5 rounded bg-slate-900 dark:bg-[#1A2234] text-white font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
                       {effectiveRole}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-3 mt-1 text-xs">
-                  <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600">
+                  <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                     MATCH READY
                   </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="font-mono text-slate-500">
-                    Ametheus ID: <span className="font-bold text-slate-900">ATH-8921-X</span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span className="font-mono text-slate-500 dark:text-slate-400">
+                    Ametheus ID: <span className="font-bold text-slate-900 dark:text-white">ATH-8921-X</span>
                   </span>
                 </div>
               </div>
@@ -572,7 +572,7 @@ export default function DashboardPage() {
 
               <button
                 onClick={() => setIsEditProfileOpen(true)}
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer border border-slate-200"
+                className="p-2.5 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#1E2538] text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer border border-slate-200 dark:border-[#242C3D]"
                 title="Edit Gamer Profile"
               >
                 <Settings className="w-4 h-4" />
@@ -583,16 +583,16 @@ export default function DashboardPage() {
           {/* Quick Metrics Ribbon (5 Cards) */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
             {/* Metric 1: Total Earnings */}
-            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
-              <div className="flex items-center justify-between text-slate-500">
+            <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Prize Winnings</span>
                 <Trophy className="w-4 h-4 text-[#E56A10]" />
               </div>
               <div className="mt-2">
-                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
                   ₹48,500
                 </div>
-                <div className="flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold mt-0.5">
+                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold mt-0.5">
                   <TrendingUp className="w-3.5 h-3.5" />
                   <span>+₹12,400 this season</span>
                 </div>
@@ -600,29 +600,29 @@ export default function DashboardPage() {
             </div>
 
             {/* Metric 2: Win Rate */}
-            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
-              <div className="flex items-center justify-between text-slate-500">
+            <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Competitive WR</span>
-                <Award className="w-4 h-4 text-blue-600" />
+                <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="mt-2">
-                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
                   68.4%
                 </div>
-                <div className="text-slate-500 font-mono text-[11px] mt-0.5">
-                  <span className="text-slate-900 font-bold">142W</span> • 66L
+                <div className="text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-0.5">
+                  <span className="text-slate-900 dark:text-white font-bold">142W</span> • 66L
                 </div>
               </div>
             </div>
 
             {/* Metric 3: Elo Rating */}
-            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
-              <div className="flex items-center justify-between text-slate-500">
+            <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Global Elo</span>
-                <Shield className="w-4 h-4 text-indigo-600" />
+                <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="mt-2">
-                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
                   2,480
                 </div>
                 <div className="text-[#E56A10] font-mono text-[11px] font-bold mt-0.5">
@@ -632,16 +632,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Metric 4: Squad Readiness */}
-            <div className="bg-[#EFF4FF] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 hover:border-blue-200 transition-colors">
-              <div className="flex items-center justify-between text-slate-500">
+            <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Active Squad</span>
-                <Users className="w-4 h-4 text-slate-600" />
+                <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               </div>
               <div className="mt-2">
-                <div className="text-base font-bold font-headline text-slate-900 truncate">
+                <div className="text-base font-bold font-headline text-slate-900 dark:text-white truncate">
                   {teams[0]?.name || "VORTEX SYND."}
                 </div>
-                <div className="flex items-center gap-1 font-mono text-[11px] text-emerald-600 font-bold mt-0.5">
+                <div className="flex items-center gap-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   {teams[0] ? `${teams[0].members?.length || 5}/5 Ready` : "5/5 Ready (Captain)"}
                 </div>
@@ -649,19 +649,19 @@ export default function DashboardPage() {
             </div>
 
             {/* Metric 5: Escrow Balance */}
-            <div className="col-span-2 md:col-span-1 bg-amber-50/70 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60">
-              <div className="flex items-center justify-between text-slate-700">
+            <div className="col-span-2 md:col-span-1 bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60 dark:border-amber-800/40 transition-colors">
+              <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E56A10]">
                   Escrow Balance
                 </span>
                 <Wallet className="w-4 h-4 text-[#E56A10]" />
               </div>
               <div className="mt-2">
-                <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
                   ₹{balance.toLocaleString()}
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-slate-500 font-mono text-[11px]">Safe Guaranteed</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">Safe Guaranteed</span>
                   <button
                     onClick={() => setIsWithdrawOpen(true)}
                     className="text-[#E56A10] hover:text-[#C95B0A] font-mono text-[11px] uppercase font-bold cursor-pointer hover:underline"
@@ -673,6 +673,8 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+
 
         {/* 2. HIGH-VISIBILITY URGENT CHECK-IN CARD (Stitch Spec Inverted Dark Banner) */}
         <div className="bg-[#10141F] text-white rounded-xl p-6 shadow-xl border border-[#242C3D] relative overflow-hidden">
@@ -779,15 +781,15 @@ export default function DashboardPage() {
           <div className="lg:col-span-8 space-y-6">
 
             {/* SECTION: Upcoming Registered Tournaments */}
-            <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-6 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-[#E56A10]" />
-                  <h3 className="font-headline text-lg font-bold text-slate-900 uppercase tracking-tight">
+                  <h3 className="font-headline text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                     Registered Tournaments
                   </h3>
                 </div>
-                <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-mono text-[11px] font-bold uppercase">
+                <span className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
                   3 ACTIVE ENTRIES
                 </span>
               </div>
@@ -795,9 +797,9 @@ export default function DashboardPage() {
               {/* Tournament Cards Stack */}
               <div className="space-y-3">
                 {/* Card 1: Smash Karts */}
-                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
                       <Image
                         src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200&auto=format&fit=crop"
                         alt="Smash Karts"
@@ -807,22 +809,22 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-300 font-mono text-[10px] font-bold uppercase">
                           SOLO DEATHMATCH
                         </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="font-mono text-[10px] text-emerald-600 font-bold uppercase">
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase">
                           CONFIRMED (SLOT #12)
                         </span>
                       </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900">
+                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
                         Smash Karts Frenzy Blitz
                       </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" /> Tomorrow @ 6:00 PM IST
                         </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
                           <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹25,000
                         </span>
                       </div>
@@ -832,13 +834,13 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     <Link
                       href="/tournaments/smash-karts-frenzy-blitz"
-                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-mono text-xs font-bold uppercase transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#202636] hover:bg-slate-100 dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#242C3D] font-mono text-xs font-bold uppercase transition-colors"
                     >
                       Rulebook
                     </Link>
                     <Link
                       href="/tournaments/smash-karts-frenzy-blitz"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
                     >
                       View Bracket
                     </Link>
@@ -846,9 +848,9 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Card 2: Mini Militia */}
-                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
                       <Image
                         src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=200&auto=format&fit=crop"
                         alt="Mini Militia"
@@ -858,25 +860,25 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-mono text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-300 font-mono text-[10px] font-bold uppercase">
                           4V4 SQUAD
                         </span>
-                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
                         <span className="font-mono text-[10px] text-[#E56A10] font-bold uppercase">
                           SQUAD CODE: MM88XK
                         </span>
                       </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900">
+                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
                         Mini Militia Subterranean Cup
                       </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" /> Saturday, 8:00 PM IST
                         </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
                           <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹15,000
                         </span>
-                        <span className="text-emerald-600 font-bold">4/4 Ready</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">4/4 Ready</span>
                       </div>
                     </div>
                   </div>
@@ -884,13 +886,13 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     <button
                       onClick={() => copyToClipboard("MM88XK", "Squad invite code copied!")}
-                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-mono text-xs font-bold uppercase flex items-center gap-1 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#202636] hover:bg-slate-100 dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#242C3D] font-mono text-xs font-bold uppercase flex items-center gap-1 transition-colors cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" /> Invite Teammate
                     </button>
                     <Link
                       href="/tournaments/mini-militia-subterranean-cup"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
                     >
                       Match Hub
                     </Link>
@@ -898,9 +900,9 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Card 3: Counter-Strike 2 */}
-                <div className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200">
+                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 shrink-0 overflow-hidden relative border border-slate-300">
+                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
                       <Image
                         src="https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=200&auto=format&fit=crop"
                         alt="CS2"
@@ -910,22 +912,22 @@ export default function DashboardPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-orange-100 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
                           5V5 COMPETITIVE
                         </span>
-                        <span className="text-slate-300">•</span>
-                        <span className="font-mono text-[10px] text-slate-600 font-bold uppercase">
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <span className="font-mono text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase">
                           SEED #4 • ESCROW SECURED
                         </span>
                       </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900">
+                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
                         Counter-Strike 2 Premier Showdown
                       </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" /> Sunday, 7:00 PM IST
                         </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900">
+                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
                           <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹1,00,000
                         </span>
                       </div>
@@ -935,7 +937,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     <Link
                       href="/tournaments/cs2-masters-s1"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-mono text-xs font-bold uppercase transition-colors"
+                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
                     >
                       Match Hub
                     </Link>
@@ -945,17 +947,17 @@ export default function DashboardPage() {
             </div>
 
             {/* SECTION: Recent Match History & OCR Verification Status */}
-            <div className="bg-white rounded-xl p-6 shadow-xs border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-6 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-[#E56A10]" />
-                  <h3 className="font-headline text-lg font-bold text-slate-900 uppercase tracking-tight">
+                  <h3 className="font-headline text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                     Recent Match Logs &amp; OCR Payouts
                   </h3>
                 </div>
                 <button
                   onClick={exportMatchCsv}
-                  className="font-mono text-xs uppercase text-slate-600 hover:text-slate-900 flex items-center gap-1 font-bold cursor-pointer transition-colors"
+                  className="font-mono text-xs uppercase text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 font-bold cursor-pointer transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Export Log
@@ -966,7 +968,7 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-100 text-slate-600 font-mono uppercase text-[11px]">
+                    <tr className="bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px]">
                       <th className="py-2.5 px-3 rounded-l-lg">Match / Event</th>
                       <th className="py-2.5 px-3">Opponent</th>
                       <th className="py-2.5 px-3">Outcome</th>
@@ -974,64 +976,64 @@ export default function DashboardPage() {
                       <th className="py-2.5 px-3 rounded-r-lg text-right">OCR Verification</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D] font-medium">
                     {/* Row 1 */}
-                    <tr className="hover:bg-slate-50 transition-colors">
+                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
                       <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900">Valorant Weekly #42</div>
-                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88912 • Ascent</span>
+                        <div className="font-headline font-bold text-slate-900 dark:text-white">Valorant Weekly #42</div>
+                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88912 • Ascent</span>
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900">Reckless Gaming</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Reckless Gaming</td>
                       <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
                           VICTORY 13-9
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                         +₹15,000
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
                           <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
                         </span>
                       </td>
                     </tr>
 
                     {/* Row 2 */}
-                    <tr className="hover:bg-slate-50 transition-colors">
+                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
                       <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900">Mini Militia Blitz Arena</div>
-                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88741 • Catacombs</span>
+                        <div className="font-headline font-bold text-slate-900 dark:text-white">Mini Militia Blitz Arena</div>
+                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88741 • Catacombs</span>
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900">Shadow Brigade</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Shadow Brigade</td>
                       <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-mono text-[10px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-400 font-mono text-[10px] font-bold">
                           DEFEAT 11-13
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-400 tabular-nums">
+                      <td className="py-3 px-3 text-right font-bold text-slate-400 dark:text-slate-500 tabular-nums">
                         ₹0
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-slate-500 font-mono text-[11px]">
+                        <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
                           <Check className="w-3.5 h-3.5" /> Auto-Settled
                         </span>
                       </td>
                     </tr>
 
                     {/* Row 3 */}
-                    <tr className="hover:bg-slate-50 transition-colors">
+                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
                       <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900">Smash Karts Solo Night</div>
-                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88604 • Lava Pit</span>
+                        <div className="font-headline font-bold text-slate-900 dark:text-white">Smash Karts Solo Night</div>
+                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88604 • Lava Pit</span>
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900">12-Player FFA</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">12-Player FFA</td>
                       <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
                           VICTORY 1st
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                         +₹2,500
                       </td>
                       <td className="py-3 px-3 text-right">
@@ -1042,22 +1044,22 @@ export default function DashboardPage() {
                     </tr>
 
                     {/* Row 4 */}
-                    <tr className="hover:bg-slate-50 transition-colors">
+                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
                       <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900">CS2 Wingman Cup Q3</div>
-                        <span className="font-mono text-slate-500 text-[11px]">#MTC-88319 • Inferno</span>
+                        <div className="font-headline font-bold text-slate-900 dark:text-white">CS2 Wingman Cup Q3</div>
+                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88319 • Inferno</span>
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900">Kodiak Duo</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Kodiak Duo</td>
                       <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
                           VICTORY 9-4
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                         +₹5,000
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-mono text-[11px] font-bold">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
                           <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
                         </span>
                       </td>
@@ -1067,12 +1069,12 @@ export default function DashboardPage() {
               </div>
 
               {/* Bottom OCR Notice */}
-              <div className="bg-slate-50 p-3 rounded-lg flex items-center justify-between text-xs text-slate-600 border border-slate-200">
+              <div className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#E56A10]" />
                   <span>
                     Ametheus OCR engine verifies victory screenshots within an average latency of{" "}
-                    <strong className="text-slate-900">18.4 seconds</strong>.
+                    <strong className="text-slate-900 dark:text-white">18.4 seconds</strong>.
                   </span>
                 </div>
                 <Link
@@ -1089,15 +1091,15 @@ export default function DashboardPage() {
           <div className="lg:col-span-4 space-y-6">
 
             {/* SECTION: Active Squads & Quick Join/Create */}
-            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-5 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#E56A10]" />
-                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                  <h3 className="font-headline text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                     Active Squads
                   </h3>
                 </div>
-                <span className="font-mono text-[11px] text-slate-500 uppercase font-bold">
+                <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold">
                   {teams.length} Squad{teams.length !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -1114,38 +1116,38 @@ export default function DashboardPage() {
                     const isCaptain = squad.captain_id === user?.id || squad.captain_username === (profile?.display_name || user?.username);
 
                     return (
-                      <div key={squad.id || inviteCode} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                      <div key={squad.id || inviteCode} className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg border border-slate-200 dark:border-[#242C3D] space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-headline text-sm font-bold text-slate-900">
+                            <span className="font-headline text-sm font-bold text-slate-900 dark:text-white">
                               {squad.name}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold ${
-                              isCaptain ? "bg-[#E56A10] text-white" : "bg-slate-200 text-slate-700"
+                              isCaptain ? "bg-[#E56A10] text-white" : "bg-slate-200 dark:bg-[#202636] text-slate-700 dark:text-slate-300"
                             }`}>
                               {isCaptain ? "CAPTAIN" : "MEMBER"}
                             </span>
                           </div>
-                          <span className="text-[11px] font-mono text-slate-500 uppercase font-semibold">
+                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase font-semibold">
                             {gameSlug}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between pt-1">
-                          <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
+                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
                             <span className={`w-2 h-2 rounded-full ${isFull ? "bg-emerald-500" : "bg-[#E56A10]"}`} />
                             <span>
                               {memberCount}/{rosterReq.max} {rosterReq.formatName} {isFull ? "• Full" : `• ${rosterReq.max - memberCount} Needed`}
                             </span>
                           </div>
 
-                          <div className="flex items-center bg-white border border-slate-300 px-2 py-0.5 rounded gap-1">
-                            <span className="font-mono text-xs font-bold text-slate-900 tracking-wider">
+                          <div className="flex items-center bg-white dark:bg-[#202636] border border-slate-300 dark:border-[#242C3D] px-2 py-0.5 rounded gap-1">
+                            <span className="font-mono text-xs font-bold text-slate-900 dark:text-white tracking-wider">
                               {inviteCode}
                             </span>
                             <button
                               onClick={() => copyToClipboard(inviteCode, `Squad Code "${inviteCode}" copied!`)}
-                              className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
                               title="Copy permanent squad code"
                             >
                               <Copy className="w-3 h-3" />
@@ -1156,10 +1158,10 @@ export default function DashboardPage() {
                     );
                   })
                 ) : (
-                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center space-y-2">
-                    <Users className="w-8 h-8 text-slate-400 mx-auto" />
-                    <div className="text-xs font-bold text-slate-800 font-headline">No Active Squads</div>
-                    <p className="text-[11px] text-slate-500 font-mono">
+                  <div className="bg-slate-50 dark:bg-[#161A24] p-6 rounded-lg border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
+                    <Users className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 font-headline">No Active Squads</div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                       Create your own squad or join your friends using an invite code.
                     </p>
                   </div>
@@ -1170,14 +1172,14 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   onClick={() => setIsCreateSquadOpen(true)}
-                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Create Squad
                 </button>
                 <button
                   onClick={() => setIsJoinSquadOpen(true)}
-                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Users className="w-3.5 h-3.5" />
                   Join via Code
@@ -1186,29 +1188,29 @@ export default function DashboardPage() {
             </div>
 
             {/* SECTION: Escrow Wallet & Quick Payout */}
-            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-5 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Wallet className="w-4 h-4 text-[#E56A10]" />
-                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                  <h3 className="font-headline text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                     Escrow Wallet
                   </h3>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
+                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
                   100% SECURE
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+              <div className="bg-slate-50 dark:bg-[#161A24] p-4 rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-3">
                 <div className="flex justify-between items-baseline">
                   <div>
-                    <span className="text-[11px] font-mono text-slate-500 uppercase">Available Balance</span>
-                    <div className="text-2xl font-bold font-headline text-slate-900 tabular-nums">
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase">Available Balance</span>
+                    <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
                       ₹{balance.toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono text-slate-500 uppercase">Locked in Escrow</span>
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase">Locked in Escrow</span>
                     <div className="text-base font-bold font-headline text-[#E56A10] tabular-nums">
                       ₹3,000
                     </div>
@@ -1218,87 +1220,87 @@ export default function DashboardPage() {
                 <div className="pt-1">
                   <button
                     onClick={() => setIsWithdrawOpen(true)}
-                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-headline text-xs font-bold uppercase rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-headline text-xs font-bold uppercase rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Send className="w-3.5 h-3.5 text-[#E56A10]" />
+                    <Send className="w-3.5 h-3.5 text-[#E56A10] dark:text-white" />
                     Request Withdrawal (Admin Approved)
                   </button>
 
-                  <div className="flex items-center justify-center gap-1 text-slate-500 font-mono text-[11px] mt-2">
-                    <CheckCircle className="w-3 h-3 text-emerald-600" />
-                    <span>Connected UPI: <strong className="text-slate-800">{upiId}</strong></span>
+                  <div className="flex items-center justify-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-2">
+                    <CheckCircle className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>Connected UPI: <strong className="text-slate-800 dark:text-slate-200">{upiId}</strong></span>
                   </div>
                 </div>
               </div>
 
               {/* Mini Transaction Ledger */}
               <div className="space-y-2 pt-1">
-                <span className="text-[11px] font-mono uppercase text-slate-500 font-bold">Recent Ledger</span>
-                <div className="space-y-1.5 text-xs font-mono divide-y divide-slate-100">
+                <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold">Recent Ledger</span>
+                <div className="space-y-1.5 text-xs font-mono divide-y divide-slate-100 dark:divide-[#242C3D]">
                   <div className="flex items-center justify-between pt-1.5">
                     <div>
-                      <div className="font-bold text-slate-800">Valorant Weekly Cup</div>
-                      <div className="text-[10px] text-slate-400">Today, 2:15 PM</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">Valorant Weekly Cup</div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Today, 2:15 PM</div>
                     </div>
-                    <span className="font-bold text-emerald-600 tabular-nums">+₹15,000</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+₹15,000</span>
                   </div>
 
                   <div className="flex items-center justify-between pt-1.5">
                     <div>
-                      <div className="font-bold text-slate-800">Subterranean Cup Entry</div>
-                      <div className="text-[10px] text-slate-400">Yesterday</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">Subterranean Cup Entry</div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Yesterday</div>
                     </div>
-                    <span className="font-bold text-slate-700 tabular-nums">-₹500</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300 tabular-nums">-₹500</span>
                   </div>
 
                   <div className="flex items-center justify-between pt-1.5">
                     <div>
-                      <div className="font-bold text-slate-800">Smash Karts Daily</div>
-                      <div className="text-[10px] text-slate-400">Nov 20, 2025</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">Smash Karts Daily</div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Nov 20, 2025</div>
                     </div>
-                    <span className="font-bold text-emerald-600 tabular-nums">+₹2,500</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+₹2,500</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* SECTION: Platform Telemetry & Live Alerts */}
-            <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="bg-white dark:bg-[#121622] rounded-xl p-5 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4 text-[#E56A10]" />
-                  <h3 className="font-headline text-base font-bold text-slate-900 uppercase tracking-tight">
+                  <h3 className="font-headline text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
                     Platform Telemetry
                   </h3>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-600 font-bold uppercase">Live</span>
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold uppercase">Live</span>
               </div>
 
               <div className="space-y-2">
-                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
+                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
                   <Shield className="w-4 h-4 text-[#E56A10] shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-bold text-slate-900">Referee match room assigned</p>
-                    <p className="text-slate-500 text-[11px]">Official referee @Kuro assigned to Room #VTX-9942.</p>
-                    <span className="text-[10px] font-mono text-slate-400">3 mins ago</span>
+                    <p className="font-bold text-slate-900 dark:text-white">Referee match room assigned</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Official referee @Kuro assigned to Room #VTX-9942.</p>
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">3 mins ago</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-bold text-slate-900">Prize payout released</p>
-                    <p className="text-slate-500 text-[11px]">Escrow released for Valorant Weekly Cup 1st place.</p>
-                    <span className="text-[10px] font-mono text-slate-400">2 hours ago</span>
+                    <p className="font-bold text-slate-900 dark:text-white">Prize payout released</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Escrow released for Valorant Weekly Cup 1st place.</p>
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">2 hours ago</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200">
-                  <Gamepad2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
+                  <Gamepad2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-bold text-slate-900">Mini Militia slot confirmed</p>
-                    <p className="text-slate-500 text-[11px]">Bracket seed locked in slot #8.</p>
-                    <span className="text-[10px] font-mono text-slate-400">Yesterday</span>
+                    <p className="font-bold text-slate-900 dark:text-white">Mini Militia slot confirmed</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Bracket seed locked in slot #8.</p>
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">Yesterday</span>
                   </div>
                 </div>
               </div>
@@ -1310,17 +1312,17 @@ export default function DashboardPage() {
       {/* MODAL 1: Edit Profile Modal (Steam ID and Riot ID removed as requested) */}
       {isEditProfileOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
                   Edit Gamer Identity
                 </h3>
               </div>
               <button
                 onClick={() => setIsEditProfileOpen(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1328,7 +1330,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Gamer Handle / Display Name *
                 </label>
                 <input
@@ -1337,15 +1339,15 @@ export default function DashboardPage() {
                   value={profileForm.display_name}
                   onChange={(e) => setProfileForm({ ...profileForm, display_name: e.target.value })}
                   placeholder="e.g. VORTEX_KID"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#E56A10] font-mono"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10] font-mono"
                 />
               </div>
 
               {/* Keep / Restore Account Profile Picture Option */}
               {user?.imageUrl && (
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 relative shrink-0">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 dark:border-[#242C3D] relative shrink-0">
                       <Image
                         src={user.imageUrl}
                         alt="Account profile picture"
@@ -1355,8 +1357,8 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-slate-900 font-headline">Original Account Picture</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Keep picture from your login account</div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white font-headline">Original Account Picture</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Keep picture from your login account</div>
                     </div>
                   </div>
                   <button
@@ -1368,7 +1370,7 @@ export default function DashboardPage() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer border ${
                       profileForm.avatar_url === user.imageUrl
                         ? "bg-[#E56A10] text-white border-[#E56A10]"
-                        : "bg-white text-slate-800 border-slate-300 hover:border-[#E56A10] hover:text-[#E56A10]"
+                        : "bg-white dark:bg-[#202636] text-slate-800 dark:text-slate-200 border-slate-300 dark:border-[#242C3D] hover:border-[#E56A10] hover:text-[#E56A10]"
                     }`}
                   >
                     {profileForm.avatar_url === user.imageUrl ? "Active" : "Use Account Picture"}
@@ -1377,9 +1379,9 @@ export default function DashboardPage() {
               )}
 
               {/* Direct File Upload to DB */}
-              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 relative shrink-0 bg-white flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 dark:border-[#242C3D] relative shrink-0 bg-white dark:bg-[#202636] flex items-center justify-center">
                     {profileForm.avatar_url ? (
                       <Image
                         src={profileForm.avatar_url}
@@ -1389,15 +1391,15 @@ export default function DashboardPage() {
                         unoptimized
                       />
                     ) : (
-                      <Upload className="w-5 h-5 text-slate-400" />
+                      <Upload className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                     )}
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900 font-headline">Upload Custom Avatar</div>
-                    <div className="text-[10px] text-slate-500 font-mono">Upload image directly to DB (PNG, JPG, WEBP)</div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white font-headline">Upload Custom Avatar</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Upload image directly to DB (PNG, JPG, WEBP)</div>
                   </div>
                 </div>
-                <label className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                <label className="px-3 py-1.5 bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
                   {isUploadingAvatar ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -1435,7 +1437,7 @@ export default function DashboardPage() {
 
               {/* Avatar Preset Selection */}
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1.5">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1.5">
                   Or Choose Esports Gaming Avatar
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1447,7 +1449,7 @@ export default function DashboardPage() {
                       className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                         profileForm.avatar_url === preset.url
                           ? "border-[#E56A10] ring-2 ring-[#E56A10]/30 scale-95"
-                          : "border-slate-200 hover:border-slate-400"
+                          : "border-slate-200 dark:border-[#242C3D] hover:border-slate-400 dark:hover:border-slate-500"
                       }`}
                     >
                       <Image
@@ -1462,7 +1464,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
+              <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#242C3D]">
                 <span className="text-[#E56A10] font-bold">Tournament Notice:</span> In-game credentials (Riot ID, Steam ID) are requested directly when entering tournament brackets.
               </div>
 
@@ -1470,7 +1472,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditProfileOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-700 dark:text-slate-300 border border-transparent dark:border-[#242C3D] text-xs font-mono uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1491,17 +1493,17 @@ export default function DashboardPage() {
       {/* MODAL 2: Deposit Funds (Razorpay Sandbox) */}
       {isDepositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
                   Deposit Funds
                 </h3>
               </div>
               <button
                 onClick={() => setIsDepositOpen(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1509,7 +1511,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleDepositSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Select Amount (₹ INR) *
                 </label>
                 <div className="grid grid-cols-4 gap-2 mb-2">
@@ -1521,7 +1523,7 @@ export default function DashboardPage() {
                       className={`py-2 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
                         depositAmount === amt
                           ? "bg-[#E56A10] text-white border-[#E56A10]"
-                          : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                          : "bg-white dark:bg-[#161A24] text-slate-800 dark:text-slate-200 border-slate-300 dark:border-[#242C3D] hover:bg-slate-100 dark:hover:bg-[#202636]"
                       }`}
                     >
                       ₹{amt}
@@ -1534,12 +1536,12 @@ export default function DashboardPage() {
                   max={50000}
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
-              <div className="p-3 bg-emerald-50 rounded-lg text-xs font-mono text-emerald-800 border border-emerald-200 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-xs font-mono text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                 <span>Instant Razorpay Escrow gateway. Funds are immediately credited to your tournament balance.</span>
               </div>
 
@@ -1547,7 +1549,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsDepositOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1568,17 +1570,17 @@ export default function DashboardPage() {
       {/* MODAL 3: Instant Withdrawal */}
       {isWithdrawOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Send className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
                   Request Wallet Withdrawal
                 </h3>
               </div>
               <button
                 onClick={() => setIsWithdrawOpen(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1586,7 +1588,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleWithdrawSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Withdrawal Amount (Available: ₹{balance.toLocaleString()}) *
                 </label>
                 <input
@@ -1595,12 +1597,12 @@ export default function DashboardPage() {
                   max={balance}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Destination UPI ID / VPA *
                 </label>
                 <input
@@ -1609,17 +1611,17 @@ export default function DashboardPage() {
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
                   placeholder="e.g. user@oksbi"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-lg text-xs font-mono text-slate-900 border border-amber-200 flex items-start gap-2.5">
-                <Shield className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-xs font-mono text-slate-900 dark:text-slate-200 border border-amber-200 dark:border-amber-900/50 flex items-start gap-2.5">
+                <Shield className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                 <div className="space-y-1">
-                  <div className="font-bold text-amber-900 uppercase tracking-wide text-[11px]">
+                  <div className="font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wide text-[11px]">
                     Admin Approval Required Before Payout
                   </div>
-                  <p className="text-slate-700 leading-relaxed text-[11px]">
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-[11px]">
                     To maintain fair play security and prevent unauthorized balance drain, all withdrawal requests are manually reviewed and certified by platform admins before IMPS/UPI disbursement.
                   </p>
                 </div>
@@ -1629,7 +1631,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsWithdrawOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer border border-slate-300"
+                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer border border-slate-300 dark:border-[#242C3D]"
                 >
                   Cancel
                 </button>
@@ -1650,17 +1652,17 @@ export default function DashboardPage() {
       {/* MODAL 4: Create Squad */}
       {isCreateSquadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
                   Register Competitive Squad
                 </h3>
               </div>
               <button
                 onClick={() => setIsCreateSquadOpen(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1668,7 +1670,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleCreateSquad} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Squad Name *
                 </label>
                 <input
@@ -1677,19 +1679,19 @@ export default function DashboardPage() {
                   placeholder="e.g. Apex Predators"
                   value={createSquadForm.name}
                   onChange={(e) => setCreateSquadForm({ ...createSquadForm, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                     Game Discipline
                   </label>
                   <select
                     value={createSquadForm.game_slug}
                     onChange={(e) => setCreateSquadForm({ ...createSquadForm, game_slug: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
                     <option value="valorant">Valorant</option>
                     <option value="counter-strike-2">Counter-Strike 2</option>
@@ -1701,7 +1703,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                     Tag (3-4 chars)
                   </label>
                   <input
@@ -1710,7 +1712,7 @@ export default function DashboardPage() {
                     placeholder="e.g. APEX"
                     value={createSquadForm.tag}
                     onChange={(e) => setCreateSquadForm({ ...createSquadForm, tag: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
               </div>
@@ -1719,14 +1721,14 @@ export default function DashboardPage() {
               {(() => {
                 const req = getGameRosterRequirement(createSquadForm.game_slug);
                 return (
-                  <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-800 border border-slate-200 flex items-center justify-between">
-                    <span className="text-slate-500">Required Squad Lineup:</span>
+                  <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#242C3D] flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Required Squad Lineup:</span>
                     <span className="font-bold text-[#E56A10] bg-[#E56A10]/10 px-2 py-0.5 rounded border border-[#E56A10]/30">{req.label}</span>
                   </div>
                 );
               })()}
 
-              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
+              <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#242C3D]">
                 You will be assigned as Squad Captain and receive a unique invite code to share with teammates.
               </div>
 
@@ -1734,7 +1736,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateSquadOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1755,17 +1757,17 @@ export default function DashboardPage() {
       {/* MODAL 5: Join Squad via Code */}
       {isJoinSquadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-lg text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
                   Join Squad via Code
                 </h3>
               </div>
               <button
                 onClick={() => setIsJoinSquadOpen(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1773,7 +1775,7 @@ export default function DashboardPage() {
 
             <form onSubmit={handleJoinSquad} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 mb-1">
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Squad Invite Code *
                 </label>
                 <input
@@ -1782,11 +1784,11 @@ export default function DashboardPage() {
                   placeholder="e.g. VTX882 or MM88XK"
                   value={joinInviteCode}
                   onChange={(e) => setJoinInviteCode(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 font-mono uppercase focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono uppercase focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
+              <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#242C3D]">
                 Ask your squad captain for their 6-character squad code. Joining links your player profile to their competitive tournament roster.
               </div>
 
@@ -1794,14 +1796,14 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsJoinSquadOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isJoiningSquad}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
+                  className="px-5 py-2 bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
                 >
                   {isJoiningSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
                   Join Squad
