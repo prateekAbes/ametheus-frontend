@@ -17,6 +17,8 @@ export default function TeamRosterCard({ team }: Props) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isFull = team.members.length >= (team.maxMembers || 5);
+
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F1F3F5] pb-4">
@@ -29,8 +31,14 @@ export default function TeamRosterCard({ team }: Props) {
               <h3 className="font-headline font-bold text-base text-[#0F172A]">
                 {team.name}
               </h3>
-              <span className="px-2 py-0.5 bg-[#F1F3F5] text-[#475569] text-[10px] font-mono font-bold rounded">
-                ACTIVE SQUAD
+              <span
+                className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded ${
+                  isFull
+                    ? "bg-rose-100 text-rose-800 border border-rose-300"
+                    : "bg-[#F1F3F5] text-[#475569]"
+                }`}
+              >
+                {isFull ? "ROSTER FULL" : "ACTIVE SQUAD"}
               </span>
             </div>
             <span className="text-xs text-[#64748B] font-mono">
@@ -51,7 +59,7 @@ export default function TeamRosterCard({ team }: Props) {
           </div>
           <button
             onClick={copyCode}
-            className="p-1 text-[#CBD5E1] hover:text-white transition-colors"
+            className="p-1 text-[#CBD5E1] hover:text-white transition-colors cursor-pointer"
             title="Copy Code"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -62,7 +70,10 @@ export default function TeamRosterCard({ team }: Props) {
       {/* Roster Slots */}
       <div>
         <div className="flex items-center justify-between text-xs text-[#64748B] font-mono mb-2">
-          <span>Roster Slots ({team.members.length} / {team.maxMembers})</span>
+          <span>
+            Roster Slots ({team.members.length} / {team.maxMembers})
+            {isFull && <strong className="text-rose-600 ml-1.5 font-bold">• ROSTER FULL</strong>}
+          </span>
           <span>Zero Substitutes Allowed</span>
         </div>
 

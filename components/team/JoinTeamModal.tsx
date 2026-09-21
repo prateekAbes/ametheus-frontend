@@ -100,8 +100,13 @@ export default function JoinTeamModal({
       return;
     }
 
+    if (matchedTeam.gameSlug === "chess" || matchedTeam.maxMembers <= 1) {
+      setError("Chess is a solo discipline. Team rosters and squad joins are not permitted.");
+      return;
+    }
+
     if (matchedTeam.members.length >= matchedTeam.maxMembers) {
-      setError("This squad is already full (5/5).");
+      setError(`This squad is already full (${matchedTeam.members.length}/${matchedTeam.maxMembers}).`);
       return;
     }
 
@@ -138,26 +143,9 @@ export default function JoinTeamModal({
       setMatchedTeam(updatedTeam);
       setJoinedSuccess(true);
       onTeamJoined(updatedTeam);
-    } catch (err: unknown) {
-      console.warn("Backend API join failed, using local fallback:", err);
-      const fallbackTeam: Team = {
-        ...matchedTeam,
-        members: [
-          ...matchedTeam.members,
-          {
-            userId: `usr_${Date.now()}`,
-            username: inGameId.split("#")[0] || "Contender",
-            role: "MEMBER",
-            gameId: inGameId.trim(),
-            riotId: inGameId.trim(),
-            joinedAt: new Date().toISOString(),
-          },
-        ],
-      };
-
-      setMatchedTeam(fallbackTeam);
-      setJoinedSuccess(true);
-      onTeamJoined(fallbackTeam);
+    } catch (err: any) {
+      console.warn("Backend API join failed:", err);
+      setError(err?.message || "Failed to join squad. The roster may be full or the code is invalid.");
     } finally {
       setIsJoining(false);
     }
@@ -262,10 +250,18 @@ export default function JoinTeamModal({
 
                 <div className="border-t border-slate-200 pt-3 flex items-center justify-between text-xs">
                   <span className="text-slate-600">Roster Fill:</span>
-                  <span className="font-mono font-bold text-slate-900">
+                  <span className={`font-mono font-bold ${matchedTeam.members.length >= matchedTeam.maxMembers ? "text-rose-600 font-bold" : "text-slate-900"}`}>
                     {matchedTeam.members.length} / {matchedTeam.maxMembers} Players
+                    {matchedTeam.members.length >= matchedTeam.maxMembers && " (FULL)"}
                   </span>
                 </div>
+
+                {matchedTeam.members.length >= matchedTeam.maxMembers && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs font-mono font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>ROSTER FULL — Maximum squad capacity reached. Cannot add more players.</span>
+                  </div>
+                )}
 
                 {/* In-Game ID prompt */}
                 <div>
@@ -277,7 +273,8 @@ export default function JoinTeamModal({
                     value={inGameId}
                     onChange={(e) => setInGameId(e.target.value)}
                     placeholder="e.g. shadow#IND"
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-hidden focus:border-[#E56A10] transition-colors"
+                    disabled={matchedTeam.members.length >= matchedTeam.maxMembers}
+                    className="w-full px-3.5 py-2.5 bg-white disabled:bg-slate-100 disabled:text-slate-400 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-hidden focus:border-[#E56A10] transition-colors"
                     required
                   />
                 </div>
@@ -294,11 +291,17 @@ export default function JoinTeamModal({
               </button>
               <button
                 type="submit"
-                disabled={!matchedTeam || isJoining}
+                disabled={!matchedTeam || isJoining || (matchedTeam ? matchedTeam.members.length >= matchedTeam.maxMembers : false)}
                 className="px-5 py-2.5 bg-[#E56A10] disabled:bg-slate-300 disabled:text-slate-500 hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 {isJoining && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isJoining ? "Joining Squad..." : "Join Squad (₹0)"}</span>
+                <span>
+                  {matchedTeam && matchedTeam.members.length >= matchedTeam.maxMembers
+                    ? "ROSTER FULL"
+                    : isJoining
+                    ? "Joining Squad..."
+                    : "Join Squad (₹0)"}
+                </span>
               </button>
             </div>
           </form>

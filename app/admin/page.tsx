@@ -66,6 +66,7 @@ import {
   createGame,
   updateGame,
   deleteGame,
+  publishGame,
   Game,
   GameCreatePayload,
 } from "@/lib/api/games";
@@ -74,6 +75,7 @@ import {
   createTournament,
   updateTournament,
   deleteTournament,
+  publishTournament,
   CreateTournamentPayload,
   UpdateTournamentPayload,
 } from "@/lib/api/organizer";
@@ -148,6 +150,13 @@ export default function AdminCockpitPage() {
     anti_cheat: "Hardware Vanguard TPM 2.0",
     match_protocol: "Competitive Match",
     accent_color: "#E56A10",
+    status: "ACTIVE",
+    expected_release_date: "",
+    announcement_text: "",
+    hero_media_url: "",
+    hero_media_type: "gif",
+    hero_media_enabled: true,
+    gallery: [],
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -175,6 +184,9 @@ export default function AdminCockpitPage() {
     min_team_size: number;
     max_team_size: number;
     status: string;
+    expected_start_date: string;
+    registration_open_date: string;
+    announcement_text: string;
     rank_requirement: string;
     format: string;
     description: string;
@@ -196,6 +208,9 @@ export default function AdminCockpitPage() {
     min_team_size: 5,
     max_team_size: 5,
     status: "REGISTRATION_OPEN",
+    expected_start_date: "",
+    registration_open_date: "",
+    announcement_text: "",
     rank_requirement: "Open to All Ranks",
     format: "Single Elimination Bracket",
     description: "Sanctioned competitive esports tournament with strict anti-cheat and automated brackets.",
@@ -288,6 +303,10 @@ export default function AdminCockpitPage() {
   const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false);
   const [isUploadingTournBanner, setIsUploadingTournBanner] = useState(false);
   const [isUploadingAvatarFile, setIsUploadingAvatarFile] = useState(false);
+  const [isUploadingHeroMedia, setIsUploadingHeroMedia] = useState(false);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const [newGalleryUrl, setNewGalleryUrl] = useState("");
+  const [newGalleryCaption, setNewGalleryCaption] = useState("");
 
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
@@ -521,7 +540,16 @@ export default function AdminCockpitPage() {
       anti_cheat: "Hardware Vanguard TPM 2.0",
       match_protocol: "Competitive Match",
       accent_color: "#E56A10",
+      status: "ACTIVE",
+      expected_release_date: "",
+      announcement_text: "",
+      hero_media_url: "",
+      hero_media_type: "gif",
+      hero_media_enabled: true,
+      gallery: [],
     });
+    setNewGalleryUrl("");
+    setNewGalleryCaption("");
     setIsGameModalOpen(true);
   };
 
@@ -543,7 +571,16 @@ export default function AdminCockpitPage() {
       anti_cheat: game.anti_cheat || "Standard Protocol",
       match_protocol: game.match_protocol || "Competitive Match",
       accent_color: game.accent_color || "#E56A10",
+      status: game.status || "ACTIVE",
+      expected_release_date: game.expected_release_date || "",
+      announcement_text: game.announcement_text || "",
+      hero_media_url: game.hero_media_url || "",
+      hero_media_type: game.hero_media_type || "gif",
+      hero_media_enabled: game.hero_media_enabled !== undefined ? game.hero_media_enabled : true,
+      gallery: Array.isArray(game.gallery) ? game.gallery : [],
     });
+    setNewGalleryUrl("");
+    setNewGalleryCaption("");
     setIsGameModalOpen(true);
   };
 
@@ -567,6 +604,13 @@ export default function AdminCockpitPage() {
           anti_cheat: gameForm.anti_cheat,
           match_protocol: gameForm.match_protocol,
           accent_color: gameForm.accent_color,
+          status: gameForm.status || "ACTIVE",
+          expected_release_date: gameForm.expected_release_date,
+          announcement_text: gameForm.announcement_text,
+          hero_media_url: gameForm.hero_media_url,
+          hero_media_type: gameForm.hero_media_type,
+          hero_media_enabled: gameForm.hero_media_enabled,
+          gallery: gameForm.gallery,
         });
         setActionMessage(`Game "${gameForm.name}" updated successfully!`);
       } else {
@@ -576,6 +620,13 @@ export default function AdminCockpitPage() {
           slug,
           min_team_size: Number(gameForm.min_team_size),
           max_team_size: Number(gameForm.max_team_size),
+          status: gameForm.status || "ACTIVE",
+          expected_release_date: gameForm.expected_release_date,
+          announcement_text: gameForm.announcement_text,
+          hero_media_url: gameForm.hero_media_url,
+          hero_media_type: gameForm.hero_media_type,
+          hero_media_enabled: gameForm.hero_media_enabled,
+          gallery: gameForm.gallery,
         });
         setActionMessage(`Game "${gameForm.name}" registered into catalog!`);
       }
@@ -588,6 +639,18 @@ export default function AdminCockpitPage() {
       setTimeout(() => setActionMessage(""), 5000);
     } finally {
       setIsSubmittingGame(false);
+    }
+  };
+
+  const handlePublishGame = async (gameId: string, gameName: string) => {
+    try {
+      await publishGame(gameId);
+      setActionMessage(`Game "${gameName}" published live to platform!`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || `Failed to publish game "${gameName}".`);
+      setTimeout(() => setActionMessage(""), 6000);
     }
   };
 
@@ -626,6 +689,9 @@ export default function AdminCockpitPage() {
       min_team_size: isSoloInitial ? 1 : initialReq.min,
       max_team_size: isSoloInitial ? 1 : initialReq.max,
       status: "REGISTRATION_OPEN",
+      expected_start_date: "",
+      registration_open_date: "",
+      announcement_text: "",
       rank_requirement: "Open to All Ranks",
       format: isSoloInitial ? "1v1 Solo Championship" : "Single Elimination Bracket",
       description: "Sanctioned competitive tournament with automated brackets.",
@@ -669,6 +735,9 @@ export default function AdminCockpitPage() {
       min_team_size: minTeamSize,
       max_team_size: maxTeamSize,
       status: t.status || "REGISTRATION_OPEN",
+      expected_start_date: t.expected_start_date || "",
+      registration_open_date: t.registration_open_date || "",
+      announcement_text: t.announcement_text || "",
       rank_requirement: t.rank_requirement || "Open to All Ranks",
       format: t.format || (isSolo ? "1v1 Solo Championship" : "Single Elimination Bracket"),
       description: t.description || "",
@@ -741,6 +810,9 @@ export default function AdminCockpitPage() {
           min_team_size: Number(tournForm.min_team_size),
           max_team_size: Number(tournForm.max_team_size),
           status: tournForm.status,
+          expected_start_date: tournForm.expected_start_date,
+          registration_open_date: tournForm.registration_open_date,
+          announcement_text: tournForm.announcement_text,
           rank_requirement: tournForm.rank_requirement,
           format: tournForm.format,
           description: tournForm.description,
@@ -762,6 +834,9 @@ export default function AdminCockpitPage() {
           min_team_size: Number(tournForm.min_team_size),
           max_team_size: Number(tournForm.max_team_size),
           status: tournForm.status || "REGISTRATION_OPEN",
+          expected_start_date: tournForm.expected_start_date,
+          registration_open_date: tournForm.registration_open_date,
+          announcement_text: tournForm.announcement_text,
           rank_requirement: tournForm.rank_requirement,
           format: tournForm.format,
           description: tournForm.description,
@@ -779,6 +854,18 @@ export default function AdminCockpitPage() {
       setTimeout(() => setActionMessage(""), 6000);
     } finally {
       setIsSubmittingTourn(false);
+    }
+  };
+
+  const handlePublishTournament = async (tournamentId: string, tournamentTitle: string) => {
+    try {
+      await publishTournament(tournamentId);
+      setActionMessage(`Tournament "${tournamentTitle}" published live for registration!`);
+      await loadAdminData();
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || `Failed to publish tournament "${tournamentTitle}".`);
+      setTimeout(() => setActionMessage(""), 6000);
     }
   };
 
@@ -1723,6 +1810,11 @@ export default function AdminCockpitPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#10141F] via-transparent to-transparent" />
                       <div className="absolute top-3 left-3 flex items-center gap-2">
+                        {game.status === "COMING_SOON" && (
+                          <span className="px-2 py-0.5 bg-amber-500/90 backdrop-blur-xs text-white border border-amber-400 text-[10px] font-mono font-bold uppercase rounded flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" /> Coming Soon
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 bg-slate-50/80 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold uppercase rounded">
                           {game.platform}
                         </span>
@@ -1780,8 +1872,17 @@ export default function AdminCockpitPage() {
                     </div>
                   </div>
 
-                  {/* Actions (Edit & Delete) */}
+                  {/* Actions (Edit, Publish & Delete) */}
                   <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t border-slate-100 mt-2">
+                    {game.status === "COMING_SOON" && (
+                      <button
+                        onClick={() => handlePublishGame(game.id, game.name)}
+                        className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                        title="Publish Game Live"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Publish Live
+                      </button>
+                    )}
                     <button
                       onClick={() => handleOpenEditGame(game)}
                       className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
@@ -1980,6 +2081,8 @@ export default function AdminCockpitPage() {
                 const statusColor =
                   tourn.status === "REGISTRATION_OPEN"
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : tourn.status === "COMING_SOON"
+                    ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
                     : tourn.status === "ONGOING"
                     ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
                     : tourn.status === "COMPLETED"
@@ -2057,6 +2160,15 @@ export default function AdminCockpitPage() {
 
                     {/* Actions */}
                     <div className="p-4 pt-0 flex items-center gap-2 border-t border-slate-100 mt-2">
+                      {tourn.status === "COMING_SOON" && (
+                        <button
+                          onClick={() => handlePublishTournament(tourn.id, tourn.title)}
+                          className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                          title="Publish Tournament Live"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Publish Live
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenEditTournament(tourn)}
                         className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
@@ -2896,6 +3008,55 @@ export default function AdminCockpitPage() {
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                    Platform Status *
+                  </label>
+                  <select
+                    value={gameForm.status || "ACTIVE"}
+                    onChange={(e) => setGameForm({ ...gameForm, status: e.target.value })}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  >
+                    <option value="ACTIVE">ACTIVE (Fully Live)</option>
+                    <option value="COMING_SOON">COMING SOON (Teaser / Preview)</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
+                </div>
+
+                {gameForm.status === "COMING_SOON" && (
+                  <div className="sm:col-span-2 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2 text-amber-500 font-mono font-bold text-xs uppercase">
+                      <Clock className="w-4 h-4" /> Coming Soon Release Telemetry
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                          Expected Release Date
+                        </label>
+                        <input
+                          type="text"
+                          value={gameForm.expected_release_date || ""}
+                          onChange={(e) => setGameForm({ ...gameForm, expected_release_date: e.target.value })}
+                          placeholder="e.g. Q4 2026 or November 15, 2026"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                          Announcement / Teaser Text
+                        </label>
+                        <input
+                          type="text"
+                          value={gameForm.announcement_text || ""}
+                          onChange={(e) => setGameForm({ ...gameForm, announcement_text: e.target.value })}
+                          placeholder="e.g. Pre-season tournament registrations opening soon"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
                     Min Team Size
                   </label>
                   <input
@@ -3069,6 +3230,206 @@ export default function AdminCockpitPage() {
                     placeholder="Brief description of competitive format and gameplay..."
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
+                </div>
+
+                {/* Hero Animated Media (GIF / Loop) */}
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#E56A10]" />
+                      Hero Animated Media (GIF / Loop Banner)
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={gameForm.hero_media_enabled !== false}
+                        onChange={(e) => setGameForm({ ...gameForm, hero_media_enabled: e.target.checked })}
+                        className="w-3.5 h-3.5 accent-[#E56A10] rounded"
+                      />
+                      <span>Enable Hero Banner</span>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    High-energy animated GIF or video loop displayed on public game detail page.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={gameForm.hero_media_url || ""}
+                      onChange={(e) => setGameForm({ ...gameForm, hero_media_url: e.target.value })}
+                      placeholder="https://... (Direct GIF or loop URL)"
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1.5 shrink-0">
+                      {isUploadingHeroMedia ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload GIF</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="hidden"
+                        disabled={isUploadingHeroMedia}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingHeroMedia(true);
+                            try {
+                              const res = await uploadImageFile(file);
+                              setGameForm((prev) => ({ ...prev, hero_media_url: res.url }));
+                              setActionMessage("Hero animated GIF uploaded successfully!");
+                            } catch {
+                              setActionMessage("Failed to upload hero media file");
+                            } finally {
+                              setIsUploadingHeroMedia(false);
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                    {gameForm.hero_media_url && (
+                      <button
+                        type="button"
+                        onClick={() => setGameForm((prev) => ({ ...prev, hero_media_url: "" }))}
+                        className="px-2.5 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-mono font-bold cursor-pointer"
+                        title="Clear Hero Media"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {gameForm.hero_media_url && (
+                    <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-950 h-36 flex items-center justify-center">
+                      <img
+                        src={gameForm.hero_media_url}
+                        alt="Hero Animated Media Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/70 text-[#E56A10] border border-[#E56A10]/40 rounded text-[10px] font-mono font-bold uppercase">
+                        Live GIF Preview
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Media Gallery screenshots */}
+                <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[#E56A10]" />
+                      Media Gallery Screenshots ({gameForm.gallery?.length || 0})
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    High-resolution screenshots and stage photos for public gallery and lightbox inspection.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <input
+                      type="url"
+                      value={newGalleryUrl}
+                      onChange={(e) => setNewGalleryUrl(e.target.value)}
+                      placeholder="Image URL or upload file..."
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <input
+                      type="text"
+                      value={newGalleryCaption}
+                      onChange={(e) => setNewGalleryCaption(e.target.value)}
+                      placeholder="Caption (optional)"
+                      className="w-full sm:w-44 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                    <label className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
+                      {isUploadingGallery ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingGallery}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setIsUploadingGallery(true);
+                            try {
+                              const res = await uploadImageFile(file);
+                              setNewGalleryUrl(res.url);
+                              setActionMessage("Gallery image uploaded!");
+                            } catch {
+                              setActionMessage("Failed to upload image");
+                            } finally {
+                              setIsUploadingGallery(false);
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newGalleryUrl.trim()) {
+                          const newItem = {
+                            id: `gal_${Date.now()}`,
+                            url: newGalleryUrl.trim(),
+                            caption: newGalleryCaption.trim() || undefined,
+                            order: (gameForm.gallery?.length || 0) + 1,
+                          };
+                          setGameForm({
+                            ...gameForm,
+                            gallery: [...(gameForm.gallery || []), newItem],
+                          });
+                          setNewGalleryUrl("");
+                          setNewGalleryCaption("");
+                        }
+                      }}
+                      disabled={!newGalleryUrl.trim()}
+                      className="px-3 py-2 bg-[#E56A10] hover:bg-[#D45900] disabled:opacity-40 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add
+                    </button>
+                  </div>
+                  {gameForm.gallery && gameForm.gallery.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                      {gameForm.gallery.map((item, idx) => (
+                        <div key={item.id || idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-900">
+                          <img src={item.url} alt={item.caption || "Gallery"} className="w-full h-full object-cover" />
+                          {item.caption && (
+                            <div className="absolute bottom-0 inset-x-0 bg-black/75 px-1.5 py-0.5 text-[10px] text-white truncate font-mono">
+                              {item.caption}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGameForm({
+                                ...gameForm,
+                                gallery: (gameForm.gallery || []).filter((_, i) => i !== idx),
+                              });
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded hover:bg-rose-700 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="Remove image"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3262,11 +3623,58 @@ export default function AdminCockpitPage() {
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="REGISTRATION_OPEN">Registration Open</option>
+                    <option value="COMING_SOON">Coming Soon (Upcoming / Teaser)</option>
                     <option value="ONGOING">Ongoing (Live Matches)</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
+
+                {tournForm.status === "COMING_SOON" && (
+                  <div className="sm:col-span-2 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2 text-amber-500 font-mono font-bold text-xs uppercase">
+                      <Clock className="w-4 h-4" /> Coming Soon Tournament Schedule
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                          Expected Start Date
+                        </label>
+                        <input
+                          type="text"
+                          value={tournForm.expected_start_date}
+                          onChange={(e) => setTournForm({ ...tournForm, expected_start_date: e.target.value })}
+                          placeholder="e.g. November 2026 or Dec 1, 2026"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                          Registration Open Date
+                        </label>
+                        <input
+                          type="text"
+                          value={tournForm.registration_open_date}
+                          onChange={(e) => setTournForm({ ...tournForm, registration_open_date: e.target.value })}
+                          placeholder="e.g. October 15, 2026"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                          Teaser / Announcement Text
+                        </label>
+                        <input
+                          type="text"
+                          value={tournForm.announcement_text}
+                          onChange={(e) => setTournForm({ ...tournForm, announcement_text: e.target.value })}
+                          placeholder="e.g. Registrations unlock next week with special founder badges!"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">

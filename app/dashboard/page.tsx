@@ -167,10 +167,13 @@ export default function DashboardPage() {
             avatar_url: effectiveAvatar,
           });
 
+          const profileStorageKey = user?.id ? `ametheus_user_profile_${user.id}` : "ametheus_user_profile";
+          const teamsStorageKey = user?.id ? `ametheus_user_teams_${user.id}` : "ametheus_user_teams";
+
           try {
-            localStorage.setItem("ametheus_user_profile", JSON.stringify(resolvedProfile));
+            localStorage.setItem(profileStorageKey, JSON.stringify(resolvedProfile));
             localStorage.setItem(
-              "ametheus_gamer_identity",
+              user?.id ? `ametheus_gamer_identity_${user.id}` : "ametheus_gamer_identity",
               JSON.stringify({
                 gamerTag: effectiveDisplayName,
                 avatarUrl: effectiveAvatar,
@@ -183,11 +186,11 @@ export default function DashboardPage() {
           if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value) && teamsRes.value.length > 0) {
             setTeams(teamsRes.value);
             try {
-              localStorage.setItem("ametheus_user_teams", JSON.stringify(teamsRes.value));
+              localStorage.setItem(teamsStorageKey, JSON.stringify(teamsRes.value));
             } catch {}
           } else {
             try {
-              const saved = localStorage.getItem("ametheus_user_teams");
+              const saved = localStorage.getItem(teamsStorageKey);
               if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
@@ -213,7 +216,7 @@ export default function DashboardPage() {
           );
 
           if (!hasAuthoritativeIdentity) {
-            const autoPersona = initFirstLaunchPersona(undefined, undefined);
+            const autoPersona = initFirstLaunchPersona(undefined, undefined, user?.id, !!isSignedIn);
             if (autoPersona && autoPersona.isNew) {
               setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
               updateUserProfile({
@@ -228,7 +231,7 @@ export default function DashboardPage() {
                       avatar_url: updated.avatar_url || autoPersona.avatarUrl,
                     });
                     try {
-                      localStorage.setItem("ametheus_user_profile", JSON.stringify(updated));
+                      localStorage.setItem(profileStorageKey, JSON.stringify(updated));
                       window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: updated }));
                     } catch {}
                   }
@@ -266,10 +269,12 @@ export default function DashboardPage() {
         avatar_url: profileForm.avatar_url,
       });
       setProfile(updated);
+      const profileStorageKey = user?.id ? `ametheus_user_profile_${user.id}` : "ametheus_user_profile";
+      const identityStorageKey = user?.id ? `ametheus_gamer_identity_${user.id}` : "ametheus_gamer_identity";
       try {
-        localStorage.setItem("ametheus_user_profile", JSON.stringify(updated));
+        localStorage.setItem(profileStorageKey, JSON.stringify(updated));
         localStorage.setItem(
-          "ametheus_gamer_identity",
+          identityStorageKey,
           JSON.stringify({
             gamerTag: updated.display_name,
             avatarUrl: updated.avatar_url,
@@ -287,6 +292,7 @@ export default function DashboardPage() {
       setIsSavingProfile(false);
     }
   };
+
 
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,7 +400,8 @@ export default function DashboardPage() {
       setTeams((prev) => {
         const updated = [newTeam, ...prev];
         try {
-          localStorage.setItem("ametheus_user_teams", JSON.stringify(updated));
+          const teamsStorageKey = user?.id ? `ametheus_user_teams_${user.id}` : "ametheus_user_teams";
+          localStorage.setItem(teamsStorageKey, JSON.stringify(updated));
         } catch {}
         return updated;
       });
@@ -445,9 +452,9 @@ export default function DashboardPage() {
     showToast("Match ledger exported to CSV!");
   };
 
-  const displayName = profile?.display_name || user?.username || "VORTEX_KID";
+  const displayName = profile?.display_name || user?.username || user?.firstName || "Contender";
   const userAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
-  const balance = profile?.inr_balance ?? 8250;
+  const balance = profile?.inr_balance != null ? Number(profile.inr_balance) : 0;
 
   return (
     <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-slate-100 antialiased transition-colors">

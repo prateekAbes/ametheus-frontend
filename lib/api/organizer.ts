@@ -21,6 +21,9 @@ export interface CreateTournamentPayload {
   schedule?: Array<{ stage: string; time: string; details?: string }>;
   prizes?: Array<{ place: string; prize: string; amount?: number }>;
   status?: string;
+  expected_start_date?: string;
+  registration_open_date?: string;
+  announcement_text?: string;
 }
 
 export interface UpdateTournamentPayload {
@@ -42,6 +45,9 @@ export interface UpdateTournamentPayload {
   schedule?: Array<{ stage: string; time: string; details?: string }>;
   prizes?: Array<{ place: string; prize: string; amount?: number }>;
   status?: string;
+  expected_start_date?: string;
+  registration_open_date?: string;
+  announcement_text?: string;
 }
 
 export async function getMyOrganizedTournaments(): Promise<Tournament[]> {
@@ -68,8 +74,8 @@ export async function deleteTournament(tournamentId: string): Promise<{ status: 
   });
 }
 
-export async function publishTournament(tournamentId: string): Promise<{ status: string; message: string }> {
-  return apiClient(`/organizer/tournaments/${tournamentId}/publish`, {
+export async function publishTournament(tournamentId: string): Promise<Tournament> {
+  return apiClient<Tournament>(`/organizer/tournaments/${tournamentId}/publish`, {
     method: "POST",
   });
 }

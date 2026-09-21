@@ -26,6 +26,9 @@ export interface Tournament {
   banner_url: string;
   badge_color: string;
   description: string;
+  expected_start_date?: string;
+  registration_open_date?: string;
+  announcement_text?: string;
   rules: string[];
   schedule: Array<{ stage: string; time: string; details?: string }>;
   prizes: Array<{ place?: string; rank?: string; badge?: string; share?: string; amount?: string; prize?: string; distribution?: string }>;
@@ -53,6 +56,9 @@ export interface NormalizedTournament {
   maxTeams: number;
   minTeamSize: number;
   maxTeamSize: number;
+  expectedStartDate?: string;
+  registrationOpenDate?: string;
+  announcementText?: string;
   rankRequirement: string;
   format: string;
   bannerUrl: string;
@@ -67,7 +73,9 @@ export interface NormalizedTournament {
 
 export function normalizeTournament(t: any): NormalizedTournament {
   const statusLabel =
-    t.status === "REGISTRATION_OPEN"
+    t.status === "COMING_SOON"
+      ? "COMING SOON"
+      : t.status === "REGISTRATION_OPEN"
       ? "REGISTRATION OPEN"
       : t.status === "LIVE"
       ? "BRACKET LIVE"
@@ -154,6 +162,9 @@ export function normalizeTournament(t: any): NormalizedTournament {
     maxTeams: t.max_teams !== undefined ? Number(t.max_teams) : (t.maxTeams ?? 16),
     minTeamSize: t.min_team_size !== undefined ? Number(t.min_team_size) : (t.minTeamSize ?? 1),
     maxTeamSize: t.max_team_size !== undefined ? Number(t.max_team_size) : (t.maxTeamSize ?? 5),
+    expectedStartDate: t.expected_start_date || t.expectedStartDate,
+    registrationOpenDate: t.registration_open_date || t.registrationOpenDate,
+    announcementText: t.announcement_text || t.announcementText,
     rankRequirement: t.rank_requirement || t.rankRequirement || "Open to All Ranks",
     format: t.format || "Single Elimination Bracket",
     bannerUrl: t.banner_url || t.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
@@ -180,6 +191,10 @@ export async function getTournaments(params?: {
 
 export async function getTournamentBySlug(slug: string): Promise<Tournament> {
   return apiClient<Tournament>(`/tournaments/${slug}`);
+}
+
+export async function getTournamentMatches(slugOrId: string): Promise<any[]> {
+  return apiClient<any[]>(`/tournaments/${slugOrId}/matches`);
 }
 
 export async function registerForTournament(

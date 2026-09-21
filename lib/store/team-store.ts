@@ -3,87 +3,14 @@
 import { useState, useEffect } from "react";
 import { Team, TeamMember } from "@/types";
 
+// Storage key is intentionally non-user-scoped here since this hook is used
+// in contexts where userId may not be available. The dashboard scopes its own
+// reads/writes by user.id directly.
 const STORAGE_KEY = "ametheus_user_teams";
 
-// Initial seed team for demo purposes
-const INITIAL_TEAMS: Team[] = [
-  {
-    id: "team_vortex_alpha",
-    gameSlug: "valorant",
-    name: "Vortex Alpha",
-    tag: "VTX",
-    logoUrl: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
-    inviteCode: "SR7X4K",
-    captainUserId: "usr_vortex_lead",
-    captainUsername: "vortex_lead",
-    maxMembers: 5,
-    createdAt: new Date().toISOString(),
-    members: [
-      {
-        userId: "usr_vortex_lead",
-        username: "vortex_lead",
-        role: "CAPTAIN",
-        gameId: "vortex#IND",
-        riotId: "vortex#IND",
-        joinedAt: new Date().toISOString(),
-      },
-      {
-        userId: "usr_phantom_99",
-        username: "phantom_99",
-        role: "MEMBER",
-        gameId: "phantom#777",
-        riotId: "phantom#777",
-        joinedAt: new Date().toISOString(),
-      },
-      {
-        userId: "usr_blaze_aim",
-        username: "blaze_aim",
-        role: "MEMBER",
-        gameId: "blaze#444",
-        riotId: "blaze#444",
-        joinedAt: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: "team_velocity_strike",
-    gameSlug: "valorant",
-    name: "Velocity Strike Elite",
-    tag: "VSE",
-    logoUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop",
-    inviteCode: "VL882K",
-    captainUserId: "usr_velocity_cap",
-    captainUsername: "velocity_cap",
-    maxMembers: 5,
-    createdAt: new Date().toISOString(),
-    members: [
-      {
-        userId: "usr_velocity_cap",
-        username: "velocity_cap",
-        role: "CAPTAIN",
-        gameId: "velocap#IN",
-        riotId: "velocap#IN",
-        joinedAt: new Date().toISOString(),
-      },
-      {
-        userId: "usr_spectre_x",
-        username: "spectre_x",
-        role: "MEMBER",
-        gameId: "spectre#01",
-        riotId: "spectre#01",
-        joinedAt: new Date().toISOString(),
-      },
-      {
-        userId: "usr_omen_cloud",
-        username: "omen_cloud",
-        role: "MEMBER",
-        gameId: "omen#888",
-        riotId: "omen#888",
-        joinedAt: new Date().toISOString(),
-      },
-    ],
-  },
-];
+// No hardcoded seed teams — real teams come from the API (dashboard loadData)
+// or from user-scoped localStorage keyed by user.id.
+const INITIAL_TEAMS: Team[] = [];
 
 // Generates an atomic 6-character random uppercase alphanumeric code
 export function generateUniqueTeamCode(): string {
@@ -153,8 +80,15 @@ export function useTeamStore(gameSlug?: string) {
     tag: string;
     logoUrl?: string;
     captainGameId: string;
+    captainUserId?: string;
+    captainUsername?: string;
+    maxMembers?: number;
     inviteCode?: string;
   }): { success: boolean; team?: Team; error?: string } => {
+    if (data.gameSlug === "chess") {
+      return { success: false, error: "Chess is a solo 1v1 discipline. Team rosters are not permitted." };
+    }
+
     const existingCode = teams.some((t) => t.name.toLowerCase() === data.name.toLowerCase());
     if (existingCode) {
       return { success: false, error: "A team with this name already exists." };
@@ -167,6 +101,10 @@ export function useTeamStore(gameSlug?: string) {
       }
     }
 
+    const capUserId = data.captainUserId || `usr_${Date.now()}`;
+    const capUsername = data.captainUsername || "Captain";
+    const dynamicMaxMembers = data.maxMembers || (data.gameSlug === "smash-karts" ? 3 : data.gameSlug === "bgmi" ? 4 : 5);
+
     const newTeam: Team = {
       id: `team_${Date.now()}`,
       gameSlug: data.gameSlug,
@@ -175,14 +113,14 @@ export function useTeamStore(gameSlug?: string) {
       logoUrl: data.logoUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
       inviteCode: code,
       ...({ invite_code: code } as any),
-      captainUserId: "usr_vortex_lead",
-      captainUsername: "vortex_lead",
-      maxMembers: data.gameSlug === "chess" ? 1 : 5,
+      captainUserId: capUserId,
+      captainUsername: capUsername,
+      maxMembers: dynamicMaxMembers,
       createdAt: new Date().toISOString(),
       members: [
         {
-          userId: "usr_vortex_lead",
-          username: "vortex_lead",
+          userId: capUserId,
+          username: capUsername,
           role: "CAPTAIN",
           gameId: data.captainGameId,
           riotId: data.captainGameId,
@@ -210,8 +148,12 @@ export function useTeamStore(gameSlug?: string) {
       return { success: false, error: "Invalid 6-character team invite code." };
     }
 
+    if (team.gameSlug === "chess" || team.maxMembers <= 1) {
+      return { success: false, error: "Chess is a solo 1v1 discipline. Squad joins are not permitted." };
+    }
+
     if (team.members.length >= team.maxMembers) {
-      return { success: false, error: "This squad is already full." };
+      return { success: false, error: `This squad is already full (${team.members.length}/${team.maxMembers}).` };
     }
 
     const alreadyJoined = team.members.some(

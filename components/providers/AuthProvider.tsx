@@ -1,18 +1,44 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { ClerkProvider, useAuth, useUser } from "@clerk/nextjs";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { setAuthTokenGetter } from "@/lib/api/client";
-import { syncUser } from "@/lib/api/auth";
+import { syncUser, getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 
-const CLERK_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+// ---------------------------------------------------------------------------
+// AuthContext — single authoritative source of truth for the current user's
+// AMETHEUS profile.  All consumers use this instead of reading localStorage
+// directly, eliminating cross-account identity bleed-through.
+// ---------------------------------------------------------------------------
 
-function TokenAndProfileSync() {
-  const { getToken, isSignedIn } = useAuth();
+interface AuthContextValue {
+  profile: UserProfile | null;
+  isLoading: boolean;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue>({
+  profile: null,
+  isLoading: true,
+  refreshProfile: async () => {},
+});
+
+export function useAuthContext() {
+  return useContext(AuthContext);
+}
+
+// ---------------------------------------------------------------------------
+// Inner component — must live inside ClerkProvider (already wrapped by layout)
+// ---------------------------------------------------------------------------
+
+function AuthSync({ children }: { children: React.ReactNode }) {
+  const { getToken, isSignedIn, isLoaded: isAuthLoaded } = useAuth();
   const { user } = useUser();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Inject token getter into the centralized API client
   useEffect(() => {
-    // 1. Inject token getter into centralized API client
     setAuthTokenGetter(async () => {
       if (!isSignedIn) return null;
       try {
@@ -21,50 +47,127 @@ function TokenAndProfileSync() {
         return null;
       }
     });
+  }, [isSignedIn, getToken]);
 
-    // 2. Sync profile to AMETHEUS backend upon sign-in
-    if (isSignedIn && user) {
-      const email = user.primaryEmailAddress?.emailAddress || `${user.id}@ametheus.gg`;
-      const username = user.username || user.firstName?.toLowerCase() || user.id.slice(0, 10);
-      const displayName = user.fullName || username;
-      const avatarUrl = user.imageUrl;
+  // ---------------------------------------------------------------------------
+  // Core profile load + sync
+  // ---------------------------------------------------------------------------
+  const loadProfile = useCallback(async () => {
+    if (!isAuthLoaded) return;
 
-      syncUser({
+    if (!isSignedIn || !user) {
+      // Signed out — wipe in-memory profile immediately; never read stale cache
+      setProfile(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // User-scoped localStorage keys — multiple accounts never share state
+    const storageKey = `ametheus_user_profile_${user.id}`;
+    const identityKey = `ametheus_gamer_identity_${user.id}`;
+
+    // 1. Instant paint from user-scoped cache
+    try {
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        setProfile(JSON.parse(cached));
+      }
+    } catch {}
+
+    // 2. Sync with backend (upsert user record)
+    const email =
+      user.primaryEmailAddress?.emailAddress || `${user.id}@ametheus.gg`;
+    const username =
+      user.username || user.firstName?.toLowerCase() || user.id.slice(0, 10);
+    const displayName = user.fullName || username;
+    const avatarUrl = user.imageUrl;
+
+    try {
+      const synced = await syncUser({
         clerk_user_id: user.id,
         email,
         username,
         display_name: displayName,
         avatar_url: avatarUrl,
-      })
-        .then((synced) => {
-          try {
-            localStorage.setItem("ametheus_user_profile", JSON.stringify(synced));
-            localStorage.setItem(
-              "ametheus_gamer_identity",
-              JSON.stringify({
-                gamerTag: synced.display_name || displayName,
-                avatarUrl: synced.avatar_url || avatarUrl,
-                clanTag: "AMX",
-                isNew: false,
-              })
-            );
-            window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: synced }));
-          } catch {}
-        })
-        .catch((err) => {
-          console.warn("[AMETHEUS] Background user sync notice:", err);
-        });
-    }
-  }, [isSignedIn, user, getToken]);
+      });
 
-  return null;
+      if (synced) {
+        setProfile(synced);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(synced));
+          localStorage.setItem(
+            identityKey,
+            JSON.stringify({
+              gamerTag: synced.display_name || displayName,
+              avatarUrl: synced.avatar_url || avatarUrl,
+              clanTag: "AMX",
+              isNew: false,
+            })
+          );
+          window.dispatchEvent(
+            new CustomEvent("ametheus:profile_updated", { detail: synced })
+          );
+        } catch {}
+        setIsLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("[AMETHEUS] Background user sync notice:", err);
+    }
+
+    // 3. Fallback: fetch existing profile directly
+    try {
+      const fetched = await getCurrentUserProfile();
+      if (fetched) {
+        setProfile(fetched);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(fetched));
+        } catch {}
+      }
+    } catch {}
+
+    setIsLoading(false);
+  }, [isAuthLoaded, isSignedIn, user]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  // Listen for profile updates dispatched from Dashboard, avatar upload, etc.
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+    const storageKey = `ametheus_user_profile_${user.id}`;
+
+    const handleUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<UserProfile>).detail;
+      if (detail) {
+        setProfile(detail);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(detail));
+        } catch {}
+      }
+    };
+
+    window.addEventListener("ametheus:profile_updated", handleUpdate);
+    return () =>
+      window.removeEventListener("ametheus:profile_updated", handleUpdate);
+  }, [isSignedIn, user]);
+
+  const refreshProfile = useCallback(async () => {
+    await loadProfile();
+  }, [loadProfile]);
+
+  return (
+    <AuthContext.Provider value={{ profile, isLoading, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
+// ---------------------------------------------------------------------------
+// Public provider — wraps the rest of the app
+// ---------------------------------------------------------------------------
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <TokenAndProfileSync />
-      {children}
-    </>
-  );
+  return <AuthSync>{children}</AuthSync>;
 }

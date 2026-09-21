@@ -20,6 +20,13 @@ export interface Game {
   antiCheat: string;
   matchProtocol: string;
   accentColor?: string;
+  status?: string;
+  expectedReleaseDate?: string;
+  announcementText?: string;
+  heroMediaUrl?: string;
+  heroMediaType?: string;
+  heroMediaEnabled?: boolean;
+  gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>;
 }
 
 export interface TeamMember {
@@ -50,21 +57,21 @@ export interface BracketMatch {
   id: string;
   round: number;
   matchNumber: number;
-  teamA: {
-    name: string;
-    tag: string;
+  teamA?: {
+    name?: string;
+    tag?: string;
     score?: number;
     seed?: number;
     isWinner?: boolean;
   };
-  teamB: {
-    name: string;
-    tag: string;
+  teamB?: {
+    name?: string;
+    tag?: string;
     score?: number;
     seed?: number;
     isWinner?: boolean;
   };
-  status: "SCHEDULED" | "LIVE" | "COMPLETED";
+  status: "SCHEDULED" | "LIVE" | "COMPLETED" | string;
   scheduledTime?: string;
 }
 
@@ -83,13 +90,18 @@ export interface Tournament {
   prizePoolNum: number;
   entryFee: string;
   entryFeeNum: number;
-  status: "REGISTRATION_OPEN" | "CHECK_IN" | "LIVE" | "COMPLETED";
+  status: "COMING_SOON" | "REGISTRATION_OPEN" | "CHECK_IN" | "LIVE" | "COMPLETED" | string;
   statusLabel: string;
   startsAt: string;
   rosterLockTime: string;
   serverRegion: string;
   registeredTeams: number;
   maxTeams: number;
+  minTeamSize?: number;
+  maxTeamSize?: number;
+  expectedStartDate?: string;
+  registrationOpenDate?: string;
+  announcementText?: string;
   rankRequirement: string;
   format?: string;
   bannerUrl: string;

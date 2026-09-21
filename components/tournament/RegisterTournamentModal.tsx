@@ -85,6 +85,11 @@ export default function RegisterTournamentModal({
         setError(`Your squad requires ${rosterReq.min} player${rosterReq.min > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length} players).`);
         return;
       }
+      const maxCap = selectedTeam.maxMembers ?? rosterReq.max;
+      if (selectedTeam.members.length > maxCap) {
+        setError(`Your squad has too many players (${selectedTeam.members.length}/${maxCap}). Maximum for this format is ${maxCap}.`);
+        return;
+      }
     }
     if (!inGameId.trim()) {
       setError(`Please provide your ${gameIdLabel.split("(")[0].trim()} to participate.`);
@@ -217,7 +222,9 @@ export default function RegisterTournamentModal({
                 {userTeams.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {userTeams.map((team) => {
-                      const isEligible = team.members.length >= rosterReq.min;
+                      const maxCap = team.maxMembers ?? rosterReq.max;
+                      const isFull = team.members.length >= maxCap;
+                      const isEligible = team.members.length >= rosterReq.min && !isFull;
                       return (
                         <label
                           key={team.id}
@@ -239,7 +246,11 @@ export default function RegisterTournamentModal({
                             <div>
                               <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
                                 <span>{team.name} [{team.tag}]</span>
-                                {isEligible ? (
+                                {isFull ? (
+                                  <span className="text-[9px] text-red-700 bg-red-100 font-mono font-bold px-1.5 py-0.2 rounded border border-red-200">
+                                    ROSTER FULL
+                                  </span>
+                                ) : isEligible ? (
                                   <span className="text-[9px] text-emerald-700 bg-emerald-100 font-mono font-bold px-1.5 py-0.2 rounded">
                                     Eligible
                                   </span>
@@ -250,7 +261,7 @@ export default function RegisterTournamentModal({
                                 )}
                               </div>
                               <div className="text-[11px] text-slate-500 font-mono">
-                                Captain: @{team.captainUsername} • {team.members.length}/{rosterReq.max} Players
+                                Captain: @{team.captainUsername} • {team.members.length}/{maxCap} Players
                               </div>
                             </div>
                           </div>

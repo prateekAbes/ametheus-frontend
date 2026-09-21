@@ -107,27 +107,38 @@ export function generateRandomGamingIdentity() {
 /**
  * Checks if the user is on their first launch or has no avatar/tag set,
  * and automatically assigns a gaming persona.
- * Never overwrites user's configured display name or avatar.
+ * 
+ * IMPORTANT: When `isAuthenticated` is true (Clerk session active), this
+ * function ALWAYS preserves the provided Clerk displayName/avatar and NEVER
+ * generates a random gaming persona. Random personas are only for unauthenticated
+ * guest visitors on their genuine first visit.
  */
-export function initFirstLaunchPersona(currentDisplayName?: string, currentAvatar?: string) {
+export function initFirstLaunchPersona(
+  currentDisplayName?: string,
+  currentAvatar?: string,
+  userId?: string,
+  isAuthenticated?: boolean
+) {
   if (typeof window === "undefined") return null;
 
-  // 1. If user already has a saved display name in MongoDB, preserve it completely
-  if (currentDisplayName && currentDisplayName.trim() !== "" && !currentDisplayName.includes("@")) {
+  const key = userId ? `ametheus_gamer_identity_${userId}` : "ametheus_gamer_identity";
+
+  // 1. Authenticated Clerk user — always use their real identity, NEVER generate random
+  if (isAuthenticated || (currentDisplayName && currentDisplayName.trim() !== "")) {
     const existing = {
-      gamerTag: currentDisplayName,
+      gamerTag: currentDisplayName || "Gamer",
       avatarUrl: currentAvatar || generateRandomGamingAvatar(currentDisplayName),
       clanTag: "AMX",
       isNew: false,
     };
     try {
-      localStorage.setItem("ametheus_gamer_identity", JSON.stringify(existing));
+      localStorage.setItem(key, JSON.stringify(existing));
     } catch {}
     return existing;
   }
 
-  // 2. If already initialized in localStorage, return it with isNew: false
-  const stored = localStorage.getItem("ametheus_gamer_identity");
+  // 2. If already initialized in localStorage for this guest, return it with isNew: false
+  const stored = localStorage.getItem(key);
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
@@ -142,17 +153,18 @@ export function initFirstLaunchPersona(currentDisplayName?: string, currentAvata
     }
   }
 
-  // 3. Generate new identity only for genuine first launch
+  // 3. Genuine first-time unauthenticated guest — generate new identity
   const newIdentity = {
     ...generateRandomGamingIdentity(),
     isNew: true,
   };
 
   try {
-    localStorage.setItem("ametheus_gamer_identity", JSON.stringify({ ...newIdentity, isNew: false }));
+    localStorage.setItem(key, JSON.stringify({ ...newIdentity, isNew: false }));
   } catch {
     // ignore
   }
 
   return newIdentity;
 }
+

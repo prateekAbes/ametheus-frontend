@@ -18,6 +18,9 @@ import {
   ArrowRight,
   Sun,
   Moon,
+  ChevronDown,
+  LogOut,
+  Wallet,
 } from "lucide-react";
 import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 import { useTheme } from "@/components/providers/ThemeProvider";
@@ -25,9 +28,9 @@ import {
   Show,
   SignInButton,
   SignUpButton,
-  UserButton,
   useUser,
   useAuth,
+  useClerk,
 } from "@clerk/nextjs";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
@@ -38,9 +41,12 @@ export default function Header() {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const { user } = useUser();
+  const { signOut } = useClerk();
   const { theme, toggleTheme } = useTheme();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [activePath, setActivePath] = useState(pathname);
   const [searchQuery, setSearchQuery] = useState("");
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>(() =>
     TOURNAMENTS_DATA.map(normalizeTournament)
@@ -48,6 +54,20 @@ export default function Header() {
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync activePath with pathname updates and popstate history
+  useEffect(() => {
+    setActivePath(pathname);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActivePath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Silently load tournament catalog for instant search autocomplete
   useEffect(() => {
@@ -62,7 +82,7 @@ export default function Header() {
       });
   }, []);
 
-  // Close search dropdown on click outside
+  // Close search and profile dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -71,68 +91,67 @@ export default function Header() {
       ) {
         setIsSearchDropdownOpen(false);
       }
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sync / fetch current user's profile for authoritative role & custom avatar
+  // Sync / fetch current user's profile for authoritative role & custom avatar (Partitioned by user.id)
   useEffect(() => {
-    // 1. Initial immediate restore from localStorage to prevent avatar/name flicker
+    if (!isSignedIn || !user) {
+      setUserProfile(null);
+      return;
+    }
+
+    const storageKey = `ametheus_user_profile_${user.id}`;
+
+    // 1. Initial immediate restore from user-scoped localStorage
     try {
-      const stored = localStorage.getItem("ametheus_user_profile");
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         setUserProfile(JSON.parse(stored));
-      } else {
-        const storedIdentity = localStorage.getItem("ametheus_gamer_identity");
-        if (storedIdentity) {
-          const parsed = JSON.parse(storedIdentity);
-          if (parsed?.gamerTag) {
-            setUserProfile((prev) => ({
-              id: prev?.id || user?.id || "usr_me",
-              email: prev?.email || user?.primaryEmailAddress?.emailAddress || "",
-              username: parsed.gamerTag,
-              display_name: parsed.gamerTag,
-              avatar_url: parsed.avatarUrl,
-              role: prev?.role || "PLAYER",
-              inr_balance: prev?.inr_balance || "0.00",
-            }));
-          }
-        }
       }
     } catch {}
 
     // 2. Fetch authoritative profile from API
-    if (isSignedIn) {
-      getCurrentUserProfile()
-        .then((profile) => {
+    getCurrentUserProfile()
+      .then((profile) => {
+        if (profile) {
           setUserProfile(profile);
           try {
-            localStorage.setItem("ametheus_user_profile", JSON.stringify(profile));
+            localStorage.setItem(storageKey, JSON.stringify(profile));
           } catch {}
-        })
-        .catch(() => {
-          // Keep local fallback
-        });
-    } else {
-      setUserProfile(null);
-    }
+        }
+      })
+      .catch(() => {
+        // Keep existing profile
+      });
 
     // 3. Listen for profile updates emitted from Dashboard or avatar upload
     const handleProfileUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<UserProfile>;
       if (customEvent.detail) {
         setUserProfile(customEvent.detail);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(customEvent.detail));
+        } catch {}
       }
     };
     window.addEventListener("ametheus:profile_updated", handleProfileUpdate);
     return () => window.removeEventListener("ametheus:profile_updated", handleProfileUpdate);
-  }, [isSignedIn, user]);
+  }, [isSignedIn, user?.id]);
 
-  // Close mobile menu and dropdown on route change
+  // Close menus and dropdowns on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsSearchDropdownOpen(false);
+    setIsProfileDropdownOpen(false);
   }, [pathname]);
 
   // Handle Ctrl+K shortcut for search focus
@@ -164,8 +183,9 @@ export default function Header() {
   const isOrganizer = isHardcodedAdmin || role === "ORGANIZER" || isSuperAdmin;
 
   const isActive = (path: string) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path);
+    const current = activePath || pathname;
+    if (path === "/") return current === "/";
+    return current.startsWith(path);
   };
 
   const navLinks = [
@@ -204,6 +224,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setActivePath(item.href)}
                   className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
                     active
                       ? "text-white bg-[#161A24] border border-[#242C3D] shadow-xs font-semibold"
@@ -220,6 +241,7 @@ export default function Header() {
             <Show when="signed-in">
               <Link
                 href="/dashboard"
+                onClick={() => setActivePath("/dashboard")}
                 className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
                   isActive("/dashboard")
                     ? "text-white bg-[#161A24] border border-[#242C3D] font-semibold"
@@ -236,6 +258,7 @@ export default function Header() {
               <div className="flex items-center gap-1 pl-1.5 xl:pl-2 border-l border-[#242C3D]/80">
                 <Link
                   href="/organizer"
+                  onClick={() => setActivePath("/organizer")}
                   className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
                     isActive("/organizer")
                       ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
@@ -249,6 +272,7 @@ export default function Header() {
                 {isSuperAdmin && (
                   <Link
                     href="/admin"
+                    onClick={() => setActivePath("/admin")}
                     className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
                       isActive("/admin")
                         ? "bg-[#E56A10] text-white font-bold shadow-xs"
@@ -388,12 +412,13 @@ export default function Header() {
             </Show>
 
             <Show when="signed-in">
-              <div className="flex items-center gap-2 xl:gap-2.5 pl-2 sm:pl-2.5 border-l border-[#242C3D] shrink-0">
-                {/* Spacious, De-congested Esports User Identity Chip */}
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 px-2 xl:px-2.5 py-1 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all group shrink-0"
-                  title="View Athlete Dashboard"
+              <div className="relative flex items-center pl-2 sm:pl-2.5 border-l border-[#242C3D] shrink-0" ref={profileDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-2 px-2 xl:px-2.5 py-1 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all cursor-pointer group shrink-0"
+                  aria-expanded={isProfileDropdownOpen}
+                  aria-label="User profile menu"
                 >
                   {/* Custom Esports Avatar */}
                   <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden border border-[#242C3D] group-hover:border-[#E56A10] bg-slate-900 shrink-0">
@@ -408,7 +433,7 @@ export default function Header() {
                   {/* Gamer Tag & Distinct Role Badge */}
                   <div className="hidden sm:flex flex-col text-left">
                     <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[100px] xl:max-w-[140px]">
-                      {userProfile?.display_name || user?.username || "Gamer"}
+                      {userProfile?.display_name || user?.username || user?.firstName || "Gamer"}
                     </span>
                     <span
                       className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit whitespace-nowrap ${
@@ -422,18 +447,108 @@ export default function Header() {
                       {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
                     </span>
                   </div>
-                </Link>
 
-                {/* Account & Sign Out Control */}
-                <div className="shrink-0 flex items-center">
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        avatarBox: "w-7 h-7 border border-[#242C3D] hover:border-[#E56A10] transition-colors opacity-80 hover:opacity-100",
-                      },
-                    }}
-                  />
-                </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-200 ${isProfileDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* Interactive Profile Dropdown */}
+                {isProfileDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-[#0E121B] border border-[#242C3D] rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in-50 zoom-in-95">
+                    {/* Header: Avatar, Name, Email, Role */}
+                    <div className="p-4 bg-[#161A24]/90 border-b border-[#242C3D] flex items-center gap-3">
+                      <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-[#242C3D] bg-slate-900 shrink-0">
+                        <img
+                          src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                          alt="Avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-white font-headline font-bold text-sm truncate">
+                            {userProfile?.display_name || user?.username || user?.firstName || "Gamer"}
+                          </span>
+                          <span className="px-1.5 py-0.2 bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/30 text-[9px] font-mono font-bold rounded">
+                            {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
+                          </span>
+                        </div>
+                        <span className="text-[#94A3B8] text-[11px] font-mono truncate">
+                          {userEmail || user?.id}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Escrow Wallet Balance */}
+                    <div className="p-3 bg-[#121622] border-b border-[#242C3D] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-[#E56A10]" />
+                        <span className="text-[11px] font-mono text-[#94A3B8] uppercase">Escrow Wallet</span>
+                      </div>
+                      <span className="font-mono font-bold text-white text-xs">
+                        ₹{Number(userProfile?.inr_balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Quick Portal Navigation Links */}
+                    <div className="p-2 space-y-1">
+                      <Link
+                        href="/dashboard"
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          setActivePath("/dashboard");
+                        }}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-[#E56A10]" />
+                        <span>Gamer Dashboard</span>
+                      </Link>
+
+                      {(isOrganizer || isSuperAdmin) && (
+                        <Link
+                          href="/organizer"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setActivePath("/organizer");
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
+                        >
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          <span>Organizer Hub</span>
+                        </Link>
+                      )}
+
+                      {isSuperAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setActivePath("/admin");
+                          }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
+                        >
+                          <Shield className="w-4 h-4 text-[#E56A10]" />
+                          <span>Admin Console</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    {/* Sign Out Action */}
+                    <div className="p-2 border-t border-[#242C3D] bg-[#121622]/50">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsProfileDropdownOpen(false);
+                          await signOut();
+                          router.push("/");
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-mono font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>SIGN OUT</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </Show>
 
@@ -595,16 +710,47 @@ export default function Header() {
                 </div>
               </Show>
               <Show when="signed-in">
-                <div className="bg-[#161A24] p-3 rounded border border-[#242C3D] flex items-center justify-between">
-                  <div>
-                    <div className="text-white text-xs font-bold truncate max-w-[140px]">
-                      @{user?.username || user?.firstName || "Player"}
+                <div className="bg-[#161A24] p-3.5 rounded-xl border border-[#242C3D] flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden border border-[#242C3D] bg-slate-900 shrink-0">
+                      <img
+                        src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                        alt="Avatar"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <span className="text-[10px] font-mono text-[#E56A10] font-bold">
-                      {role}
+                    <div className="flex flex-col min-w-0">
+                      <div className="text-white text-xs font-bold truncate">
+                        {userProfile?.display_name || user?.username || user?.firstName || "Player"}
+                      </div>
+                      <span className="text-[10px] font-mono text-[#E56A10] font-bold">
+                        {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
+                      </span>
+                      <span className="text-[10px] text-[#94A3B8] font-mono truncate">
+                        {userEmail}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-[#0E121B] px-3 py-2 rounded-lg border border-[#242C3D] text-xs font-mono">
+                    <span className="text-[#94A3B8]">Wallet Balance</span>
+                    <span className="text-white font-bold">
+                      ₹{Number(userProfile?.inr_balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <UserButton />
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsMobileMenuOpen(false);
+                      await signOut();
+                      router.push("/");
+                    }}
+                    className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>SIGN OUT</span>
+                  </button>
                 </div>
               </Show>
             </div>

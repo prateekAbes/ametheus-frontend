@@ -32,6 +32,11 @@ export default function CreateTeamModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (gameSlug === "chess") {
+      setError("Chess is a solo discipline. Squad creation is not allowed.");
+      return;
+    }
+
     if (!name.trim() || !tag.trim() || !gameId.trim()) {
       setError("All fields are required to register squad.");
       return;
@@ -71,40 +76,9 @@ export default function CreateTeamModal({
 
       setCreatedTeam(newTeam);
       onTeamCreated(newTeam);
-    } catch (err: unknown) {
-      console.warn("Backend API call failed, falling back to local creation:", err);
-      // Generate random 6-character code
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      let code = "";
-      for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-
-      const fallbackTeam: Team = {
-        id: `team_${Date.now()}`,
-        gameSlug,
-        name: name.trim(),
-        tag: tag.trim().toUpperCase(),
-        logoUrl: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop",
-        inviteCode: code,
-        captainUserId: "usr_vortex_lead",
-        captainUsername: "vortex_lead",
-        maxMembers: gameSlug === "chess" ? 1 : 5,
-        createdAt: new Date().toISOString(),
-        members: [
-          {
-            userId: "usr_vortex_lead",
-            username: "vortex_lead",
-            role: "CAPTAIN",
-            gameId: gameId.trim(),
-            riotId: gameId.trim(),
-            joinedAt: new Date().toISOString(),
-          },
-        ],
-      };
-
-      setCreatedTeam(fallbackTeam);
-      onTeamCreated(fallbackTeam);
+    } catch (err: any) {
+      console.warn("Backend API create team failed:", err);
+      setError(err?.message || "Failed to create squad. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

@@ -17,6 +17,13 @@ export interface Game {
   anti_cheat: string;
   match_protocol: string;
   accent_color: string;
+  status: string;
+  expected_release_date?: string;
+  announcement_text?: string;
+  hero_media_url?: string;
+  hero_media_type?: string;
+  hero_media_enabled?: boolean;
+  gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>;
   active_tournaments_count: number;
 }
 
@@ -37,6 +44,13 @@ export interface NormalizedGame {
   antiCheat: string;
   matchProtocol: string;
   accentColor: string;
+  status: string;
+  expectedReleaseDate?: string;
+  announcementText?: string;
+  heroMediaUrl?: string;
+  heroMediaType?: string;
+  heroMediaEnabled: boolean;
+  gallery: Array<{ id: string; url: string; caption?: string; order?: number }>;
   activeTournaments: number;
   upcomingTournaments: number;
   activePool: string;
@@ -53,6 +67,13 @@ export function normalizeGame(g: any): NormalizedGame {
     isTeamGame: g.is_team_game !== undefined ? Boolean(g.is_team_game) : (g.isTeamGame ?? true),
     minTeamSize: g.min_team_size !== undefined ? Number(g.min_team_size) : (g.minTeamSize ?? 1),
     maxTeamSize: g.max_team_size !== undefined ? Number(g.max_team_size) : (g.maxTeamSize ?? 5),
+    status: g.status || "ACTIVE",
+    expectedReleaseDate: g.expected_release_date || g.expectedReleaseDate,
+    announcementText: g.announcement_text || g.announcementText,
+    heroMediaUrl: g.hero_media_url || g.heroMediaUrl,
+    heroMediaType: g.hero_media_type || g.heroMediaType || "gif",
+    heroMediaEnabled: g.hero_media_enabled !== undefined ? Boolean(g.hero_media_enabled) : (g.heroMediaEnabled ?? true),
+    gallery: Array.isArray(g.gallery) ? g.gallery : [],
     bannerUrl: (() => {
       const b = g.banner_url || g.bannerUrl;
       if (!b || b.includes("aida-public") || b.includes("googleusercontent.com")) {
@@ -78,8 +99,11 @@ export function normalizeGame(g: any): NormalizedGame {
   };
 }
 
-export async function getGames(): Promise<Game[]> {
-  return apiClient<Game[]>("/games");
+export async function getGames(params?: { status?: string }): Promise<Game[]> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  const qs = query.toString();
+  return apiClient<Game[]>(`/games${qs ? `?${qs}` : ""}`);
 }
 
 export async function getGameBySlug(slug: string): Promise<Game> {
@@ -102,6 +126,13 @@ export interface GameCreatePayload {
   anti_cheat?: string;
   match_protocol?: string;
   accent_color?: string;
+  status?: string;
+  expected_release_date?: string;
+  announcement_text?: string;
+  hero_media_url?: string;
+  hero_media_type?: string;
+  hero_media_enabled?: boolean;
+  gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>;
 }
 
 export interface GameUpdatePayload {
@@ -119,6 +150,13 @@ export interface GameUpdatePayload {
   anti_cheat?: string;
   match_protocol?: string;
   accent_color?: string;
+  status?: string;
+  expected_release_date?: string;
+  announcement_text?: string;
+  hero_media_url?: string;
+  hero_media_type?: string;
+  hero_media_enabled?: boolean;
+  gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>;
 }
 
 export async function createGame(payload: GameCreatePayload): Promise<Game> {
@@ -132,6 +170,12 @@ export async function updateGame(id: string, payload: GameUpdatePayload): Promis
   return apiClient<Game>(`/games/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function publishGame(id: string): Promise<Game> {
+  return apiClient<Game>(`/games/${id}/publish`, {
+    method: "POST",
   });
 }
 
