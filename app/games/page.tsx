@@ -230,10 +230,10 @@ export default function GamesDirectoryPage() {
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        {game.activeTournaments} CUPS LIVE
+                        {game.teamsCount || 0} SQUADS
                       </span>
                       <span className="bg-black/60 px-2 py-0.5 rounded text-[11px]">
-                        {game.upcomingTournaments} UPCOMING
+                        {game.entryFeeInr > 0 ? `ENTRY ₹${game.entryFeeInr}` : "FREE ENTRY"}
                       </span>
                     </div>
                   </div>
@@ -252,10 +252,10 @@ export default function GamesDirectoryPage() {
                     <div className="grid grid-cols-2 gap-2 py-2.5 border-y border-[#F1F3F5] dark:border-[#242C3D] text-xs">
                       <div>
                         <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] uppercase font-mono block">
-                          Active Pool
+                          Prize Pool
                         </span>
                         <span className="text-base font-bold font-headline text-[#E56A10] tabular-nums">
-                          {game.activePool}
+                          {game.prizePoolInr > 0 ? `₹${game.prizePoolInr.toLocaleString("en-IN")}` : "Glory & Rank"}
                         </span>
                       </div>
                       <div>

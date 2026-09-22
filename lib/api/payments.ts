@@ -1,53 +1,109 @@
 import { apiClient } from "./client";
 
-export interface CreateOrderResponse {
-  status: string;
-  order_id: string | null;
-  amount_paise?: number;
-  amount_inr?: number;
-  currency?: string;
-  tournament_title?: string;
-  team_name?: string;
-  message?: string;
-}
-
-export interface VerifyPaymentRequest {
-  order_id: string;
-  payment_id?: string;
-  signature?: string;
-}
-
-export interface VerifyPaymentResponse {
-  status: string;
-  message: string;
-  order_id: string;
+export interface InitiatePaymentResponse {
   payment_id: string;
+  game_id: string;
+  game_name: string;
+  team_id?: string;
+  amount_inr: number;
+  amount_paise: number;
+  payment_method: string;
+  status: string;
+  wallet_discount_inr?: number;
+  payment_account_code?: string;
+  upi_id?: string;
+  payee_name?: string;
+  qr_url?: string;
+  upi_uri?: string;
 }
 
-export async function createEscrowOrder(
-  tournamentId: string,
-  teamId?: string
-): Promise<CreateOrderResponse> {
-  return apiClient<CreateOrderResponse>("/payments/create-order", {
+export interface PaymentRecord {
+  id: string;
+  payment_type: string;
+  user_id: string;
+  game_id?: string;
+  game_name?: string;
+  team_id?: string;
+  team_name?: string;
+  amount_paise: number;
+  amount_inr: number;
+  payment_method: string;
+  payment_account_code?: string;
+  upi_id?: string;
+  payee_name?: string;
+  qr_url?: string;
+  upi_uri?: string;
+  utr?: string;
+  screenshot_url?: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rejection_reason?: string;
+  created_at: string;
+}
+
+export async function initiateGamePayment(
+  gameSlug: string,
+  teamId?: string,
+  paymentMethod: "UPI" | "WALLET" = "UPI"
+): Promise<InitiatePaymentResponse> {
+  return apiClient<InitiatePaymentResponse>("/payments/game/initiate", {
     method: "POST",
-    body: JSON.stringify(teamId ? { tournament_id: tournamentId, team_id: teamId } : { tournament_id: tournamentId }),
+    body: JSON.stringify({
+      game_slug: gameSlug,
+      team_id: teamId,
+      payment_method: paymentMethod,
+    }),
   });
 }
 
-export async function verifyEscrowPayment(
-  data: VerifyPaymentRequest
-): Promise<VerifyPaymentResponse> {
-  return apiClient<VerifyPaymentResponse>("/payments/verify", {
+export async function submitPaymentUtr(
+  paymentId: string,
+  utr: string,
+  screenshotUrl?: string
+): Promise<{ status: string; message: string; payment_id: string; utr: string }> {
+  return apiClient(`/payments/game/${paymentId}/submit-utr`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      utr,
+      screenshot_url: screenshotUrl,
+    }),
   });
 }
 
-export async function getOrderStatus(orderId: string): Promise<{
-  order_id: string;
-  payment_status: string;
-  tournament_id: string;
-  team_id: string;
+export async function initiateWalletTopup(amountInr: number): Promise<{
+  payment_id: string;
+  amount_inr: number;
+  amount_paise: number;
+  payment_account_code: string;
+  upi_id: string;
+  payee_name: string;
+  qr_url?: string;
+  upi_uri: string;
 }> {
-  return apiClient(`/payments/order/${orderId}`);
+  return apiClient("/payments/wallet/topup/initiate", {
+    method: "POST",
+    body: JSON.stringify({ amount_inr: amountInr }),
+  });
+}
+
+export async function getMyPayments(): Promise<PaymentRecord[]> {
+  return apiClient<PaymentRecord[]>("/payments/my");
+}
+
+export async function getPaymentStatus(paymentId: string): Promise<PaymentRecord> {
+  return apiClient<PaymentRecord>(`/payments/${paymentId}`);
+}
+
+export async function createEscrowOrder(tournamentIdOrPayload: any, teamId?: string): Promise<any> {
+  if (typeof tournamentIdOrPayload === "string") {
+    return initiateGamePayment(tournamentIdOrPayload, teamId);
+  }
+  return initiateGamePayment(
+    tournamentIdOrPayload.game_slug || tournamentIdOrPayload.tournament_id,
+    tournamentIdOrPayload.team_id || teamId,
+    tournamentIdOrPayload.payment_method
+  );
+}
+
+export async function verifyEscrowPayment(payload: any): Promise<any> {
+  return submitPaymentUtr(payload.payment_id || payload.order_id, payload.utr || payload.transaction_id, payload.screenshot_url);
 }

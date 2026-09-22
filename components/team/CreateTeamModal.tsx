@@ -67,7 +67,7 @@ export default function CreateTeamModal({
         members: res.members.map((m) => ({
           userId: m.user_id,
           username: m.username,
-          role: m.role,
+          role: (m.role === "CAPTAIN" ? "CAPTAIN" : "MEMBER") as "CAPTAIN" | "MEMBER",
           gameId: m.game_handle,
           riotId: m.game_handle,
           joinedAt: new Date().toISOString(),

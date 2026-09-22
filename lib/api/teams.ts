@@ -4,7 +4,7 @@ export interface TeamMember {
   id: string;
   user_id: string;
   username: string;
-  role: "CAPTAIN" | "MEMBER";
+  role: string;
   game_handle: string;
 }
 
@@ -17,7 +17,11 @@ export interface Team {
   captain_id: string;
   captain_username: string;
   max_members: number;
+  max_substitutes: number;
+  payment_status: "UNPAID" | "PAYMENT_PENDING" | "PAID" | "PAYMENT_REJECTED";
+  payment_id?: string;
   members: TeamMember[];
+  substitutes: TeamMember[];
 }
 
 export interface CreateTeamPayload {
@@ -30,10 +34,7 @@ export interface CreateTeamPayload {
 export interface JoinTeamPayload {
   invite_code: string;
   player_handle: string;
-}
-
-export async function getMyTeams(): Promise<Team[]> {
-  return apiClient<Team[]>("/teams/my-teams");
+  is_substitute?: boolean;
 }
 
 export async function createTeam(payload: CreateTeamPayload): Promise<Team> {
@@ -50,30 +51,35 @@ export async function joinTeam(payload: JoinTeamPayload): Promise<Team> {
   });
 }
 
-export async function getTeam(teamId: string): Promise<Team> {
-  return apiClient<Team>(`/teams/${teamId}`);
+export async function getMyTeams(gameSlug?: string): Promise<Team[]> {
+  const q = gameSlug ? `?game_slug=${encodeURIComponent(gameSlug)}` : "";
+  return apiClient<Team[]>(`/teams/my-teams${q}`);
 }
 
 export async function getTeamByCode(code: string): Promise<Team> {
-  return apiClient<Team>(`/teams/code/${encodeURIComponent(code)}`);
+  return apiClient<Team>(`/teams/code/${code}`);
 }
 
-export async function leaveTeam(teamId: string): Promise<{ message: string }> {
-  return apiClient<{ message: string }>(`/teams/${teamId}/leave`, {
+export async function getTeamById(id: string): Promise<Team> {
+  return apiClient<Team>(`/teams/${id}`);
+}
+
+export async function leaveTeam(id: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/teams/${id}/leave`, {
     method: "POST",
   });
 }
 
-export async function kickTeamMember(teamId: string, userId: string): Promise<{ message: string }> {
-  return apiClient<{ message: string }>(`/teams/${teamId}/kick/${userId}`, {
+export async function kickTeamMember(id: string, userId: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/teams/${id}/kick/${userId}`, {
     method: "POST",
   });
 }
 
-export async function disbandTeam(teamId: string): Promise<{ message: string }> {
-  return apiClient<{ message: string }>(`/teams/${teamId}`, {
+export async function deleteTeam(id: string): Promise<{ status: string; message: string }> {
+  return apiClient<{ status: string; message: string }>(`/teams/${id}`, {
     method: "DELETE",
   });
 }
 
-
+export const disbandTeam = deleteTeam;

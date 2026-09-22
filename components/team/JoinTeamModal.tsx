@@ -9,7 +9,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   gameSlug: string;
-  gameName: string;
+  gameName?: string;
   onTeamJoined: (team: Team) => void;
   findTeamByCode?: (code: string) => Team | undefined;
 }
@@ -18,7 +18,7 @@ export default function JoinTeamModal({
   isOpen,
   onClose,
   gameSlug,
-  gameName,
+  gameName = "Game",
   onTeamJoined,
   findTeamByCode,
 }: Props) {
@@ -71,7 +71,7 @@ export default function JoinTeamModal({
               members: apiTeam.members.map((m) => ({
                 userId: m.user_id,
                 username: m.username,
-                role: m.role,
+                role: (m.role === "CAPTAIN" ? "CAPTAIN" : "MEMBER") as "CAPTAIN" | "MEMBER",
                 gameId: m.game_handle,
                 riotId: m.game_handle,
                 joinedAt: new Date().toISOString(),
@@ -133,7 +133,7 @@ export default function JoinTeamModal({
         members: res.members.map((m) => ({
           userId: m.user_id,
           username: m.username,
-          role: m.role,
+          role: (m.role === "CAPTAIN" ? "CAPTAIN" : "MEMBER") as "CAPTAIN" | "MEMBER",
           gameId: m.game_handle,
           riotId: m.game_handle,
           joinedAt: new Date().toISOString(),

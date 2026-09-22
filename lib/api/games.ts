@@ -10,6 +10,10 @@ export interface Game {
   is_team_game: boolean;
   min_team_size: number;
   max_team_size: number;
+  max_substitutes?: number;
+  entry_fee_inr?: number;
+  prize_pool_inr?: number;
+  play_url?: string;
   banner_url: string;
   logo_url: string;
   description: string;
@@ -24,7 +28,7 @@ export interface Game {
   hero_media_type?: string;
   hero_media_enabled?: boolean;
   gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>;
-  active_tournaments_count: number;
+  teams_count?: number;
 }
 
 export interface NormalizedGame {
@@ -37,6 +41,10 @@ export interface NormalizedGame {
   isTeamGame: boolean;
   minTeamSize: number;
   maxTeamSize: number;
+  maxSubstitutes: number;
+  entryFeeInr: number;
+  prizePoolInr: number;
+  playUrl?: string;
   bannerUrl: string;
   logoUrl: string;
   description: string;
@@ -51,9 +59,7 @@ export interface NormalizedGame {
   heroMediaType?: string;
   heroMediaEnabled: boolean;
   gallery: Array<{ id: string; url: string; caption?: string; order?: number }>;
-  activeTournaments: number;
-  upcomingTournaments: number;
-  activePool: string;
+  teamsCount: number;
 }
 
 export function normalizeGame(g: any): NormalizedGame {
@@ -67,6 +73,10 @@ export function normalizeGame(g: any): NormalizedGame {
     isTeamGame: g.is_team_game !== undefined ? Boolean(g.is_team_game) : (g.isTeamGame ?? true),
     minTeamSize: g.min_team_size !== undefined ? Number(g.min_team_size) : (g.minTeamSize ?? 1),
     maxTeamSize: g.max_team_size !== undefined ? Number(g.max_team_size) : (g.maxTeamSize ?? 5),
+    maxSubstitutes: g.max_substitutes !== undefined ? Number(g.max_substitutes) : (g.maxSubstitutes ?? 1),
+    entryFeeInr: g.entry_fee_inr !== undefined ? Number(g.entry_fee_inr) : (g.entryFeeInr ?? 0),
+    prizePoolInr: g.prize_pool_inr !== undefined ? Number(g.prize_pool_inr) : (g.prizePoolInr ?? 0),
+    playUrl: g.play_url || g.playUrl,
     status: g.status || "ACTIVE",
     expectedReleaseDate: g.expected_release_date || g.expectedReleaseDate,
     announcementText: g.announcement_text || g.announcementText,
@@ -93,9 +103,7 @@ export function normalizeGame(g: any): NormalizedGame {
     antiCheat: g.anti_cheat || g.antiCheat || "Hardware Vanguard TPM 2.0",
     matchProtocol: g.match_protocol || g.matchProtocol || "Competitive MR12",
     accentColor: g.accent_color || g.accentColor || "#E56A10",
-    activeTournaments: g.active_tournaments_count !== undefined ? Number(g.active_tournaments_count) : (g.activeTournaments ?? 1),
-    upcomingTournaments: g.upcomingTournaments ?? 2,
-    activePool: g.activePool || "₹50,000",
+    teamsCount: g.teams_count !== undefined ? Number(g.teams_count) : (g.teamsCount ?? 0),
   };
 }
 
@@ -119,6 +127,10 @@ export interface GameCreatePayload {
   is_team_game?: boolean;
   min_team_size?: number;
   max_team_size?: number;
+  max_substitutes?: number;
+  entry_fee_inr?: number;
+  prize_pool_inr?: number;
+  play_url?: string;
   banner_url: string;
   logo_url: string;
   description?: string;
@@ -143,6 +155,10 @@ export interface GameUpdatePayload {
   is_team_game?: boolean;
   min_team_size?: number;
   max_team_size?: number;
+  max_substitutes?: number;
+  entry_fee_inr?: number;
+  prize_pool_inr?: number;
+  play_url?: string;
   banner_url?: string;
   logo_url?: string;
   description?: string;
@@ -184,4 +200,3 @@ export async function deleteGame(id: string): Promise<{ status: string; message:
     method: "DELETE",
   });
 }
-

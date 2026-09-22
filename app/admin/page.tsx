@@ -103,12 +103,47 @@ import {
 } from "@/lib/api/persona";
 import { uploadImageFile } from "@/lib/api/media";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
+import {
+  getAdminPayments,
+  approvePayment,
+  rejectPayment,
+  getAdminPayouts,
+  createWinningPayout,
+  completePayout,
+  rejectPayout,
+  seedDummyData,
+  removeDummyData,
+  PayoutRecord,
+} from "@/lib/api/admin_payments";
+import { PaymentRecord } from "@/lib/api/payments";
+import {
+  getAdminUpiAccounts,
+  createUpiAccount,
+  updateUpiAccount,
+  toggleUpiAccountStatus,
+  UpiAccount,
+} from "@/lib/api/upi_accounts";
 
 export default function AdminCockpitPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user: clerkUser } = useUser();
 
-  const [activeTab, setActiveTab] = useState<"overview" | "tournaments" | "queue" | "disputes" | "games" | "leaderboards" | "users" | "audit" | "withdrawals" | "personas">("overview");
+  const [activeTab, setActiveTab] = useState<
+    | "overview"
+    | "tournaments"
+    | "queue"
+    | "disputes"
+    | "games"
+    | "leaderboards"
+    | "users"
+    | "audit"
+    | "withdrawals"
+    | "personas"
+    | "upi_accounts"
+    | "payment_verifications"
+    | "payouts_ledger"
+    | "dev_data"
+  >("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
@@ -143,6 +178,10 @@ export default function AdminCockpitPage() {
     is_team_game: true,
     min_team_size: 1,
     max_team_size: 5,
+    max_substitutes: 1,
+    entry_fee_inr: 0,
+    prize_pool_inr: 0,
+    play_url: "",
     banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
     logo_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop",
     description: "",
@@ -308,10 +347,85 @@ export default function AdminCockpitPage() {
   const [newGalleryUrl, setNewGalleryUrl] = useState("");
   const [newGalleryCaption, setNewGalleryCaption] = useState("");
 
+  // UPI Accounts & Payment Gateways State
+  const [upiAccounts, setUpiAccounts] = useState<UpiAccount[]>([]);
+  const [isUpiModalOpen, setIsUpiModalOpen] = useState(false);
+  const [editingUpiAccount, setEditingUpiAccount] = useState<UpiAccount | null>(null);
+  const [upiForm, setUpiForm] = useState<{
+    code: string;
+    upi_id: string;
+    payee_name: string;
+    qr_url: string;
+    display_name: string;
+    status: "ACTIVE" | "INACTIVE";
+  }>({
+    code: "",
+    upi_id: "",
+    payee_name: "",
+    qr_url: "",
+    display_name: "",
+    status: "ACTIVE",
+  });
+  const [isSubmittingUpi, setIsSubmittingUpi] = useState(false);
+
+  // Incoming Payment Verifications State
+  const [adminPayments, setAdminPayments] = useState<PaymentRecord[]>([]);
+  const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
+  const [rejectingPayment, setRejectingPayment] = useState<PaymentRecord | null>(null);
+  const [paymentRejectReason, setPaymentRejectReason] = useState("UTR reference not found in bank ledger");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Payouts Ledger State
+  const [adminPayouts, setAdminPayouts] = useState<PayoutRecord[]>([]);
+  const [payoutFilter, setPayoutFilter] = useState<string>("ALL");
+  const [completingPayout, setCompletingPayout] = useState<PayoutRecord | null>(null);
+  const [outgoingUtrInput, setOutgoingUtrInput] = useState("");
+  const [rejectingPayoutRecord, setRejectingPayoutRecord] = useState<PayoutRecord | null>(null);
+  const [payoutRejectReason, setPayoutRejectReason] = useState("Beneficiary account / UPI ID declined");
+  const [isProcessingPayoutAction, setIsProcessingPayoutAction] = useState(false);
+
+  // Manual Winning Payout State
+  const [isWinningPayoutModalOpen, setIsWinningPayoutModalOpen] = useState(false);
+  const [winningPayoutForm, setWinningPayoutForm] = useState<{
+    user_id: string;
+    game_id: string;
+    rank_or_placement: string;
+    amount_inr: number;
+    destination: "WALLET" | "UPI";
+    upi_id: string;
+  }>({
+    user_id: "",
+    game_id: "",
+    rank_or_placement: "1st Place (Champion)",
+    amount_inr: 500,
+    destination: "WALLET",
+    upi_id: "",
+  });
+  const [isSubmittingWinningPayout, setIsSubmittingWinningPayout] = useState(false);
+
+  // Dev Data State
+  const [isSeedingDevData, setIsSeedingDevData] = useState(false);
+  const [isRemovingDevData, setIsRemovingDevData] = useState(false);
+
   const loadAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [profileRes, logsRes, usersRes, statsRes, matchesRes, disputesRes, gamesRes, tournRes, catsRes, withdrawalsRes, personaRes] = await Promise.allSettled([
+      const [
+        profileRes,
+        logsRes,
+        usersRes,
+        statsRes,
+        matchesRes,
+        disputesRes,
+        gamesRes,
+        tournRes,
+        catsRes,
+        withdrawalsRes,
+        personaRes,
+        upiRes,
+        paymentsRes,
+        payoutsRes,
+      ] = await Promise.allSettled([
         getCurrentUserProfile(),
         getAuditLogs(),
         getAdminUsers(),
@@ -323,6 +437,9 @@ export default function AdminCockpitPage() {
         getLeaderboardCategories(),
         getAdminWithdrawals(),
         getPersonaPool(),
+        getAdminUpiAccounts(),
+        getAdminPayments(),
+        getAdminPayouts(),
       ]);
 
       if (profileRes.status === "fulfilled") {
@@ -367,6 +484,15 @@ export default function AdminCockpitPage() {
       }
       if (personaRes.status === "fulfilled" && personaRes.value && Array.isArray(personaRes.value.names)) {
         setPersonaPool(personaRes.value);
+      }
+      if (upiRes.status === "fulfilled" && Array.isArray(upiRes.value)) {
+        setUpiAccounts(upiRes.value);
+      }
+      if (paymentsRes.status === "fulfilled" && Array.isArray(paymentsRes.value)) {
+        setAdminPayments(paymentsRes.value);
+      }
+      if (payoutsRes.status === "fulfilled" && Array.isArray(payoutsRes.value)) {
+        setAdminPayouts(payoutsRes.value);
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -533,6 +659,10 @@ export default function AdminCockpitPage() {
       is_team_game: true,
       min_team_size: 1,
       max_team_size: 5,
+      max_substitutes: 1,
+      entry_fee_inr: 0,
+      prize_pool_inr: 0,
+      play_url: "",
       banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
       logo_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop",
       description: "",
@@ -564,6 +694,10 @@ export default function AdminCockpitPage() {
       is_team_game: game.is_team_game,
       min_team_size: game.min_team_size,
       max_team_size: game.max_team_size,
+      max_substitutes: game.max_substitutes !== undefined ? game.max_substitutes : 1,
+      entry_fee_inr: game.entry_fee_inr || 0,
+      prize_pool_inr: game.prize_pool_inr || 0,
+      play_url: game.play_url || "",
       banner_url: game.banner_url,
       logo_url: game.logo_url,
       description: game.description || "",
@@ -597,6 +731,10 @@ export default function AdminCockpitPage() {
           is_team_game: gameForm.is_team_game,
           min_team_size: Number(gameForm.min_team_size),
           max_team_size: Number(gameForm.max_team_size),
+          max_substitutes: Number(gameForm.max_substitutes || 0),
+          entry_fee_inr: Number(gameForm.entry_fee_inr || 0),
+          prize_pool_inr: Number(gameForm.prize_pool_inr || 0),
+          play_url: gameForm.play_url,
           banner_url: gameForm.banner_url,
           logo_url: gameForm.logo_url,
           description: gameForm.description,
@@ -620,6 +758,10 @@ export default function AdminCockpitPage() {
           slug,
           min_team_size: Number(gameForm.min_team_size),
           max_team_size: Number(gameForm.max_team_size),
+          max_substitutes: Number(gameForm.max_substitutes || 0),
+          entry_fee_inr: Number(gameForm.entry_fee_inr || 0),
+          prize_pool_inr: Number(gameForm.prize_pool_inr || 0),
+          play_url: gameForm.play_url,
           status: gameForm.status || "ACTIVE",
           expected_release_date: gameForm.expected_release_date,
           announcement_text: gameForm.announcement_text,
@@ -1028,12 +1170,7 @@ export default function AdminCockpitPage() {
 
   const handleGenerateTestWithdrawal = async () => {
     try {
-      await requestWithdrawal({
-        amount: 2500,
-        upi_id: "pro_athlete@oksbi",
-        account_holder_name: "Pro Athlete (Tournament Prize)",
-        notes: "Tournament 1st place prize reward payout",
-      });
+      await requestWithdrawal(2500, "pro_athlete@oksbi");
       setActionMessage("Test withdrawal request of ₹2,500 created! Status: PENDING ADMIN APPROVAL.");
       await loadAdminData();
       setTimeout(() => setActionMessage(""), 5000);
@@ -1042,17 +1179,189 @@ export default function AdminCockpitPage() {
         id: `wth_${Date.now()}`,
         user_id: "usr_athlete_demo",
         user_name: "ShadowStriker",
-        user_email: "shadow@ametheus.gg",
         amount: 2500,
+        amount_paise: 250000,
+        amount_inr: 2500,
+        destination: "UPI",
         upi_id: "pro_athlete@oksbi",
-        account_holder_name: "Shadow Striker (Demo)",
-        notes: "Mumbai Masters 1st place prize reward",
-        status: "PENDING_APPROVAL",
+        status: "PENDING",
         created_at: new Date().toISOString(),
       };
       setWithdrawals((prev) => [testReq, ...prev]);
       setActionMessage("Test withdrawal request of ₹2,500 queued for Admin approval.");
       setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  // ── UPI Account Handlers ──────────────────────────────────────────────────
+  const handleOpenCreateUpi = () => {
+    setEditingUpiAccount(null);
+    setUpiForm({ code: "", upi_id: "", payee_name: "", display_name: "", qr_url: "", status: "ACTIVE" });
+    setIsUpiModalOpen(true);
+  };
+
+  const handleOpenEditUpi = (acct: UpiAccount) => {
+    setEditingUpiAccount(acct);
+    setUpiForm({
+      code: acct.code,
+      upi_id: acct.upi_id,
+      payee_name: acct.payee_name,
+      display_name: acct.display_name || "",
+      qr_url: acct.qr_url || "",
+      status: acct.status,
+    });
+    setIsUpiModalOpen(true);
+  };
+
+  const handleSaveUpiAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingUpi(true);
+    try {
+      if (editingUpiAccount) {
+        await updateUpiAccount(editingUpiAccount.id, {
+          upi_id: upiForm.upi_id,
+          payee_name: upiForm.payee_name,
+          display_name: upiForm.display_name,
+          qr_url: upiForm.qr_url,
+        });
+        setActionMessage(`UPI account ${editingUpiAccount.code} updated.`);
+      } else {
+        await createUpiAccount({
+          code: upiForm.code,
+          upi_id: upiForm.upi_id,
+          payee_name: upiForm.payee_name,
+          display_name: upiForm.display_name,
+          qr_url: upiForm.qr_url,
+        });
+        setActionMessage(`UPI account ${upiForm.code} created.`);
+      }
+      setIsUpiModalOpen(false);
+      const accounts = await getAdminUpiAccounts();
+      setUpiAccounts(accounts);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to save UPI account.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsSubmittingUpi(false);
+    }
+  };
+
+  const handleToggleUpiAccount = async (id: string, code: string) => {
+    try {
+      await toggleUpiAccountStatus(id);
+      const accounts = await getAdminUpiAccounts();
+      setUpiAccounts(accounts);
+      setActionMessage(`UPI account ${code} status toggled.`);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to toggle UPI account.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  // ── Payment Verification Handlers ─────────────────────────────────────────
+  const handleApprovePayment = async (paymentId: string) => {
+    if (!confirm("Approve this payment? This will credit the player wallet / mark team PAID.")) return;
+    setIsProcessingPayment(true);
+    try {
+      await approvePayment(paymentId);
+      setActionMessage("Payment approved successfully.");
+      const payments = await getAdminPayments();
+      setAdminPayments(payments);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to approve payment.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleRejectPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingPayment) return;
+    setIsProcessingPayment(true);
+    try {
+      await rejectPayment(rejectingPayment.id, paymentRejectReason);
+      setActionMessage("Payment rejected.");
+      setRejectingPayment(null);
+      setPaymentRejectReason("");
+      const payments = await getAdminPayments();
+      setAdminPayments(payments);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to reject payment.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // ── Payout Ledger Handlers ────────────────────────────────────────────────
+  const handleCompletePayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completingPayout) return;
+    setIsProcessingPayoutAction(true);
+    try {
+      await completePayout(completingPayout.id, outgoingUtrInput);
+      setActionMessage(`Payout of ₹${completingPayout.amount_inr.toLocaleString("en-IN")} marked as PAID.`);
+      setCompletingPayout(null);
+      setOutgoingUtrInput("");
+      const payouts = await getAdminPayouts();
+      setAdminPayouts(payouts);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to complete payout.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingPayoutAction(false);
+    }
+  };
+
+  const handleRejectPayoutRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingPayoutRecord) return;
+    setIsProcessingPayoutAction(true);
+    try {
+      await rejectPayout(rejectingPayoutRecord.id, payoutRejectReason);
+      setActionMessage("Payout rejected and funds restored.");
+      setRejectingPayoutRecord(null);
+      setPayoutRejectReason("");
+      const payouts = await getAdminPayouts();
+      setAdminPayouts(payouts);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to reject payout.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsProcessingPayoutAction(false);
+    }
+  };
+
+  const handleSaveWinningPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingWinningPayout(true);
+    try {
+      await createWinningPayout({
+        user_id: winningPayoutForm.user_id,
+        game_id: winningPayoutForm.game_id,
+        amount_inr: Number(winningPayoutForm.amount_inr),
+        rank_or_placement: winningPayoutForm.rank_or_placement,
+        destination: winningPayoutForm.destination,
+        upi_id: winningPayoutForm.upi_id,
+      });
+      setActionMessage("Winning payout created successfully.");
+      setIsWinningPayoutModalOpen(false);
+      setWinningPayoutForm({ user_id: "", game_id: "", amount_inr: 0, rank_or_placement: "1st Place", destination: "WALLET", upi_id: "" });
+      const payouts = await getAdminPayouts();
+      setAdminPayouts(payouts);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to create winning payout.");
+      setTimeout(() => setActionMessage(""), 6000);
+    } finally {
+      setIsSubmittingWinningPayout(false);
     }
   };
 
@@ -1205,18 +1514,67 @@ export default function AdminCockpitPage() {
             </div>
           </div>
 
-          {/* Action Tools (Seed Catalog & Refresh) */}
-          <div className="flex items-center gap-2">
+          {/* Action Tools (Seed Catalog, Dev Data & Refresh) */}
+          <div className="flex items-center gap-2 flex-wrap">
             {isSuperAdmin && (
-              <button
-                onClick={handleTriggerSeed}
-                disabled={isSeeding}
-                className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 hover:bg-[#1C2230] text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Populate MongoDB with default competitive games, tournaments, teams and demo matches"
-              >
-                {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E56A10]" /> : <Database className="w-3.5 h-3.5 text-[#E56A10]" />}
-                <span>{isSeeding ? "Seeding..." : "Seed Platform"}</span>
-              </button>
+              <>
+                <button
+                  onClick={async () => {
+                    setIsSeedingDevData(true);
+                    try {
+                      const res = await seedDummyData();
+                      setActionMessage(res.message || "Dummy development data generated.");
+                      await loadAdminData();
+                      setTimeout(() => setActionMessage(""), 5000);
+                    } catch (e: any) {
+                      setActionMessage(e?.message || "Failed to seed dummy data");
+                      setTimeout(() => setActionMessage(""), 5000);
+                    } finally {
+                      setIsSeedingDevData(false);
+                    }
+                  }}
+                  disabled={isSeedingDevData || isRemovingDevData}
+                  className="px-3 py-1.5 bg-emerald-950/40 border border-emerald-700/60 hover:bg-emerald-900/60 text-emerald-300 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  title="Generate safe development dummy games, teams, and payments (flagged with is_dummy)"
+                >
+                  {isSeedingDevData ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  <span>{isSeedingDevData ? "Seeding..." : "Seed Dummy"}</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (!confirm("Are you sure you want to remove all dummy data? Only records marked is_dummy will be deleted.")) return;
+                    setIsRemovingDevData(true);
+                    try {
+                      const res = await removeDummyData();
+                      setActionMessage(res.message || "Dummy development data removed.");
+                      await loadAdminData();
+                      setTimeout(() => setActionMessage(""), 5000);
+                    } catch (e: any) {
+                      setActionMessage(e?.message || "Failed to remove dummy data");
+                      setTimeout(() => setActionMessage(""), 5000);
+                    } finally {
+                      setIsRemovingDevData(false);
+                    }
+                  }}
+                  disabled={isSeedingDevData || isRemovingDevData}
+                  className="px-3 py-1.5 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  title="Purge all development dummy records (is_dummy: true)"
+                >
+                  {isRemovingDevData ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  <span>{isRemovingDevData ? "Purging..." : "Remove Dummy"}</span>
+                </button>
+
+                <button
+                  onClick={handleTriggerSeed}
+                  disabled={isSeeding}
+                  className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 hover:bg-[#1C2230] text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Populate MongoDB with default competitive games, tournaments, teams and demo matches"
+                >
+                  {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E56A10]" /> : <Database className="w-3.5 h-3.5 text-[#E56A10]" />}
+                  <span>{isSeeding ? "Seeding..." : "Seed Platform"}</span>
+                </button>
+              </>
             )}
 
             <button
@@ -1315,6 +1673,46 @@ export default function AdminCockpitPage() {
                 <Users className="w-3.5 h-3.5" /> User RBAC ({users.length})
               </button>
               <button
+                onClick={() => setActiveTab("upi_accounts")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "upi_accounts"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" /> UPI Accounts ({upiAccounts.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("payment_verifications")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "payment_verifications"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Payments
+                {adminPayments.filter((p) => p.status === "PENDING").length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
+                    {adminPayments.filter((p) => p.status === "PENDING").length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("payouts_ledger")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "payouts_ledger"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <DollarSign className="w-3.5 h-3.5" /> Payouts
+                {adminPayouts.filter((p) => p.status === "PENDING").length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
+                    {adminPayouts.filter((p) => p.status === "PENDING").length}
+                  </span>
+                )}
+              </button>
+              <button
                 onClick={() => setActiveTab("withdrawals")}
                 className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === "withdrawals"
@@ -1322,7 +1720,7 @@ export default function AdminCockpitPage() {
                     : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
                 }`}
               >
-                <DollarSign className="w-3.5 h-3.5" /> Payout Approvals
+                <Wallet className="w-3.5 h-3.5" /> Escrow Approvals
                 {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length > 0 && (
                   <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
                     {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length}
@@ -1849,6 +2247,18 @@ export default function AdminCockpitPage() {
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-slate-200">
                         <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Entry Fee</span>
+                          <span className="text-emerald-700 font-bold">
+                            {game.entry_fee_inr ? `₹${game.entry_fee_inr.toLocaleString("en-IN")}` : "FREE"}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Prize Pool</span>
+                          <span className="text-[#E56A10] font-bold">
+                            ₹{(game.prize_pool_inr || 0).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
                           <span className="text-[#64748B] block text-[9px] uppercase">Squad Format</span>
                           <span className="text-slate-900 font-bold">
                             {game.is_team_game
@@ -1857,9 +2267,9 @@ export default function AdminCockpitPage() {
                           </span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                          <span className="text-[#64748B] block text-[9px] uppercase">Tournaments</span>
-                          <span className="text-[#E56A10] font-bold">
-                            {game.active_tournaments_count || 0} Active
+                          <span className="text-[#64748B] block text-[9px] uppercase">Teams Enrolled</span>
+                          <span className="text-blue-700 font-bold">
+                            {game.teams_count || 0} Squads
                           </span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded border border-slate-200 col-span-2">
@@ -1912,6 +2322,309 @@ export default function AdminCockpitPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ─── TAB: UPI PAYMENT ACCOUNTS ─────────────────────────────────── */}
+        {activeTab === "upi_accounts" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#E56A10]" /> UPI Payment Accounts
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Manage rotating UPI/QR accounts. New payments auto-select an active account in round-robin order.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreateUpi}
+                className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Add UPI Account
+              </button>
+            </div>
+
+            {upiAccounts.length === 0 ? (
+              <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">
+                <CreditCard className="w-12 h-12 text-slate-300 mx-auto" />
+                <p className="font-headline font-bold text-slate-900 text-base">No UPI Accounts Configured</p>
+                <p className="text-xs text-slate-500 font-mono">Add at least one active UPI account to accept payments.</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase">
+                        <th className="px-4 py-3">Code</th>
+                        <th className="px-4 py-3">UPI ID</th>
+                        <th className="px-4 py-3">Payee Name</th>
+                        <th className="px-4 py-3">Display Name</th>
+                        <th className="px-4 py-3">QR</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {upiAccounts.map((acct) => (
+                        <tr key={acct.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-bold text-[#E56A10]">{acct.code}</td>
+                          <td className="px-4 py-3 text-slate-900">{acct.upi_id}</td>
+                          <td className="px-4 py-3 text-slate-700">{acct.payee_name}</td>
+                          <td className="px-4 py-3 text-slate-500">{acct.display_name || "—"}</td>
+                          <td className="px-4 py-3">
+                            {acct.qr_url ? (
+                              <img src={acct.qr_url} alt="QR" className="w-10 h-10 rounded border border-slate-200 object-contain bg-white" />
+                            ) : (
+                              <span className="text-slate-400 italic">No QR</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${acct.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                              {acct.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleToggleUpiAccount(acct.id, acct.code)}
+                                className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer ${acct.status === "ACTIVE" ? "bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-200 hover:border-rose-300" : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"}`}
+                              >
+                                {acct.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditUpi(acct)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 border border-slate-200 cursor-pointer transition-colors"
+                                title="Edit"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── TAB: PAYMENT VERIFICATIONS ────────────────────────────────── */}
+        {activeTab === "payment_verifications" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-[#E56A10]" /> Payment Verifications
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Review and approve or reject incoming UPI payment screenshots submitted by players.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((f) => {
+                  const count = f === "ALL" ? adminPayments.length : adminPayments.filter((p) => p.status === f).length;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setPaymentFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${paymentFilter === f ? "bg-[#E56A10] text-white border-[#E56A10]" : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"}`}
+                    >
+                      {f.replace(/_/g, " ")}
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${paymentFilter === f ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(() => {
+              const filtered = paymentFilter === "ALL" ? adminPayments : adminPayments.filter((p) => p.status === paymentFilter);
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">
+                    <CheckCircle className="w-12 h-12 text-emerald-300 mx-auto" />
+                    <p className="font-headline font-bold text-slate-900 text-base">No Payments Found</p>
+                    <p className="text-xs text-slate-500 font-mono">No payment records match the selected filter.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase">
+                          <th className="px-4 py-3">User ID</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Amount</th>
+                          <th className="px-4 py-3">UTR / Ref</th>
+                          <th className="px-4 py-3">UPI Account</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Submitted</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.map((pmt) => (
+                          <tr key={pmt.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 font-bold text-slate-900 text-[11px]">{pmt.user_id}</td>
+                            <td className="px-4 py-3 text-slate-600">{pmt.payment_type || "ENTRY"}</td>
+                            <td className="px-4 py-3 font-bold text-[#E56A10]">₹{pmt.amount_inr.toLocaleString("en-IN")}</td>
+                            <td className="px-4 py-3 text-slate-700">{pmt.utr || "—"}</td>
+                            <td className="px-4 py-3 text-slate-600">{pmt.payment_account_code || "—"}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                pmt.status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                pmt.status === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>{pmt.status}</span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500">{pmt.created_at ? new Date(pmt.created_at).toLocaleDateString("en-IN") : "—"}</td>
+                            <td className="px-4 py-3">
+                              {pmt.status === "PENDING" && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => handleApprovePayment(pmt.id)}
+                                    disabled={isProcessingPayment}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                                  >
+                                    <Check className="w-3 h-3" /> Approve
+                                  </button>
+                                  <button
+                                    onClick={() => { setRejectingPayment(pmt); setPaymentRejectReason(""); }}
+                                    className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <X className="w-3 h-3" /> Reject
+                                  </button>
+                                </div>
+                              )}
+                              {pmt.screenshot_url && (
+                                <a href={pmt.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 underline ml-auto block text-right mt-1">
+                                  View Screenshot
+                                </a>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ─── TAB: PAYOUTS LEDGER ───────────────────────────────────────── */}
+        {activeTab === "payouts_ledger" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                  <ArrowUpRight className="w-5 h-5 text-[#E56A10]" /> Payouts Ledger
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  All outgoing payouts — prize winnings, wallet withdrawals, and refunds. Confirm UPI transfer to mark PAID.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => { setIsWinningPayoutModalOpen(true); setWinningPayoutForm({ user_id: "", game_id: "", amount_inr: 0, rank_or_placement: "1st Place", destination: "WALLET", upi_id: "" }); }}
+                  className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Create Winning Payout
+                </button>
+                {(["ALL", "PENDING", "PAID", "REJECTED"] as const).map((f) => {
+                  const count = f === "ALL" ? adminPayouts.length : adminPayouts.filter((p) => p.status === f).length;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setPayoutFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${payoutFilter === f ? "bg-[#E56A10] text-white border-[#E56A10]" : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"}`}
+                    >
+                      {f}
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${payoutFilter === f ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(() => {
+              const filtered = payoutFilter === "ALL" ? adminPayouts : adminPayouts.filter((p) => p.status === payoutFilter);
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">
+                    <ArrowUpRight className="w-12 h-12 text-slate-300 mx-auto" />
+                    <p className="font-headline font-bold text-slate-900 text-base">No Payouts Found</p>
+                    <p className="text-xs text-slate-500 font-mono">No payout records match the selected filter.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase">
+                          <th className="px-4 py-3">User</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Amount</th>
+                          <th className="px-4 py-3">Destination UPI</th>
+                          <th className="px-4 py-3">Game</th>
+                          <th className="px-4 py-3">Rank</th>
+                          <th className="px-4 py-3">UTR / Ref</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.map((po) => (
+                          <tr key={po.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 font-bold text-slate-900">@{po.user_name}</td>
+                            <td className="px-4 py-3 text-slate-600">{po.payout_type}</td>
+                            <td className="px-4 py-3 font-bold text-emerald-700">₹{po.amount_inr.toLocaleString("en-IN")}</td>
+                            <td className="px-4 py-3 text-slate-700">{po.upi_id || po.destination || "—"}</td>
+                            <td className="px-4 py-3 text-slate-600">{po.game_name || "—"}</td>
+                            <td className="px-4 py-3 text-slate-500">{po.rank_or_placement || "—"}</td>
+                            <td className="px-4 py-3 text-slate-500">{po.outgoing_utr || "Pending"}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                po.status === "PAID" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                po.status === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                                "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>{po.status}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {po.status === "PENDING" && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => { setCompletingPayout(po); setOutgoingUtrInput(""); }}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Check className="w-3 h-3" /> Mark Paid
+                                  </button>
+                                  <button
+                                    onClick={() => { setRejectingPayoutRecord(po); setPayoutRejectReason(""); }}
+                                    className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                  >
+                                    <X className="w-3 h-3" /> Reject
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2922,6 +3635,364 @@ export default function AdminCockpitPage() {
         </div>
       )}
 
+
+      {/* ─── UPI Account Add/Edit Modal ────────────────────────────────── */}
+      {isUpiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                  {editingUpiAccount ? `Edit ${editingUpiAccount.code}` : "Add UPI Account"}
+                </h3>
+              </div>
+              <button onClick={() => setIsUpiModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveUpiAccount} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Payment Code *</label>
+                  <input
+                    type="text"
+                    required
+                    disabled={!!editingUpiAccount}
+                    value={upiForm.code}
+                    onChange={(e) => setUpiForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. UPI001"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10] disabled:bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">UPI ID *</label>
+                  <input
+                    type="text"
+                    required
+                    value={upiForm.upi_id}
+                    onChange={(e) => setUpiForm((f) => ({ ...f, upi_id: e.target.value }))}
+                    placeholder="e.g. tournament@oksbi"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Payee Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={upiForm.payee_name}
+                    onChange={(e) => setUpiForm((f) => ({ ...f, payee_name: e.target.value }))}
+                    placeholder="e.g. Ametheus Gaming Pvt Ltd"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Display Name</label>
+                  <input
+                    type="text"
+                    value={upiForm.display_name}
+                    onChange={(e) => setUpiForm((f) => ({ ...f, display_name: e.target.value }))}
+                    placeholder="e.g. Primary Account"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">QR Code Image URL</label>
+                  <input
+                    type="url"
+                    value={upiForm.qr_url}
+                    onChange={(e) => setUpiForm((f) => ({ ...f, qr_url: e.target.value }))}
+                    placeholder="https://... (paste QR image URL)"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                  {upiForm.qr_url && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <img src={upiForm.qr_url} alt="QR Preview" className="w-16 h-16 object-contain rounded border border-slate-200 bg-white" />
+                      <span className="text-[10px] font-mono text-emerald-600">QR preview loaded</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsUpiModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmittingUpi} className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                  {isSubmittingUpi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  {editingUpiAccount ? "Save Changes" : "Create Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Payment Rejection Modal ───────────────────────────────────── */}
+      {rejectingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payment</h3>
+              </div>
+              <button onClick={() => setRejectingPayment(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRejectPayment} className="space-y-4">
+              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+                <div className="font-bold">Payment by user: {rejectingPayment.user_id}</div>
+                <div>Amount: ₹{rejectingPayment.amount_inr.toLocaleString("en-IN")}</div>
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Rejection Reason *</label>
+                <select
+                  required
+                  value={paymentRejectReason}
+                  onChange={(e) => setPaymentRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                >
+                  <option value="">— Select a reason —</option>
+                  <option value="UTR reference not found in bank records">UTR reference not found in bank records</option>
+                  <option value="Screenshot unclear or illegible">Screenshot unclear or illegible</option>
+                  <option value="Amount mismatch — incorrect amount transferred">Amount mismatch — incorrect amount transferred</option>
+                  <option value="UPI ID mismatch — payment sent to wrong account">UPI ID mismatch — payment sent to wrong account</option>
+                  <option value="Duplicate submission">Duplicate submission</option>
+                  <option value="Payment reversed by bank">Payment reversed by bank</option>
+                  <option value="Fraudulent or forged screenshot">Fraudulent or forged screenshot</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setRejectingPayment(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isProcessingPayment} className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                  {isProcessingPayment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  Reject Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Complete Payout (Mark Paid) Modal ────────────────────────── */}
+      {completingPayout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Confirm UPI Transfer</h3>
+              </div>
+              <button onClick={() => setCompletingPayout(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCompletePayout} className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-xs font-mono space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Recipient:</span>
+                  <span className="font-bold text-slate-900">@{completingPayout.user_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Amount:</span>
+                  <span className="font-bold text-emerald-700 text-sm">₹{completingPayout.amount_inr.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Destination UPI:</span>
+                  <span className="font-bold text-slate-900">{completingPayout.upi_id || completingPayout.destination || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Type:</span>
+                  <span className="text-slate-700">{completingPayout.payout_type}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Outgoing UTR / Transfer Reference *</label>
+                <input
+                  type="text"
+                  required
+                  value={outgoingUtrInput}
+                  onChange={(e) => setOutgoingUtrInput(e.target.value)}
+                  placeholder="e.g. UPI/2026/88491023 or IMPS-109248"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setCompletingPayout(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isProcessingPayoutAction} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                  {isProcessingPayoutAction ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Mark as Paid
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Payout Rejection Modal ────────────────────────────────────── */}
+      {rejectingPayoutRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payout</h3>
+              </div>
+              <button onClick={() => setRejectingPayoutRecord(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRejectPayoutRecord} className="space-y-4">
+              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+                <div className="font-bold">Payout to @{rejectingPayoutRecord.user_name}</div>
+                <div>Amount: ₹{rejectingPayoutRecord.amount_inr.toLocaleString("en-IN")} | Type: {rejectingPayoutRecord.payout_type}</div>
+                <p className="mt-1">Rejecting a withdrawal payout will restore the reserved funds to the user&apos;s wallet.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Rejection Reason *</label>
+                <select
+                  required
+                  value={payoutRejectReason}
+                  onChange={(e) => setPayoutRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                >
+                  <option value="">— Select a reason —</option>
+                  <option value="UPI ID is invalid or closed">UPI ID is invalid or closed</option>
+                  <option value="Bank rejected the beneficiary handle">Bank rejected the beneficiary handle</option>
+                  <option value="Account holder name mismatch">Account holder name mismatch</option>
+                  <option value="IMPS/UPI transfer failed — bank error">IMPS/UPI transfer failed — bank error</option>
+                  <option value="Suspected fraudulent withdrawal">Suspected fraudulent withdrawal</option>
+                  <option value="Admin manual cancellation">Admin manual cancellation</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setRejectingPayoutRecord(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isProcessingPayoutAction} className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                  {isProcessingPayoutAction ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  Reject Payout
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Create Winning Payout Modal ───────────────────────────────── */}
+      {isWinningPayoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Create Winning Payout</h3>
+              </div>
+              <button onClick={() => setIsWinningPayoutModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveWinningPayout} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">User ID *</label>
+                  <input
+                    type="text"
+                    required
+                    value={winningPayoutForm.user_id}
+                    onChange={(e) => setWinningPayoutForm((f) => ({ ...f, user_id: e.target.value }))}
+                    placeholder="usr_... or username"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Game</label>
+                  <select
+                    value={winningPayoutForm.game_id}
+                    onChange={(e) => setWinningPayoutForm((f) => ({ ...f, game_id: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="">— Select Game —</option>
+                    {games.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Amount (₹ INR) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={winningPayoutForm.amount_inr || ""}
+                    onChange={(e) => setWinningPayoutForm((f) => ({ ...f, amount_inr: Number(e.target.value) }))}
+                    placeholder="e.g. 15000"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Rank / Placement *</label>
+                  <select
+                    value={winningPayoutForm.rank_or_placement}
+                    onChange={(e) => setWinningPayoutForm((f) => ({ ...f, rank_or_placement: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option>1st Place</option>
+                    <option>2nd Place</option>
+                    <option>3rd Place</option>
+                    <option>4th Place</option>
+                    <option>Top 5</option>
+                    <option>Top 8</option>
+                    <option>Top 16</option>
+                    <option>MVP Bonus</option>
+                    <option>Participation Bonus</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Destination *</label>
+                  <select
+                    value={winningPayoutForm.destination}
+                    onChange={(e) => setWinningPayoutForm((f) => ({ ...f, destination: e.target.value as "UPI" | "WALLET" }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="WALLET">WALLET (credit user wallet)</option>
+                    <option value="UPI">UPI (direct transfer)</option>
+                  </select>
+                </div>
+                {winningPayoutForm.destination === "UPI" && (
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">UPI ID *</label>
+                    <input
+                      type="text"
+                      required={winningPayoutForm.destination === "UPI"}
+                      value={winningPayoutForm.upi_id}
+                      onChange={(e) => setWinningPayoutForm((f) => ({ ...f, upi_id: e.target.value }))}
+                      placeholder="e.g. winner@oksbi"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsWinningPayoutModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmittingWinningPayout} className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
+                  {isSubmittingWinningPayout ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                  Create Payout
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Game Modal */}
       {isGameModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
@@ -3079,6 +4150,61 @@ export default function AdminCockpitPage() {
                     max={10}
                     value={gameForm.max_team_size}
                     onChange={(e) => setGameForm({ ...gameForm, max_team_size: parseInt(e.target.value) || 5 })}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                    Entry Fee (₹ INR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={gameForm.entry_fee_inr ?? 0}
+                    onChange={(e) => setGameForm({ ...gameForm, entry_fee_inr: parseInt(e.target.value) || 0 })}
+                    placeholder="0 = Free"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                    Prize Pool (₹ INR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={gameForm.prize_pool_inr ?? 0}
+                    onChange={(e) => setGameForm({ ...gameForm, prize_pool_inr: parseInt(e.target.value) || 0 })}
+                    placeholder="e.g. 50000"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                    Max Substitutes
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    value={gameForm.max_substitutes ?? 1}
+                    onChange={(e) => setGameForm({ ...gameForm, max_substitutes: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                    Play URL (Game Server / Lobby Link)
+                  </label>
+                  <input
+                    type="url"
+                    value={gameForm.play_url ?? ""}
+                    onChange={(e) => setGameForm({ ...gameForm, play_url: e.target.value })}
+                    placeholder="https://... game lobby or server URL"
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   />
                 </div>
