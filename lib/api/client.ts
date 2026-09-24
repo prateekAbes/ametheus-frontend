@@ -27,15 +27,15 @@ export class ApiError extends Error {
   }
 }
 
-let authTokenGetter: (() => Promise<string | null>) | null = null;
+let authTokenGetter: ((options?: { skipCache?: boolean }) => Promise<string | null>) | null = null;
 
-export function setAuthTokenGetter(getter: () => Promise<string | null>) {
+export function setAuthTokenGetter(getter: (options?: { skipCache?: boolean }) => Promise<string | null>) {
   authTokenGetter = getter;
 }
 
 export async function apiClient<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit & { _isRetry?: boolean } = {}
 ): Promise<T> {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${API_BASE_URL}/api/v1${cleanEndpoint}`;
@@ -57,10 +57,28 @@ export async function apiClient<T>(
     }
   }
 
-  const response = await fetch(url, {
-    ...options,
+  const { _isRetry, ...fetchOptions } = options;
+
+  let response = await fetch(url, {
+    ...fetchOptions,
     headers,
   });
+
+  // If unauthorized and we haven't retried yet, request a fresh token (skipCache) and retry once
+  if (response.status === 401 && authTokenGetter && !_isRetry) {
+    try {
+      const freshToken = await authTokenGetter({ skipCache: true });
+      if (freshToken) {
+        headers["Authorization"] = `Bearer ${freshToken}`;
+        response = await fetch(url, {
+          ...fetchOptions,
+          headers,
+        });
+      }
+    } catch {
+      // Ignore retry failure and proceed to error handling
+    }
+  }
 
   if (!response.ok) {
     const errorData = (await response.json().catch(() => ({}))) as ApiErrorResponse;

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createEscrowOrder, verifyEscrowPayment } from "@/lib/api/payments";
+import { registerForTournament } from "@/lib/api/tournaments";
 import { Team } from "@/types";
-import { X, Shield, Check, AlertCircle, CreditCard, Lock, Sparkles, Gamepad2, UserCheck } from "lucide-react";
+import { X, Shield, Check, AlertCircle, CreditCard, Lock, Gamepad2, UserCheck } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
@@ -104,7 +104,7 @@ export default function RegisterTournamentModal({
     if (tournament.entryFeeNum === 0) {
       // Free tournament
       setIsProcessing(true);
-      createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id)
+      registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id)
         .then(() => {
           setStep("SUCCESS");
           onRegistrationSuccess();
@@ -118,26 +118,17 @@ export default function RegisterTournamentModal({
     }
   };
 
-  const handleEscrowPayment = async (simulateFailure = false) => {
+  const handleEscrowPayment = async () => {
     if (!isSolo && !selectedTeam) return;
     setIsProcessing(true);
     setError("");
 
     try {
-      if (simulateFailure) {
-        throw new Error("Escrow payment simulated failure: Card declined / Insufficient test funds.");
-      }
-
-      const order = await createEscrowOrder(tournament.id, isSolo ? undefined : selectedTeam?.id);
-      await verifyEscrowPayment({
-        order_id: order.order_id || `order_amx_${Date.now()}`,
-        payment_id: `pay_escrow_${Date.now()}`,
-        signature: "mock_signature_verified",
-      });
+      await registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id);
       setStep("SUCCESS");
       onRegistrationSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Escrow payment verification failed";
+      const msg = err instanceof Error ? err.message : "Tournament registration failed";
       setError(msg);
     } finally {
       setIsProcessing(false);
@@ -146,25 +137,25 @@ export default function RegisterTournamentModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white text-[#0B1C30] border border-slate-200 rounded-xl shadow-2xl p-6 flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#111622] text-[#0B1C30] dark:text-[#F8FAFC] border border-slate-200 dark:border-[#242C3D] rounded-xl shadow-2xl p-6 flex flex-col max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-4 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded bg-[#E56A10]/10 border border-[#E56A10] flex items-center justify-center text-[#E56A10]">
               <Shield className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-headline font-bold text-lg text-slate-900">
+              <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white">
                 Register for Tournament
               </h3>
-              <span className="font-mono text-[10px] text-slate-500 uppercase">
+              <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 uppercase">
                 {tournament.title}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -355,88 +346,52 @@ export default function RegisterTournamentModal({
               </div>
             )}
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex flex-col gap-3">
+            <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg flex flex-col gap-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Tournament:</span>
-                <span className="font-bold text-slate-900">{tournament.title}</span>
+                <span className="text-slate-500 dark:text-slate-400">Tournament:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{tournament.title}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">{isSolo ? "Contender:" : "Registering Squad:"}</span>
-                <span className="font-bold text-slate-900">
+                <span className="text-slate-500 dark:text-slate-400">{isSolo ? "Contender:" : "Registering Squad:"}</span>
+                <span className="font-bold text-slate-900 dark:text-white">
                   {isSolo ? (user?.fullName || user?.username || "Solo Athlete") : selectedTeam?.name}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Player In-Game Handle:</span>
+                <span className="text-slate-500 dark:text-slate-400">Player In-Game Handle:</span>
                 <span className="font-bold font-mono text-[#E56A10]">{inGameId}</span>
               </div>
-              <div className="flex items-center justify-between text-xs border-t border-slate-200 pt-2">
-                <span className="text-slate-500">Total Amount Due:</span>
+              <div className="flex items-center justify-between text-xs border-t border-slate-200 dark:border-[#242C3D] pt-2">
+                <span className="text-slate-500 dark:text-slate-400">Total Amount Due:</span>
                 <span className="font-headline font-bold text-xl text-[#E56A10]">
                   {tournament.entryFee}
                 </span>
               </div>
             </div>
 
-            {/* Platform Escrow Quick Test System Box */}
-            <div className="bg-amber-50/70 border border-amber-300 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 uppercase">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Platform Escrow Quick Test
-                </div>
-                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-mono border border-amber-300 rounded font-bold">
-                  TEST MODE ACTIVE
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                Test end-to-end tournament registration and prize vault entry via Platform Escrow without requiring external bank redirects.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handleEscrowPayment(false)}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{isProcessing ? "Processing..." : "⚡ Instant Escrow Payment"}</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handleEscrowPayment(true)}
-                  className="w-full py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-mono text-xs uppercase rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Simulate Failure</span>
-                </button>
-              </div>
-            </div>
-
             {/* Payment Gateway Footer */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col items-center text-center gap-2">
-              <div className="flex items-center gap-2 text-xs text-slate-700 font-mono">
+            <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-2">
+              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
                 <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
                 Platform Escrow Protected • Guaranteed Prize Vault
               </div>
-              <p className="text-[10px] text-slate-500">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
                 Prize funds are guaranteed and held in the protected prize vault until tournament completion.
               </p>
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
               <button
                 type="button"
                 onClick={() => setStep("SELECT_TEAM")}
-                className="px-4 py-2 bg-transparent text-slate-600 hover:text-slate-900 text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
+                className="px-4 py-2 bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
               >
                 Back
               </button>
               <button
                 type="button"
                 disabled={isProcessing}
-                onClick={() => handleEscrowPayment(false)}
+                onClick={() => handleEscrowPayment()}
                 className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
               >
                 <CreditCard className="w-4 h-4" />
@@ -448,18 +403,18 @@ export default function RegisterTournamentModal({
 
         {step === "SUCCESS" && (
           <div className="flex flex-col items-center text-center py-6">
-            <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-300 flex items-center justify-center text-emerald-600 mb-4 shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 shadow-sm">
               <Check className="w-8 h-8" />
             </div>
 
-            <h4 className="font-headline font-bold text-xl text-slate-900 mb-1">
+            <h4 className="font-headline font-bold text-xl text-slate-900 dark:text-white mb-1">
               Registration Confirmed!
             </h4>
-            <p className="text-xs text-slate-600 max-w-sm mb-6 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
               {isSolo ? (
-                <>You have been confirmed as a solo contender for <strong className="text-slate-900">{tournament.title}</strong> with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+                <>You have been confirmed as a solo contender for <strong className="text-slate-900 dark:text-white">{tournament.title}</strong> with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
               ) : (
-                <>Your squad <strong className="text-slate-900">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+                <>Your squad <strong className="text-slate-900 dark:text-white">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
               )}
             </p>
 

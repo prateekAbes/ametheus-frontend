@@ -13,8 +13,11 @@ export interface Match {
   server_region: string;
   lobby_code: string;
   lobby_password: string;
-  team_a?: { name: string; tag: string; score?: number } | null;
-  team_b?: { name: string; tag: string; score?: number } | null;
+  team_a?: { id?: string; name: string; tag: string; score?: number } | null;
+  team_b?: { id?: string; name: string; tag: string; score?: number } | null;
+  team_a_id?: string;
+  team_b_id?: string;
+  winner_team_id?: string;
   evidence_url?: string;
   dispute_notes?: string;
 }

@@ -481,8 +481,8 @@ export default function LeaderboardPage() {
                   Active Contenders
                 </div>
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white">{stats.active_contenders}</div>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 mt-1 font-bold">
-                  <TrendingUp className="w-3.5 h-3.5" /> +3,120 This Month
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-1 font-bold">
+                  <Users className="w-3.5 h-3.5 text-[#E56A10]" /> Platform Contenders
                 </span>
               </div>
               <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] flex items-center justify-center text-slate-700 dark:text-slate-300">

@@ -72,15 +72,3 @@ export async function rejectPayout(payoutId: string, reason: string): Promise<{ 
     body: JSON.stringify({ rejection_reason: reason }),
   });
 }
-
-export async function seedDummyData(): Promise<{ status: string; message: string; details: any }> {
-  return apiClient("/admin/dev/seed-dummy", {
-    method: "POST",
-  });
-}
-
-export async function removeDummyData(): Promise<{ status: string; message: string; details: any }> {
-  return apiClient("/admin/dev/remove-dummy", {
-    method: "POST",
-  });
-}

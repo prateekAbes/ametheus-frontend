@@ -106,10 +106,10 @@ export default function GamesDirectoryPage() {
                     Prize Vault
                   </span>
                   <span className="text-2xl font-bold font-headline text-[#E56A10] block tabular-nums">
-                    ₹12.5L+
+                    ₹{games.reduce((acc, g) => acc + (g.prizePoolInr || 0), 0).toLocaleString("en-IN")}
                   </span>
                   <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
-                    Guaranteed Vault
+                    Total Prize Pools
                   </span>
                 </div>
               </div>
@@ -186,20 +186,24 @@ export default function GamesDirectoryPage() {
           <div className="text-center py-16 bg-white dark:bg-[#121622] rounded-xl border border-[#E2E8F0] dark:border-[#242C3D] p-8 space-y-4">
             <AlertTriangle className="w-12 h-12 text-[#94A3B8] mx-auto" />
             <h3 className="text-lg font-bold font-headline text-[#0F172A] dark:text-white">
-              No Competitive Disciplines Found
+              {games.length === 0 ? "No Sanctioned Disciplines Yet" : "No Matching Disciplines Found"}
             </h3>
             <p className="text-xs text-[#64748B] dark:text-[#94A3B8] max-w-sm mx-auto">
-              No games matched category &quot;{selectedCategory}&quot; and search &quot;{searchQuery}&quot;. Try adjusting filters.
+              {games.length === 0
+                ? "There are currently no competitive titles configured in the platform database."
+                : `No games matched category "${selectedCategory}" and search "${searchQuery}". Try adjusting filters.`}
             </p>
-            <button
-              onClick={() => {
-                setSelectedCategory("all");
-                setSearchQuery("");
-              }}
-              className="px-4 py-2 bg-[#0F172A] dark:bg-[#E56A10] text-white rounded text-xs font-mono font-bold uppercase hover:bg-[#1E293B] dark:hover:bg-[#D45900] cursor-pointer"
-            >
-              Reset Filters
-            </button>
+            {games.length > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedCategory("all");
+                  setSearchQuery("");
+                }}
+                className="px-4 py-2 bg-[#0F172A] dark:bg-[#E56A10] text-white rounded text-xs font-mono font-bold uppercase hover:bg-[#1E293B] dark:hover:bg-[#D45900] cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

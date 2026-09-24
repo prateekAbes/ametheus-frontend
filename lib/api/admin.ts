@@ -162,9 +162,3 @@ export async function rejectMatchProof(
   });
 }
 
-export async function triggerSeedCatalog(): Promise<{ status: string; message: string }> {
-  return apiClient("/admin/seed-catalog", {
-    method: "POST",
-  });
-}
-

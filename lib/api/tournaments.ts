@@ -13,6 +13,7 @@ export interface Tournament {
   entry_fee_inr: number;
   status: string;
   starts_at: string;
+  start_date?: string;
   roster_lock_time: string;
   server_region: string;
   registered_teams: number;

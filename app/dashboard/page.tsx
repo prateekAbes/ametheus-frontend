@@ -86,7 +86,7 @@ export default function DashboardPage() {
 
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("1000");
-  const [upiId, setUpiId] = useState("vortex@oksbi");
+  const [upiId, setUpiId] = useState("");
   const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
 
   // Squad Modals (from previous dashboard)
@@ -455,6 +455,17 @@ export default function DashboardPage() {
   const displayName = profile?.display_name || user?.username || user?.firstName || "Contender";
   const userAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
   const balance = profile?.inr_balance != null ? Number(profile.inr_balance) : 0;
+  const ametheusId = profile?.id ? `ATH-${profile.id.slice(-6).toUpperCase()}` : user?.id ? `ATH-${user.id.slice(-6).toUpperCase()}` : "ATH-READY";
+
+  // Calculate real performance metrics from matches
+  const completedMatches = matches.filter((m) => m.status === "COMPLETED");
+  const wins = completedMatches.filter((m) => {
+    const myTeam = teams.find((t) => t.id === m.team_a_id || t.id === m.team_b_id);
+    return myTeam && m.winner_team_id === myTeam.id;
+  }).length;
+  const losses = completedMatches.length - wins;
+  const winRate = completedMatches.length > 0 ? ((wins / completedMatches.length) * 100).toFixed(1) : "0.0";
+  const eloRating = 1500 + wins * 25;
 
   return (
     <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-slate-100 antialiased transition-colors">
@@ -546,23 +557,18 @@ export default function DashboardPage() {
                     {displayName}
                   </h1>
                   <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[11px] font-bold uppercase">
-                    PRO TIER 1
+                    {effectiveRole}
                   </span>
-                  {effectiveRole !== "PLAYER" && (
-                    <span className="px-2 py-0.5 rounded bg-slate-900 dark:bg-[#1A2234] text-white font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
-                      {effectiveRole}
-                    </span>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-3 mt-1 text-xs">
                   <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     MATCH READY
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
                   <span className="font-mono text-slate-500 dark:text-slate-400">
-                    Ametheus ID: <span className="font-bold text-slate-900 dark:text-white">ATH-8921-X</span>
+                    Ametheus ID: <span className="font-bold text-slate-900 dark:text-white">{ametheusId}</span>
                   </span>
                 </div>
               </div>
@@ -597,11 +603,10 @@ export default function DashboardPage() {
               </div>
               <div className="mt-2">
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
-                  ₹48,500
+                  ₹0
                 </div>
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold mt-0.5">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>+₹12,400 this season</span>
+                <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-0.5">
+                  <span>Season 2026</span>
                 </div>
               </div>
             </div>
@@ -614,10 +619,10 @@ export default function DashboardPage() {
               </div>
               <div className="mt-2">
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
-                  68.4%
+                  {winRate}%
                 </div>
                 <div className="text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-0.5">
-                  <span className="text-slate-900 dark:text-white font-bold">142W</span> • 66L
+                  <span className="text-slate-900 dark:text-white font-bold">{wins}W</span> • {losses}L
                 </div>
               </div>
             </div>
@@ -630,10 +635,10 @@ export default function DashboardPage() {
               </div>
               <div className="mt-2">
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
-                  2,480
+                  {eloRating.toLocaleString()}
                 </div>
-                <div className="text-[#E56A10] font-mono text-[11px] font-bold mt-0.5">
-                  #14 National Rank
+                <div className="text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-0.5">
+                  Base 1,500
                 </div>
               </div>
             </div>
@@ -646,11 +651,17 @@ export default function DashboardPage() {
               </div>
               <div className="mt-2">
                 <div className="text-base font-bold font-headline text-slate-900 dark:text-white truncate">
-                  {teams[0]?.name || "VORTEX SYND."}
+                  {teams[0]?.name || "No Squad"}
                 </div>
-                <div className="flex items-center gap-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {teams[0] ? `${teams[0].members?.length || 5}/5 Ready` : "5/5 Ready (Captain)"}
+                <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {teams[0] ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>{teams[0].members?.length || 1} Member{teams[0].members?.length === 1 ? "" : "s"}</span>
+                    </>
+                  ) : (
+                    <span>No active team</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -683,103 +694,46 @@ export default function DashboardPage() {
 
 
 
-        {/* 2. HIGH-VISIBILITY URGENT CHECK-IN CARD (Stitch Spec Inverted Dark Banner) */}
-        <div className="bg-[#10141F] text-white rounded-xl p-6 shadow-xl border border-[#242C3D] relative overflow-hidden">
-          {/* Ambient decorative glow */}
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-[#E56A10] rounded-full blur-3xl opacity-20 pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-2 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded bg-[#E56A10] text-white font-mono text-xs font-bold animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-white" />
-                  CHECK-IN OPEN
-                </span>
-                <span className="text-[#64748B]">•</span>
-                <span className="font-mono text-xs uppercase text-orange-300 font-bold tracking-wider">
-                  Starting in 00:14:32
-                </span>
-                <span className="text-[#64748B]">•</span>
-                <span className="font-mono text-xs uppercase text-[#94A3B8]">
-                  Single Elim Bo3
-                </span>
-              </div>
-
-              <h2 className="text-2xl sm:text-3xl font-bold font-headline text-white tracking-tight uppercase">
-                AMETHEUS VALORANT WINTER INVITATIONAL 2026
-              </h2>
-
-              <div className="flex flex-wrap items-center gap-y-2 gap-x-4 pt-1 font-mono text-xs text-[#CBD5E1]">
-                <div className="flex items-center gap-1">
-                  <span className="text-[#94A3B8]">Round:</span>
-                  <span className="font-bold text-white">Round of 16 (Bo3)</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[#94A3B8]">Versus:</span>
-                  <span className="font-bold text-orange-300">Team Apex Predators [Seed #3]</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[#94A3B8]">Server:</span>
-                  <span className="bg-[#161A24] border border-[#242C3D] px-2 py-0.5 rounded text-[11px] text-white font-bold">
-                    Mumbai-1 (18ms)
+        {/* 2. URGENT CHECK-IN CARD — only shown when there is a real CHECK_IN_OPEN match */}
+        {matches.filter((m) => m.status === "CHECK_IN_OPEN").map((m) => (
+          <div key={m.id} className="bg-[#10141F] text-white rounded-xl p-6 shadow-xl border border-[#242C3D] relative overflow-hidden">
+            <div className="absolute -right-16 -top-16 w-64 h-64 bg-[#E56A10] rounded-full blur-3xl opacity-20 pointer-events-none" />
+            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded bg-[#E56A10] text-white font-mono text-xs font-bold animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-white" />
+                    CHECK-IN OPEN
+                  </span>
+                  <span className="text-[#64748B]">•</span>
+                  <span className="font-mono text-xs uppercase text-[#94A3B8]">
+                    {m.stage || "Competitive Match"}
                   </span>
                 </div>
-              </div>
-
-              {/* Lobby Code & Squad Check Status */}
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <div className="flex items-center bg-[#161A24] border border-[#242C3D] rounded-lg px-3 py-1.5 gap-2">
-                  <span className="text-[11px] font-mono text-[#94A3B8] uppercase">Lobby Code:</span>
-                  <span className="font-mono font-bold text-white text-sm">VTX-9942</span>
-                  <button
-                    onClick={() => copyToClipboard("VTX-9942", "Lobby Code copied!")}
-                    className="text-[#E56A10] hover:text-white transition-colors cursor-pointer"
-                    title="Copy code"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* 5 Green Checkmarks */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-mono uppercase text-[#94A3B8] mr-1">Roster:</span>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <span
-                        key={i}
-                        className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center text-white"
-                        title="Checked In"
-                      >
-                        <Check className="w-3 h-3" />
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-400 font-bold ml-1">
-                    5/5 READY
-                  </span>
+                <h2 className="text-2xl sm:text-3xl font-bold font-headline text-white tracking-tight uppercase">
+                  {m.tournament_title || "Official Match"}
+                </h2>
+                <div className="flex flex-wrap items-center gap-y-2 gap-x-4 pt-1 font-mono text-xs text-[#CBD5E1]">
+                  {m.team_a?.name && m.team_b?.name && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[#94A3B8]">Versus:</span>
+                      <span className="font-bold text-orange-300">{m.team_b?.name}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-
-            {/* Right Urgent Actions */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full lg:w-auto shrink-0">
-              <Link
-                href="/matches"
-                className="px-6 py-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-headline text-xs font-bold uppercase rounded-lg shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 text-center"
-              >
-                <Gamepad2 className="w-4 h-4" />
-                Enter Match Lobby
-              </Link>
-              <button
-                onClick={() => showToast("Match proof upload drawer ready for score submission.")}
-                className="px-4 py-2.5 bg-[#161A24] hover:bg-[#202636] border border-[#242C3D] text-[#CBD5E1] hover:text-white font-mono text-xs uppercase rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <UploadDocIcon className="w-3.5 h-3.5 text-[#E56A10]" />
-                Submit Score Proof
-              </button>
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 w-full lg:w-auto shrink-0">
+                <Link
+                  href={`/matches/${m.id}`}
+                  className="px-6 py-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-headline text-xs font-bold uppercase rounded-lg shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 text-center"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                  Enter Match Lobby
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        ))}
 
         {/* 3. MAIN 2-COLUMN BALANCED OPERATIONAL GRID (8 cols left / 4 cols right) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -797,169 +751,85 @@ export default function DashboardPage() {
                   </h3>
                 </div>
                 <span className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
-                  3 ACTIVE ENTRIES
+                  {tournaments.length} {tournaments.length === 1 ? "ENTRY" : "ENTRIES"}
                 </span>
               </div>
 
               {/* Tournament Cards Stack */}
               <div className="space-y-3">
-                {/* Card 1: Smash Karts */}
-                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
-                      <Image
-                        src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=200&auto=format&fit=crop"
-                        alt="Smash Karts"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-300 font-mono text-[10px] font-bold uppercase">
-                          SOLO DEATHMATCH
-                        </span>
-                        <span className="text-slate-300 dark:text-slate-600">•</span>
-                        <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase">
-                          CONFIRMED (SLOT #12)
-                        </span>
+                {tournaments.length > 0 ? (
+                  tournaments.map((t) => (
+                    <div key={t.id} className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
+                      <div className="flex items-start gap-4">
+                        {t.banner_url && (
+                          <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
+                            <Image src={t.banner_url} alt={t.title || "Tournament"} fill className="object-cover" />
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
+                              {t.game_name || "Tournament"}
+                            </span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className={`font-mono text-[10px] font-bold uppercase ${
+                              t.status === "REGISTRATION_OPEN" ? "text-emerald-600 dark:text-emerald-400" :
+                              t.status === "ONGOING" ? "text-[#E56A10]" :
+                              "text-slate-500 dark:text-slate-400"
+                            }`}>
+                              {t.status?.replace(/_/g, " ") ?? "UPCOMING"}
+                            </span>
+                          </div>
+                          <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
+                            {t.title}
+                          </h4>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
+                            {(t.starts_at || t.start_date) && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5" /> {new Date(t.starts_at || t.start_date!).toLocaleDateString("en-IN")}
+                              </span>
+                            )}
+                            {t.prize_pool_inr != null && (
+                              <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
+                                <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹{t.prize_pool_inr.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
-                        Smash Karts Frenzy Blitz
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> Tomorrow @ 6:00 PM IST
-                        </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
-                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹25,000
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <Link
-                      href="/tournaments/smash-karts-frenzy-blitz"
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#202636] hover:bg-slate-100 dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#242C3D] font-mono text-xs font-bold uppercase transition-colors"
-                    >
-                      Rulebook
-                    </Link>
-                    <Link
-                      href="/tournaments/smash-karts-frenzy-blitz"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
-                    >
-                      View Bracket
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Card 2: Mini Militia */}
-                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
-                      <Image
-                        src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=200&auto=format&fit=crop"
-                        alt="Mini Militia"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-300 font-mono text-[10px] font-bold uppercase">
-                          4V4 SQUAD
-                        </span>
-                        <span className="text-slate-300 dark:text-slate-600">•</span>
-                        <span className="font-mono text-[10px] text-[#E56A10] font-bold uppercase">
-                          SQUAD CODE: MM88XK
-                        </span>
-                      </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
-                        Mini Militia Subterranean Cup
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" /> Saturday, 8:00 PM IST
-                        </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
-                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹15,000
-                        </span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">4/4 Ready</span>
+                      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                        <Link
+                          href={`/tournaments/${t.id}`}
+                          className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
+                        >
+                          View Details
+                        </Link>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <button
-                      onClick={() => copyToClipboard("MM88XK", "Squad invite code copied!")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#202636] hover:bg-slate-100 dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-[#242C3D] font-mono text-xs font-bold uppercase flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5" /> Invite Teammate
-                    </button>
-                    <Link
-                      href="/tournaments/mini-militia-subterranean-cup"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
-                    >
-                      Match Hub
+                  ))
+                ) : (
+                  <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
+                    <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
+                    <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Registered Tournaments</div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      Browse available games to enter a match or competition.
+                    </p>
+                    <Link href="/games" className="inline-block mt-2 px-4 py-1.5 rounded-lg bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors">
+                      Browse Games
                     </Link>
                   </div>
-                </div>
-
-                {/* Card 3: Counter-Strike 2 */}
-                <div className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
-                      <Image
-                        src="https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=200&auto=format&fit=crop"
-                        alt="CS2"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
-                          5V5 COMPETITIVE
-                        </span>
-                        <span className="text-slate-300 dark:text-slate-600">•</span>
-                        <span className="font-mono text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase">
-                          SEED #4 • ESCROW SECURED
-                        </span>
-                      </div>
-                      <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
-                        Counter-Strike 2 Premier Showdown
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" /> Sunday, 7:00 PM IST
-                        </span>
-                        <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
-                          <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹1,00,000
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <Link
-                      href="/tournaments/cs2-masters-s1"
-                      className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
-                    >
-                      Match Hub
-                    </Link>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* SECTION: Recent Match History & OCR Verification Status */}
+
+            {/* SECTION: Recent Match History */}
             <div className="bg-white dark:bg-[#121622] rounded-xl p-6 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-[#E56A10]" />
                   <h3 className="font-headline text-lg font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                    Recent Match Logs &amp; OCR Payouts
+                    Recent Match Logs
                   </h3>
                 </div>
                 <button
@@ -971,127 +841,70 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              {/* Data Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px]">
-                      <th className="py-2.5 px-3 rounded-l-lg">Match / Event</th>
-                      <th className="py-2.5 px-3">Opponent</th>
-                      <th className="py-2.5 px-3">Outcome</th>
-                      <th className="py-2.5 px-3 text-right">Prize</th>
-                      <th className="py-2.5 px-3 rounded-r-lg text-right">OCR Verification</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D] font-medium">
-                    {/* Row 1 */}
-                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900 dark:text-white">Valorant Weekly #42</div>
-                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88912 • Ascent</span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Reckless Gaming</td>
-                      <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
-                          VICTORY 13-9
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                        +₹15,000
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
-                          <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
-                        </span>
-                      </td>
-                    </tr>
-
-                    {/* Row 2 */}
-                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900 dark:text-white">Mini Militia Blitz Arena</div>
-                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88741 • Catacombs</span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Shadow Brigade</td>
-                      <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-400 font-mono text-[10px] font-bold">
-                          DEFEAT 11-13
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-400 dark:text-slate-500 tabular-nums">
-                        ₹0
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-                          <Check className="w-3.5 h-3.5" /> Auto-Settled
-                        </span>
-                      </td>
-                    </tr>
-
-                    {/* Row 3 */}
-                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900 dark:text-white">Smash Karts Solo Night</div>
-                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88604 • Lava Pit</span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">12-Player FFA</td>
-                      <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
-                          VICTORY 1st
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                        +₹2,500
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-[#E56A10] font-mono text-[11px] font-bold">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Referee Review
-                        </span>
-                      </td>
-                    </tr>
-
-                    {/* Row 4 */}
-                    <tr className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="font-headline font-bold text-slate-900 dark:text-white">CS2 Wingman Cup Q3</div>
-                        <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#MTC-88319 • Inferno</span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">Kodiak Duo</td>
-                      <td className="py-3 px-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
-                          VICTORY 9-4
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                        +₹5,000
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-bold">
-                          <CheckCircle className="w-3.5 h-3.5" /> Verified &amp; Paid
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Bottom OCR Notice */}
-              <div className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#242C3D]">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#E56A10]" />
-                  <span>
-                    Ametheus OCR engine verifies victory screenshots within an average latency of{" "}
-                    <strong className="text-slate-900 dark:text-white">18.4 seconds</strong>.
-                  </span>
+              {matches.filter((m) => m.status === "COMPLETED").length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px]">
+                        <th className="py-2.5 px-3 rounded-l-lg">Match</th>
+                        <th className="py-2.5 px-3">Opponent</th>
+                        <th className="py-2.5 px-3">Outcome</th>
+                        <th className="py-2.5 px-3 text-right rounded-r-lg">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D] font-medium">
+                      {matches.filter((m) => m.status === "COMPLETED").slice(0, 10).map((m) => {
+                        const myTeam = teams.find((t) => t.id === m.team_a_id || t.id === m.team_b_id);
+                        const isWin = myTeam && m.winner_team_id === myTeam.id;
+                        return (
+                          <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-[#161A24]/60 transition-colors">
+                            <td className="py-3 px-3">
+                              <div className="font-headline font-bold text-slate-900 dark:text-white">{m.tournament_title || "Match"}</div>
+                              <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">#{m.id?.slice(-8)?.toUpperCase()}</span>
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-200">
+                              {myTeam?.id === m.team_a_id ? (m.team_b?.name || "—") : (m.team_a?.name || "—")}
+                            </td>
+                            <td className="py-3 px-3">
+                              {m.winner_team_id ? (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
+                                  isWin
+                                    ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400"
+                                    : "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-400"
+                                }`}>
+                                  {isWin ? "VICTORY" : "DEFEAT"}
+                                </span>
+                              ) : (
+                                <span className="font-mono text-slate-400 text-[10px]">—</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                                <CheckCircle className="w-3.5 h-3.5" /> Completed
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <Link
-                  href="/contact"
-                  className="font-mono text-[11px] uppercase text-[#E56A10] hover:underline font-bold shrink-0 ml-2"
-                >
-                  Raise Ticket
-                </Link>
+              ) : (
+                <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
+                  <Clock className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Match History Yet</div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    Completed matches will appear here once you play.
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#242C3D]">
+                <Sparkles className="w-4 h-4 text-[#E56A10]" />
+                <span>Match results are verified by the Ametheus referee system.</span>
               </div>
             </div>
+
           </div>
 
           {/* RIGHT COLUMN: Active Squads, Escrow Wallet & Telemetry (~35% = 4 cols) */}
@@ -1219,7 +1032,7 @@ export default function DashboardPage() {
                   <div className="text-right">
                     <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase">Locked in Escrow</span>
                     <div className="text-base font-bold font-headline text-[#E56A10] tabular-nums">
-                      ₹3,000
+                      ₹0
                     </div>
                   </div>
                 </div>
@@ -1235,7 +1048,7 @@ export default function DashboardPage() {
 
                   <div className="flex items-center justify-center gap-1 text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-2">
                     <CheckCircle className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                    <span>Connected UPI: <strong className="text-slate-800 dark:text-slate-200">{upiId}</strong></span>
+                    <span>Connected UPI: <strong className="text-slate-800 dark:text-slate-200">{upiId || "Not Connected"}</strong></span>
                   </div>
                 </div>
               </div>
@@ -1243,30 +1056,8 @@ export default function DashboardPage() {
               {/* Mini Transaction Ledger */}
               <div className="space-y-2 pt-1">
                 <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold">Recent Ledger</span>
-                <div className="space-y-1.5 text-xs font-mono divide-y divide-slate-100 dark:divide-[#242C3D]">
-                  <div className="flex items-center justify-between pt-1.5">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">Valorant Weekly Cup</div>
-                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Today, 2:15 PM</div>
-                    </div>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+₹15,000</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1.5">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">Subterranean Cup Entry</div>
-                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Yesterday</div>
-                    </div>
-                    <span className="font-bold text-slate-700 dark:text-slate-300 tabular-nums">-₹500</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1.5">
-                    <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">Smash Karts Daily</div>
-                      <div className="text-[10px] text-slate-400 dark:text-slate-500">Nov 20, 2025</div>
-                    </div>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+₹2,500</span>
-                  </div>
+                <div className="bg-slate-50 dark:bg-[#161A24] p-4 rounded-lg border border-slate-200 dark:border-[#242C3D] text-center">
+                  <span className="font-mono text-xs text-slate-400 dark:text-slate-500">No recent transactions</span>
                 </div>
               </div>
             </div>
@@ -1283,33 +1074,8 @@ export default function DashboardPage() {
                 <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold uppercase">Live</span>
               </div>
 
-              <div className="space-y-2">
-                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
-                  <Shield className="w-4 h-4 text-[#E56A10] shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-bold text-slate-900 dark:text-white">Referee match room assigned</p>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Official referee @Kuro assigned to Room #VTX-9942.</p>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">3 mins ago</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-bold text-slate-900 dark:text-white">Prize payout released</p>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Escrow released for Valorant Weekly Cup 1st place.</p>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">2 hours ago</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-[#161A24] p-2.5 rounded-lg flex items-start gap-2.5 border border-slate-200 dark:border-[#242C3D]">
-                  <Gamepad2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-bold text-slate-900 dark:text-white">Mini Militia slot confirmed</p>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">Bracket seed locked in slot #8.</p>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">Yesterday</span>
-                  </div>
-                </div>
+              <div className="bg-slate-50 dark:bg-[#161A24] p-4 rounded-lg border border-slate-200 dark:border-[#242C3D] text-center">
+                <span className="font-mono text-xs text-slate-400 dark:text-slate-500">All systems normal • No active alerts</span>
               </div>
             </div>
           </div>

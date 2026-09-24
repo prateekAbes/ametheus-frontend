@@ -22,7 +22,6 @@ import {
   Loader2,
   RefreshCw,
   FileCheck,
-  Database,
   Sliders,
   Scale,
   LogOut,
@@ -53,7 +52,6 @@ import {
   verifyMatchResult,
   getDisputes,
   resolveDispute,
-  triggerSeedCatalog,
   AuditLog,
   AdminUser,
   AdminStats,
@@ -111,8 +109,6 @@ import {
   createWinningPayout,
   completePayout,
   rejectPayout,
-  seedDummyData,
-  removeDummyData,
   PayoutRecord,
 } from "@/lib/api/admin_payments";
 import { PaymentRecord } from "@/lib/api/payments";
@@ -148,7 +144,6 @@ export default function AdminCockpitPage() {
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
   const [evidenceApproved, setEvidenceApproved] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [pendingMatches, setPendingMatches] = useState<Match[]>([]);
   const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
@@ -362,10 +357,6 @@ export default function AdminCockpitPage() {
   });
   const [isSubmittingWinningPayout, setIsSubmittingWinningPayout] = useState(false);
 
-  // Dev Data State
-  const [isSeedingDevData, setIsSeedingDevData] = useState(false);
-  const [isRemovingDevData, setIsRemovingDevData] = useState(false);
-
   const loadAdminData = useCallback(async () => {
     try {
       const [
@@ -522,21 +513,6 @@ export default function AdminCockpitPage() {
     }
   };
 
-  const handleTriggerSeed = async () => {
-    setIsSeeding(true);
-    try {
-      await triggerSeedCatalog();
-      setActionMessage("Platform catalog re-seeded successfully with games, tournaments, teams & sample matches.");
-      await loadAdminData();
-      setTimeout(() => setActionMessage(""), 6000);
-    } catch (err: any) {
-      setActionMessage(err?.message || "Failed to trigger catalog seed.");
-      setTimeout(() => setActionMessage(""), 5000);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   const handleForceMatchForfeit = async (matchId: string, winnerTag: "A" | "B") => {
     try {
       await (window as any).fetch?.(`/api/v1/admin/matches/${matchId}/forfeit`, {
@@ -621,12 +597,12 @@ export default function AdminCockpitPage() {
       entry_fee_inr: 0,
       prize_pool_inr: 0,
       play_url: "",
-      banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
-      logo_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop",
+      banner_url: "",
+      logo_url: "",
       description: "",
       server_region: "AWS Mumbai (ap-south-1)",
-      anti_cheat: "Hardware Vanguard TPM 2.0",
-      match_protocol: "Competitive Match",
+      anti_cheat: "",
+      match_protocol: "",
       accent_color: "#E56A10",
       status: "ACTIVE",
       expected_release_date: "",
@@ -780,10 +756,10 @@ export default function AdminCockpitPage() {
     setTournForm({
       game_id: initialGame?.id || initialGameSlug,
       title: "",
-      prize_pool_inr: 25000,
+      prize_pool_inr: 0,
       entry_fee_inr: 0,
-      starts_at: "Saturday, 8:00 PM IST",
-      roster_lock_time: "Saturday, 7:30 PM IST",
+      starts_at: "",
+      roster_lock_time: "",
       server_region: "AWS Mumbai (ap-south-1)",
       max_teams: 16,
       min_team_size: isSoloInitial ? 1 : initialReq.min,
@@ -794,14 +770,10 @@ export default function AdminCockpitPage() {
       announcement_text: "",
       rank_requirement: "Open to All Ranks",
       format: isSoloInitial ? "1v1 Solo Championship" : "Single Elimination Bracket",
-      description: "Sanctioned competitive tournament with automated brackets.",
-      banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
-      rules: ["Competitive MR12 rulebook", "Anti-cheat verification mandatory", "15-minute grace check-in"],
-      prizes: [
-        { place: "1st Place", prize: "₹15,000" },
-        { place: "2nd Place", prize: "₹7,000" },
-        { place: "3rd Place", prize: "₹3,000" },
-      ],
+      description: "",
+      banner_url: "",
+      rules: [],
+      prizes: [],
       newRule: "",
       newPrizePlace: "",
       newPrizeAmount: "",
@@ -947,6 +919,7 @@ export default function AdminCockpitPage() {
         setActionMessage(`Tournament "${tournForm.title}" created successfully!`);
       }
       setIsTournamentModalOpen(false);
+      setEditingTournament(null);
       await loadAdminData();
       setTimeout(() => setActionMessage(""), 5000);
     } catch (err: any) {
@@ -1123,31 +1096,6 @@ export default function AdminCockpitPage() {
     } catch (err: any) {
       setActionMessage(err?.message || "Failed to remove avatar from pool.");
       setTimeout(() => setActionMessage(""), 6000);
-    }
-  };
-
-  const handleGenerateTestWithdrawal = async () => {
-    try {
-      await requestWithdrawal(2500, "pro_athlete@oksbi");
-      setActionMessage("Test withdrawal request of ₹2,500 created! Status: PENDING ADMIN APPROVAL.");
-      await loadAdminData();
-      setTimeout(() => setActionMessage(""), 5000);
-    } catch {
-      const testReq: WithdrawalRequest = {
-        id: `wth_${Date.now()}`,
-        user_id: "usr_athlete_demo",
-        user_name: "ShadowStriker",
-        amount: 2500,
-        amount_paise: 250000,
-        amount_inr: 2500,
-        destination: "UPI",
-        upi_id: "pro_athlete@oksbi",
-        status: "PENDING",
-        created_at: new Date().toISOString(),
-      };
-      setWithdrawals((prev) => [testReq, ...prev]);
-      setActionMessage("Test withdrawal request of ₹2,500 queued for Admin approval.");
-      setTimeout(() => setActionMessage(""), 5000);
     }
   };
 
@@ -1364,28 +1312,28 @@ export default function AdminCockpitPage() {
   // 2. Unauthenticated State (Guest)
   if (!isSignedIn && !isHardcodedAdmin) {
     return (
-      <div className="max-w-2xl mx-auto my-16 p-8 bg-white border border-slate-200 rounded-xl text-center space-y-6 shadow-xl text-slate-900">
+      <div className="max-w-2xl mx-auto my-16 p-8 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl text-center space-y-6 shadow-xl text-slate-900 dark:text-white">
         <div className="w-16 h-16 rounded-full bg-[#E56A10]/10 border border-[#E56A10]/40 flex items-center justify-center mx-auto text-[#E56A10]">
           <Lock className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-wider">
+          <h1 className="text-2xl font-bold font-headline text-slate-900 dark:text-white uppercase tracking-wider">
             Admin Console — Authentication Required
           </h1>
-          <p className="text-sm text-slate-600 max-w-md mx-auto">
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
             This cockpit controls platform competitions, tournament rules, bracket progression, games catalog, and user roles.
           </p>
         </div>
 
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700">
-          <div className="text-slate-500 font-bold uppercase tracking-wider">Required Privileges:</div>
+        <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700 dark:text-slate-300">
+          <div className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Required Privileges:</div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#E56A10]"></span>
-            <span><strong className="text-slate-900">SUPER_ADMIN:</strong> Full platform ownership &amp; configuration (e.g. pk.4081988@gmail.com)</span>
+            <span><strong className="text-slate-900 dark:text-white">SUPER_ADMIN:</strong> Full platform ownership &amp; configuration (e.g. pk.4081988@gmail.com)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span><strong className="text-slate-900">ORGANIZER / TOURNAMENT_ADMIN:</strong> Tournament management &amp; dispute review</span>
+            <span><strong className="text-slate-900 dark:text-white">ORGANIZER / TOURNAMENT_ADMIN:</strong> Tournament management &amp; dispute review</span>
           </div>
         </div>
 
@@ -1401,33 +1349,33 @@ export default function AdminCockpitPage() {
   // 3. Authenticated but unauthorized (PLAYER role without hardcoded override)
   if (!isHardcodedAdmin && currentUser && currentUser.role === "PLAYER") {
     return (
-      <div className="max-w-2xl mx-auto my-16 p-8 bg-white border border-rose-200 rounded-xl text-center space-y-6 shadow-xl text-slate-900">
-        <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
+      <div className="max-w-2xl mx-auto my-16 p-8 bg-white dark:bg-[#121622] border border-rose-200 dark:border-rose-900/40 rounded-xl text-center space-y-6 shadow-xl text-slate-900 dark:text-white">
+        <div className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400">
           <Lock className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold font-headline text-slate-900 uppercase tracking-wider">
+          <h1 className="text-2xl font-bold font-headline text-slate-900 dark:text-white uppercase tracking-wider">
             Restricted Clearance (PLAYER Role)
           </h1>
-          <p className="text-sm text-slate-600 max-w-md mx-auto">
-            Your account <strong className="text-slate-900">@{currentUser.username}</strong> ({currentUser.email}) is registered with standard competitive <strong className="text-amber-600">PLAYER</strong> status.
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+            Your account <strong className="text-slate-900 dark:text-white">@{currentUser.username}</strong> ({currentUser.email}) is registered with standard competitive <strong className="text-amber-600 dark:text-amber-400">PLAYER</strong> status.
           </p>
         </div>
 
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700">
-          <div className="text-slate-500 font-bold uppercase tracking-wider">Admin Elevation Note:</div>
-          <p className="text-slate-600">
-            To access this cockpit with <strong className="text-slate-900">SUPER_ADMIN</strong> privileges, sign in with the platform owner email (<code className="text-[#E56A10] font-semibold">pk.4081988@gmail.com</code> or <code className="text-[#E56A10] font-semibold">admin@ametheus.gg</code>).
+        <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] p-4 rounded-lg text-left text-xs font-mono space-y-2 text-slate-700 dark:text-slate-300">
+          <div className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Admin Elevation Note:</div>
+          <p className="text-slate-600 dark:text-slate-400">
+            To access this cockpit with <strong className="text-slate-900 dark:text-white">SUPER_ADMIN</strong> privileges, sign in with the platform owner email (<code className="text-[#E56A10] font-semibold">pk.4081988@gmail.com</code> or <code className="text-[#E56A10] font-semibold">admin@ametheus.gg</code>).
           </p>
-          <p className="text-slate-600">
-            Existing Super Admins can also promote your username <strong className="text-slate-900">@{currentUser.username}</strong> from the User Management console.
+          <p className="text-slate-600 dark:text-slate-400">
+            Existing Super Admins can also promote your username <strong className="text-slate-900 dark:text-white">@{currentUser.username}</strong> from the User Management console.
           </p>
         </div>
 
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => loadAdminData()}
-            className="px-4 py-2 bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Re-check Clearance
           </button>
@@ -1445,7 +1393,7 @@ export default function AdminCockpitPage() {
   // 4. Authorized Admin Cockpit
 
   return (
-    <div className="flex flex-col w-full bg-[#F8F9FF] min-h-screen text-[#0B1C30]">
+    <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-[#F8FAFC] transition-colors">
       {/* Console Top Bar */}
       <header className="bg-[#0B0E16] text-white border-b border-slate-800 px-4 md:px-8 py-4 sticky top-16 z-30">
         <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1474,67 +1422,6 @@ export default function AdminCockpitPage() {
 
           {/* Action Tools (Seed Catalog, Dev Data & Refresh) */}
           <div className="flex items-center gap-2 flex-wrap">
-            {isSuperAdmin && (
-              <>
-                <button
-                  onClick={async () => {
-                    setIsSeedingDevData(true);
-                    try {
-                      const res = await seedDummyData();
-                      setActionMessage(res.message || "Dummy development data generated.");
-                      await loadAdminData();
-                      setTimeout(() => setActionMessage(""), 5000);
-                    } catch (e: any) {
-                      setActionMessage(e?.message || "Failed to seed dummy data");
-                      setTimeout(() => setActionMessage(""), 5000);
-                    } finally {
-                      setIsSeedingDevData(false);
-                    }
-                  }}
-                  disabled={isSeedingDevData || isRemovingDevData}
-                  className="px-3 py-1.5 bg-emerald-950/40 border border-emerald-700/60 hover:bg-emerald-900/60 text-emerald-300 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  title="Generate safe development dummy games, teams, and payments (flagged with is_dummy)"
-                >
-                  {isSeedingDevData ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  <span>{isSeedingDevData ? "Seeding..." : "Seed Dummy"}</span>
-                </button>
-
-                <button
-                  onClick={async () => {
-                    if (!confirm("Are you sure you want to remove all dummy data? Only records marked is_dummy will be deleted.")) return;
-                    setIsRemovingDevData(true);
-                    try {
-                      const res = await removeDummyData();
-                      setActionMessage(res.message || "Dummy development data removed.");
-                      await loadAdminData();
-                      setTimeout(() => setActionMessage(""), 5000);
-                    } catch (e: any) {
-                      setActionMessage(e?.message || "Failed to remove dummy data");
-                      setTimeout(() => setActionMessage(""), 5000);
-                    } finally {
-                      setIsRemovingDevData(false);
-                    }
-                  }}
-                  disabled={isSeedingDevData || isRemovingDevData}
-                  className="px-3 py-1.5 bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  title="Purge all development dummy records (is_dummy: true)"
-                >
-                  {isRemovingDevData ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  <span>{isRemovingDevData ? "Purging..." : "Remove Dummy"}</span>
-                </button>
-
-                <button
-                  onClick={handleTriggerSeed}
-                  disabled={isSeeding}
-                  className="px-3 py-1.5 bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 hover:bg-[#1C2230] text-[#CBD5E1] text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-all cursor-pointer"
-                  title="Populate MongoDB with default competitive games, tournaments, teams and demo matches"
-                >
-                  {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E56A10]" /> : <Database className="w-3.5 h-3.5 text-[#E56A10]" />}
-                  <span>{isSeeding ? "Seeding..." : "Seed Platform"}</span>
-                </button>
-              </>
-            )}
-
             <button
               onClick={() => loadAdminData()}
               disabled={isLoading}
@@ -1728,7 +1615,7 @@ export default function AdminCockpitPage() {
               <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
                 <div className="text-[11px] font-mono text-slate-500 uppercase font-bold">Platform Prize Vault</div>
                 <div className="text-2xl font-bold font-headline text-slate-900 mt-1">
-                  ₹{(stats?.platform_escrow_vault ?? 1245000).toLocaleString()}
+                  ₹{(stats?.platform_escrow_vault ?? 0).toLocaleString()}
                 </div>
                 <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
                   <ShieldCheck className="w-3.5 h-3.5" /> Protected Prize Vault Active
@@ -2987,24 +2874,14 @@ export default function AdminCockpitPage() {
         {activeTab === "withdrawals" && isSuperAdmin && (
           <div className="space-y-6">
             {/* Header / Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs">
               <div>
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
                   <DollarSign className="w-5 h-5 text-[#E56A10]" /> Tournament Prize Payout Approvals
                 </h3>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                   All athlete withdrawals require Super Admin verification before UPI / IMPS escrow release.
                 </p>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={handleGenerateTestWithdrawal}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Queue a test ₹2,500 payout request for testing"
-                >
-                  <Plus className="w-3.5 h-3.5 text-[#E56A10]" /> Generate Test Payout
-                </button>
               </div>
             </div>
 
@@ -3022,12 +2899,12 @@ export default function AdminCockpitPage() {
                     className={`px-3 py-1.5 rounded-lg border font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
                       withdrawalFilter === filterKey
                         ? "bg-[#E56A10] text-white border-[#E56A10] shadow-xs"
-                        : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
+                        : "bg-white dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-[#242C3D] hover:border-slate-400"
                     }`}
                   >
                     <span>{filterKey.replace("_", " ")}</span>
                     <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
-                      withdrawalFilter === filterKey ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      withdrawalFilter === filterKey ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-[#202534] text-slate-600 dark:text-slate-400"
                     }`}>
                       {count}
                     </span>
@@ -3044,27 +2921,19 @@ export default function AdminCockpitPage() {
 
               if (filtered.length === 0) {
                 return (
-                  <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-4 shadow-xs">
-                    <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600">
+                  <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-12 rounded-xl text-center space-y-4 shadow-xs">
+                    <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
                       <ShieldCheck className="w-8 h-8" />
                     </div>
                     <div className="space-y-1.5 max-w-md mx-auto">
-                      <h4 className="font-headline font-bold text-slate-900 text-lg">
+                      <h4 className="font-headline font-bold text-slate-900 dark:text-white text-lg">
                         {withdrawalFilter === "ALL"
                           ? "No Payout Requests Queued"
                           : `No ${withdrawalFilter.replace("_", " ")} Requests`}
                       </h4>
-                      <p className="text-xs text-slate-500 font-mono leading-relaxed">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed">
                         All athlete prize money withdrawals have been certified and settled via UPI. When tournament winners submit a withdrawal from their Dashboard, it appears here for two-factor approval.
                       </p>
-                    </div>
-                    <div className="pt-2">
-                      <button
-                        onClick={handleGenerateTestWithdrawal}
-                        className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Plus className="w-4 h-4" /> Create Test Payout Request (₹2,500)
-                      </button>
                     </div>
                   </div>
                 );
@@ -3406,40 +3275,46 @@ export default function AdminCockpitPage() {
       {/* Payout Approval Modal */}
       {approvingWithdrawal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
                   Certify & Disburse Payout
                 </h3>
               </div>
               <button
                 onClick={() => setApprovingWithdrawal(null)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleApprovePayout} className="space-y-4">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs font-mono">
+              <div className="bg-slate-50 dark:bg-[#161B26] p-3.5 rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-1.5 text-xs font-mono">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Athlete:</span>
-                  <span className="font-bold text-slate-900">@{approvingWithdrawal.user_name}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Athlete:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">@{approvingWithdrawal.user_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Payout Amount:</span>
+                  <span className="text-slate-500 dark:text-slate-400">Payout Amount:</span>
                   <span className="font-bold text-[#E56A10] text-sm">₹{approvingWithdrawal.amount.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Destination UPI ID:</span>
-                  <span className="font-bold text-slate-900">{approvingWithdrawal.upi_id}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Destination UPI ID:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{approvingWithdrawal.upi_id}</span>
                 </div>
+                {approvingWithdrawal.account_holder_name && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Account Name:</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{approvingWithdrawal.account_holder_name}</span>
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   IMPS / UTR Payout Reference *
                 </label>
                 <input
@@ -3448,12 +3323,12 @@ export default function AdminCockpitPage() {
                   value={payoutReference}
                   onChange={(e) => setPayoutReference(e.target.value)}
                   placeholder="e.g. UPI/2026/88491023 or IMPS-109248"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   Admin Audit Note
                 </label>
                 <input
@@ -3461,7 +3336,7 @@ export default function AdminCockpitPage() {
                   value={approvalNotes}
                   onChange={(e) => setApprovalNotes(e.target.value)}
                   placeholder="Disbursed via official banking channel"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
@@ -3469,7 +3344,7 @@ export default function AdminCockpitPage() {
                 <button
                   type="button"
                   onClick={() => setApprovingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3490,24 +3365,24 @@ export default function AdminCockpitPage() {
       {/* Payout Rejection Modal */}
       {rejectingWithdrawal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
                   Reject Withdrawal Request
                 </h3>
               </div>
               <button
                 onClick={() => setRejectingWithdrawal(null)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleRejectPayout} className="space-y-4">
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-mono text-rose-800 dark:text-rose-300 space-y-1">
                 <div className="font-bold">Refund Notice:</div>
                 <p>
                   Rejecting this request will immediately refund ₹{rejectingWithdrawal.amount.toLocaleString("en-IN")} back to @{rejectingWithdrawal.user_name}&apos;s wallet balance.
@@ -3515,7 +3390,7 @@ export default function AdminCockpitPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   Rejection Reason (Sent to User) *
                 </label>
                 <textarea
@@ -3524,7 +3399,7 @@ export default function AdminCockpitPage() {
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   placeholder="e.g. UPI ID invalid or bank rejected beneficiary handle"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
                 />
               </div>
 
@@ -3532,7 +3407,7 @@ export default function AdminCockpitPage() {
                 <button
                   type="button"
                   onClick={() => setRejectingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3553,38 +3428,38 @@ export default function AdminCockpitPage() {
       {/* Screenshot Evidence Inspection Modal */}
       {inspectingEvidence && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-3xl w-full rounded overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-3xl w-full max-h-[90vh] flex flex-col rounded-xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-[#242C3D]">
               <div className="flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-[#E56A10]" />
-                <span className="font-headline font-bold text-sm text-slate-900 uppercase">Match Scoreboard Evidence</span>
+                <span className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase">Match Scoreboard Evidence</span>
               </div>
               <button
                 onClick={() => setInspectingEvidence(null)}
-                className="p-1 text-slate-600 hover:text-slate-900 rounded cursor-pointer"
+                className="p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 flex items-center justify-center bg-slate-50 min-h-[300px]">
+            <div className="p-4 flex items-center justify-center bg-slate-50 dark:bg-[#0B0E16] min-h-[300px] overflow-auto">
               {inspectingEvidence.startsWith("data:") || inspectingEvidence.startsWith("http") ? (
                 <img
                   src={inspectingEvidence}
                   alt="Evidence Screenshot"
-                  className="max-h-[60vh] object-contain rounded border border-slate-200"
+                  className="max-h-[60vh] object-contain rounded border border-slate-200 dark:border-[#242C3D]"
                 />
               ) : (
-                <div className="text-center p-8 text-slate-500 font-mono text-xs">
+                <div className="text-center p-8 text-slate-500 dark:text-slate-400 font-mono text-xs">
                   <FileCheck className="w-12 h-12 text-[#E56A10] mx-auto mb-2 opacity-50" />
-                  Evidence File: <span className="text-slate-900 font-bold">{inspectingEvidence}</span>
-                  <p className="text-[11px] text-[#64748B] mt-1">Uploaded and certified by squad captain.</p>
+                  Evidence File: <span className="text-slate-900 dark:text-white font-bold">{inspectingEvidence}</span>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8] mt-1">Uploaded and certified by squad captain.</p>
                 </div>
               )}
             </div>
-            <div className="p-3 bg-white border-t border-slate-200 flex justify-end">
+            <div className="p-3 bg-white dark:bg-[#111622] border-t border-slate-200 dark:border-[#242C3D] flex justify-end">
               <button
                 onClick={() => setInspectingEvidence(null)}
-                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded text-xs font-mono font-bold cursor-pointer"
+                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded text-xs font-mono font-bold cursor-pointer"
               >
                 Close Inspector
               </button>
@@ -3596,23 +3471,23 @@ export default function AdminCockpitPage() {
 
       {/* ─── UPI Account Add/Edit Modal ────────────────────────────────── */}
       {isUpiModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#E56A10]" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
                   {editingUpiAccount ? `Edit ${editingUpiAccount.code}` : "Add UPI Account"}
                 </h3>
               </div>
-              <button onClick={() => setIsUpiModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => { setIsUpiModalOpen(false); setEditingUpiAccount(null); }} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSaveUpiAccount} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Payment Code *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Payment Code *</label>
                   <input
                     type="text"
                     required
@@ -3620,60 +3495,60 @@ export default function AdminCockpitPage() {
                     value={upiForm.code}
                     onChange={(e) => setUpiForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
                     placeholder="e.g. UPI001"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10] disabled:bg-slate-50"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10] disabled:bg-slate-50 dark:disabled:bg-slate-900/40"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">UPI ID *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">UPI ID *</label>
                   <input
                     type="text"
                     required
                     value={upiForm.upi_id}
                     onChange={(e) => setUpiForm((f) => ({ ...f, upi_id: e.target.value }))}
                     placeholder="e.g. tournament@oksbi"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Payee Name *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Payee Name *</label>
                   <input
                     type="text"
                     required
                     value={upiForm.payee_name}
                     onChange={(e) => setUpiForm((f) => ({ ...f, payee_name: e.target.value }))}
                     placeholder="e.g. Ametheus Gaming Pvt Ltd"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Display Name</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Display Name</label>
                   <input
                     type="text"
                     value={upiForm.display_name}
                     onChange={(e) => setUpiForm((f) => ({ ...f, display_name: e.target.value }))}
                     placeholder="e.g. Primary Account"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">QR Code Image URL</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">QR Code Image URL</label>
                   <input
                     type="url"
                     value={upiForm.qr_url}
                     onChange={(e) => setUpiForm((f) => ({ ...f, qr_url: e.target.value }))}
                     placeholder="https://... (paste QR image URL)"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
                   {upiForm.qr_url && (
                     <div className="mt-2 flex items-center gap-2">
-                      <img src={upiForm.qr_url} alt="QR Preview" className="w-16 h-16 object-contain rounded border border-slate-200 bg-white" />
-                      <span className="text-[10px] font-mono text-emerald-600">QR preview loaded</span>
+                      <img src={upiForm.qr_url} alt="QR Preview" className="w-16 h-16 object-contain rounded border border-slate-200 dark:border-[#242C3D] bg-white" />
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">QR preview loaded</span>
                     </div>
                   )}
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsUpiModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                <button type="button" onClick={() => { setIsUpiModalOpen(false); setEditingUpiAccount(null); }} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#161A24] dark:hover:bg-[#202534] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={isSubmittingUpi} className="px-5 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
@@ -3689,28 +3564,28 @@ export default function AdminCockpitPage() {
       {/* ─── Payment Rejection Modal ───────────────────────────────────── */}
       {rejectingPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payment</h3>
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Reject Payment</h3>
               </div>
-              <button onClick={() => setRejectingPayment(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => setRejectingPayment(null)} className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleRejectPayment} className="space-y-4">
-              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+              <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 p-3.5 rounded-xl text-xs font-mono text-rose-800 dark:text-rose-300 space-y-1">
                 <div className="font-bold">Payment by user: {rejectingPayment.user_id}</div>
                 <div>Amount: ₹{rejectingPayment.amount_inr.toLocaleString("en-IN")}</div>
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Rejection Reason *</label>
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">Rejection Reason *</label>
                 <select
                   required
                   value={paymentRejectReason}
                   onChange={(e) => setPaymentRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
                 >
                   <option value="">— Select a reason —</option>
                   <option value="UTR reference not found in bank records">UTR reference not found in bank records</option>
@@ -3723,7 +3598,7 @@ export default function AdminCockpitPage() {
                 </select>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setRejectingPayment(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                <button type="button" onClick={() => setRejectingPayment(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={isProcessingPayment} className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
@@ -3739,48 +3614,48 @@ export default function AdminCockpitPage() {
       {/* ─── Complete Payout (Mark Paid) Modal ────────────────────────── */}
       {completingPayout && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Confirm UPI Transfer</h3>
+                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Confirm UPI Transfer</h3>
               </div>
-              <button onClick={() => setCompletingPayout(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => setCompletingPayout(null)} className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCompletePayout} className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-xs font-mono space-y-1.5">
+              <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] p-3.5 rounded-xl text-xs font-mono space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Recipient:</span>
-                  <span className="font-bold text-slate-900">@{completingPayout.user_name}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Recipient:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">@{completingPayout.user_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Amount:</span>
-                  <span className="font-bold text-emerald-700 text-sm">₹{completingPayout.amount_inr.toLocaleString("en-IN")}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Amount:</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">₹{completingPayout.amount_inr.toLocaleString("en-IN")}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Destination UPI:</span>
-                  <span className="font-bold text-slate-900">{completingPayout.upi_id || completingPayout.destination || "—"}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Destination UPI:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{completingPayout.upi_id || completingPayout.destination || "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Type:</span>
-                  <span className="text-slate-700">{completingPayout.payout_type}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Type:</span>
+                  <span className="text-slate-700 dark:text-slate-300">{completingPayout.payout_type}</span>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Outgoing UTR / Transfer Reference *</label>
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">Outgoing UTR / Transfer Reference *</label>
                 <input
                   type="text"
                   required
                   value={outgoingUtrInput}
                   onChange={(e) => setOutgoingUtrInput(e.target.value)}
                   placeholder="e.g. UPI/2026/88491023 or IMPS-109248"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setCompletingPayout(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                <button type="button" onClick={() => setCompletingPayout(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={isProcessingPayoutAction} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
@@ -3796,29 +3671,29 @@ export default function AdminCockpitPage() {
       {/* ─── Payout Rejection Modal ────────────────────────────────────── */}
       {rejectingPayoutRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payout</h3>
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Reject Payout</h3>
               </div>
-              <button onClick={() => setRejectingPayoutRecord(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => setRejectingPayoutRecord(null)} className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleRejectPayoutRecord} className="space-y-4">
-              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl text-xs font-mono text-rose-800 space-y-1">
+              <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 p-3.5 rounded-xl text-xs font-mono text-rose-800 dark:text-rose-300 space-y-1">
                 <div className="font-bold">Payout to @{rejectingPayoutRecord.user_name}</div>
                 <div>Amount: ₹{rejectingPayoutRecord.amount_inr.toLocaleString("en-IN")} | Type: {rejectingPayoutRecord.payout_type}</div>
                 <p className="mt-1">Rejecting a withdrawal payout will restore the reserved funds to the user&apos;s wallet.</p>
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">Rejection Reason *</label>
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">Rejection Reason *</label>
                 <select
                   required
                   value={payoutRejectReason}
                   onChange={(e) => setPayoutRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono text-slate-900 focus:outline-none focus:border-rose-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
                 >
                   <option value="">— Select a reason —</option>
                   <option value="UPI ID is invalid or closed">UPI ID is invalid or closed</option>
@@ -3830,7 +3705,7 @@ export default function AdminCockpitPage() {
                 </select>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setRejectingPayoutRecord(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                <button type="button" onClick={() => setRejectingPayoutRecord(null)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={isProcessingPayoutAction} className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
@@ -3846,35 +3721,35 @@ export default function AdminCockpitPage() {
       {/* ─── Create Winning Payout Modal ───────────────────────────────── */}
       {isWinningPayoutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Create Winning Payout</h3>
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Create Winning Payout</h3>
               </div>
-              <button onClick={() => setIsWinningPayoutModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => setIsWinningPayoutModalOpen(false)} className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSaveWinningPayout} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">User ID *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">User ID *</label>
                   <input
                     type="text"
                     required
                     value={winningPayoutForm.user_id}
                     onChange={(e) => setWinningPayoutForm((f) => ({ ...f, user_id: e.target.value }))}
                     placeholder="usr_... or username"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Game</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Game</label>
                   <select
                     value={winningPayoutForm.game_id}
                     onChange={(e) => setWinningPayoutForm((f) => ({ ...f, game_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
                     <option value="">— Select Game —</option>
                     {games.map((g) => (
@@ -3883,7 +3758,7 @@ export default function AdminCockpitPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Amount (₹ INR) *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Amount (₹ INR) *</label>
                   <input
                     type="number"
                     required
@@ -3891,15 +3766,15 @@ export default function AdminCockpitPage() {
                     value={winningPayoutForm.amount_inr || ""}
                     onChange={(e) => setWinningPayoutForm((f) => ({ ...f, amount_inr: Number(e.target.value) }))}
                     placeholder="e.g. 15000"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Rank / Placement *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Rank / Placement *</label>
                   <select
                     value={winningPayoutForm.rank_or_placement}
                     onChange={(e) => setWinningPayoutForm((f) => ({ ...f, rank_or_placement: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
                     <option>1st Place</option>
                     <option>2nd Place</option>
@@ -3913,11 +3788,11 @@ export default function AdminCockpitPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">Destination *</label>
+                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">Destination *</label>
                   <select
                     value={winningPayoutForm.destination}
                     onChange={(e) => setWinningPayoutForm((f) => ({ ...f, destination: e.target.value as "UPI" | "WALLET" }))}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
                     <option value="WALLET">WALLET (credit user wallet)</option>
                     <option value="UPI">UPI (direct transfer)</option>
@@ -3925,20 +3800,20 @@ export default function AdminCockpitPage() {
                 </div>
                 {winningPayoutForm.destination === "UPI" && (
                   <div>
-                    <label className="block text-[10px] font-mono uppercase text-slate-500 font-bold mb-1">UPI ID *</label>
+                    <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">UPI ID *</label>
                     <input
                       type="text"
                       required={winningPayoutForm.destination === "UPI"}
                       value={winningPayoutForm.upi_id}
                       onChange={(e) => setWinningPayoutForm((f) => ({ ...f, upi_id: e.target.value }))}
                       placeholder="e.g. winner@oksbi"
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10]"
+                      className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
                     />
                   </div>
                 )}
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsWinningPayoutModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
+                <button type="button" onClick={() => setIsWinningPayoutModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" disabled={isSubmittingWinningPayout} className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50">
@@ -3954,15 +3829,15 @@ export default function AdminCockpitPage() {
       {/* Add / Edit Game Modal */}
       {isGameModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-2xl p-6 space-y-5 my-8 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 my-8 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 dark:text-white flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-[#E56A10]" />
                 {editingGame ? `Edit Game: ${editingGame.name}` : "Register New Game Title"}
               </h3>
               <button
-                onClick={() => setIsGameModalOpen(false)}
-                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
+                onClick={() => { setIsGameModalOpen(false); setEditingGame(null); }}
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4517,11 +4392,11 @@ export default function AdminCockpitPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#242C3D]">
                 <button
                   type="button"
-                  onClick={() => setIsGameModalOpen(false)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
+                  onClick={() => { setIsGameModalOpen(false); setEditingGame(null); }}
+                  className="px-4 py-2 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] text-xs font-mono uppercase rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -4549,15 +4424,15 @@ export default function AdminCockpitPage() {
       {/* Tournament Editor Modal */}
       {isTournamentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl w-full max-w-3xl p-6 space-y-5 my-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 dark:text-white flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#E56A10]" />
                 {editingTournament ? `Edit Tournament: ${editingTournament.title}` : "Create New Platform Tournament"}
               </h3>
               <button
-                onClick={() => setIsTournamentModalOpen(false)}
-                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
+                onClick={() => { setIsTournamentModalOpen(false); setEditingTournament(null); }}
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5091,11 +4966,11 @@ export default function AdminCockpitPage() {
               </div>
 
               {/* Form Footer */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#242C3D]">
                 <button
                   type="button"
-                  onClick={() => setIsTournamentModalOpen(false)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
+                  onClick={() => { setIsTournamentModalOpen(false); setEditingTournament(null); }}
+                  className="px-4 py-2 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] text-xs font-mono uppercase rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -5123,16 +4998,16 @@ export default function AdminCockpitPage() {
 
       {/* Leaderboard Category Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-base font-bold uppercase font-mono text-slate-900 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <h3 className="text-base font-bold uppercase font-mono text-slate-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-[#E56A10]" />
                 Add Dynamic Leaderboard Category
               </h3>
               <button
                 onClick={() => setIsCategoryModalOpen(false)}
-                className="text-slate-600 hover:text-slate-900 p-1 cursor-pointer"
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5140,7 +5015,7 @@ export default function AdminCockpitPage() {
 
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   Category Name *
                 </label>
                 <input
@@ -5149,19 +5024,19 @@ export default function AdminCockpitPage() {
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                   placeholder="e.g. Valorant Top Fraggers, Apex Predator Winrate"
-                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                     Game Filter *
                   </label>
                   <select
                     value={categoryForm.game_slug}
                     onChange={(e) => setCategoryForm({ ...categoryForm, game_slug: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="all">All Games</option>
                     {games.map((g) => (
@@ -5173,13 +5048,13 @@ export default function AdminCockpitPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                     Sorting Metric *
                   </label>
                   <select
                     value={categoryForm.sort_metric}
                     onChange={(e) => setCategoryForm({ ...categoryForm, sort_metric: e.target.value as any })}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    className="w-full bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="rating">Skill Rating (MMR / ELO)</option>
                     <option value="win_rate">Win Rate Percentage (%)</option>
@@ -5191,7 +5066,7 @@ export default function AdminCockpitPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   Minimum Matches Required to Qualify
                 </label>
                 <input
@@ -5200,12 +5075,12 @@ export default function AdminCockpitPage() {
                   max={100}
                   value={categoryForm.min_matches}
                   onChange={(e) => setCategoryForm({ ...categoryForm, min_matches: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
                   Description
                 </label>
                 <textarea
@@ -5213,19 +5088,19 @@ export default function AdminCockpitPage() {
                   value={categoryForm.description}
                   onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                   placeholder="Official explanation of category ranking criteria..."
-                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                  className="w-full bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                 />
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-500">
+              <div className="p-3 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400">
                 <span className="text-[#E56A10] font-bold">Auto-Rank Calculation:</span> The leaderboard engine will automatically aggregate match results and rank all qualifying squads and players in real-time.
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#242C3D]">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-xs font-mono uppercase rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer"
+                  className="px-4 py-2 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] text-xs font-mono uppercase rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -5251,46 +5126,46 @@ export default function AdminCockpitPage() {
 
       {/* Score Override Modal */}
       {scoreOverrideMatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white border border-amber-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-amber-700/50 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-amber-400" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Manual Score Override</h3>
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Manual Score Override</h3>
               </div>
-              <button onClick={() => setScoreOverrideMatch(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer"><X className="w-5 h-5" /></button>
+              <button onClick={() => setScoreOverrideMatch(null)} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono">
-              <span className="text-slate-500">Match: </span>
-              <span className="text-slate-900 font-bold">{scoreOverrideMatch.team_a?.name || "Team A"} vs {scoreOverrideMatch.team_b?.name || "Team B"}</span>
-              <span className="text-slate-500 block mt-1">{scoreOverrideMatch.tournament_title || "Official Tournament"} · {scoreOverrideMatch.stage || "Match"}</span>
+            <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] p-3 rounded-lg text-xs font-mono">
+              <span className="text-slate-500 dark:text-slate-400">Match: </span>
+              <span className="text-slate-900 dark:text-white font-bold">{scoreOverrideMatch.team_a?.name || "Team A"} vs {scoreOverrideMatch.team_b?.name || "Team B"}</span>
+              <span className="text-slate-500 dark:text-slate-400 block mt-1">{scoreOverrideMatch.tournament_title || "Official Tournament"} · {scoreOverrideMatch.stage || "Match"}</span>
             </div>
             <form onSubmit={handleScoreOverride} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">
+                  <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
                     {scoreOverrideMatch.team_a?.name || "Team A"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreA} onChange={(e) => setScoreA(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">
+                  <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
                     {scoreOverrideMatch.team_b?.name || "Team B"} Score *
                   </label>
                   <input type="number" min={0} required value={scoreB} onChange={(e) => setScoreB(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium focus:outline-none focus:border-amber-500 font-mono" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Override Reason *</label>
+                <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Override Reason *</label>
                 <input type="text" required value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="e.g. Server crash — arbiter reconciled from replay"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none focus:border-amber-500 font-mono" />
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium focus:outline-none focus:border-amber-500 font-mono" />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setScoreOverrideMatch(null)}
-                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingOverride}
                   className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingOverride ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5" />}
@@ -5304,24 +5179,24 @@ export default function AdminCockpitPage() {
 
       {/* Reject Proof Modal */}
       {rejectProofMatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white border border-rose-700/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-rose-700/50 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
                 <X className="w-5 h-5 text-rose-400" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Evidence & Request Re-upload</h3>
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">Reject Evidence & Request Re-upload</h3>
               </div>
-              <button onClick={() => setRejectProofMatch(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer"><X className="w-5 h-5" /></button>
+              <button onClick={() => setRejectProofMatch(null)} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono">
-              <span className="text-slate-500">Match: </span>
-              <span className="text-slate-900 font-bold">{rejectProofMatch.team_a?.name || "Team A"} vs {rejectProofMatch.team_b?.name || "Team B"}</span>
+            <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] p-3 rounded-lg text-xs font-mono">
+              <span className="text-slate-500 dark:text-slate-400">Match: </span>
+              <span className="text-slate-900 dark:text-white font-bold">{rejectProofMatch.team_a?.name || "Team A"} vs {rejectProofMatch.team_b?.name || "Team B"}</span>
             </div>
             <form onSubmit={handleRejectMatchProof} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-slate-500 uppercase font-bold mb-1">Rejection Reason *</label>
+                <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Rejection Reason *</label>
                 <select value={rejectProofReason} onChange={(e) => setRejectProofReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-medium focus:outline-none focus:border-rose-500 font-mono">
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-rose-500 font-mono">
                   <option>Screenshot incomplete or unreadable</option>
                   <option>Score visible but timestamp missing</option>
                   <option>Wrong match — screenshot shows different game</option>
@@ -5335,171 +5210,11 @@ export default function AdminCockpitPage() {
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setRejectProofMatch(null)}
-                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-mono font-bold uppercase cursor-pointer">Cancel</button>
                 <button type="submit" disabled={isSubmittingReject}
                   className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                   {isSubmittingReject ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
                   Reject & Notify
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Approve Payout Modal */}
-      {approvingWithdrawal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white border border-emerald-600/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Authorize Payout Disbursal</h3>
-              </div>
-              <button onClick={() => setApprovingWithdrawal(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Player:</span>
-                <span className="text-slate-900 font-bold">@{approvingWithdrawal.user_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Amount:</span>
-                <span className="text-emerald-600 font-bold text-sm">₹{approvingWithdrawal.amount.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">UPI VPA:</span>
-                <span className="text-slate-900 font-bold">{approvingWithdrawal.upi_id}</span>
-              </div>
-              {approvingWithdrawal.account_holder_name && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Account Name:</span>
-                  <span className="text-slate-900">{approvingWithdrawal.account_holder_name}</span>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleApprovePayout} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
-                  Payout Reference / UTR *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={payoutReference}
-                  onChange={(e) => setPayoutReference(e.target.value)}
-                  placeholder="e.g. UPI/2026/8912384"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
-                  Admin Audit Notes
-                </label>
-                <input
-                  type="text"
-                  value={approvalNotes}
-                  onChange={(e) => setApprovalNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
-                />
-              </div>
-
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] font-mono text-emerald-800">
-                Authorizing this payout records an irreversible financial transaction and notifies the player.
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setApprovingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono uppercase font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessingWithdrawal}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Confirm Disbursal
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Withdrawal Modal */}
-      {rejectingWithdrawal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-white border border-rose-600/50 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <X className="w-5 h-5 text-rose-600" />
-                <h3 className="font-headline font-bold text-base text-slate-900 uppercase">Reject Payout & Refund Balance</h3>
-              </div>
-              <button onClick={() => setRejectingWithdrawal(null)} className="text-slate-600 hover:text-slate-900 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs font-mono space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Player:</span>
-                <span className="text-slate-900 font-bold">@{rejectingWithdrawal.user_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Refund Amount:</span>
-                <span className="text-rose-600 font-bold text-sm">₹{rejectingWithdrawal.amount.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Target VPA:</span>
-                <span className="text-slate-900 font-bold">{rejectingWithdrawal.upi_id}</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleRejectPayout} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono text-slate-800 uppercase font-bold mb-1">
-                  Rejection Reason *
-                </label>
-                <select
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-medium focus:outline-none focus:border-rose-500 font-mono"
-                >
-                  <option>UPI ID invalid or inactive with banking handle</option>
-                  <option>Beneficiary name mismatch with verified account</option>
-                  <option>Bank server declined UPI transaction request</option>
-                  <option>Duplicate withdrawal request detected</option>
-                  <option>User requested cancellation of withdrawal</option>
-                </select>
-              </div>
-
-              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-[11px] font-mono text-amber-900">
-                ₹{rejectingWithdrawal.amount.toLocaleString("en-IN")} will be instantly restored and credited back to @{rejectingWithdrawal.user_name}&apos;s wallet balance.
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRejectingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded-lg text-xs font-mono uppercase font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessingWithdrawal}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                  Reject & Refund Balance
                 </button>
               </div>
             </form>

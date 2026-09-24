@@ -39,10 +39,10 @@ function AuthSync({ children }: { children: React.ReactNode }) {
 
   // Inject token getter into the centralized API client
   useEffect(() => {
-    setAuthTokenGetter(async () => {
+    setAuthTokenGetter(async (options?: { skipCache?: boolean }) => {
       if (!isSignedIn) return null;
       try {
-        return await getToken();
+        return await getToken(options);
       } catch {
         return null;
       }

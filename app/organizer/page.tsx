@@ -39,18 +39,18 @@ export default function OrganizerCockpitPage() {
   const [formData, setFormData] = useState<CreateTournamentPayload>({
     game_id: "",
     title: "",
-    prize_pool_inr: 25000,
-    entry_fee_inr: 50,
-    starts_at: "Saturday, 8:00 PM IST",
-    roster_lock_time: "Saturday, 7:30 PM IST",
+    prize_pool_inr: 0,
+    entry_fee_inr: 0,
+    starts_at: "",
+    roster_lock_time: "",
     server_region: "AWS Mumbai (ap-south-1)",
     max_teams: 16,
-    min_team_size: 5,
+    min_team_size: 1,
     max_team_size: 5,
     rank_requirement: "Open to All Ranks",
     format: "Single Elimination Bracket",
     description: "Sanctioned competitive esports tournament. Strict anti-cheat verification and automated brackets.",
-    rules: ["Competitive MR12 rulebook", "Vanguard/VAC mandatory", "15-minute grace check-in"],
+    rules: ["Competitive rulebook", "Anti-cheat verification mandatory", "Check-in mandatory prior to match start"],
   });
 
   const fetchData = async () => {
@@ -119,7 +119,7 @@ export default function OrganizerCockpitPage() {
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#F8F9FF] min-h-screen text-[#0B1C30]">
+    <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-[#F8FAFC] transition-colors">
       {/* 1. Header Bar */}
       <header className="bg-[#0B0E16] text-white border-b border-slate-800 px-4 md:px-8 py-5">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -156,7 +156,7 @@ export default function OrganizerCockpitPage() {
 
       {/* Action Notification Banner */}
       {actionMsg && (
-        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 text-xs font-mono text-emerald-800 text-center font-semibold">
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 px-4 py-2.5 text-xs font-mono text-emerald-800 dark:text-emerald-300 text-center font-semibold">
           {actionMsg}
         </div>
       )}
@@ -165,10 +165,10 @@ export default function OrganizerCockpitPage() {
       <main className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 w-full space-y-8">
         {/* Creation Modal / Inline Drawer */}
         {isCreating && (
-          <section className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <section className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <Plus className="w-5 h-5 text-[#E56A10]" />
-              <h2 className="text-base font-bold font-headline text-slate-900 uppercase">
+              <h2 className="text-base font-bold font-headline text-slate-900 dark:text-white uppercase">
                 New Tournament Specification Wizard
               </h2>
             </div>
@@ -424,21 +424,21 @@ export default function OrganizerCockpitPage() {
         {/* 3. Tournaments List */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold font-headline text-slate-900 uppercase tracking-wider flex items-center gap-2">
+            <h2 className="text-base font-bold font-headline text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#E56A10]" />
               <span>Tournaments Managed by You ({tournaments.length})</span>
             </h2>
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs font-mono text-slate-500 bg-white border border-slate-200 rounded-xl animate-pulse shadow-sm">
+            <div className="p-8 text-center text-xs font-mono text-slate-500 dark:text-slate-400 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl animate-pulse shadow-sm">
               Querying organizer tournament allocations...
             </div>
           ) : tournaments.length === 0 ? (
-            <div className="p-12 text-center bg-white border border-slate-200 rounded-xl space-y-3 shadow-sm">
-              <Trophy className="w-10 h-10 text-slate-400 mx-auto" />
-              <p className="text-sm text-slate-900 font-bold font-headline">No Tournaments Created Yet</p>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto font-mono">
+            <div className="p-12 text-center bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl space-y-3 shadow-sm">
+              <Trophy className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto" />
+              <p className="text-sm text-slate-900 dark:text-white font-bold font-headline">No Tournaments Created Yet</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto font-mono">
                 Click &quot;Create Tournament&quot; above to launch your first sanctioned competitive cup.
               </p>
             </div>
@@ -447,44 +447,44 @@ export default function OrganizerCockpitPage() {
               {tournaments.map((t) => (
                 <div
                   key={t.id}
-                  className="bg-white border border-slate-200 hover:border-[#E56A10] rounded-xl p-5 space-y-4 transition-all shadow-sm"
+                  className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] rounded-xl p-5 space-y-4 transition-all shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-mono text-[#E56A10] uppercase font-bold">
                         {t.game_name} • {t.format}
                       </span>
-                      <h3 className="text-base font-bold text-slate-900 font-headline mt-0.5">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white font-headline mt-0.5">
                         {t.title}
                       </h3>
                     </div>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
                         t.status === "LIVE"
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800"
                           : t.status === "REGISTRATION_OPEN"
-                          ? "bg-orange-100 text-orange-800 border border-orange-300"
-                          : "bg-slate-100 text-slate-700 border border-slate-300"
+                          ? "bg-orange-100 dark:bg-orange-950/40 text-orange-800 dark:text-orange-400 border border-orange-300 dark:border-orange-800"
+                          : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#242C3D]"
                       }`}
                     >
                       {t.status}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-xs font-mono">
+                  <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 dark:border-[#242C3D] text-xs font-mono">
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Prize Pool</span>
-                      <span className="text-slate-900 font-bold">{t.prize_pool}</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block">Prize Pool</span>
+                      <span className="text-slate-900 dark:text-white font-bold">{t.prize_pool}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Squads Enrolled</span>
-                      <span className="text-slate-900 font-bold">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block">Squads Enrolled</span>
+                      <span className="text-slate-900 dark:text-white font-bold">
                         {t.registered_teams} / {t.max_teams}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Schedule</span>
-                      <span className="text-slate-600 text-[11px] truncate block">{t.starts_at}</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block">Schedule</span>
+                      <span className="text-slate-600 dark:text-slate-300 text-[11px] truncate block">{t.starts_at}</span>
                     </div>
                   </div>
 
@@ -512,7 +512,7 @@ export default function OrganizerCockpitPage() {
 
                     <Link
                       href={`/tournaments/${t.slug}`}
-                      className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-mono rounded-lg flex items-center gap-1.5 transition-colors ml-auto shadow-xs"
+                      className="px-3 py-1.5 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] hover:bg-slate-100 dark:hover:bg-[#202636] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-mono rounded-lg flex items-center gap-1.5 transition-colors ml-auto shadow-xs"
                     >
                       <span>Public Hub</span>
                       <ArrowRight className="w-3 h-3" />
