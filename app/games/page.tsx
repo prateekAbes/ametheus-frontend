@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
-import { GAMES_DATA } from "@/lib/data/games";
 import { GameCategory } from "@/types";
 import { Shield, Search, ArrowRight, RefreshCw, AlertTriangle } from "lucide-react";
 
 export default function GamesDirectoryPage() {
-  const [games, setGames] = useState<NormalizedGame[]>(() => GAMES_DATA.map(normalizeGame));
+  const [games, setGames] = useState<NormalizedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<GameCategory>("all");
@@ -20,14 +19,15 @@ export default function GamesDirectoryPage() {
     setError(null);
     try {
       const apiGames = await getGames();
-      if (apiGames && apiGames.length > 0) {
+      if (Array.isArray(apiGames)) {
         setGames(apiGames.map(normalizeGame));
+      } else {
+        setGames([]);
       }
     } catch (err: unknown) {
-      console.warn("Backend /games unavailable, falling back to static cache", err);
-      // Fallback to static data
-      setGames(GAMES_DATA.map(normalizeGame));
-      setError("Connected in offline preview mode. Showing cached disciplines.");
+      console.error("Failed to load games from database", err);
+      setGames([]);
+      setError("Unable to load games from database. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -126,10 +126,10 @@ export default function GamesDirectoryPage() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 rounded text-xs font-mono font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-4 py-1.5 rounded text-xs font-mono font-bold uppercase transition-colors whitespace-nowrap cursor-pointer border ${
                   selectedCategory === cat
-                    ? "bg-[#0F172A] dark:bg-[#E56A10] text-white shadow-xs"
-                    : "bg-white dark:bg-[#161A24] text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white border border-[#E2E8F0] dark:border-[#242C3D]"
+                    ? "bg-[#0F172A] dark:bg-[#E56A10] text-white border-transparent shadow-xs"
+                    : "bg-white dark:bg-[#161A24] text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white border-[#E2E8F0] dark:border-[#242C3D]"
                 }`}
               >
                 {cat === "all" ? "All Disciplines" : cat}

@@ -1,7 +1,7 @@
 "use client";
 
 import { BracketRound, BracketMatch } from "@/types";
-import { Trophy, Flame, Clock, CheckCircle } from "lucide-react";
+import { Trophy } from "lucide-react";
 
 interface Props {
   rounds: BracketRound[];

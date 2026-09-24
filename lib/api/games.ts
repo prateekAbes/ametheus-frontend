@@ -86,14 +86,14 @@ export function normalizeGame(g: any): NormalizedGame {
     gallery: Array.isArray(g.gallery) ? g.gallery : [],
     bannerUrl: (() => {
       const b = g.banner_url || g.bannerUrl;
-      if (!b || b.includes("aida-public") || b.includes("googleusercontent.com")) {
+      if (!b || b.includes("aida") || b.includes("googleusercontent.com")) {
         return "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
       }
       return b;
     })(),
     logoUrl: (() => {
       const l = g.logo_url || g.logoUrl;
-      if (!l || l.includes("aida-public") || l.includes("googleusercontent.com")) {
+      if (!l || l.includes("aida") || l.includes("googleusercontent.com")) {
         return "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop";
       }
       return l;

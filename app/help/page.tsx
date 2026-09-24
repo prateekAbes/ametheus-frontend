@@ -209,7 +209,7 @@ export default function HelpPage() {
 
           {filteredFaqs.length === 0 && (
             <div className="p-12 text-center bg-white rounded-xl border border-dashed border-[#CBD5E1] text-[#64748B] text-xs">
-              No matching help topics found for "{searchQuery}". Try a different keyword or contact operations support.
+              No matching help topics found for &quot;{searchQuery}&quot;. Try a different keyword or contact operations support.
             </div>
           )}
         </div>

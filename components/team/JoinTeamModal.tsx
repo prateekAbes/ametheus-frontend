@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Users, Check, AlertCircle, Sparkles, Loader2 } from "lucide-react";
+import { X, Users, Check, AlertCircle, Loader2 } from "lucide-react";
 import { Team } from "@/types";
 import { getTeamByCode, joinTeam as apiJoinTeam } from "@/lib/api/teams";
 

@@ -4,8 +4,6 @@ import { useEffect, use, useState } from "react";
 import { getTournamentBySlug, getTournamentMatches, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
-import { TOURNAMENTS_DATA } from "@/lib/data/tournaments";
 import { useTeamStore } from "@/lib/store/team-store";
 import BracketTree from "@/components/tournament/BracketTree";
 import RegisterTournamentModal from "@/components/tournament/RegisterTournamentModal";
@@ -16,17 +14,10 @@ import { MatchLobbyInfo, BracketMatch } from "@/types";
 import {
   Shield,
   Trophy,
-  Calendar,
   Clock,
-  Server,
-  Award,
-  Users,
   Check,
   CheckCircle,
-  AlertTriangle,
   Lock,
-  ArrowRight,
-  UserPlus,
   Radio,
   Swords,
 } from "lucide-react";
@@ -37,15 +28,10 @@ interface Props {
 
 export default function TournamentDetailPage({ params }: Props) {
   const resolvedParams = use(params);
-  const staticMatch = TOURNAMENTS_DATA.find(
-    (t) => t.slug === resolvedParams.slug || t.id === resolvedParams.slug
-  );
 
-  const [tournament, setTournament] = useState<NormalizedTournament | null>(() =>
-    staticMatch ? normalizeTournament(staticMatch) : null
-  );
+  const [tournament, setTournament] = useState<NormalizedTournament | null>(null);
   const [matches, setMatches] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(!staticMatch);
+  const [isLoading, setIsLoading] = useState(true);
   const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
@@ -55,14 +41,17 @@ export default function TournamentDetailPage({ params }: Props) {
         if (isMounted) {
           if (data) {
             setTournament(normalizeTournament(data));
+          } else {
+            setTournament(null);
           }
           setIsLoading(false);
           setHasFetched(true);
         }
       })
       .catch((err) => {
-        console.warn("[Tournament Detail] Fetch failed, checking static fallback:", err);
+        console.warn("[Tournament Detail] Fetch from database failed:", err);
         if (isMounted) {
+          setTournament(null);
           setIsLoading(false);
           setHasFetched(true);
         }
@@ -83,7 +72,17 @@ export default function TournamentDetailPage({ params }: Props) {
     };
   }, [resolvedParams.slug]);
 
-  const activeTourn = tournament || (staticMatch ? normalizeTournament(staticMatch) : null);
+  const activeTourn = tournament;
+  const { teams, findTeamByCode } = useTeamStore(activeTourn?.gameSlug);
+
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "schedule" | "prizes" | "bracket" | "matches" | "rosters"
+  >("overview");
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [selectedBracketMatch, setSelectedBracketMatch] = useState<MatchLobbyInfo | null>(null);
+  const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<MatchLobbyInfo | null>(null);
 
   if (isLoading && !activeTourn) {
     return (
@@ -142,16 +141,6 @@ export default function TournamentDetailPage({ params }: Props) {
 
   // Narrowed non-null reference
   const currentTournament: NormalizedTournament = activeTourn;
-  const { teams, findTeamByCode } = useTeamStore(currentTournament.gameSlug);
-
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "schedule" | "prizes" | "bracket" | "matches" | "rosters"
-  >("overview");
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [selectedBracketMatch, setSelectedBracketMatch] = useState<MatchLobbyInfo | null>(null);
-  const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<MatchLobbyInfo | null>(null);
 
   const isSoloGame = currentTournament.gameSlug === "chess" || currentTournament.maxTeamSize === 1;
   const isComingSoon = currentTournament.status === "COMING_SOON";
@@ -209,9 +198,16 @@ export default function TournamentDetailPage({ params }: Props) {
       {/* Tournament Banner Hero Header */}
       <div className="relative w-full h-52 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200 dark:border-[#242C3D]">
         <Image
-          src={currentTournament.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200"}
+          src={
+            currentTournament.bannerUrl &&
+            !currentTournament.bannerUrl.includes("aida") &&
+            !currentTournament.bannerUrl.includes("googleusercontent.com")
+              ? currentTournament.bannerUrl
+              : "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"
+          }
           alt={currentTournament.title}
           fill
+          unoptimized
           className="object-cover"
           priority
         />
@@ -465,10 +461,10 @@ export default function TournamentDetailPage({ params }: Props) {
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id as any)}
-                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-colors cursor-pointer ${
+                className={`px-4 py-2 rounded text-xs font-bold uppercase transition-colors cursor-pointer border ${
                   activeTab === t.id
-                    ? "bg-[#E56A10] text-white shadow-xs"
-                    : "bg-[#F1F3F5] dark:bg-[#161A24] text-[#475569] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white border border-transparent dark:border-[#242C3D]"
+                    ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                    : "bg-[#F1F3F5] dark:bg-[#161A24] text-[#475569] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white border-transparent dark:border-[#242C3D]"
                 }`}
               >
                 {t.label}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -21,39 +21,50 @@ import {
 } from "@/lib/api/index";
 
 export default function NotificationsDropdown() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifs = async () => {
-    if (!isSignedIn) return;
+  const activeNotifications = isSignedIn ? notifications : [];
+  const activeUnreadCount = isSignedIn ? unreadCount : 0;
+
+  const fetchNotifs = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return;
     try {
+      const token = await getToken();
+      if (!token) return;
       const data = await getNotifications();
       setNotifications(data.items || []);
       setUnreadCount(data.unread_count || 0);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Background notifications poll fails gracefully
     }
-  };
+  }, [isLoaded, isSignedIn, getToken]);
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
     fetchNotifs();
     const interval = setInterval(fetchNotifs, 30000); // 30s poll
     return () => clearInterval(interval);
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn, fetchNotifs]);
 
-  // Handle click outside to close dropdown
+  // Handle click outside or global close event to close dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
+    const handleClose = () => setIsOpen(false);
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("ametheus:close_dropdowns", handleClose);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("ametheus:close_dropdowns", handleClose);
+    };
   }, []);
 
   const handleMarkAllRead = async () => {
@@ -104,32 +115,32 @@ export default function NotificationsDropdown() {
           setIsOpen(!isOpen);
           if (!isOpen && isSignedIn) fetchNotifs();
         }}
-        className="relative p-2 bg-[#161A24] border border-[#242C3D] rounded text-[#CBD5E1] hover:text-white hover:border-[#CBD5E1] transition-colors cursor-pointer"
+        className="relative h-8 w-8 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] flex items-center justify-center text-[#CBD5E1] hover:text-white transition-colors cursor-pointer shrink-0"
         aria-label="Notifications"
       >
         <Bell className="w-4 h-4" />
-        {unreadCount > 0 && (
+        {activeUnreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-[#E56A10] text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold animate-pulse">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {activeUnreadCount > 9 ? "9+" : activeUnreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-lg shadow-2xl z-50 overflow-hidden text-left font-sans">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-xl shadow-2xl z-50 overflow-hidden text-left font-sans animate-in fade-in-50 zoom-in-95">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#242C3D] bg-[#161A24]">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold font-mono tracking-wider uppercase text-white">
                 Notifications
               </span>
-              {unreadCount > 0 && (
+              {activeUnreadCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold rounded">
-                  {unreadCount} NEW
+                  {activeUnreadCount} NEW
                 </span>
               )}
             </div>
-            {unreadCount > 0 && (
+            {activeUnreadCount > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}
@@ -147,13 +158,13 @@ export default function NotificationsDropdown() {
               <div className="p-6 text-center text-xs text-[#94A3B8]">
                 Please sign in to view your live tournament updates and notifications.
               </div>
-            ) : notifications.length === 0 ? (
+            ) : activeNotifications.length === 0 ? (
               <div className="p-8 text-center text-xs text-[#64748B]">
                 <Bell className="w-6 h-6 mx-auto mb-2 text-[#334155]" />
-                You're all caught up! No active notifications.
+                You&apos;re all caught up! No active notifications.
               </div>
             ) : (
-              notifications.map((n) => {
+              activeNotifications.map((n) => {
                 const content = (
                   <div
                     key={n.id}

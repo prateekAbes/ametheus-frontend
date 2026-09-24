@@ -1,57 +1,46 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Trophy, Users, Shield, ArrowRight, Flame, CheckCircle, Gamepad2 } from "lucide-react";
+import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
+import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
 
 export default function HomePage() {
-  const featuredTournaments = [
-    {
-      id: "val-open-s4",
-      title: "VALORANT APEX CHALLENGERS — SEASON 4",
-      game: "Valorant (5v5 PC)",
-      gameSlug: "valorant",
-      prizePool: "₹50,000",
-      entryFee: "₹60 / Team",
-      teamsRegistered: 14,
-      maxTeams: 16,
-      status: "REGISTRATION CLOSING",
-      startsAt: "Today, 8:00 PM IST",
-      badgeColor: "bg-[#E56A10] text-white",
-    },
-    {
-      id: "cs2-masters-s1",
-      title: "COUNTER-STRIKE 2 PRO DIVISION CUP",
-      game: "Counter-Strike 2 (5v5 PC)",
-      gameSlug: "counter-strike-2",
-      prizePool: "₹35,000",
-      entryFee: "₹50 / Team",
-      teamsRegistered: 8,
-      maxTeams: 16,
-      status: "CHECK-IN OPEN",
-      startsAt: "Tomorrow, 6:00 PM IST",
-      badgeColor: "bg-[#F59E0B] text-slate-900 font-bold",
-    },
-    {
-      id: "chess-rapid-masters",
-      title: "AMETHEUS GRANDMASTER BLITZ #12",
-      game: "Chess (1v1)",
-      gameSlug: "chess",
-      prizePool: "₹15,000",
-      entryFee: "₹0 / Free",
-      teamsRegistered: 32,
-      maxTeams: 32,
-      status: "BRACKET SEEDED",
-      startsAt: "Live Now",
-      badgeColor: "bg-[#10B981] text-white font-bold",
-    },
-  ];
+  const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
+  const [games, setGames] = useState<NormalizedGame[]>([]);
+  const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
+  const [isLoadingGames, setIsLoadingGames] = useState(true);
 
-  const featuredGames = [
-    { name: "Valorant", tag: "5V5 TACTICAL PC", slug: "valorant", prizePool: "₹1,20,000", activeTournaments: 4 },
-    { name: "Counter-Strike 2", tag: "5V5 PC", slug: "counter-strike-2", prizePool: "₹85,000", activeTournaments: 3 },
-    { name: "Chess", tag: "1V1 BLITZ & RAPID", slug: "chess", prizePool: "₹40,000", activeTournaments: 6 },
-    { name: "BGMI", tag: "BATTLE ROYALE MOBILE", slug: "bgmi", prizePool: "₹90,000", activeTournaments: 2 },
-    { name: "Smash Karts", tag: "3D BATTLE ARENA", slug: "smash-karts", prizePool: "₹25,000", activeTournaments: 2 },
-    { name: "Mini Militia", tag: "2D MULTIPLAYER", slug: "mini-militia", prizePool: "₹20,000", activeTournaments: 1 },
-  ];
+  useEffect(() => {
+    getTournaments()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setTournaments(data.map(normalizeTournament));
+        } else {
+          setTournaments([]);
+        }
+      })
+      .catch(() => setTournaments([]))
+      .finally(() => setIsLoadingTournaments(false));
+
+    getGames()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setGames(data.map(normalizeGame));
+        } else {
+          setGames([]);
+        }
+      })
+      .catch(() => setGames([]))
+      .finally(() => setIsLoadingGames(false));
+  }, []);
+
+  const featuredTournaments = tournaments.slice(0, 3);
+  const featuredGames = games.slice(0, 6);
+
+  const totalPrizePool = tournaments.reduce((acc, t) => acc + (t.prizePoolNum || 0), 0);
+  const prizePoolDisplay = totalPrizePool > 0 ? `₹${totalPrizePool.toLocaleString()}+` : "₹0+";
 
   return (
     <div className="flex flex-col w-full">
@@ -96,15 +85,15 @@ export default function HomePage() {
           <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/60">
             <div>
               <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
-                ₹3,50,000+
+                {prizePoolDisplay}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
-                Monthly Prize Pool
+                Active Prize Pool
               </div>
             </div>
             <div>
               <div className="text-2xl sm:text-3xl font-bold font-headline text-[#E56A10] tabular-nums">
-                12
+                {games.length}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
                 Esports Disciplines
@@ -150,73 +139,84 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {featuredTournaments.map((t) => (
-            <div
-              key={t.id}
-              className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] hover:border-[#CBD5E1] dark:hover:border-[#E56A10] rounded-lg p-6 flex flex-col justify-between transition-all hover:shadow-md"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-4">
-                  <span className={`px-2 py-0.5 text-[10px] rounded font-mono ${t.badgeColor}`}>
-                    {t.status}
-                  </span>
-                  <span className="text-xs text-[#64748B] dark:text-slate-400 font-mono">
-                    {t.startsAt}
-                  </span>
-                </div>
-
-                <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white leading-snug mb-2">
-                  {t.title}
-                </h3>
-
-                <p className="text-xs text-[#64748B] dark:text-slate-400 font-mono mb-6">
-                  {t.game}
-                </p>
-
-                <div className="grid grid-cols-2 gap-3 py-3 border-y border-[#F1F3F5] dark:border-[#242C3D] mb-6">
+        {featuredTournaments.length === 0 ? (
+          <div className="p-12 text-center bg-white dark:bg-[#121622] rounded-lg border border-dashed border-[#E2E8F0] dark:border-[#242C3D] text-[#64748B] dark:text-slate-400 font-mono text-xs">
+            {isLoadingTournaments ? "Loading featured tournaments from database..." : "No active tournaments currently scheduled."}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {featuredTournaments.map((t) => {
+              const registered = t.registeredTeams || 0;
+              const max = t.maxTeams || 16;
+              const percent = max > 0 ? Math.min(100, Math.round((registered / max) * 100)) : 0;
+              return (
+                <div
+                  key={t.id}
+                  className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] hover:border-[#CBD5E1] dark:hover:border-[#E56A10] rounded-lg p-6 flex flex-col justify-between transition-all hover:shadow-md"
+                >
                   <div>
-                    <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
-                      Prize Pool
-                    </span>
-                    <span className="text-lg font-bold font-headline text-[#E56A10] tabular-nums">
-                      {t.prizePool}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
-                      Entry Fee
-                    </span>
-                    <span className="text-lg font-bold font-headline text-[#0F172A] dark:text-white tabular-nums">
-                      {t.entryFee}
-                    </span>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-[#E56A10] text-white">
+                        {t.statusLabel || t.status}
+                      </span>
+                      <span className="text-xs text-[#64748B] dark:text-slate-400 font-mono">
+                        {t.startsAt}
+                      </span>
+                    </div>
 
-                <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-slate-400 mb-4">
-                  <span>Registered Slots:</span>
-                  <span className="font-bold text-[#0F172A] dark:text-white font-mono">
-                    {t.teamsRegistered} / {t.maxTeams} Teams
-                  </span>
-                </div>
-                {/* Progress bar */}
-                <div className="w-full h-1.5 bg-[#F1F3F5] dark:bg-[#161A24] rounded-full overflow-hidden mb-6">
-                  <div
-                    className="h-full bg-[#E56A10] rounded-full"
-                    style={{ width: `${(t.teamsRegistered / t.maxTeams) * 100}%` }}
-                  />
-                </div>
-              </div>
+                    <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white leading-snug mb-2">
+                      {t.title}
+                    </h3>
 
-              <Link
-                href={`/tournaments/${t.id}`}
-                className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#C95B0A] text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block"
-              >
-                View Tournament Details
-              </Link>
-            </div>
-          ))}
-        </div>
+                    <p className="text-xs text-[#64748B] dark:text-slate-400 font-mono mb-6">
+                      {t.gameName}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 py-3 border-y border-[#F1F3F5] dark:border-[#242C3D] mb-6">
+                      <div>
+                        <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
+                          Prize Pool
+                        </span>
+                        <span className="text-lg font-bold font-headline text-[#E56A10] tabular-nums">
+                          {t.prizePool}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
+                          Entry Fee
+                        </span>
+                        <span className="text-lg font-bold font-headline text-[#0F172A] dark:text-white tabular-nums">
+                          {t.entryFee}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-slate-400 mb-4">
+                      <span>Registered Slots:</span>
+                      <span className="font-bold text-[#0F172A] dark:text-white font-mono">
+                        {registered} / {max} Teams
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full h-1.5 bg-[#F1F3F5] dark:bg-[#161A24] rounded-full overflow-hidden mb-6">
+                      <div
+                        className="h-full bg-[#E56A10] rounded-full transition-all"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <Link
+                    href={`/tournaments/${t.slug || t.id}`}
+                    className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#C95B0A] text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block"
+                  >
+                    View Tournament Details
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* 3. Games Directory Preview (Contextual Game Hub Entry) */}
@@ -238,47 +238,56 @@ export default function HomePage() {
               href="/games"
               className="text-xs font-bold uppercase tracking-wider text-[#0F172A] dark:text-slate-300 hover:text-[#E56A10] dark:hover:text-[#E56A10] flex items-center gap-1.5 transition-colors"
             >
-              Explore all 12 games
+              Explore all {games.length > 0 ? games.length : ""} games
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredGames.map((g) => (
-              <div
-                key={g.slug}
-                className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] rounded-lg p-6 flex flex-col justify-between transition-all group hover:shadow-md"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] text-[#475569] dark:text-slate-300 font-mono text-[10px] font-bold rounded">
-                      {g.tag}
-                    </span>
-                    <span className="text-xs text-[#10B981] font-mono font-bold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-                      {g.activeTournaments} Active
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white group-hover:text-[#E56A10] transition-colors mb-1">
-                    {g.name}
-                  </h3>
-                  <div className="text-xs text-[#64748B] dark:text-slate-400 font-mono mb-6">
-                    Total Active Pool: <span className="font-bold text-[#0F172A] dark:text-slate-200">{g.prizePool}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-4 border-t border-[#F1F3F5] dark:border-[#242C3D]">
-                  <Link
-                    href={`/games/${g.slug}`}
-                    className="flex-1 py-2 bg-[#F8F9FA] dark:bg-[#161A24] hover:bg-[#E56A10] hover:text-white dark:hover:bg-[#E56A10] text-[#0F172A] dark:text-slate-200 text-xs font-bold uppercase tracking-wider rounded text-center transition-colors border border-[#E2E8F0] dark:border-[#242C3D]"
+          {featuredGames.length === 0 ? (
+            <div className="p-12 text-center bg-white dark:bg-[#121622] rounded-lg border border-dashed border-[#E2E8F0] dark:border-[#242C3D] text-[#64748B] dark:text-slate-400 font-mono text-xs">
+              {isLoadingGames ? "Loading game hubs from database..." : "No active game hubs found."}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredGames.map((g) => {
+                const activeTournCount = tournaments.filter((t) => t.gameSlug === g.slug).length;
+                return (
+                  <div
+                    key={g.slug}
+                    className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] rounded-lg p-6 flex flex-col justify-between transition-all group hover:shadow-md"
                   >
-                    Enter Hub
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] text-[#475569] dark:text-slate-300 font-mono text-[10px] font-bold rounded">
+                          {g.tag || g.platform}
+                        </span>
+                        <span className="text-xs text-[#10B981] font-mono font-bold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+                          {activeTournCount} Active
+                        </span>
+                      </div>
+
+                      <h3 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white group-hover:text-[#E56A10] transition-colors mb-1">
+                        {g.name}
+                      </h3>
+                      <div className="text-xs text-[#64748B] dark:text-slate-400 font-mono mb-6">
+                        Active Tournaments: <span className="font-bold text-[#0F172A] dark:text-slate-200">{activeTournCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-4 border-t border-[#F1F3F5] dark:border-[#242C3D]">
+                      <Link
+                        href={`/games/${g.slug}`}
+                        className="flex-1 py-2 bg-[#F8F9FA] dark:bg-[#161A24] hover:bg-[#E56A10] hover:text-white dark:hover:bg-[#E56A10] text-[#0F172A] dark:text-slate-200 text-xs font-bold uppercase tracking-wider rounded text-center transition-colors border border-[#E2E8F0] dark:border-[#242C3D]"
+                      >
+                        Enter Hub
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

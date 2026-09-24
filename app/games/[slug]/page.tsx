@@ -18,7 +18,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Wallet,
-  Sparkles,
   CreditCard,
   Layers,
   ChevronLeft,
@@ -566,6 +565,70 @@ export default function DedicatedGameHubPage({ params }: Props) {
             fetchGameAndTeams();
           }}
         />
+      )}
+
+      {/* Media Gallery Lightbox Modal */}
+      {selectedGalleryIndex !== null && game.gallery && game.gallery[selectedGalleryIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setSelectedGalleryIndex(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center bg-[#0B0E16] border border-[#242C3D] rounded-xl overflow-hidden p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 border-b border-[#242C3D] text-xs font-mono text-[#94A3B8]">
+              <span>
+                {game.name} Media Asset ({selectedGalleryIndex + 1} of {game.gallery.length})
+              </span>
+              <button
+                onClick={() => setSelectedGalleryIndex(null)}
+                className="p-1 rounded text-[#94A3B8] hover:text-white hover:bg-[#161A24] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="relative w-full flex items-center justify-center my-4 overflow-hidden max-h-[70vh]">
+              <img
+                src={game.gallery[selectedGalleryIndex].url}
+                alt={game.gallery[selectedGalleryIndex].caption || `${game.name} preview`}
+                className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+              />
+
+              {game.gallery.length > 1 && (
+                <>
+                  <button
+                    onClick={() =>
+                      setSelectedGalleryIndex((prev) =>
+                        prev !== null ? (prev > 0 ? prev - 1 : game.gallery.length - 1) : 0
+                      )
+                    }
+                    className="absolute left-2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white border border-[#242C3D] transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setSelectedGalleryIndex((prev) =>
+                        prev !== null ? (prev < game.gallery.length - 1 ? prev + 1 : 0) : 0
+                      )
+                    }
+                    className="absolute right-2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white border border-[#242C3D] transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {game.gallery[selectedGalleryIndex].caption && (
+              <div className="w-full text-center text-xs font-mono text-[#CBD5E1] pt-2 border-t border-[#242C3D]">
+                {game.gallery[selectedGalleryIndex].caption}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

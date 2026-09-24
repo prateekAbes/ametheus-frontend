@@ -1,7 +1,7 @@
 "use client";
 
 import { Team } from "@/types";
-import { Shield, Copy, UserCheck, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 
 interface Props {

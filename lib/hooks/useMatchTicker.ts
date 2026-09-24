@@ -13,7 +13,7 @@ export interface TickerEvent {
 }
 
 function getWsUrl(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const base = process.env.NEXT_PUBLIC_API_URL || "https://ametheus.duckdns.org";
   const wsProto = base.startsWith("https") ? "wss" : "ws";
   const host = base.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   return `${wsProto}://${host}/ws/ticker`;

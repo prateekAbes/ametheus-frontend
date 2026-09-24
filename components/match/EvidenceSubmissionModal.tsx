@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useRef } from "react";
 import { MatchLobbyInfo } from "@/types";
-import { X, UploadCloud, CheckCircle, ShieldAlert, FileText, Check, Image as ImageIcon } from "lucide-react";
+import { X, UploadCloud, CheckCircle, ShieldAlert, Check } from "lucide-react";
 import { submitMatchResult } from "@/lib/api/matches";
 
 interface Props {

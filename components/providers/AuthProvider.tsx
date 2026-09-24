@@ -83,6 +83,12 @@ function AuthSync({ children }: { children: React.ReactNode }) {
     const avatarUrl = user.imageUrl;
 
     try {
+      const token = await getToken();
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
       const synced = await syncUser({
         clerk_user_id: user.id,
         email,
@@ -111,8 +117,8 @@ function AuthSync({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return;
       }
-    } catch (err) {
-      console.warn("[AMETHEUS] Background user sync notice:", err);
+    } catch {
+      // Silent fallback: profile will be restored from cache or subsequent refresh
     }
 
     // 3. Fallback: fetch existing profile directly
@@ -127,7 +133,7 @@ function AuthSync({ children }: { children: React.ReactNode }) {
     } catch {}
 
     setIsLoading(false);
-  }, [isAuthLoaded, isSignedIn, user]);
+  }, [isAuthLoaded, isSignedIn, user, getToken]);
 
   useEffect(() => {
     loadProfile();

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { MOCK_MATCHES } from "@/lib/data/matches";
 import { MatchLobbyInfo } from "@/types";
 import { getMatches, Match as ApiMatch } from "@/lib/api/matches";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
@@ -61,7 +60,7 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
 }
 
 export default function MatchesPage() {
-  const [matches, setMatches] = useState<MatchLobbyInfo[]>(MOCK_MATCHES);
+  const [matches, setMatches] = useState<MatchLobbyInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [activeLobbyMatch, setActiveLobbyMatch] = useState<MatchLobbyInfo | null>(null);
@@ -70,14 +69,14 @@ export default function MatchesPage() {
   const fetchMatchesData = useCallback(async () => {
     try {
       const data = await getMatches();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setMatches(data.map(mapApiMatchToLobby));
       } else {
-        setMatches(MOCK_MATCHES);
+        setMatches([]);
       }
     } catch (err) {
-      console.warn("Failed to fetch live matches from backend, using default mock matches:", err);
-      setMatches(MOCK_MATCHES);
+      console.warn("Failed to fetch live matches from backend database:", err);
+      setMatches([]);
     } finally {
       setIsLoading(false);
     }
@@ -149,10 +148,10 @@ export default function MatchesPage() {
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id)}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase rounded transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-4 py-2 font-mono text-xs font-bold uppercase rounded transition-colors whitespace-nowrap cursor-pointer border ${
                 filterStatus === tab.id
-                  ? "bg-[#E56A10] text-white shadow-sm"
-                  : "bg-white dark:bg-[#161A24] border border-[#D3E4FE] dark:border-[#242C3D] text-[#565E74] dark:text-slate-300 hover:text-[#0B1C30] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1E2538]"
+                  ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                  : "bg-white dark:bg-[#161A24] border-[#D3E4FE] dark:border-[#242C3D] text-[#565E74] dark:text-slate-300 hover:text-[#0B1C30] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1E2538]"
               }`}
             >
               {tab.label}
@@ -161,8 +160,21 @@ export default function MatchesPage() {
         </div>
 
         {/* Matches Grid */}
-        <div className="grid grid-cols-1 gap-4">
-          {filteredMatches.map((match) => (
+        {filteredMatches.length === 0 ? (
+          <div className="p-16 text-center bg-white dark:bg-[#121622] rounded-xl border border-dashed border-[#D3E4FE] dark:border-[#242C3D] text-[#64748B] dark:text-[#94A3B8]">
+            <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40 text-[#E56A10]" />
+            <h4 className="text-sm font-bold font-headline text-slate-800 dark:text-slate-200 uppercase mb-1">
+              {isLoading ? "Loading Matches..." : "No Matches Scheduled"}
+            </h4>
+            <p className="text-xs font-mono text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              {isLoading
+                ? "Fetching match lobbies from the database..."
+                : "There are currently no active or scheduled matches matching this filter in the database."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {filteredMatches.map((match) => (
             <div
               key={match.id}
               className="bg-white dark:bg-[#121622] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] shadow-sm p-6 hover:border-[#CBD5E1] dark:hover:border-[#E56A10] transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
@@ -246,6 +258,7 @@ export default function MatchesPage() {
             </div>
           ))}
         </div>
+      )}
       </main>
 
       {/* Modals */}

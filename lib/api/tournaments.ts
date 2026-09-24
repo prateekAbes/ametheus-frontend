@@ -167,7 +167,13 @@ export function normalizeTournament(t: any): NormalizedTournament {
     announcementText: t.announcement_text || t.announcementText,
     rankRequirement: t.rank_requirement || t.rankRequirement || "Open to All Ranks",
     format: t.format || "Single Elimination Bracket",
-    bannerUrl: t.banner_url || t.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200",
+    bannerUrl: (() => {
+      const b = t.banner_url || t.bannerUrl;
+      if (!b || b.includes("aida") || b.includes("googleusercontent.com")) {
+        return "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+      }
+      return b;
+    })(),
     badgeColor: t.badge_color || t.badgeColor || "#E56A10",
     description: t.description || "Official Sanctioned Tournament",
     rules,

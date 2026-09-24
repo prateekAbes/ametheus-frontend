@@ -18,8 +18,7 @@ export interface NotificationListResponse {
 export async function getNotifications(): Promise<NotificationListResponse> {
   try {
     return await apiClient<NotificationListResponse>("/notifications");
-  } catch (error) {
-    console.error("Failed to load notifications:", error);
+  } catch {
     return { items: [], unread_count: 0 };
   }
 }

@@ -10,7 +10,7 @@ interface Props {
   latestEvent: TickerEvent | null;
 }
 
-export default function LiveTickerBar({ isConnected, events, latestEvent }: Props) {
+export default function LiveTickerBar({ isConnected, latestEvent }: Props) {
   return (
     <div className="w-full bg-[#0B0E16] border-y border-[#242C3D] py-2.5 px-4">
       <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">

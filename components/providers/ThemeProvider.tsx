@@ -16,38 +16,36 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
 });
 
+function applyTheme(newTheme: Theme) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (newTheme === "dark") {
+    root.classList.add("dark");
+    root.setAttribute("data-theme", "dark");
+  } else {
+    root.classList.remove("dark");
+    root.setAttribute("data-theme", "light");
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem("ametheus_theme") as Theme | null;
       if (savedTheme === "light" || savedTheme === "dark") {
-        setThemeState(savedTheme);
+        if (savedTheme !== "dark") {
+          setTimeout(() => setThemeState(savedTheme), 0);
+        }
         applyTheme(savedTheme);
       } else {
-        // Default to dark mode for AMETHEUS esports theme
-        setThemeState("dark");
         applyTheme("dark");
       }
     } catch {
       applyTheme("dark");
-    } finally {
-      setMounted(true);
     }
   }, []);
-
-  const applyTheme = (newTheme: Theme) => {
-    const root = document.documentElement;
-    if (newTheme === "dark") {
-      root.classList.add("dark");
-      root.setAttribute("data-theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      root.setAttribute("data-theme", "light");
-    }
-  };
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

@@ -5,25 +5,26 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
-import { TOURNAMENTS_DATA } from "@/lib/data/tournaments";
-import { GAMES_DATA } from "@/lib/data/games";
+import { getGames, Game } from "@/lib/api/games";
 import {
   Trophy,
   Search,
   ArrowRight,
-  Shield,
-  Gamepad2,
-  Calendar,
   X,
 } from "lucide-react";
 
 const DEFAULT_TOURNAMENT_BANNER = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
 
 function TournamentBanner({ src, alt }: { src: string; alt: string }) {
-  const [imgSrc, setImgSrc] = useState(src || DEFAULT_TOURNAMENT_BANNER);
+  const isBroken = !src || src.includes("aida") || src.includes("googleusercontent.com");
+  const [imgSrc, setImgSrc] = useState(isBroken ? DEFAULT_TOURNAMENT_BANNER : src);
 
   useEffect(() => {
-    if (src) setImgSrc(src);
+    if (src && !src.includes("aida") && !src.includes("googleusercontent.com")) {
+      setImgSrc(src);
+    } else {
+      setImgSrc(DEFAULT_TOURNAMENT_BANNER);
+    }
   }, [src]);
 
   return (
@@ -31,6 +32,7 @@ function TournamentBanner({ src, alt }: { src: string; alt: string }) {
       src={imgSrc}
       alt={alt}
       fill
+      unoptimized
       className="object-cover group-hover:scale-105 transition-transform duration-500"
       onError={() => setImgSrc(DEFAULT_TOURNAMENT_BANNER)}
     />
@@ -41,9 +43,8 @@ function TournamentsContent() {
   const searchParams = useSearchParams();
   const searchFromUrl = searchParams.get("search") || "";
 
-  const [tournaments, setTournaments] = useState<NormalizedTournament[]>(() =>
-    TOURNAMENTS_DATA.map(normalizeTournament)
-  );
+  const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState("all");
   const [selectedFee, setSelectedFee] = useState("all");
@@ -53,24 +54,36 @@ function TournamentsContent() {
     setSearchQuery(searchFromUrl);
   }, [searchFromUrl]);
 
-  const fetchTournaments = async () => {
+  const fetchTournamentsAndGames = async () => {
     setLoading(true);
     try {
-      const data = await getTournaments();
-      if (data && data.length > 0) {
-        setTournaments(data.map(normalizeTournament));
+      const [tList, gList] = await Promise.allSettled([
+        getTournaments(),
+        getGames(),
+      ]);
+
+      if (tList.status === "fulfilled" && Array.isArray(tList.value)) {
+        setTournaments(tList.value.map(normalizeTournament));
+      } else {
+        setTournaments([]);
+      }
+
+      if (gList.status === "fulfilled" && Array.isArray(gList.value)) {
+        setGames(gList.value);
+      } else {
+        setGames([]);
       }
     } catch (err: unknown) {
-      // Silent seamless fallback to cached static tournament catalog without user disruption
-      console.warn("Backend /tournaments fallback to local catalog", err);
-      setTournaments(TOURNAMENTS_DATA.map(normalizeTournament));
+      console.error("Failed to load tournaments from database", err);
+      setTournaments([]);
+      setGames([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTournaments();
+    fetchTournamentsAndGames();
   }, []);
 
   const filteredTournaments = tournaments.filter((t) => {
@@ -135,22 +148,22 @@ function TournamentsContent() {
           <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
             <button
               onClick={() => setSelectedGame("all")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-colors whitespace-nowrap cursor-pointer border ${
                 selectedGame === "all"
-                  ? "bg-[#E56A10] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538] border border-slate-200 dark:border-[#242C3D]"
+                  ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                  : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538] border-slate-200 dark:border-[#242C3D]"
               }`}
             >
               All Disciplines
             </button>
-            {GAMES_DATA.map((g) => (
+            {games.map((g) => (
               <button
                 key={g.slug}
                 onClick={() => setSelectedGame(g.slug)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-colors whitespace-nowrap cursor-pointer border ${
                   selectedGame === g.slug
-                    ? "bg-[#E56A10] text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538] border border-slate-200 dark:border-[#242C3D]"
+                    ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                    : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538] border-slate-200 dark:border-[#242C3D]"
                 }`}
               >
                 {g.name}

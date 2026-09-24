@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { MatchLobbyInfo } from "@/types";
-import { X, CheckCircle, Copy, Shield, Server, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { X, CheckCircle, Copy, Server, Loader2 } from "lucide-react";
 import { checkInMatch } from "@/lib/api/matches";
 
 interface Props {

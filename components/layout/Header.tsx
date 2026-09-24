@@ -34,7 +34,6 @@ import {
 } from "@clerk/nextjs";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
-import { TOURNAMENTS_DATA } from "@/lib/data/tournaments";
 
 export default function Header() {
   const pathname = usePathname();
@@ -46,39 +45,23 @@ export default function Header() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const [activePath, setActivePath] = useState(pathname);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tournaments, setTournaments] = useState<NormalizedTournament[]>(() =>
-    TOURNAMENTS_DATA.map(normalizeTournament)
-  );
+  const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync activePath with pathname updates and popstate history
-  useEffect(() => {
-    setActivePath(pathname);
-  }, [pathname]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setActivePath(window.location.pathname);
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
   // Silently load tournament catalog for instant search autocomplete
   useEffect(() => {
     getTournaments()
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setTournaments(data.map(normalizeTournament));
         }
       })
       .catch(() => {
-        // Keep initial normalized TOURNAMENTS_DATA
+        setTournaments([]);
       });
   }, []);
 
@@ -145,14 +128,43 @@ export default function Header() {
     };
     window.addEventListener("ametheus:profile_updated", handleProfileUpdate);
     return () => window.removeEventListener("ametheus:profile_updated", handleProfileUpdate);
-  }, [isSignedIn, user?.id]);
+  }, [isSignedIn, user]);
 
-  // Close menus and dropdowns on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
+  const closeAllDropdowns = () => {
     setIsSearchDropdownOpen(false);
     setIsProfileDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ametheus:close_dropdowns"));
+    }
+  };
+
+  // Close menus and dropdowns on route change or global close event
+  useEffect(() => {
+    closeAllDropdowns();
   }, [pathname]);
+
+  useEffect(() => {
+    const handleClose = () => {
+      setIsSearchDropdownOpen(false);
+      setIsProfileDropdownOpen(false);
+      setIsMobileMenuOpen(false);
+    };
+    window.addEventListener("ametheus:close_dropdowns", handleClose);
+    return () => window.removeEventListener("ametheus:close_dropdowns", handleClose);
+  }, []);
+
+  // Prevent background scrolling when mobile menu drawer is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
 
   // Handle Ctrl+K shortcut for search focus
   useEffect(() => {
@@ -183,7 +195,7 @@ export default function Header() {
   const isOrganizer = isHardcodedAdmin || role === "ORGANIZER" || isSuperAdmin;
 
   const isActive = (path: string) => {
-    const current = activePath || pathname;
+    const current = pathname;
     if (path === "/") return current === "/";
     return current.startsWith(path);
   };
@@ -197,11 +209,11 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
-        <div className="h-16 max-w-[1440px] mx-auto px-4 sm:px-6 md:pl-8 md:pr-10 lg:pr-14 xl:pr-16 flex items-center justify-between gap-2 lg:gap-3">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
+        <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 md:pl-8 md:pr-10 lg:pr-14 xl:pr-16 flex items-center justify-between gap-2 lg:gap-3">
           {/* Brand Logo (Enlarged Stitch Brandmark) */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <Link href="/" className="flex items-center gap-2 group py-1">
+            <Link href="/" onClick={closeAllDropdowns} className="flex items-center gap-2 group py-1">
               <Image
                 src="/brand/ametheus-logo.svg"
                 alt="AMETHEUS"
@@ -224,11 +236,11 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setActivePath(item.href)}
-                  className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                  onClick={closeAllDropdowns}
+                  className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium ${
                     active
-                      ? "text-white bg-[#161A24] border border-[#242C3D] shadow-xs font-semibold"
-                      : "hover:text-white hover:bg-[#161A24]/60"
+                      ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
+                      : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
                   }`}
                 >
                   <item.icon className={`w-3.5 h-3.5 ${active ? "text-[#E56A10]" : "text-[#94A3B8]"}`} />
@@ -241,11 +253,11 @@ export default function Header() {
             <Show when="signed-in">
               <Link
                 href="/dashboard"
-                onClick={() => setActivePath("/dashboard")}
-                className={`px-2 xl:px-3 py-1.5 rounded transition-all flex items-center gap-1.5 ${
+                onClick={closeAllDropdowns}
+                className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium ${
                   isActive("/dashboard")
-                    ? "text-white bg-[#161A24] border border-[#242C3D] font-semibold"
-                    : "hover:text-white hover:bg-[#161A24]/60"
+                    ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
+                    : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
                 }`}
               >
                 <LayoutDashboard className={`w-3.5 h-3.5 ${isActive("/dashboard") ? "text-[#E56A10]" : "text-[#94A3B8]"}`} />
@@ -258,11 +270,11 @@ export default function Header() {
               <div className="flex items-center gap-1 pl-1.5 xl:pl-2 border-l border-[#242C3D]/80">
                 <Link
                   href="/organizer"
-                  onClick={() => setActivePath("/organizer")}
-                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                  onClick={closeAllDropdowns}
+                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-semibold ${
                     isActive("/organizer")
-                      ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
-                      : "text-[#E56A10] hover:bg-[#161A24] font-semibold"
+                      ? "bg-[#E56A10]/20 text-[#E56A10] border-[#E56A10]/40 font-bold"
+                      : "text-[#E56A10] border-transparent hover:bg-[#161A24]"
                   }`}
                   title="Organizer Tournament Creator & Lifecycle Manager"
                 >
@@ -272,11 +284,11 @@ export default function Header() {
                 {isSuperAdmin && (
                   <Link
                     href="/admin"
-                    onClick={() => setActivePath("/admin")}
-                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    onClick={closeAllDropdowns}
+                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-bold ${
                       isActive("/admin")
-                        ? "bg-[#E56A10] text-white font-bold shadow-xs"
-                        : "bg-[#E56A10]/15 text-[#FFB68F] border border-[#E56A10]/40 font-bold hover:bg-[#E56A10]/25"
+                        ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                        : "bg-[#E56A10]/15 text-[#FFB68F] border-[#E56A10]/40 hover:bg-[#E56A10]/25"
                     }`}
                     title="Super Admin Cockpit & Match Arbitration"
                   >
@@ -293,7 +305,7 @@ export default function Header() {
             {/* Quick Search Bar with Live Autocomplete */}
             <div className="relative hidden md:block" ref={searchDropdownRef}>
               <form onSubmit={handleSearchSubmit} className="flex items-center relative">
-                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-28 lg:w-36 xl:w-44 focus-within:w-44 xl:focus-within:w-56 focus-within:border-[#E56A10]/60">
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-36 lg:w-44 xl:w-52 focus-within:border-[#E56A10]/60">
                   <Search className="w-3.5 h-3.5 mr-1.5 text-[#94A3B8] shrink-0" />
                   <input
                     ref={searchInputRef}
@@ -383,7 +395,7 @@ export default function Header() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-1.5 rounded-lg border border-[#242C3D] bg-[#161A24]/70 hover:bg-[#161A24] text-[#CBD5E1] hover:text-white transition-all cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg border border-[#242C3D] bg-[#161A24]/70 hover:bg-[#161A24] text-[#CBD5E1] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle Color Theme"
             >
@@ -495,7 +507,6 @@ export default function Header() {
                         href="/dashboard"
                         onClick={() => {
                           setIsProfileDropdownOpen(false);
-                          setActivePath("/dashboard");
                         }}
                         className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
                       >
@@ -508,7 +519,6 @@ export default function Header() {
                           href="/organizer"
                           onClick={() => {
                             setIsProfileDropdownOpen(false);
-                            setActivePath("/organizer");
                           }}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
                         >
@@ -522,7 +532,6 @@ export default function Header() {
                           href="/admin"
                           onClick={() => {
                             setIsProfileDropdownOpen(false);
-                            setActivePath("/admin");
                           }}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#CBD5E1] hover:text-white hover:bg-[#161A24] rounded-lg transition-colors"
                         >
@@ -566,16 +575,31 @@ export default function Header() {
 
       {/* Mobile Sliding Navigation Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           {/* Backdrop */}
           <div
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/70 backdrop-blur-xs"
+            onClick={closeAllDropdowns}
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
           />
 
           {/* Drawer Menu */}
-          <div className="fixed top-16 right-0 bottom-0 w-4/5 max-w-sm bg-[#0E121B] border-l border-[#242C3D] p-5 flex flex-col justify-between overflow-y-auto">
+          <div className="fixed top-0 right-0 bottom-0 w-4/5 max-w-sm bg-[#0E121B] border-l border-[#242C3D] p-5 flex flex-col justify-between overflow-y-auto shadow-2xl z-10 animate-in slide-in-from-right duration-200">
             <div className="space-y-5">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#242C3D]">
+                <span className="text-xs font-mono font-bold uppercase text-[#CBD5E1] tracking-wider">
+                  Arena Navigation
+                </span>
+                <button
+                  type="button"
+                  onClick={closeAllDropdowns}
+                  className="p-1 rounded-lg border border-[#242C3D] text-[#CBD5E1] hover:text-white hover:bg-[#161A24] cursor-pointer"
+                  aria-label="Close menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
               {/* Mobile Search Input */}
               <form onSubmit={handleSearchSubmit}>
                 <div className="flex items-center bg-[#161A24] border border-[#242C3D] px-3 py-2 rounded text-xs text-[#94A3B8]">
@@ -601,7 +625,7 @@ export default function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={closeAllDropdowns}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors ${
                         active
                           ? "bg-[#161A24] text-white border border-[#242C3D]"
@@ -617,7 +641,7 @@ export default function Header() {
                 <Show when="signed-in">
                   <Link
                     href="/dashboard"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={closeAllDropdowns}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors ${
                       isActive("/dashboard")
                         ? "bg-[#161A24] text-white border border-[#242C3D]"
@@ -638,7 +662,7 @@ export default function Header() {
                   </div>
                   <Link
                     href="/organizer"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={closeAllDropdowns}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
                       isActive("/organizer")
                         ? "bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 font-bold"
@@ -651,7 +675,7 @@ export default function Header() {
                   {isSuperAdmin && (
                     <Link
                       href="/admin"
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={closeAllDropdowns}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-mono font-medium transition-colors ${
                         isActive("/admin")
                           ? "bg-[#E56A10] text-white font-bold"

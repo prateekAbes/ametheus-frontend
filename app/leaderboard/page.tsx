@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { LEADERBOARD_ENTRIES } from "@/lib/data/leaderboard";
 import {
   getLeaderboard,
   getLeaderboardCategories,
@@ -57,7 +56,7 @@ import {
 export default function LeaderboardPage() {
   const { user } = useUser();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [entries, setEntries] = useState<any[]>(LEADERBOARD_ENTRIES);
+  const [entries, setEntries] = useState<any[]>([]);
   const [categories, setCategories] = useState<LeaderboardCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("overall");
   const [selectedDiscipline, setSelectedDiscipline] = useState<string>("all");
@@ -86,19 +85,19 @@ export default function LeaderboardPage() {
   });
 
   const [stats, setStats] = useState<LeaderboardStats>({
-    total_awarded_prizes: "₹14,50,000+",
-    active_contenders: "24,800+",
-    verified_squads: "1,120+",
-    top_team_earnings: "₹1,85,000",
-    top_team_name: "Team Solaris X",
+    total_awarded_prizes: "₹0",
+    active_contenders: "0",
+    verified_squads: "0",
+    top_team_earnings: "₹0",
+    top_team_name: "-",
   });
   const [isEditingStats, setIsEditingStats] = useState(false);
   const [statsForm, setStatsForm] = useState<LeaderboardStats>({
-    total_awarded_prizes: "₹14,50,000+",
-    active_contenders: "24,800+",
-    verified_squads: "1,120+",
-    top_team_earnings: "₹1,85,000",
-    top_team_name: "Team Solaris X",
+    total_awarded_prizes: "₹0",
+    active_contenders: "0",
+    verified_squads: "0",
+    top_team_earnings: "₹0",
+    top_team_name: "-",
   });
   const [isSubmittingStats, setIsSubmittingStats] = useState(false);
 
@@ -207,30 +206,39 @@ export default function LeaderboardPage() {
     try {
       const data = await getLeaderboard(selectedCategory, selectedDiscipline);
       if (data && data.length > 0) {
-        const mapped = data.map((d) => ({
-          rank: d.rank,
-          id: d.id,
-          name: d.name,
-          tag: d.tag,
-          type: d.type || "team",
-          gameSlug: d.game_slug,
-          gameName: d.game_name,
-          captain: d.captain,
-          logoUrl: d.logo_url,
-          winRate: d.win_rate,
-          matchesPlayed: d.matches_played,
-          wins: d.wins,
-          losses: d.losses,
-          rating: d.rating,
-          earnings: d.earnings,
-          form: d.form || ["W", "W", "W", "W", "W"],
-          isVerified: d.is_verified,
-          category: d.category || "pc",
-        }));
+        const mapped = data.map((d) => {
+          const rawLogo = d.logo_url;
+          const safeLogo = (!rawLogo || rawLogo.includes("aida") || rawLogo.includes("googleusercontent.com"))
+            ? "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&auto=format&fit=crop"
+            : rawLogo;
+          return {
+            rank: d.rank,
+            id: d.id,
+            name: d.name,
+            tag: d.tag,
+            type: d.type || "team",
+            gameSlug: d.game_slug,
+            gameName: d.game_name,
+            captain: d.captain,
+            logoUrl: safeLogo,
+            winRate: d.win_rate,
+            matchesPlayed: d.matches_played,
+            wins: d.wins,
+            losses: d.losses,
+            rating: d.rating,
+            earnings: d.earnings,
+            form: d.form || ["W", "W", "W", "W", "W"],
+            isVerified: d.is_verified,
+            category: d.category || "pc",
+          };
+        });
         setEntries(mapped);
+      } else {
+        setEntries([]);
       }
     } catch (e) {
-      console.warn("Leaderboard live API fetch fallback:", e);
+      console.warn("Leaderboard live API fetch error:", e);
+      setEntries([]);
     } finally {
       setIsLoading(false);
     }
@@ -543,10 +551,10 @@ export default function LeaderboardPage() {
                 <div key={cat.slug} className="relative group flex items-center">
                   <button
                     onClick={() => setSelectedCategory(cat.slug)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer border ${
                       active
-                        ? "bg-[#E56A10] text-white shadow-xs"
-                        : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#242C3D] hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538]"
+                        ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                        : "bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#242C3D] hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1E2538]"
                     }`}
                   >
                     <span>{cat.name}</span>
@@ -581,20 +589,20 @@ export default function LeaderboardPage() {
             <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#161A24] p-1 rounded-lg border border-slate-200 dark:border-[#242C3D]">
               <button
                 onClick={() => setSelectedType("teams")}
-                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
+                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer border ${
                   selectedType === "teams"
-                    ? "bg-[#E56A10] text-white shadow-xs"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Franchise Squads
               </button>
               <button
                 onClick={() => setSelectedType("players")}
-                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
+                className={`px-4 py-1.5 font-headline text-xs font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer border ${
                   selectedType === "players"
-                    ? "bg-[#E56A10] text-white shadow-xs"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    ? "bg-[#E56A10] text-white border-transparent shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Individual Athletes
@@ -607,10 +615,10 @@ export default function LeaderboardPage() {
                 <button
                   key={d.id}
                   onClick={() => setSelectedDiscipline(d.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-colors whitespace-nowrap cursor-pointer border ${
                     selectedDiscipline === d.id
-                      ? "bg-slate-900 dark:bg-[#E56A10] text-white shadow-xs"
-                      : "bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#242C3D] hover:bg-slate-200 dark:hover:bg-[#1E2538] hover:text-slate-900 dark:hover:text-white"
+                      ? "bg-slate-900 dark:bg-[#E56A10] text-white border-transparent shadow-xs"
+                      : "bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#242C3D] hover:bg-slate-200 dark:hover:bg-[#1E2538] hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   {d.name}
@@ -684,6 +692,7 @@ export default function LeaderboardPage() {
                       src={topThree[1].logoUrl}
                       alt={topThree[1].name}
                       fill
+                      unoptimized
                       className="object-cover"
                     />
                   </div>
@@ -735,6 +744,7 @@ export default function LeaderboardPage() {
                       src={topThree[0].logoUrl}
                       alt={topThree[0].name}
                       fill
+                      unoptimized
                       className="object-cover"
                     />
                   </div>
@@ -785,6 +795,7 @@ export default function LeaderboardPage() {
                       src={topThree[2].logoUrl}
                       alt={topThree[2].name}
                       fill
+                      unoptimized
                       className="object-cover"
                     />
                   </div>
@@ -948,6 +959,7 @@ export default function LeaderboardPage() {
                                 src={entry.logoUrl}
                                 alt={entry.name}
                                 fill
+                                unoptimized
                                 className="object-cover"
                               />
                             ) : (

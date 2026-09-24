@@ -278,36 +278,7 @@ export default function AdminCockpitPage() {
   });
 
   // Withdrawals State (Payout Approvals)
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([
-    {
-      id: "wth_demo_01",
-      user_id: "usr_apex99",
-      user_name: "ApexPredator",
-      user_email: "apex@ametheus.gg",
-      amount: 4500,
-      upi_id: "apexpredator@okhdfcbank",
-      account_holder_name: "A. Predator",
-      notes: "Prize winnings withdrawal - Mumbai Masters QF",
-      status: "PENDING_APPROVAL",
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    },
-    {
-      id: "wth_demo_02",
-      user_id: "usr_valk",
-      user_name: "Valkyrie",
-      user_email: "valk@ametheus.gg",
-      amount: 15000,
-      upi_id: "valkyrie.strike@oksbi",
-      account_holder_name: "Valkyrie R.",
-      notes: "First place tournament prize withdrawal",
-      status: "COMPLETED",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      reviewed_by: "pk.4081988@gmail.com",
-      reviewed_at: new Date(Date.now() - 43200000).toISOString(),
-      payout_reference: "UPI/2026/88491023",
-      admin_notes: "Certified & transferred via UPI gateway",
-    },
-  ]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [withdrawalFilter, setWithdrawalFilter] = useState<"ALL" | "PENDING_APPROVAL" | "COMPLETED" | "REJECTED">("ALL");
   const [rejectingWithdrawal, setRejectingWithdrawal] = useState<WithdrawalRequest | null>(null);
   const [rejectReason, setRejectReason] = useState("UPI ID invalid or inactive with banking handle");
@@ -318,20 +289,8 @@ export default function AdminCockpitPage() {
 
   // Persona & Avatar Pool State
   const [personaPool, setPersonaPool] = useState<PersonaPool>({
-    names: [
-      "Vanguard_Ranger", "Shadow_Viper", "Phantom_Striker", "Ghost_Recon",
-      "Apex_Sentinel", "Iron_Clad", "Cyber_Ninja", "Volt_Spectre",
-      "Kuro_Striker", "Blaze_Hunter", "Neon_Glitch", "Titan_Force",
-      "Frost_Byte", "Rogue_Sniper", "Echo_Six", "Thunder_Hawk"
-    ],
-    avatars: [
-      { id: "av_1", name: "Cyber Samurai", url: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop" },
-      { id: "av_2", name: "Tactical Operative", url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop" },
-      { id: "av_3", name: "Shadow Assassin", url: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=200&auto=format&fit=crop" },
-      { id: "av_4", name: "Neon Valkyrie", url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop" },
-      { id: "av_5", name: "Vanguard Sentinel", url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=200&auto=format&fit=crop" },
-      { id: "av_6", name: "Mecha Pilot", url: "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?q=80&w=200&auto=format&fit=crop" },
-    ],
+    names: [],
+    avatars: [],
   });
   const [newPersonaName, setNewPersonaName] = useState("");
   const [isSubmittingPersonaName, setIsSubmittingPersonaName] = useState(false);
@@ -408,7 +367,6 @@ export default function AdminCockpitPage() {
   const [isRemovingDevData, setIsRemovingDevData] = useState(false);
 
   const loadAdminData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const [
         profileRes,
