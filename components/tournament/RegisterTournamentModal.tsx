@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { registerForTournament } from "@/lib/api/tournaments";
+import { getWallet } from "@/lib/api/wallet";
 import { Team } from "@/types";
-import { X, Shield, Check, AlertCircle, CreditCard, Lock, Gamepad2, UserCheck } from "lucide-react";
+import { X, Shield, Check, AlertCircle, CreditCard, Wallet, Gamepad2, UserCheck } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
@@ -43,6 +45,15 @@ export default function RegisterTournamentModal({
   const [step, setStep] = useState<"SELECT_TEAM" | "CHECKOUT" | "SUCCESS">("SELECT_TEAM");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      getWallet()
+        .then((w) => setWalletBalance(w.available_inr))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -82,7 +93,8 @@ export default function RegisterTournamentModal({
         return;
       }
       if (selectedTeam.members.length < rosterReq.min) {
-        setError(`Your squad requires ${rosterReq.min} player${rosterReq.min > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length} players).`);
+        const missing = rosterReq.min - selectedTeam.members.length;
+        setError(`Your squad requires ${missing} more player${missing > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length}/${rosterReq.min} required).`);
         return;
       }
       const maxCap = selectedTeam.maxMembers ?? rosterReq.max;
@@ -101,7 +113,7 @@ export default function RegisterTournamentModal({
     }
 
     setError("");
-    if (tournament.entryFeeNum === 0) {
+    if (!tournament.entryFeeNum || tournament.entryFeeNum === 0) {
       // Free tournament
       setIsProcessing(true);
       registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id)
@@ -118,7 +130,7 @@ export default function RegisterTournamentModal({
     }
   };
 
-  const handleEscrowPayment = async () => {
+  const handleTournamentPayment = async () => {
     if (!isSolo && !selectedTeam) return;
     setIsProcessing(true);
     setError("");
@@ -362,23 +374,49 @@ export default function RegisterTournamentModal({
                 <span className="font-bold font-mono text-[#E56A10]">{inGameId}</span>
               </div>
               <div className="flex items-center justify-between text-xs border-t border-slate-200 dark:border-[#242C3D] pt-2">
-                <span className="text-slate-500 dark:text-slate-400">Total Amount Due:</span>
+                <span className="text-slate-500 dark:text-slate-400">Available Wallet Balance:</span>
+                <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  ₹{walletBalance !== null ? walletBalance.toLocaleString() : "..."}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs border-t border-slate-200 dark:border-[#242C3D] pt-2">
+                <span className="text-slate-500 dark:text-slate-400 font-bold">Total Amount Due:</span>
                 <span className="font-headline font-bold text-xl text-[#E56A10]">
                   {tournament.entryFee}
                 </span>
               </div>
             </div>
 
-            {/* Payment Gateway Footer */}
-            <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-2">
-              <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
-                <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
-                Platform Escrow Protected • Guaranteed Prize Vault
+            {/* Insufficient balance prompt or secure deduction confirmation */}
+            {walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance ? (
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs space-y-2">
+                <div className="text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  Insufficient Wallet Balance
+                </div>
+                <p className="text-slate-600 dark:text-slate-300 font-mono text-[11px] leading-relaxed">
+                  Entry fee requires ₹{tournament.entryFeeNum}. Your available balance is ₹{walletBalance.toLocaleString()}. Please top up your wallet in the dashboard to register.
+                </p>
+                <Link
+                  href="/dashboard"
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-[11px] font-bold uppercase rounded shadow-xs"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  Top Up Wallet in Dashboard →
+                </Link>
               </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                Prize funds are guaranteed and held in the protected prize vault until tournament completion.
-              </p>
-            </div>
+            ) : (
+              <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-1.5">
+                <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
+                  <Wallet className="w-3.5 h-3.5 text-[#E56A10]" />
+                  Direct Wallet Balance Deduction • Instant Registration
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  The entry fee will be deducted directly from your captain wallet balance.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
               <button
@@ -390,12 +428,12 @@ export default function RegisterTournamentModal({
               </button>
               <button
                 type="button"
-                disabled={isProcessing}
-                onClick={() => handleEscrowPayment()}
+                disabled={isProcessing || (walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance)}
+                onClick={() => handleTournamentPayment()}
                 className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
               >
                 <CreditCard className="w-4 h-4" />
-                <span>{isProcessing ? "Verifying..." : `Confirm Escrow Payment`}</span>
+                <span>{isProcessing ? "Processing..." : `Confirm Wallet Deduction`}</span>
               </button>
             </div>
           </div>

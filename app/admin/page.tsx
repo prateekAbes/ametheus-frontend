@@ -52,6 +52,8 @@ import {
   verifyMatchResult,
   getDisputes,
   resolveDispute,
+  getUserWalletSummary,
+  UserWalletSummary,
   AuditLog,
   AdminUser,
   AdminStats,
@@ -357,6 +359,22 @@ export default function AdminCockpitPage() {
     upi_id: "",
   });
   const [isSubmittingWinningPayout, setIsSubmittingWinningPayout] = useState(false);
+
+  // User Wallet Detail Modal State
+  const [selectedUserWallet, setSelectedUserWallet] = useState<UserWalletSummary | null>(null);
+  const [isLoadingUserWallet, setIsLoadingUserWallet] = useState(false);
+
+  const handleOpenUserWallet = async (userId: string) => {
+    setIsLoadingUserWallet(true);
+    try {
+      const summary = await getUserWalletSummary(userId);
+      setSelectedUserWallet(summary);
+    } catch (err: any) {
+      alert(err?.message || "Failed to fetch user wallet summary");
+    } finally {
+      setIsLoadingUserWallet(false);
+    }
+  };
 
   const loadAdminData = useCallback(async () => {
     try {
@@ -2279,7 +2297,12 @@ export default function AdminCockpitPage() {
                   className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#E56A10]"
                 />
                 {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((f) => {
-                  const count = f === "ALL" ? adminPayments.length : adminPayments.filter((p) => p.status === f).length;
+                  const count =
+                    f === "ALL"
+                      ? adminPayments.length
+                      : f === "PENDING"
+                      ? adminPayments.filter((p) => p.status === "PENDING" && !!p.utr && p.utr.trim().length >= 6).length
+                      : adminPayments.filter((p) => p.status === f).length;
                   return (
                     <button
                       key={f}
@@ -2297,7 +2320,12 @@ export default function AdminCockpitPage() {
             {(() => {
               const term = paymentSearchTerm.trim().toLowerCase();
               const filtered = adminPayments.filter((p) => {
-                const matchesStatus = paymentFilter === "ALL" || p.status === paymentFilter;
+                const matchesStatus =
+                  paymentFilter === "ALL"
+                    ? true
+                    : paymentFilter === "PENDING"
+                    ? p.status === "PENDING" && !!p.utr && p.utr.trim().length >= 6
+                    : p.status === paymentFilter;
                 if (!matchesStatus) return false;
                 if (!term) return true;
                 return (
@@ -2549,7 +2577,16 @@ export default function AdminCockpitPage() {
                           {u.role}
                         </span>
                       </td>
-                      <td>₹{Number(u.inr_balance || 0).toLocaleString()}</td>
+                      <td>
+                        <button
+                          onClick={() => handleOpenUserWallet(u.id)}
+                          className="font-bold text-slate-900 hover:text-[#E56A10] hover:underline flex items-center gap-1.5 cursor-pointer text-xs"
+                          title="View Ledger & Wallet Accounting"
+                        >
+                          <span>₹{Number(u.inr_balance || 0).toLocaleString()}</span>
+                          <Eye className="w-3.5 h-3.5 text-[#E56A10]" />
+                        </button>
+                      </td>
                       <td className="text-right">
                         {u.email !== "pk.4081988@gmail.com" && u.email !== "admin@ametheus.gg" ? (
                           <select
@@ -3577,6 +3614,132 @@ export default function AdminCockpitPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── User Wallet Detail & Accounting Modal ───────────────────────── */}
+      {selectedUserWallet && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2.5">
+                <Wallet className="w-5 h-5 text-[#E56A10]" />
+                <div>
+                  <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                    User Wallet &amp; Ledger Audit
+                  </h3>
+                  <span className="font-mono text-xs text-slate-500">
+                    @{selectedUserWallet.username} ({selectedUserWallet.email})
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUserWallet(null)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Accounting Metric Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-slate-50 dark:bg-[#161B26] rounded-xl border border-slate-200 dark:border-[#242C3D]">
+                <span className="text-[10px] font-mono uppercase text-slate-500 block">Available</span>
+                <span className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  ₹{selectedUserWallet.available_balance_inr.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-[#161B26] rounded-xl border border-slate-200 dark:border-[#242C3D]">
+                <span className="text-[10px] font-mono uppercase text-slate-500 block">Total Deposited</span>
+                <span className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400">
+                  ₹{selectedUserWallet.total_deposited_inr.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-[#161B26] rounded-xl border border-slate-200 dark:border-[#242C3D]">
+                <span className="text-[10px] font-mono uppercase text-slate-500 block">Total Spent</span>
+                <span className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400">
+                  ₹{selectedUserWallet.total_spent_inr.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-[#161B26] rounded-xl border border-slate-200 dark:border-[#242C3D]">
+                <span className="text-[10px] font-mono uppercase text-slate-500 block">Total Withdrawn</span>
+                <span className="text-lg font-bold font-mono text-slate-700 dark:text-slate-300">
+                  ₹{selectedUserWallet.total_withdrawn_inr.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+
+            {/* Ledger Transactions */}
+            <div className="space-y-2">
+              <div className="text-xs font-mono font-bold uppercase text-slate-700 dark:text-slate-300">
+                Authoritative Ledger History ({selectedUserWallet.ledger.length} entries)
+              </div>
+              {selectedUserWallet.ledger.length === 0 ? (
+                <div className="p-6 bg-slate-50 dark:bg-[#161B26] rounded-xl text-center text-xs font-mono text-slate-500">
+                  No ledger activity recorded for this user.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 dark:border-[#242C3D] rounded-xl">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-slate-50 dark:bg-[#161B26] border-b border-slate-200 dark:border-[#242C3D] text-[10px] uppercase text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Direction</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Balance After</th>
+                        <th className="px-3 py-2">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D]">
+                      {selectedUserWallet.ledger.map((entry) => (
+                        <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-[#161B26]/50">
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[11px]">
+                            {new Date(entry.created_at).toLocaleDateString("en-IN")}
+                          </td>
+                          <td className="px-3 py-2 font-bold text-slate-800 dark:text-slate-200 text-[10px]">
+                            {entry.txn_type}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                entry.direction === "CREDIT"
+                                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                                  : "bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300"
+                              }`}
+                            >
+                              {entry.direction}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-bold font-mono">
+                            <span className={entry.direction === "CREDIT" ? "text-emerald-600" : "text-rose-600"}>
+                              {entry.direction === "CREDIT" ? "+" : "-"}₹{entry.amount_inr.toLocaleString("en-IN")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">
+                            ₹{entry.balance_after_inr.toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-3 py-2 text-slate-500 text-[11px] truncate max-w-[200px]" title={entry.description}>
+                            {entry.description || entry.reference_id || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-[#242C3D]">
+              <button
+                type="button"
+                onClick={() => setSelectedUserWallet(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-[#161B26] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

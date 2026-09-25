@@ -213,3 +213,7 @@ export async function registerForTournament(
     body: JSON.stringify(teamId ? { team_id: teamId } : {}),
   });
 }
+
+export async function getMyTournamentRegistrations(): Promise<any[]> {
+  return apiClient<any[]>("/tournaments/my-registrations");
+}

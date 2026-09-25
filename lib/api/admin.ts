@@ -162,3 +162,30 @@ export async function rejectMatchProof(
   });
 }
 
+export interface UserWalletSummary {
+  user_id: string;
+  username: string;
+  email: string;
+  available_balance_inr: number;
+  reserved_balance_inr: number;
+  total_balance_inr: number;
+  total_deposited_inr: number;
+  total_withdrawn_inr: number;
+  total_spent_inr: number;
+  ledger: Array<{
+    id: string;
+    txn_type: string;
+    direction: string;
+    amount_inr: number;
+    amount_paise: number;
+    balance_after_inr: number;
+    reference_id?: string;
+    description: string;
+    created_at: string;
+  }>;
+}
+
+export async function getUserWalletSummary(userId: string): Promise<UserWalletSummary> {
+  return apiClient<UserWalletSummary>(`/admin/users/${userId}/wallet-summary`);
+}
+

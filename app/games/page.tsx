@@ -62,8 +62,8 @@ export default function GamesDirectoryPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="inline-flex items-center gap-1.5 text-[#0F172A] dark:text-slate-200">
-              <span className="w-2 h-2 rounded-full bg-[#E56A10] animate-pulse" />
-              PRIZE VAULT PROTECTED
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              TOURNAMENT PLATFORM ACTIVE
             </span>
             <span className="hidden md:inline text-[#64748B] dark:text-[#94A3B8]">LIVE ARENA ENGINE</span>
           </div>
@@ -103,13 +103,13 @@ export default function GamesDirectoryPage() {
                 </div>
                 <div className="p-3 bg-white dark:bg-[#161A24] rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
                   <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
-                    Prize Vault
+                    Active Squads
                   </span>
                   <span className="text-2xl font-bold font-headline text-[#E56A10] block tabular-nums">
-                    ₹{games.reduce((acc, g) => acc + (g.prizePoolInr || 0), 0).toLocaleString("en-IN")}
+                    {games.reduce((acc, g) => acc + (g.teamsCount || 0), 0)}
                   </span>
                   <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
-                    Total Prize Pools
+                    Registered Rosters
                   </span>
                 </div>
               </div>
@@ -264,10 +264,10 @@ export default function GamesDirectoryPage() {
                       </div>
                       <div>
                         <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] uppercase font-mono block">
-                          Squad Format
+                          Game Format
                         </span>
                         <span className="text-xs font-bold text-[#0F172A] dark:text-white font-mono block mt-0.5">
-                          {game.isTeamGame ? `${game.minTeamSize} Players Fixed` : "Solo 1v1"}
+                          {game.isTeamGame ? `${game.minTeamSize}v${game.minTeamSize} Squad` : "Solo 1v1"}
                         </span>
                       </div>
                     </div>

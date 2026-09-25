@@ -46,7 +46,7 @@ import {
   disbandTeam,
   Team,
 } from "@/lib/api/teams";
-import { getTournaments, Tournament } from "@/lib/api/tournaments";
+import { getTournaments, getMyTournamentRegistrations, Tournament } from "@/lib/api/tournaments";
 import { getMatches, Match } from "@/lib/api/matches";
 import {
   initFirstLaunchPersona,
@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [myRegistrations, setMyRegistrations] = useState<any[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -144,11 +145,12 @@ export default function DashboardPage() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [profileRes, teamsRes, tournRes, matchRes] = await Promise.allSettled([
+        const [profileRes, teamsRes, tournRes, matchRes, myRegsRes] = await Promise.allSettled([
           getCurrentUserProfile(),
           getMyTeams(),
           getTournaments(),
           getMatches(),
+          getMyTournamentRegistrations(),
         ]);
 
         let currentProf: UserProfile | null = null;
@@ -209,12 +211,17 @@ export default function DashboardPage() {
           if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
             setTournaments(tournRes.value);
           }
+          if (myRegsRes.status === "fulfilled" && Array.isArray(myRegsRes.value)) {
+            setMyRegistrations(myRegsRes.value);
+          } else {
+            setMyRegistrations([]);
+          }
           if (matchRes.status === "fulfilled" && Array.isArray(matchRes.value)) {
             setMatches(matchRes.value);
           }
 
-          // Persona check: ONLY trigger random persona if NO database profile exists and NO Clerk identity exists
-          if (!currentProf && !clerkDisplayName && !clerkAvatar) {
+          // Persona check: ONLY trigger random persona if unauthenticated or NO database profile and NO Clerk identity
+          if (!isSignedIn && !currentProf && !clerkDisplayName && !clerkAvatar) {
             const autoPersona = initFirstLaunchPersona(undefined, undefined, user?.id, !!isSignedIn);
             if (autoPersona && autoPersona.isNew) {
               setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
@@ -355,7 +362,7 @@ export default function DashboardPage() {
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const deducted = parseInt(withdrawAmount) || 0;
+    const deducted = parseFloat(withdrawAmount) || 0;
     // Re-compute safe balance for validation
     const currentBal = (() => {
       const raw = profile?.inr_balance;
@@ -363,8 +370,12 @@ export default function DashboardPage() {
       const p = parseFloat(String(raw));
       return isNaN(p) ? 0 : p;
     })();
-    if (deducted <= 0 || deducted > currentBal) {
-      showToast(`Invalid withdrawal amount. Available: ₹${currentBal.toLocaleString()}`);
+    if (deducted < 100) {
+      showToast("Minimum withdrawal amount is ₹100.");
+      return;
+    }
+    if (deducted > currentBal) {
+      showToast(`Insufficient balance. Available: ₹${currentBal.toLocaleString()}`);
       return;
     }
     if (!upiId.includes("@")) {
@@ -375,6 +386,7 @@ export default function DashboardPage() {
     try {
       const res = await requestWithdrawal({
         amount: deducted,
+        amount_inr: deducted,
         upi_id: upiId.trim(),
         account_holder_name: profile?.display_name || user?.username || "Gamer",
       });
@@ -656,11 +668,11 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Metric 4: Escrow Balance */}
+            {/* Metric 4: Available Wallet Balance */}
             <div className="bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60 dark:border-amber-800/40 transition-colors">
               <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E56A10]">
-                  Escrow Balance
+                  Available Balance
                 </span>
                 <Wallet className="w-4 h-4 text-[#E56A10]" />
               </div>
@@ -669,7 +681,7 @@ export default function DashboardPage() {
                   ₹{balance.toLocaleString()}
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">Pending approval</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">Instant tournament entry</span>
                   <button
                     onClick={() => setIsWithdrawOpen(true)}
                     className="text-[#E56A10] hover:text-[#C95B0A] font-mono text-[11px] uppercase font-bold cursor-pointer hover:underline"
@@ -740,27 +752,61 @@ export default function DashboardPage() {
                     Registered Tournaments
                   </h3>
                 </div>
-                {/* Shows 0 — player registrations are tracked separately; this section shows upcoming open tournaments */}
                 <span className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
-                  0 ENTRIES
+                  {myRegistrations.length === 1 ? "1 ENTRY" : `${myRegistrations.length} ENTRIES`}
                 </span>
               </div>
 
-              {/* No registration data available at the player level — always show empty state.
-                  Tournament registrations are tracked via tournament_registrations collection server-side.
-                  Players should navigate to /tournaments to register. */}
-              <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
-                <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
-                <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Registered Tournaments</div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  Browse open tournaments and register your team to compete.
-                </p>
-                <Link href="/tournaments" className="inline-block mt-2 px-4 py-1.5 rounded-lg bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors">
-                  Browse Tournaments
-                </Link>
-              </div>
+              {myRegistrations.length === 0 ? (
+                <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
+                  <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Registered Tournaments</div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    Browse open tournaments and register your team to compete.
+                  </p>
+                  <Link href="/tournaments" className="inline-block mt-2 px-4 py-1.5 rounded-lg bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors">
+                    Browse Tournaments
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {myRegistrations.map((reg) => (
+                    <div
+                      key={reg.id || reg._id}
+                      className="bg-slate-50 dark:bg-[#161A24] p-4 rounded-xl border border-slate-200 dark:border-[#242C3D] flex flex-col justify-between space-y-3 hover:border-[#E56A10] transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-bold uppercase">
+                            {reg.payment_status === "PAID" || reg.payment_status === "FREE" ? "CONFIRMED" : reg.payment_status || "REGISTERED"}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {reg.check_in_status || "PENDING CHECK-IN"}
+                          </span>
+                        </div>
+                        <h4 className="font-headline font-bold text-slate-900 dark:text-white text-base truncate">
+                          {reg.tournament_title || "Official Tournament"}
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                          {reg.team_name ? `Squad: ${reg.team_name}` : "Solo Player Entry"}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-[#242C3D] flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                          {reg.starts_at || "Schedule in bracket"}
+                        </span>
+                        <Link
+                          href={`/tournaments/${reg.tournament_slug || reg.tournament_id}`}
+                          className="text-[#E56A10] hover:text-[#C95B0A] font-mono text-xs font-bold uppercase flex items-center gap-1"
+                        >
+                          View Details →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
 
             {/* SECTION: Recent Match History */}
             <div className="bg-white dark:bg-[#121622] rounded-xl p-6 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
@@ -1395,10 +1441,9 @@ export default function DashboardPage() {
                 </label>
                 <input
                   type="number"
-                  min={100}
-                  max={balance}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="Min ₹100"
                   className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>

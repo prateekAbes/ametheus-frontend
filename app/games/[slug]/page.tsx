@@ -74,7 +74,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
 
   const isSoloGame = !game.isTeamGame || game.maxTeamSize === 1 || game.slug === "chess";
   const userTeam = myTeams.length > 0 ? myTeams[0] : null;
-  const isPaid = userTeam?.payment_status === "PAID";
+  const isPaid = userTeam?.payment_status === "PAID" || !game.entryFeeInr || game.entryFeeInr <= 0;
   const isPending = userTeam?.payment_status === "PAYMENT_PENDING";
   const isRejected = userTeam?.payment_status === "PAYMENT_REJECTED";
 
@@ -411,7 +411,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                           <span>Pay Again to Unlock Play</span>
                         </button>
                       </div>
-                    ) : (
+                    ) : game.entryFeeInr > 0 ? (
                       <button
                         onClick={() => handleOpenPayment(userTeam)}
                         className="w-full py-4 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
@@ -419,6 +419,14 @@ export default function DedicatedGameHubPage({ params }: Props) {
                         <CreditCard className="w-5 h-5" />
                         <span>Pay Entry Fee (₹{game.entryFeeInr}) to Play</span>
                       </button>
+                    ) : (
+                      <Link
+                        href={`/tournaments?game=${game.slug}`}
+                        className="w-full py-4 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        <span>Browse {game.name} Tournaments</span>
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -434,7 +442,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                     </h3>
                     <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
                       {isSoloGame
-                        ? "Register as a solo contender, pay the entry fee, and compete."
+                        ? "Register as a solo contender and compete."
                         : `Form your ${game.minTeamSize}-${game.maxTeamSize} athlete squad or join an existing roster using an invite code.`}
                     </p>
                   </div>
