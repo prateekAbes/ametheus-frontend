@@ -79,30 +79,30 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Featured Disciplines */}
+          {/* Help & Support */}
           <div className="flex flex-col gap-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#CBD5E1] font-mono">
-              Featured Titles
+              Help & Support
             </h4>
             <ul className="flex flex-col gap-2 text-sm text-[#94A3B8]">
               <li>
-                <Link href="/games/valorant" className="hover:text-white transition-colors">
-                  Valorant (5v5 Tactical PC)
+                <Link href="/help" className="hover:text-white transition-colors">
+                  Wallet & Payments Help
                 </Link>
               </li>
               <li>
-                <Link href="/games/counter-strike-2" className="hover:text-white transition-colors">
-                  Counter-Strike 2
+                <Link href="/help" className="hover:text-white transition-colors">
+                  Tournament Rules
                 </Link>
               </li>
               <li>
-                <Link href="/games/chess" className="hover:text-white transition-colors">
-                  Chess (1v1 Blitz/Rapid)
+                <Link href="/contact" className="hover:text-white transition-colors">
+                  Contact Support
                 </Link>
               </li>
               <li>
-                <Link href="/games/bgmi" className="hover:text-white transition-colors">
-                  BGMI Battle Royale
+                <Link href="/help" className="hover:text-white transition-colors">
+                  Report Dispute
                 </Link>
               </li>
             </ul>

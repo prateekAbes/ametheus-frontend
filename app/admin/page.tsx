@@ -325,6 +325,7 @@ export default function AdminCockpitPage() {
   // Incoming Payment Verifications State
   const [adminPayments, setAdminPayments] = useState<PaymentRecord[]>([]);
   const [paymentFilter, setPaymentFilter] = useState<string>("ALL");
+  const [paymentSearchTerm, setPaymentSearchTerm] = useState<string>("");
   const [rejectingPayment, setRejectingPayment] = useState<PaymentRecord | null>(null);
   const [paymentRejectReason, setPaymentRejectReason] = useState("UTR reference not found in bank ledger");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -2263,13 +2264,20 @@ export default function AdminCockpitPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-5 rounded-xl shadow-xs">
               <div>
                 <h3 className="font-headline font-bold text-base text-slate-900 uppercase flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-[#E56A10]" /> Payment Verifications
+                  <CheckCircle className="w-5 h-5 text-[#E56A10]" /> Payment Verifications & UPI Ledger
                 </h3>
                 <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  Review and approve or reject incoming UPI payment screenshots submitted by players.
+                  Review and verify incoming UPI payments, top-ups, and game entry fees.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Filter by User, UTR, or Ref ID..."
+                  value={paymentSearchTerm}
+                  onChange={(e) => setPaymentSearchTerm(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#E56A10]"
+                />
                 {(["ALL", "PENDING", "APPROVED", "REJECTED"] as const).map((f) => {
                   const count = f === "ALL" ? adminPayments.length : adminPayments.filter((p) => p.status === f).length;
                   return (
@@ -2287,7 +2295,19 @@ export default function AdminCockpitPage() {
             </div>
 
             {(() => {
-              const filtered = paymentFilter === "ALL" ? adminPayments : adminPayments.filter((p) => p.status === paymentFilter);
+              const term = paymentSearchTerm.trim().toLowerCase();
+              const filtered = adminPayments.filter((p) => {
+                const matchesStatus = paymentFilter === "ALL" || p.status === paymentFilter;
+                if (!matchesStatus) return false;
+                if (!term) return true;
+                return (
+                  (p.user_id && p.user_id.toLowerCase().includes(term)) ||
+                  (p.utr && p.utr.toLowerCase().includes(term)) ||
+                  (p.id && p.id.toLowerCase().includes(term)) ||
+                  (p.payment_account_code && p.payment_account_code.toLowerCase().includes(term)) ||
+                  (p.payment_type && p.payment_type.toLowerCase().includes(term))
+                );
+              });
               if (filtered.length === 0) {
                 return (
                   <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">

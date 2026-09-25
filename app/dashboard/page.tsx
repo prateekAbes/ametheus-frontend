@@ -52,7 +52,7 @@ import {
   initFirstLaunchPersona,
   GAMING_AVATAR_PRESETS,
 } from "@/lib/utils/gamingIdentity";
-import { requestWithdrawal, depositFunds } from "@/lib/api/wallet";
+import { requestWithdrawal, depositFunds, submitPaymentUtr } from "@/lib/api/wallet";
 import { uploadImageFile } from "@/lib/api/media";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
@@ -74,6 +74,7 @@ export default function DashboardPage() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     display_name: "",
+    username: "",
     avatar_url: "",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -83,6 +84,17 @@ export default function DashboardPage() {
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("500");
   const [isProcessingDeposit, setIsProcessingDeposit] = useState(false);
+  // UPI deposit step: null = amount selection, object = show UPI details & UTR form
+  const [depositUpiStep, setDepositUpiStep] = useState<{
+    payment_id: string;
+    upi_id: string;
+    payee_name: string;
+    amount_inr: number;
+    qr_url?: string;
+    upi_uri: string;
+  } | null>(null);
+  const [depositUtrInput, setDepositUtrInput] = useState("");
+  const [isSubmittingUtr, setIsSubmittingUtr] = useState(false);
 
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("1000");
@@ -143,10 +155,12 @@ export default function DashboardPage() {
           currentProf = profileRes.value;
         }
 
-        // Establish authoritative identity prioritizing Clerk account details
+        // Authoritative identity: Ametheus DB profile is the single source of truth.
+        // Only fall back to Clerk data when no DB profile exists at all.
         const clerkDisplayName = user?.fullName || user?.username || (user?.primaryEmailAddress?.emailAddress ? user.primaryEmailAddress.emailAddress.split("@")[0] : "");
         const clerkAvatar = user?.imageUrl || "";
 
+        // Prefer Ametheus DB values; Clerk is fallback ONLY when profile is missing
         const effectiveDisplayName = currentProf?.display_name || clerkDisplayName || "Gamer";
         const effectiveAvatar = currentProf?.avatar_url || clerkAvatar || "";
 
@@ -154,7 +168,8 @@ export default function DashboardPage() {
           const resolvedProfile: UserProfile = currentProf || {
             id: user?.id || "usr_me",
             email: user?.primaryEmailAddress?.emailAddress || "",
-            username: user?.username || effectiveDisplayName.toLowerCase().replace(/\s+/g, "_"),
+            // Use Ametheus username if it exists, not Clerk username
+            username: currentProf?.username || (user?.username || "").toLowerCase().replace(/\s+/g, "_") || "",
             display_name: effectiveDisplayName,
             avatar_url: effectiveAvatar,
             role: "PLAYER",
@@ -164,11 +179,11 @@ export default function DashboardPage() {
           setProfile(resolvedProfile);
           setProfileForm({
             display_name: effectiveDisplayName,
+            username: currentProf?.username || "",
             avatar_url: effectiveAvatar,
           });
 
           const profileStorageKey = user?.id ? `ametheus_user_profile_${user.id}` : "ametheus_user_profile";
-          const teamsStorageKey = user?.id ? `ametheus_user_teams_${user.id}` : "ametheus_user_teams";
 
           try {
             localStorage.setItem(profileStorageKey, JSON.stringify(resolvedProfile));
@@ -183,21 +198,12 @@ export default function DashboardPage() {
             );
           } catch {}
 
-          if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value) && teamsRes.value.length > 0) {
+          // Teams: ONLY use DB data. Never fall back to localStorage — stale data causes phantom squads.
+          if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value)) {
             setTeams(teamsRes.value);
-            try {
-              localStorage.setItem(teamsStorageKey, JSON.stringify(teamsRes.value));
-            } catch {}
           } else {
-            try {
-              const saved = localStorage.getItem(teamsStorageKey);
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  setTeams(parsed);
-                }
-              }
-            } catch {}
+            // API failed — show empty, not stale cached data
+            setTeams([]);
           }
 
           if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
@@ -207,15 +213,8 @@ export default function DashboardPage() {
             setMatches(matchRes.value);
           }
 
-          // Persona check: ONLY trigger random persona if NO Clerk name, NO Clerk avatar, and NO user profile exists
-          const hasAuthoritativeIdentity = Boolean(
-            clerkDisplayName ||
-            clerkAvatar ||
-            (currentProf?.display_name && !currentProf.display_name.includes("@")) ||
-            currentProf?.avatar_url
-          );
-
-          if (!hasAuthoritativeIdentity) {
+          // Persona check: ONLY trigger random persona if NO database profile exists and NO Clerk identity exists
+          if (!currentProf && !clerkDisplayName && !clerkAvatar) {
             const autoPersona = initFirstLaunchPersona(undefined, undefined, user?.id, !!isSignedIn);
             if (autoPersona && autoPersona.isNew) {
               setFirstLaunchNotification(`Welcome to AMETHEUS! Your gaming persona @${autoPersona.gamerTag} has been assigned.`);
@@ -228,6 +227,7 @@ export default function DashboardPage() {
                     setProfile(updated);
                     setProfileForm({
                       display_name: updated.display_name || autoPersona.gamerTag,
+                      username: updated.username || "",
                       avatar_url: updated.avatar_url || autoPersona.avatarUrl,
                     });
                     try {
@@ -238,12 +238,6 @@ export default function DashboardPage() {
                 })
                 .catch(() => {});
             }
-          } else if (currentProf && (!currentProf.display_name || !currentProf.avatar_url)) {
-            // Silently backfill backend with Clerk details if missing
-            updateUserProfile({
-              display_name: effectiveDisplayName,
-              avatar_url: effectiveAvatar,
-            }).catch(() => {});
           }
         }
       } catch (e) {
@@ -264,10 +258,16 @@ export default function DashboardPage() {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      const updated = await updateUserProfile({
+      const updatePayload: { display_name: string; avatar_url: string; username?: string } = {
         display_name: profileForm.display_name,
         avatar_url: profileForm.avatar_url,
-      });
+      };
+      // Only send username if the user has changed it from what's stored
+      const currentUsername = profile?.username || "";
+      if (profileForm.username && profileForm.username !== currentUsername) {
+        updatePayload.username = profileForm.username;
+      }
+      const updated = await updateUserProfile(updatePayload);
       setProfile(updated);
       const profileStorageKey = user?.id ? `ametheus_user_profile_${user.id}` : "ametheus_user_profile";
       const identityStorageKey = user?.id ? `ametheus_gamer_identity_${user.id}` : "ametheus_gamer_identity";
@@ -297,35 +297,72 @@ export default function DashboardPage() {
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessingDeposit(true);
-    const added = parseInt(depositAmount) || 500;
+    const amountInr = parseInt(depositAmount) || 500;
+    if (amountInr < 50 || amountInr > 50000) {
+      showToast("Deposit amount must be between ₹50 and ₹50,000.");
+      setIsProcessingDeposit(false);
+      return;
+    }
     try {
-      const res = await depositFunds(added);
-      if (profile) {
-        setProfile({
-          ...profile,
-          inr_balance: String(res.new_balance),
-        });
-      }
-      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Platform Escrow!`);
-    } catch {
-      if (profile) {
-        const newBal = Number(profile.inr_balance || 0) + added;
-        setProfile({
-          ...profile,
-          inr_balance: String(newBal),
-        });
-      }
-      showToast(`₹${added.toLocaleString()} credited to your Escrow Wallet via Platform Escrow!`);
+      // Initiates a UPI payment — returns UPI account info, NOT a balance credit
+      const res = await depositFunds(amountInr);
+      // Move to UPI step: show QR / UPI ID and collect UTR reference
+      setDepositUpiStep({
+        payment_id: res.payment_id,
+        upi_id: res.upi_id,
+        payee_name: res.payee_name,
+        amount_inr: res.amount_inr,
+        qr_url: res.qr_url,
+        upi_uri: res.upi_uri,
+      });
+      setDepositUtrInput("");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to initiate deposit. Please try again.");
     } finally {
       setIsProcessingDeposit(false);
-      setIsDepositOpen(false);
     }
+  };
+
+  const handleDepositUtrSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!depositUpiStep) return;
+    const cleanUtr = depositUtrInput.trim();
+    if (cleanUtr.length < 6) {
+      showToast("Please enter a valid UTR / UPI Transaction Reference (at least 6 characters).");
+      return;
+    }
+    setIsSubmittingUtr(true);
+    try {
+      await submitPaymentUtr(depositUpiStep.payment_id, cleanUtr);
+      showToast("Payment reference submitted! Wallet will be credited after admin verification.");
+      setDepositUpiStep(null);
+      setDepositUtrInput("");
+      setIsDepositOpen(false);
+      setDepositAmount("500");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to submit UTR. Please try again.");
+    } finally {
+      setIsSubmittingUtr(false);
+    }
+  };
+
+  const handleDepositModalClose = () => {
+    setIsDepositOpen(false);
+    setDepositUpiStep(null);
+    setDepositUtrInput("");
+    setDepositAmount("500");
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const deducted = parseInt(withdrawAmount) || 1000;
-    const currentBal = Number(profile?.inr_balance || 0);
+    const deducted = parseInt(withdrawAmount) || 0;
+    // Re-compute safe balance for validation
+    const currentBal = (() => {
+      const raw = profile?.inr_balance;
+      if (raw == null) return 0;
+      const p = parseFloat(String(raw));
+      return isNaN(p) ? 0 : p;
+    })();
     if (deducted <= 0 || deducted > currentBal) {
       showToast(`Invalid withdrawal amount. Available: ₹${currentBal.toLocaleString()}`);
       return;
@@ -341,24 +378,19 @@ export default function DashboardPage() {
         upi_id: upiId.trim(),
         account_holder_name: profile?.display_name || user?.username || "Gamer",
       });
-      if (profile) {
+      // Update balance from authoritative backend response
+      if (profile && typeof res.available_inr === "number") {
         setProfile({
           ...profile,
-          inr_balance: String(res.new_balance),
+          inr_balance: String(res.available_inr),
         });
       }
       showToast(`Withdrawal request of ₹${deducted.toLocaleString()} submitted! Status: PENDING ADMIN APPROVAL`);
-    } catch {
-      if (profile && currentBal >= deducted) {
-        setProfile({
-          ...profile,
-          inr_balance: String(Math.max(0, currentBal - deducted)),
-        });
-      }
-      showToast(`Withdrawal request of ₹${deducted.toLocaleString()} submitted! Status: PENDING ADMIN APPROVAL`);
+      setIsWithdrawOpen(false);
+    } catch (err: any) {
+      showToast(err?.message || "Failed to submit withdrawal request. Please try again.");
     } finally {
       setIsProcessingWithdraw(false);
-      setIsWithdrawOpen(false);
     }
   };
 
@@ -368,48 +400,18 @@ export default function DashboardPage() {
     setIsSubmittingSquad(true);
     try {
       const tag = createSquadForm.tag || createSquadForm.name.slice(0, 4).toUpperCase();
-      let newTeam: Team;
-      try {
-        newTeam = await createTeam({
-          name: createSquadForm.name,
-          game_slug: createSquadForm.game_slug,
-          tag,
-          captain_handle: profile?.display_name || user?.username || "Captain",
-        });
-      } catch {
-        // Deterministic fallback code based on timestamp & tag, stored permanently
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        const codeSuffix = tag.slice(0, 3) + chars[(Date.now() % chars.length)] + chars[((Date.now() >> 3) % chars.length)];
-        newTeam = {
-          id: `team_${Date.now()}`,
-          name: createSquadForm.name,
-          game_slug: createSquadForm.game_slug,
-          tag,
-          captain_handle: profile?.display_name || user?.username || "Captain",
-          invite_code: codeSuffix.toUpperCase(),
-          members: [
-            {
-              user_id: user?.id || "usr_captain",
-              username: profile?.display_name || user?.username || "Captain",
-              role: "CAPTAIN",
-              game_handle: profile?.display_name || "Captain",
-            } as any
-          ],
-        } as unknown as Team;
-      }
-      setTeams((prev) => {
-        const updated = [newTeam, ...prev];
-        try {
-          const teamsStorageKey = user?.id ? `ametheus_user_teams_${user.id}` : "ametheus_user_teams";
-          localStorage.setItem(teamsStorageKey, JSON.stringify(updated));
-        } catch {}
-        return updated;
+      const newTeam = await createTeam({
+        name: createSquadForm.name,
+        game_slug: createSquadForm.game_slug,
+        tag,
+        captain_handle: profile?.display_name || user?.username || "Captain",
       });
+      setTeams((prev) => [newTeam, ...prev]);
       setIsCreateSquadOpen(false);
       setCreateSquadForm({ name: "", game_slug: "valorant", tag: "" });
       showToast(`Squad "${newTeam.name}" created! Invite code: ${newTeam.invite_code}`);
     } catch (e: any) {
-      showToast(e?.message || "Failed to create squad");
+      showToast(e?.message || "Failed to create squad. Please try again.");
     } finally {
       setIsSubmittingSquad(false);
     }
@@ -436,25 +438,36 @@ export default function DashboardPage() {
   };
 
   const exportMatchCsv = () => {
-    const headers = "Match,Opponent,Game,Outcome,Prize,Status\n";
-    const sampleRows = [
-      'Valorant Weekly #42,Reckless Gaming,Valorant,VICTORY 13-9,₹15000,Verified & Paid\n',
-      'Mini Militia Blitz Arena,Shadow Brigade,Mini Militia,DEFEAT 11-13,₹0,Auto-Settled\n',
-      'Smash Karts Solo Night,12-Player FFA,Smash Karts,VICTORY 1st,₹2500,Referee Review\n',
-      'CS2 Wingman Cup Q3,Kodiak Duo,Counter-Strike 2,VICTORY 9-4,₹5000,Verified & Paid\n',
-    ].join("");
-    const blob = new Blob([headers + sampleRows], { type: "text/csv" });
+    const headers = "Match ID,Tournament,Opponent,Game,Outcome,Status\n";
+    const completedRows = matches
+      .filter((m) => m.status === "COMPLETED")
+      .map((m) => {
+        const myTeam = teams.find((t) => t.id === m.team_a_id || t.id === m.team_b_id);
+        const opponent = myTeam?.id === m.team_a_id ? (m.team_b?.name || "—") : (m.team_a?.name || "—");
+        const outcome = myTeam && m.winner_team_id === myTeam.id ? "VICTORY" : (m.winner_team_id ? "DEFEAT" : "NO RESULT");
+        return `${m.id?.slice(-8) || ""},${m.tournament_title || "Match"},${opponent},,${outcome},Completed\n`;
+      })
+      .join("");
+    const blob = new Blob([headers + completedRows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `ametheus-match-ledger-${Date.now()}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
     showToast("Match ledger exported to CSV!");
   };
 
-  const displayName = profile?.display_name || user?.username || user?.firstName || "Contender";
+  // Authoritative identity: Ametheus MongoDB username > display_name > Clerk username
+  const displayName = profile?.username || profile?.display_name || user?.username || user?.firstName || "Player";
   const userAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
-  const balance = profile?.inr_balance != null ? Number(profile.inr_balance) : 0;
+  // Safe balance: parse from inr_balance string, guard NaN explicitly
+  const balance = (() => {
+    const raw = profile?.inr_balance;
+    if (raw == null) return 0;
+    const parsed = parseFloat(String(raw));
+    return isNaN(parsed) ? 0 : parsed;
+  })();
   const ametheusId = profile?.id ? `ATH-${profile.id.slice(-6).toUpperCase()}` : user?.id ? `ATH-${user.id.slice(-6).toUpperCase()}` : "ATH-READY";
 
   // Calculate real performance metrics from matches
@@ -593,8 +606,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick Metrics Ribbon (5 Cards) */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+          {/* Quick Metrics Ribbon (4 Cards — Active Squad removed per design spec) */}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
             {/* Metric 1: Total Earnings */}
             <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
@@ -627,47 +640,24 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Metric 3: Elo Rating */}
+            {/* Metric 3: Matches Played (real DB data) */}
             <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Global Elo</span>
-                <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Matches Played</span>
+                <Gamepad2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="mt-2">
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white tabular-nums">
-                  {eloRating.toLocaleString()}
+                  {completedMatches.length}
                 </div>
                 <div className="text-slate-500 dark:text-slate-400 font-mono text-[11px] mt-0.5">
-                  Base 1,500
+                  {completedMatches.length === 0 ? "No matches yet" : `${wins} wins · ${losses} losses`}
                 </div>
               </div>
             </div>
 
-            {/* Metric 4: Squad Readiness */}
-            <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
-              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider">Active Squad</span>
-                <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-              </div>
-              <div className="mt-2">
-                <div className="text-base font-bold font-headline text-slate-900 dark:text-white truncate">
-                  {teams[0]?.name || "No Squad"}
-                </div>
-                <div className="flex items-center gap-1 font-mono text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {teams[0] ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span>{teams[0].members?.length || 1} Member{teams[0].members?.length === 1 ? "" : "s"}</span>
-                    </>
-                  ) : (
-                    <span>No active team</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Metric 5: Escrow Balance */}
-            <div className="col-span-2 md:col-span-1 bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60 dark:border-amber-800/40 transition-colors">
+            {/* Metric 4: Escrow Balance */}
+            <div className="bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl flex flex-col justify-between border border-amber-200/60 dark:border-amber-800/40 transition-colors">
               <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E56A10]">
                   Escrow Balance
@@ -679,7 +669,7 @@ export default function DashboardPage() {
                   ₹{balance.toLocaleString()}
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">Safe Guaranteed</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">Pending approval</span>
                   <button
                     onClick={() => setIsWithdrawOpen(true)}
                     className="text-[#E56A10] hover:text-[#C95B0A] font-mono text-[11px] uppercase font-bold cursor-pointer hover:underline"
@@ -750,75 +740,24 @@ export default function DashboardPage() {
                     Registered Tournaments
                   </h3>
                 </div>
+                {/* Shows 0 — player registrations are tracked separately; this section shows upcoming open tournaments */}
                 <span className="px-2.5 py-1 rounded bg-slate-100 dark:bg-[#161A24] text-slate-600 dark:text-slate-400 font-mono text-[11px] font-bold uppercase border border-transparent dark:border-[#242C3D]">
-                  {tournaments.length} {tournaments.length === 1 ? "ENTRY" : "ENTRIES"}
+                  0 ENTRIES
                 </span>
               </div>
 
-              {/* Tournament Cards Stack */}
-              <div className="space-y-3">
-                {tournaments.length > 0 ? (
-                  tournaments.map((t) => (
-                    <div key={t.id} className="bg-slate-50 dark:bg-[#161A24] hover:bg-slate-100/80 dark:hover:bg-[#1A2030] rounded-xl p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-200 dark:border-[#242C3D]">
-                      <div className="flex items-start gap-4">
-                        {t.banner_url && (
-                          <div className="w-16 h-16 rounded-lg bg-slate-200 dark:bg-[#202636] shrink-0 overflow-hidden relative border border-slate-300 dark:border-[#242C3D]">
-                            <Image src={t.banner_url} alt={t.title || "Tournament"} fill className="object-cover" />
-                          </div>
-                        )}
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[10px] font-bold uppercase">
-                              {t.game_name || "Tournament"}
-                            </span>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                            <span className={`font-mono text-[10px] font-bold uppercase ${
-                              t.status === "REGISTRATION_OPEN" ? "text-emerald-600 dark:text-emerald-400" :
-                              t.status === "ONGOING" ? "text-[#E56A10]" :
-                              "text-slate-500 dark:text-slate-400"
-                            }`}>
-                              {t.status?.replace(/_/g, " ") ?? "UPCOMING"}
-                            </span>
-                          </div>
-                          <h4 className="font-headline text-base font-bold text-slate-900 dark:text-white">
-                            {t.title}
-                          </h4>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-slate-500 dark:text-slate-400">
-                            {(t.starts_at || t.start_date) && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3.5 h-3.5" /> {new Date(t.starts_at || t.start_date!).toLocaleDateString("en-IN")}
-                              </span>
-                            )}
-                            {t.prize_pool_inr != null && (
-                              <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-200">
-                                <Trophy className="w-3.5 h-3.5 text-[#E56A10]" /> Prize Pool ₹{t.prize_pool_inr.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                        <Link
-                          href={`/tournaments/${t.id}`}
-                          className="px-4 py-1.5 rounded-lg bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors"
-                        >
-                          View Details
-                        </Link>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
-                    <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
-                    <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Registered Tournaments</div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                      Browse available games to enter a match or competition.
-                    </p>
-                    <Link href="/games" className="inline-block mt-2 px-4 py-1.5 rounded-lg bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors">
-                      Browse Games
-                    </Link>
-                  </div>
-                )}
+              {/* No registration data available at the player level — always show empty state.
+                  Tournament registrations are tracked via tournament_registrations collection server-side.
+                  Players should navigate to /tournaments to register. */}
+              <div className="bg-slate-50 dark:bg-[#161A24] p-8 rounded-xl border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
+                <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
+                <div className="text-sm font-bold text-slate-800 dark:text-slate-200 font-headline">No Registered Tournaments</div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  Browse open tournaments and register your team to compete.
+                </p>
+                <Link href="/tournaments" className="inline-block mt-2 px-4 py-1.5 rounded-lg bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase transition-colors">
+                  Browse Tournaments
+                </Link>
               </div>
             </div>
 
@@ -910,17 +849,17 @@ export default function DashboardPage() {
           {/* RIGHT COLUMN: Active Squads, Escrow Wallet & Telemetry (~35% = 4 cols) */}
           <div className="lg:col-span-4 space-y-6">
 
-            {/* SECTION: Active Squads & Quick Join/Create */}
+            {/* SECTION: My Teams & Game Rosters */}
             <div className="bg-white dark:bg-[#121622] rounded-xl p-5 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#E56A10]" />
                   <h3 className="font-headline text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                    Active Squads
+                    My Game Rosters
                   </h3>
                 </div>
                 <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold">
-                  {teams.length} Squad{teams.length !== 1 ? "s" : ""}
+                  {teams.length} {teams.length !== 1 ? "Teams" : "Team"}
                 </span>
               </div>
 
@@ -980,9 +919,9 @@ export default function DashboardPage() {
                 ) : (
                   <div className="bg-slate-50 dark:bg-[#161A24] p-6 rounded-lg border border-slate-200 dark:border-[#242C3D] text-center space-y-2">
                     <Users className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 font-headline">No Active Squads</div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 font-headline">No Game Rosters</div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                      Create your own squad or join your friends using an invite code.
+                      Teams are game-specific rosters. Create or join a team for a game discipline. Registration is free.
                     </p>
                   </div>
                 )}
@@ -1114,6 +1053,24 @@ export default function DashboardPage() {
                   placeholder="e.g. VORTEX_KID"
                   className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10] font-mono"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
+                  Username (Unique @handle)
+                </label>
+                <input
+                  type="text"
+                  value={profileForm.username}
+                  onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_\-.]/g, "") })}
+                  placeholder={profile?.username || "e.g. vortex_kid"}
+                  minLength={3}
+                  maxLength={30}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10] font-mono"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+                  3–30 chars. Letters, numbers, underscores, hyphens, dots only. Must be unique.
+                </p>
               </div>
 
               {/* Keep / Restore Account Profile Picture Option */}
@@ -1263,7 +1220,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL 2: Deposit Funds (Platform Escrow) */}
+      {/* MODAL 2: Deposit Funds (UPI Flow) */}
       {isDepositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
@@ -1271,71 +1228,143 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-[#E56A10]" />
                 <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
-                  Deposit Funds
+                  {depositUpiStep ? "Complete UPI Payment" : "Add Money to Wallet"}
                 </h3>
               </div>
               <button
-                onClick={() => setIsDepositOpen(false)}
+                onClick={handleDepositModalClose}
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleDepositSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
-                  Select Amount (₹ INR) *
-                </label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {["200", "500", "1000", "2500"].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setDepositAmount(amt)}
-                      className={`py-2 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
-                        depositAmount === amt
-                          ? "bg-[#E56A10] text-white border-[#E56A10]"
-                          : "bg-white dark:bg-[#161A24] text-slate-800 dark:text-slate-200 border-slate-300 dark:border-[#242C3D] hover:bg-slate-100 dark:hover:bg-[#202636]"
-                      }`}
-                    >
-                      ₹{amt}
-                    </button>
-                  ))}
+            {!depositUpiStep ? (
+              /* Step 1: Select amount */
+              <form onSubmit={handleDepositSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
+                    Select Amount (₹ INR) *
+                  </label>
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {["200", "500", "1000", "2500"].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setDepositAmount(amt)}
+                        className={`py-2 text-xs font-mono font-bold rounded-lg border transition-all cursor-pointer ${
+                          depositAmount === amt
+                            ? "bg-[#E56A10] text-white border-[#E56A10]"
+                            : "bg-white dark:bg-[#161A24] text-slate-800 dark:text-slate-200 border-slate-300 dark:border-[#242C3D] hover:bg-slate-100 dark:hover:bg-[#202636]"
+                        }`}
+                      >
+                        ₹{amt}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    min={50}
+                    max={50000}
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                  />
                 </div>
-                <input
-                  type="number"
-                  min={50}
-                  max={50000}
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                />
-              </div>
 
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-xs font-mono text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                <span>Instant Platform Escrow deposit. Funds are immediately credited to your tournament balance.</span>
-              </div>
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-lg text-xs font-mono text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 flex items-start gap-2">
+                  <Shield className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <span>Pay via UPI to our account. Submit your UTR reference after payment. Wallet is credited after admin verification.</span>
+                </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDepositOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessingDeposit}
-                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessingDeposit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-                  Deposit ₹{depositAmount} to Escrow Wallet
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDepositModalClose}
+                    className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isProcessingDeposit}
+                    className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isProcessingDeposit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                    Get UPI Payment Details
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Step 2: Show UPI details and collect UTR */
+              <form onSubmit={handleDepositUtrSubmit} className="space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-[#161A24] rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-3">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase font-bold">Amount to Pay</span>
+                    <span className="text-xl font-bold text-slate-900 dark:text-white">₹{depositUpiStep.amount_inr.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-slate-200 dark:border-[#242C3D] pt-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-500 dark:text-slate-400 uppercase">Pay To (UPI ID)</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{depositUpiStep.upi_id}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-500 dark:text-slate-400 uppercase">Payee Name</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{depositUpiStep.payee_name}</span>
+                    </div>
+                  </div>
+                  {depositUpiStep.upi_uri && (
+                    <a
+                      href={depositUpiStep.upi_uri}
+                      className="block w-full text-center py-2 mt-1 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase rounded-lg transition-colors"
+                    >
+                      Open in UPI App
+                    </a>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
+                    UPI Transaction Reference (UTR) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    placeholder="e.g. 422345678901"
+                    value={depositUtrInput}
+                    onChange={(e) => setDepositUtrInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                  />
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+                    Found in your UPI app under transaction details or SMS confirmation.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-xs font-mono text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900/50 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <span>After submitting your UTR, admin will verify the payment and credit your wallet. This usually takes up to 30 minutes.</span>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setDepositUpiStep(null); setDepositUtrInput(""); }}
+                    className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingUtr}
+                    className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmittingUtr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Submit UTR Reference
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

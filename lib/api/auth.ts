@@ -34,6 +34,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile> {
 
 export interface UserProfileUpdatePayload {
   display_name?: string;
+  username?: string;
   riot_id?: string;
   steam_id?: string;
   avatar_url?: string;
