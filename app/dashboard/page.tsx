@@ -52,7 +52,8 @@ import {
   initFirstLaunchPersona,
   GAMING_AVATAR_PRESETS,
 } from "@/lib/utils/gamingIdentity";
-import { requestWithdrawal, depositFunds, submitPaymentUtr } from "@/lib/api/wallet";
+import { requestWithdrawal, depositFunds } from "@/lib/api/wallet";
+import { submitPaymentUtr } from "@/lib/api/payments";
 import { uploadImageFile } from "@/lib/api/media";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
@@ -168,8 +169,7 @@ export default function DashboardPage() {
           const resolvedProfile: UserProfile = currentProf || {
             id: user?.id || "usr_me",
             email: user?.primaryEmailAddress?.emailAddress || "",
-            // Use Ametheus username if it exists, not Clerk username
-            username: currentProf?.username || (user?.username || "").toLowerCase().replace(/\s+/g, "_") || "",
+            username: (user?.username || "").toLowerCase().replace(/\s+/g, "_") || "",
             display_name: effectiveDisplayName,
             avatar_url: effectiveAvatar,
             role: "PLAYER",
@@ -179,7 +179,7 @@ export default function DashboardPage() {
           setProfile(resolvedProfile);
           setProfileForm({
             display_name: effectiveDisplayName,
-            username: currentProf?.username || "",
+            username: resolvedProfile.username || "",
             avatar_url: effectiveAvatar,
           });
 

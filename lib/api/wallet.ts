@@ -134,14 +134,3 @@ export async function depositFunds(amountInr: number): Promise<{
     body: JSON.stringify({ amount_inr: amountInr }),
   });
 }
-
-export async function submitPaymentUtr(
-  paymentId: string,
-  utr: string,
-  screenshotUrl?: string
-): Promise<{ status: string; message: string; payment_id: string; utr: string }> {
-  return apiClient(`/payments/wallet/${paymentId}/submit-utr`, {
-    method: "POST",
-    body: JSON.stringify({ utr, screenshot_url: screenshotUrl }),
-  });
-}
