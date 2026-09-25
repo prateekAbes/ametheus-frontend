@@ -38,7 +38,7 @@ export default function TeamRosterCard({ team }: Props) {
                     : "bg-[#F1F3F5] text-[#475569]"
                 }`}
               >
-                {isFull ? "ROSTER FULL" : "ACTIVE SQUAD"}
+                {isFull ? "ROSTER FULL" : "ACTIVE TEAM"}
               </span>
             </div>
             <span className="text-xs text-[#64748B] font-mono">
@@ -51,7 +51,7 @@ export default function TeamRosterCard({ team }: Props) {
         <div className="flex items-center gap-2 bg-[#0B0E16] text-white px-3 py-1.5 rounded-lg border border-[#242C3D]">
           <div className="flex flex-col text-left">
             <span className="text-[9px] text-[#94A3B8] font-mono uppercase">
-              Squad Code
+              Team Code
             </span>
             <span className="font-mono font-bold text-sm tracking-wider text-[#E56A10]">
               {team.inviteCode}

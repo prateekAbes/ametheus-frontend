@@ -5,25 +5,27 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getGameBySlug, normalizeGame, NormalizedGame } from "@/lib/api/games";
-import { getMyTeams, Team } from "@/lib/api/teams";
+import { getMyTeams, kickTeamMember, leaveTeam, disbandTeam, Team } from "@/lib/api/teams";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import CreateTeamModal from "@/components/team/CreateTeamModal";
 import JoinTeamModal from "@/components/team/JoinTeamModal";
-import GamePaymentModal from "@/components/game/GamePaymentModal";
 import {
   Shield,
   Users,
   UserPlus,
   Play,
-  Clock,
   CheckCircle,
   AlertTriangle,
-  Wallet,
-  CreditCard,
   Layers,
   ChevronLeft,
   ChevronRight,
   X,
-  ExternalLink,
+  Copy,
+  Check,
+  Trash2,
+  UserMinus,
+  Loader2,
+  Trophy,
 } from "lucide-react";
 
 interface Props {
@@ -32,14 +34,16 @@ interface Props {
 
 export default function DedicatedGameHubPage({ params }: Props) {
   const resolvedParams = use(params);
+  const { profile: userProfile } = useAuthContext();
   const [game, setGame] = useState<NormalizedGame | null>(null);
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedTeamForPayment, setSelectedTeamForPayment] = useState<Team | null>(null);
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const fetchGameAndTeams = async () => {
     try {
@@ -74,13 +78,64 @@ export default function DedicatedGameHubPage({ params }: Props) {
 
   const isSoloGame = !game.isTeamGame || game.maxTeamSize === 1 || game.slug === "chess";
   const userTeam = myTeams.length > 0 ? myTeams[0] : null;
-  const isPaid = userTeam?.payment_status === "PAID" || !game.entryFeeInr || game.entryFeeInr <= 0;
-  const isPending = userTeam?.payment_status === "PAYMENT_PENDING";
-  const isRejected = userTeam?.payment_status === "PAYMENT_REJECTED";
 
-  const handleOpenPayment = (team?: Team) => {
-    setSelectedTeamForPayment(team || userTeam);
-    setIsPaymentModalOpen(true);
+  const isCaptain =
+    userTeam &&
+    userProfile &&
+    (userTeam.captain_id === userProfile.id ||
+      userTeam.captain_username === userProfile.username);
+
+  const rosterCount = userTeam?.members?.length || 0;
+  const isRosterReady = rosterCount >= game.minTeamSize;
+
+  const handleCopyCode = () => {
+    if (userTeam?.invite_code) {
+      navigator.clipboard.writeText(userTeam.invite_code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  const handleKickMember = async (teamId: string, memberUserId: string, username: string) => {
+    if (!confirm(`Are you sure you want to remove @${username} from the team roster?`)) return;
+    setActionLoading(`kick-${memberUserId}`);
+    setActionError(null);
+    try {
+      await kickTeamMember(teamId, memberUserId);
+      await fetchGameAndTeams();
+    } catch (err: any) {
+      setActionError(err?.message || `Failed to remove @${username}.`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLeaveTeam = async (teamId: string) => {
+    if (!confirm("Are you sure you want to leave this team? You will need an invite code to rejoin.")) return;
+    setActionLoading("leave");
+    setActionError(null);
+    try {
+      await leaveTeam(teamId);
+      await fetchGameAndTeams();
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to leave the team.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDisbandTeam = async (teamId: string) => {
+    if (!confirm("Are you sure you want to disband this team? All members will be removed. This cannot be undone.")) return;
+    setActionLoading("disband");
+    setActionError(null);
+    try {
+      await disbandTeam(teamId);
+      await fetchGameAndTeams();
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to disband the team.");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -155,7 +210,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                   className="w-full h-full object-cover"
                 />
                 <span className="absolute bottom-1.5 right-1.5 px-1.5 bg-[#E56A10] text-white font-mono text-[9px] font-bold rounded">
-                  {isSoloGame ? "1v1" : `${game.minTeamSize}-${game.maxTeamSize}`}
+                  {isSoloGame ? "Solo (1v1)" : `${game.minTeamSize}-${game.maxTeamSize}`}
                 </span>
               </div>
 
@@ -163,7 +218,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#E56A10]/10 text-[#E56A10] text-[10px] font-mono font-bold rounded">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#E56A10] animate-pulse" />
-                    GAME TITLE
+                    DISCIPLINE
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] border dark:border-[#242C3D] text-[#0F172A] dark:text-slate-200 text-[10px] font-mono rounded">
                     <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
@@ -179,28 +234,28 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 </h1>
 
                 <p className="text-xs sm:text-sm text-[#475569] dark:text-[#94A3B8] max-w-2xl leading-relaxed">
-                  {game.description || "Compete in official competitive lobbies, form your roster, and play for verified match results."}
+                  {game.description || "Manage your competitive roster, form official teams, and enter sanctioned tournaments."}
                 </p>
               </div>
             </div>
 
-            {/* Entry Fee & Format Highlights */}
+            {/* Roster Format & Mode Highlights (No Entry Fee) */}
             <div className="flex items-center gap-6 lg:border-l border-[#E2E8F0] dark:border-[#242C3D] lg:pl-8 shrink-0 w-full lg:w-auto justify-between lg:justify-start">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">Entry Fee</span>
-                <span className="text-3xl font-bold font-headline text-[#E56A10] tabular-nums">
-                  {game.entryFeeInr > 0 ? `₹${game.entryFeeInr}` : "FREE"}
-                </span>
-                <span className="text-[11px] text-emerald-600 font-mono">5% off with Wallet</span>
-              </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">Roster Format</span>
                 <span className="text-2xl font-bold font-headline text-slate-900 dark:text-white">
                   {isSoloGame ? "Solo (1v1)" : `${game.maxTeamSize} Players`}
                 </span>
                 <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
-                  {game.maxSubstitutes} Sub allowed
+                  {game.maxSubstitutes > 0 ? `${game.maxSubstitutes} Sub allowed` : "No substitutes"}
                 </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">Competition</span>
+                <span className="text-2xl font-bold font-headline text-[#E56A10]">
+                  TOURNAMENTS
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">Sanctioned Arenas</span>
               </div>
             </div>
           </div>
@@ -210,7 +265,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
             <div>
               <span className="text-[10px] uppercase text-[#64748B] dark:text-[#94A3B8] font-mono block">Required Players</span>
               <span className="font-semibold text-[#0F172A] dark:text-white">
-                {isSoloGame ? "1 Solo Athlete" : `${game.maxTeamSize} Athletes`}
+                {isSoloGame ? "1 Solo Athlete" : `${game.minTeamSize} Min / ${game.maxTeamSize} Max`}
               </span>
             </div>
             <div>
@@ -224,54 +279,64 @@ export default function DedicatedGameHubPage({ params }: Props) {
               <span className="font-semibold text-[#0F172A] dark:text-white">{game.matchProtocol}</span>
             </div>
             <div>
-              <span className="text-[10px] uppercase text-[#64748B] dark:text-[#94A3B8] font-mono block">Active Squads</span>
-              <span className="font-semibold text-[#0F172A] dark:text-white">{game.teamsCount} Registered</span>
+              <span className="text-[10px] uppercase text-[#64748B] dark:text-[#94A3B8] font-mono block">Active Teams</span>
+              <span className="font-semibold text-[#0F172A] dark:text-white">{game.teamsCount || 0} Registered</span>
             </div>
           </div>
         </section>
 
-        {/* 3. CORE USER FLOW: GAME -> CREATE TEAM -> PAY -> PLAY */}
+        {/* 3. CORE USER FLOW: TEAM MANAGEMENT ON GAME PAGE */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Main Action Hub */}
           <div className="lg:col-span-8 space-y-6">
-            {/* Squad Status & Action Card */}
+            {/* Team Status & Management Card */}
             <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] rounded-2xl p-6 shadow-sm space-y-5">
-              <div className="flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#242C3D] pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E2E8F0] dark:border-[#242C3D] pb-4 gap-2">
                 <div>
                   <h2 className="text-xl font-bold font-headline text-slate-900 dark:text-white uppercase">
-                    {userTeam ? "Your Registered Squad" : isSoloGame ? "Solo Contender Status" : "Join the Arena"}
+                    {userTeam ? "Your Official Team Roster" : isSoloGame ? "Solo Contender Profile" : "Team Roster Management"}
                   </h2>
                   <p className="text-xs text-slate-500 font-mono">
                     {userTeam
-                      ? `Squad details for ${game.name}`
-                      : "Create your squad or join with an invite code to proceed to payment and play."}
+                      ? `Active team for ${game.name}. Manage teammates and check tournament readiness.`
+                      : isSoloGame
+                      ? `Register your solo athlete profile for ${game.name} competitions.`
+                      : `Create or join a team for ${game.name}. Your team will be used to register for tournaments.`}
                   </p>
                 </div>
                 {userTeam && (
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border ${
-                      isPaid
+                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border self-start sm:self-auto ${
+                      isRosterReady
                         ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                        : isPending
-                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                        : isRejected
-                        ? "bg-rose-500/10 text-rose-600 border-rose-500/30"
-                        : "bg-slate-100 text-slate-700 border-slate-300"
+                        : "bg-amber-500/10 text-amber-600 border-amber-500/30"
                     }`}
                   >
-                    {isPaid
-                      ? "✓ PAID & READY"
-                      : isPending
-                      ? "PAYMENT PENDING VERIFICATION"
-                      : isRejected
-                      ? "PAYMENT REJECTED"
-                      : "UNPAID"}
+                    {isRosterReady
+                      ? "✓ READY FOR TOURNAMENTS"
+                      : `NEEDS ${game.minTeamSize - rosterCount} MORE PLAYER${game.minTeamSize - rosterCount > 1 ? "S" : ""}`}
                   </span>
                 )}
               </div>
 
-              {/* If User has a team */}
-              {userTeam ? (
+              {actionError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-red-700 dark:text-red-400 text-xs font-mono flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{actionError}</span>
+                </div>
+              )}
+
+              {/* Loading Skeleton */}
+              {loading ? (
+                <div className="space-y-4 animate-pulse">
+                  <div className="h-20 bg-slate-100 dark:bg-[#161A24] rounded-xl" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="h-16 bg-slate-100 dark:bg-[#161A24] rounded-xl" />
+                    <div className="h-16 bg-slate-100 dark:bg-[#161A24] rounded-xl" />
+                  </div>
+                </div>
+              ) : userTeam ? (
+                /* User Team Exists */
                 <div className="space-y-5">
                   <div className="p-4 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -282,168 +347,210 @@ export default function DedicatedGameHubPage({ params }: Props) {
                           [{userTeam.tag}]
                         </span>
                       </div>
-                      <div className="text-xs font-mono text-slate-500 mt-1">
-                        Captain: <strong className="text-slate-800 dark:text-slate-200">@{userTeam.captain_username}</strong> • Invite Code:{" "}
-                        <strong className="text-[#E56A10]">{userTeam.invite_code}</strong>
+                      <div className="text-xs font-mono text-slate-500 mt-1 flex flex-wrap items-center gap-2">
+                        <span>
+                          Captain: <strong className="text-slate-800 dark:text-slate-200">@{userTeam.captain_username}</strong>
+                          {isCaptain && <span className="ml-1 text-[10px] text-[#E56A10] font-bold">(You)</span>}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Invite Code: <strong className="text-[#E56A10] font-bold tracking-wider">{userTeam.invite_code}</strong>
+                        </span>
                       </div>
                     </div>
 
-                    {/* Roster counts */}
-                    <div className="flex items-center gap-3 text-xs font-mono">
+                    {/* Roster counts & Code Copy */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
                       <div className="bg-white dark:bg-[#121622] px-3 py-2 rounded-lg border border-slate-200 dark:border-[#242C3D]">
                         <span className="text-slate-400 block text-[10px]">MAIN ROSTER</span>
                         <span className="text-slate-900 dark:text-white font-bold">
-                          {userTeam.members?.length || 0} / {userTeam.max_members}
+                          {userTeam.members?.length || 0} / {userTeam.max_members || game.maxTeamSize}
                         </span>
                       </div>
-                      {userTeam.max_substitutes > 0 && (
+                      {game.maxSubstitutes > 0 && (
                         <div className="bg-white dark:bg-[#121622] px-3 py-2 rounded-lg border border-slate-200 dark:border-[#242C3D]">
                           <span className="text-slate-400 block text-[10px]">SUBSTITUTES</span>
                           <span className="text-slate-900 dark:text-white font-bold">
-                            {userTeam.substitutes?.length || 0} / {userTeam.max_substitutes}
+                            {userTeam.substitutes?.length || 0} / {game.maxSubstitutes}
                           </span>
                         </div>
                       )}
+                      <button
+                        onClick={handleCopyCode}
+                        className="px-3.5 py-2 bg-white dark:bg-[#121622] hover:bg-slate-100 dark:hover:bg-[#1e2538] border border-slate-200 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Copy Team Code to share"
+                      >
+                        {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-[#E56A10]" />}
+                        <span className="font-bold">{copiedCode ? "Copied!" : "Copy Code"}</span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Roster Members list */}
+                  {/* Main Roster Members list */}
                   <div className="space-y-2">
-                    <div className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase">
-                      Active Roster Athletes:
+                    <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase">
+                      <span>Main Roster Athletes ({userTeam.members?.length || 0} / {userTeam.max_members || game.maxTeamSize}):</span>
+                      <span className="text-[11px] text-slate-400 font-normal">Min required for tournament: {game.minTeamSize}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {userTeam.members?.map((m, idx) => (
-                        <div
-                          key={m.id || idx}
-                          className="p-3 bg-white dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl flex items-center justify-between text-xs font-mono"
-                        >
-                          <div>
-                            <span className="font-bold text-slate-900 dark:text-white block">
-                              {idx + 1}. @{m.username}
-                            </span>
-                            <span className="text-[11px] text-slate-500">Handle: {m.game_handle}</span>
+                      {userTeam.members?.map((m, idx) => {
+                        const isThisMemberCaptain = m.role === "CAPTAIN" || m.user_id === userTeam.captain_id;
+                        const isThisUser = userProfile && m.user_id === userProfile.id;
+                        const canCaptainKick = isCaptain && !isThisMemberCaptain && !isThisUser;
+
+                        return (
+                          <div
+                            key={m.id || m.user_id || idx}
+                            className="p-3 bg-white dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl flex items-center justify-between text-xs font-mono"
+                          >
+                            <div className="truncate mr-2">
+                              <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                {idx + 1}. @{m.username} {isThisUser && <span className="text-[#E56A10]">(You)</span>}
+                              </span>
+                              <span className="text-[11px] text-slate-500 truncate block">Handle: {m.game_handle}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {isThisMemberCaptain ? (
+                                <span className="px-1.5 py-0.5 bg-[#E56A10]/15 text-[#E56A10] text-[9px] font-bold rounded">
+                                  CAPTAIN
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold rounded">
+                                  MEMBER
+                                </span>
+                              )}
+                              {canCaptainKick && (
+                                <button
+                                  onClick={() => handleKickMember(userTeam.id, m.user_id, m.username)}
+                                  disabled={actionLoading === `kick-${m.user_id}`}
+                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer"
+                                  title="Remove member from roster"
+                                >
+                                  {actionLoading === `kick-${m.user_id}` ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <UserMinus className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          {m.role === "CAPTAIN" && (
-                            <span className="px-1.5 py-0.5 bg-[#E56A10]/15 text-[#E56A10] text-[9px] font-bold rounded">
-                              CAPTAIN
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Primary Stage Gate Action: PAY or PLAY */}
-                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#242C3D]">
-                    {isPaid ? (
-                      <div className="space-y-3">
-                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle className="w-6 h-6 text-emerald-500" />
-                            <div>
-                              <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                Squad Verified &amp; Confirmed!
-                              </div>
-                              <p className="text-xs text-slate-500 font-mono">
-                                Entry fee verified. You are authorized to launch the competitive match lobby.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                  {/* Substitutes List (if any) */}
+                  {userTeam.substitutes && userTeam.substitutes.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase">
+                        Substitute Athletes ({userTeam.substitutes.length} / {game.maxSubstitutes}):
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {userTeam.substitutes.map((sub, idx) => {
+                          const isThisUser = userProfile && sub.user_id === userProfile.id;
+                          const canCaptainKick = isCaptain && !isThisUser;
 
-                        {game.playUrl ? (
-                          <a
-                            href={game.playUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-sm uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                          >
-                            <Play className="w-5 h-5 fill-current" />
-                            <span>LAUNCH / PLAY {game.name} NOW</span>
-                            <ExternalLink className="w-4 h-4 ml-1" />
-                          </a>
-                        ) : (
-                          <div className="p-4 bg-slate-900 dark:bg-black text-white rounded-xl font-mono text-center space-y-2">
-                            <div className="text-sm font-bold text-[#E56A10]">LOBBY READY TO PLAY</div>
-                            <p className="text-xs text-slate-400">
-                              Lobby credentials and server slot have been issued to team captain @{userTeam.captain_username}.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : isPending ? (
-                      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Clock className="w-6 h-6 text-amber-500 animate-pulse" />
-                          <div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-white">
-                              Waiting for Payment Verification
+                          return (
+                            <div
+                              key={sub.id || sub.user_id || idx}
+                              className="p-3 bg-white dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl flex items-center justify-between text-xs font-mono"
+                            >
+                              <div className="truncate mr-2">
+                                <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                  Sub {idx + 1}. @{sub.username} {isThisUser && <span className="text-[#E56A10]">(You)</span>}
+                                </span>
+                                <span className="text-[11px] text-slate-500 truncate block">Handle: {sub.game_handle}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-600 text-[9px] font-bold rounded">
+                                  SUBSTITUTE
+                                </span>
+                                {canCaptainKick && (
+                                  <button
+                                    onClick={() => handleKickMember(userTeam.id, sub.user_id, sub.username)}
+                                    disabled={actionLoading === `kick-${sub.user_id}`}
+                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer"
+                                    title="Remove substitute"
+                                  >
+                                    {actionLoading === `kick-${sub.user_id}` ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <UserMinus className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-xs text-slate-500 font-mono">
-                              Admin is verifying your submitted UPI transaction ID. Refresh or check back shortly.
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleOpenPayment(userTeam)}
-                          className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 border border-amber-500/40 rounded-lg text-xs font-mono font-bold cursor-pointer"
-                        >
-                          View Payment
-                        </button>
+                          );
+                        })}
                       </div>
-                    ) : isRejected ? (
-                      <div className="space-y-3">
-                        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-3">
-                          <AlertTriangle className="w-6 h-6 text-rose-500" />
-                          <div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-white">Payment Rejected</div>
-                            <p className="text-xs text-slate-500 font-mono">
-                              The submitted transaction ID could not be verified by platform administrators.
-                            </p>
-                          </div>
-                        </div>
+                    </div>
+                  )}
+
+                  {/* Team Management Actions */}
+                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#242C3D] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {isCaptain ? (
                         <button
-                          onClick={() => handleOpenPayment(userTeam)}
-                          className="w-full py-3.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                          onClick={() => handleDisbandTeam(userTeam.id)}
+                          disabled={actionLoading === "disband"}
+                          className="px-4 py-2.5 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/40 text-red-700 dark:text-red-400 font-mono text-xs font-bold uppercase rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <CreditCard className="w-4 h-4" />
-                          <span>Pay Again to Unlock Play</span>
+                          {actionLoading === "disband" ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>Disband Team</span>
                         </button>
-                      </div>
-                    ) : game.entryFeeInr > 0 ? (
+                      ) : (
+                        <button
+                          onClick={() => handleLeaveTeam(userTeam.id)}
+                          disabled={actionLoading === "leave"}
+                          className="px-4 py-2.5 bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 font-mono text-xs font-bold uppercase rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {actionLoading === "leave" ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <UserMinus className="w-3.5 h-3.5" />
+                          )}
+                          <span>Leave Team</span>
+                        </button>
+                      )}
+
                       <button
-                        onClick={() => handleOpenPayment(userTeam)}
-                        className="w-full py-4 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                        onClick={handleCopyCode}
+                        className="px-4 py-2.5 bg-white dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] text-slate-800 dark:text-slate-200 font-mono text-xs font-bold uppercase rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <CreditCard className="w-5 h-5" />
-                        <span>Pay Entry Fee (₹{game.entryFeeInr}) to Play</span>
+                        {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-[#E56A10]" />}
+                        <span>{copiedCode ? "Code Copied!" : "Invite Teammates"}</span>
                       </button>
-                    ) : (
-                      <Link
-                        href={`/tournaments?game=${game.slug}`}
-                        className="w-full py-4 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-sm uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                      >
-                        <Play className="w-5 h-5 fill-current" />
-                        <span>Browse {game.name} Tournaments</span>
-                      </Link>
-                    )}
+                    </div>
+
+                    <Link
+                      href={`/tournaments?game=${game.slug}`}
+                      className="px-6 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <Trophy className="w-4 h-4" />
+                      <span>Browse {game.name} Tournaments</span>
+                    </Link>
                   </div>
                 </div>
               ) : (
                 /* No Team Created Yet */
-                <div className="py-6 text-center space-y-4">
+                <div className="py-8 text-center space-y-4">
                   <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center mx-auto">
                     <Users className="w-8 h-8" />
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold font-headline text-slate-900 dark:text-white uppercase">
-                      No Registered Squad for {game.name}
+                      {isSoloGame ? "No Solo Profile for " + game.name : "No Registered Team for " + game.name}
                     </h3>
                     <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
                       {isSoloGame
-                        ? "Register as a solo contender and compete."
-                        : `Form your ${game.minTeamSize}-${game.maxTeamSize} athlete squad or join an existing roster using an invite code.`}
+                        ? "Register your solo competitor profile to enter official tournaments."
+                        : `Form your ${game.minTeamSize}-${game.maxTeamSize} athlete team or join an existing roster using an invite code.`}
                     </p>
                   </div>
 
@@ -453,7 +560,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
                       className="px-6 py-3 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm"
                     >
                       <Users className="w-4 h-4" />
-                      <span>{isSoloGame ? "Register Solo Contender" : "Create Team"}</span>
+                      <span>{isSoloGame ? "Register Solo Profile" : "Create Team"}</span>
                     </button>
 
                     {!isSoloGame && (
@@ -465,6 +572,14 @@ export default function DedicatedGameHubPage({ params }: Props) {
                         <span>Join Team with Code</span>
                       </button>
                     )}
+
+                    <Link
+                      href={`/tournaments?game=${game.slug}`}
+                      className="px-6 py-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202534] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#242C3D] font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Trophy className="w-4 h-4 text-[#E56A10]" />
+                      <span>View Tournaments</span>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -501,7 +616,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
             )}
           </div>
 
-          {/* Right Sidebar: Quick Rules & Game Highlights */}
+          {/* Right Sidebar: Quick Rules & Platform Highlights */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] rounded-2xl p-6 shadow-sm space-y-4">
               <h3 className="text-base font-bold font-headline text-slate-900 dark:text-white uppercase flex items-center gap-2">
@@ -516,14 +631,24 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 </div>
 
                 <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-xl border border-slate-200 dark:border-[#242C3D]">
-                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Payment Guarantee</span>
-                  Manual admin verification ensures complete payment authenticity before lobby access.
+                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Verified Rosters</span>
+                  Teams lock in verified player handles and Riot/Steam IDs before tournament check-in.
                 </div>
 
                 <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-xl border border-slate-200 dark:border-[#242C3D]">
-                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Direct Gameplay</span>
-                  No complicated tournament brackets or event waiting lines. Form team, pay, play immediately.
+                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Official Tournaments</span>
+                  Use your registered team to enter open tournaments. Entry fees and prize pools belong strictly to tournaments.
                 </div>
+              </div>
+
+              <div className="pt-2">
+                <Link
+                  href={`/tournaments?game=${game.slug}`}
+                  className="w-full py-3 bg-[#E56A10] hover:bg-[#D45900] text-white font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <Trophy className="w-4 h-4" />
+                  <span>View {game.name} Tournaments</span>
+                </Link>
               </div>
             </div>
           </div>
@@ -536,13 +661,9 @@ export default function DedicatedGameHubPage({ params }: Props) {
         onClose={() => setIsCreateModalOpen(false)}
         gameSlug={game.slug}
         gameName={game.name}
-        onTeamCreated={(team) => {
+        onTeamCreated={() => {
           setIsCreateModalOpen(false);
           fetchGameAndTeams();
-          // Directly open payment after team creation
-          if (game.entryFeeInr > 0) {
-            handleOpenPayment(team as any);
-          }
         }}
       />
 
@@ -556,24 +677,6 @@ export default function DedicatedGameHubPage({ params }: Props) {
           fetchGameAndTeams();
         }}
       />
-
-      {isPaymentModalOpen && (
-        <GamePaymentModal
-          isOpen={isPaymentModalOpen}
-          onClose={() => {
-            setIsPaymentModalOpen(false);
-            fetchGameAndTeams();
-          }}
-          gameSlug={game.slug}
-          gameName={game.name}
-          entryFeeInr={game.entryFeeInr}
-          teamId={selectedTeamForPayment?.id}
-          teamName={selectedTeamForPayment?.name}
-          onPaymentSuccess={() => {
-            fetchGameAndTeams();
-          }}
-        />
-      )}
 
       {/* Media Gallery Lightbox Modal */}
       {selectedGalleryIndex !== null && game.gallery && game.gallery[selectedGalleryIndex] && (

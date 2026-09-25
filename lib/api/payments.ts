@@ -92,18 +92,3 @@ export async function getMyPayments(): Promise<PaymentRecord[]> {
 export async function getPaymentStatus(paymentId: string): Promise<PaymentRecord> {
   return apiClient<PaymentRecord>(`/payments/${paymentId}`);
 }
-
-export async function createEscrowOrder(tournamentIdOrPayload: any, teamId?: string): Promise<any> {
-  if (typeof tournamentIdOrPayload === "string") {
-    return initiateGamePayment(tournamentIdOrPayload, teamId);
-  }
-  return initiateGamePayment(
-    tournamentIdOrPayload.game_slug || tournamentIdOrPayload.tournament_id,
-    tournamentIdOrPayload.team_id || teamId,
-    tournamentIdOrPayload.payment_method
-  );
-}
-
-export async function verifyEscrowPayment(payload: any): Promise<any> {
-  return submitPaymentUtr(payload.payment_id || payload.order_id, payload.utr || payload.transaction_id, payload.screenshot_url);
-}

@@ -32,7 +32,7 @@ import {
   useAuth,
   useClerk,
 } from "@clerk/nextjs";
-import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
 
 export default function Header() {
@@ -42,7 +42,7 @@ export default function Header() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { theme, toggleTheme } = useTheme();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { profile: userProfile, isLoading: isProfileLoading } = useAuthContext();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,51 +84,6 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Sync / fetch current user's profile for authoritative role & custom avatar (Partitioned by user.id)
-  useEffect(() => {
-    if (!isSignedIn || !user) {
-      setUserProfile(null);
-      return;
-    }
-
-    const storageKey = `ametheus_user_profile_${user.id}`;
-
-    // 1. Initial immediate restore from user-scoped localStorage
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        setUserProfile(JSON.parse(stored));
-      }
-    } catch {}
-
-    // 2. Fetch authoritative profile from API
-    getCurrentUserProfile()
-      .then((profile) => {
-        if (profile) {
-          setUserProfile(profile);
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(profile));
-          } catch {}
-        }
-      })
-      .catch(() => {
-        // Keep existing profile
-      });
-
-    // 3. Listen for profile updates emitted from Dashboard or avatar upload
-    const handleProfileUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<UserProfile>;
-      if (customEvent.detail) {
-        setUserProfile(customEvent.detail);
-        try {
-          localStorage.setItem(storageKey, JSON.stringify(customEvent.detail));
-        } catch {}
-      }
-    };
-    window.addEventListener("ametheus:profile_updated", handleProfileUpdate);
-    return () => window.removeEventListener("ametheus:profile_updated", handleProfileUpdate);
-  }, [isSignedIn, user]);
 
   const closeAllDropdowns = () => {
     setIsSearchDropdownOpen(false);
@@ -444,20 +399,29 @@ export default function Header() {
 
                   {/* Gamer Tag & Distinct Role Badge */}
                   <div className="hidden sm:flex flex-col text-left">
-                    <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[100px] xl:max-w-[140px]">
-                      {userProfile?.display_name || user?.username || user?.firstName || "Gamer"}
-                    </span>
-                    <span
-                      className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit whitespace-nowrap ${
-                        isSuperAdmin
-                          ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
-                          : role === "ORGANIZER"
-                          ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
-                          : "bg-slate-800/80 text-slate-300 border-slate-700"
-                      }`}
-                    >
-                      {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
-                    </span>
+                    {isProfileLoading ? (
+                      <div className="space-y-1">
+                        <div className="w-16 h-3 bg-slate-700/60 rounded animate-pulse" />
+                        <div className="w-10 h-2 bg-slate-800 rounded animate-pulse" />
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-white font-headline font-bold text-xs tracking-wide group-hover:text-[#E56A10] transition-colors truncate max-w-[100px] xl:max-w-[140px]">
+                          {userProfile?.username || userProfile?.display_name || "Gamer"}
+                        </span>
+                        <span
+                          className={`inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded border w-fit whitespace-nowrap ${
+                            isSuperAdmin
+                              ? "bg-[#E56A10]/20 text-[#FFB68F] border-[#E56A10]/50"
+                              : role === "ORGANIZER"
+                              ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
+                              : "bg-slate-800/80 text-slate-300 border-slate-700"
+                          }`}
+                        >
+                          {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-200 ${isProfileDropdownOpen ? "rotate-180" : ""}`} />
@@ -478,7 +442,7 @@ export default function Header() {
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-white font-headline font-bold text-sm truncate">
-                            {userProfile?.display_name || user?.username || user?.firstName || "Gamer"}
+                            {userProfile?.username || userProfile?.display_name || "Gamer"}
                           </span>
                           <span className="px-1.5 py-0.2 bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/30 text-[9px] font-mono font-bold rounded">
                             {role === "SUPER_ADMIN" ? "SUPER ADMIN" : role}
@@ -490,11 +454,11 @@ export default function Header() {
                       </div>
                     </div>
 
-                    {/* Escrow Wallet Balance */}
+                    {/* Wallet Balance */}
                     <div className="p-3 bg-[#121622] border-b border-[#242C3D] flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Wallet className="w-4 h-4 text-[#E56A10]" />
-                        <span className="text-[11px] font-mono text-[#94A3B8] uppercase">Escrow Wallet</span>
+                        <span className="text-[11px] font-mono text-[#94A3B8] uppercase">Wallet Balance</span>
                       </div>
                       <span className="font-mono font-bold text-white text-xs">
                         ₹{Number(userProfile?.inr_balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}

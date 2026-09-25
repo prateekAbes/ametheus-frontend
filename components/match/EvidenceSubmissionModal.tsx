@@ -200,7 +200,7 @@ export default function EvidenceSubmissionModal({ match, isOpen, onClose, onSucc
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-[11px] text-amber-800">
               <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <span>
-                Submitting fraudulent match screenshots or falsified scores is grounds for permanent squad forfeiture and platform escrow blacklist.
+                Submitting fraudulent match screenshots or falsified scores is grounds for permanent team forfeiture and platform blacklist.
               </span>
             </div>
 

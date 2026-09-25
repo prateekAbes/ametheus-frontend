@@ -136,7 +136,7 @@ function TournamentsContent() {
             TOURNAMENT SCHEDULE &amp; PRIZE POOLS
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
-            Discover upcoming competitive cups across certified esports disciplines. Register verified squads, compete with zero hidden fees, and battle under automated anti-cheat supervision.
+            Discover upcoming competitive cups across certified esports disciplines. Register verified teams, compete with zero hidden fees, and battle under automated anti-cheat supervision.
           </p>
         </div>
       </section>
@@ -296,7 +296,7 @@ function TournamentsContent() {
                       </span>
                     </div>
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
-                      <span className="text-slate-300">{tournament.registeredTeams} / {tournament.maxTeams} SQUADS</span>
+                      <span className="text-slate-300">{tournament.registeredTeams} / {tournament.maxTeams} TEAMS</span>
                       <span className="text-[#E56A10] font-bold text-sm bg-black/60 px-2 py-0.5 rounded border border-[#E56A10]/40">{tournament.prizePool}</span>
                     </div>
                   </div>

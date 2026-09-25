@@ -272,7 +272,13 @@ export default function DashboardPage() {
       // Only send username if the user has changed it from what's stored
       const currentUsername = profile?.username || "";
       if (profileForm.username && profileForm.username !== currentUsername) {
-        updatePayload.username = profileForm.username;
+        const cleanCandidate = profileForm.username.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (cleanCandidate === "admin" && !isSuperAdmin) {
+          showToast("The username 'admin' is strictly reserved for platform administrators.");
+          setIsSavingProfile(false);
+          return;
+        }
+        updatePayload.username = profileForm.username.trim();
       }
       const updated = await updateUserProfile(updatePayload);
       setProfile(updated);
@@ -421,9 +427,9 @@ export default function DashboardPage() {
       setTeams((prev) => [newTeam, ...prev]);
       setIsCreateSquadOpen(false);
       setCreateSquadForm({ name: "", game_slug: "valorant", tag: "" });
-      showToast(`Squad "${newTeam.name}" created! Invite code: ${newTeam.invite_code}`);
+      showToast(`Team "${newTeam.name}" created! Invite code: ${newTeam.invite_code}`);
     } catch (e: any) {
-      showToast(e?.message || "Failed to create squad. Please try again.");
+      showToast(e?.message || "Failed to create team. Please try again.");
     } finally {
       setIsSubmittingSquad(false);
     }
@@ -441,9 +447,9 @@ export default function DashboardPage() {
       setTeams((prev) => [joined, ...prev]);
       setIsJoinSquadOpen(false);
       setJoinInviteCode("");
-      showToast(`Successfully joined squad "${joined.name}"!`);
+      showToast(`Successfully joined team "${joined.name}"!`);
     } catch (e: any) {
-      showToast(e?.message || "Invalid squad invite code");
+      showToast(e?.message || "Invalid team invite code");
     } finally {
       setIsJoiningSquad(false);
     }
@@ -578,9 +584,13 @@ export default function DashboardPage() {
 
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-bold font-headline text-slate-900 dark:text-white uppercase tracking-tight">
-                    {displayName}
-                  </h1>
+                  {isLoading ? (
+                    <div className="h-7 w-44 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+                  ) : (
+                    <h1 className="text-2xl font-bold font-headline text-slate-900 dark:text-white uppercase tracking-tight">
+                      {displayName}
+                    </h1>
+                  )}
                   <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/40 text-[#E56A10] font-mono text-[11px] font-bold uppercase">
                     {effectiveRole}
                   </span>
@@ -593,7 +603,12 @@ export default function DashboardPage() {
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
                   <span className="font-mono text-slate-500 dark:text-slate-400">
-                    Ametheus ID: <span className="font-bold text-slate-900 dark:text-white">{ametheusId}</span>
+                    Ametheus ID:{" "}
+                    {isLoading ? (
+                      <span className="inline-block w-20 h-3.5 bg-slate-200 dark:bg-slate-700 animate-pulse rounded align-middle" />
+                    ) : (
+                      <span className="font-bold text-slate-900 dark:text-white">{ametheusId}</span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -788,7 +803,7 @@ export default function DashboardPage() {
                           {reg.tournament_title || "Official Tournament"}
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                          {reg.team_name ? `Squad: ${reg.team_name}` : "Solo Player Entry"}
+                          {reg.team_name ? `Team: ${reg.team_name}` : "Solo Player Entry"}
                         </p>
                       </div>
                       <div className="pt-2 border-t border-slate-200/60 dark:border-[#242C3D] flex items-center justify-between">
@@ -951,9 +966,9 @@ export default function DashboardPage() {
                               {inviteCode}
                             </span>
                             <button
-                              onClick={() => copyToClipboard(inviteCode, `Squad Code "${inviteCode}" copied!`)}
+                              onClick={() => copyToClipboard(inviteCode, `Team Code "${inviteCode}" copied!`)}
                               className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-                              title="Copy permanent squad code"
+                              title="Copy permanent team code"
                             >
                               <Copy className="w-3 h-3" />
                             </button>
@@ -973,32 +988,32 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Quick Squad Buttons */}
+              {/* Quick Team Buttons */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   onClick={() => setIsCreateSquadOpen(true)}
                   className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Create Squad
+                  Create Team
                 </button>
                 <button
                   onClick={() => setIsJoinSquadOpen(true)}
                   className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  Join via Code
+                  Join Team
                 </button>
               </div>
             </div>
 
-            {/* SECTION: Escrow Wallet & Quick Payout */}
+            {/* SECTION: Competitive Wallet & Quick Payout */}
             <div className="bg-white dark:bg-[#121622] rounded-xl p-5 shadow-xs border border-slate-200 dark:border-[#242C3D] space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#242C3D]">
                 <div className="flex items-center gap-2">
                   <Wallet className="w-4 h-4 text-[#E56A10]" />
                   <h3 className="font-headline text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">
-                    Escrow Wallet
+                    Competitive Wallet
                   </h3>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-mono text-[10px] font-bold">
@@ -1015,7 +1030,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase">Locked in Escrow</span>
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase">Reserved Funds</span>
                     <div className="text-base font-bold font-headline text-[#E56A10] tabular-nums">
                       ₹0
                     </div>
@@ -1114,6 +1129,11 @@ export default function DashboardPage() {
                   maxLength={30}
                   className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10] font-mono"
                 />
+                {profileForm.username.trim().toLowerCase().replace(/[^a-z0-9]/g, "") === "admin" && !isSuperAdmin && (
+                  <p className="text-[11px] text-red-600 dark:text-red-400 font-mono mt-1 font-bold">
+                    Reserved: &apos;admin&apos; is strictly reserved for platform administrators.
+                  </p>
+                )}
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
                   3–30 chars. Letters, numbers, underscores, hyphens, dots only. Must be unique.
                 </p>
@@ -1496,7 +1516,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL 4: Create Squad */}
+      {/* MODAL 4: Create Team */}
       {isCreateSquadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
@@ -1504,7 +1524,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#E56A10]" />
                 <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
-                  Register Competitive Squad
+                  Register Competitive Team
                 </h3>
               </div>
               <button
@@ -1518,7 +1538,7 @@ export default function DashboardPage() {
             <form onSubmit={handleCreateSquad} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
-                  Squad Name *
+                  Team Name *
                 </label>
                 <input
                   type="text"
@@ -1569,14 +1589,14 @@ export default function DashboardPage() {
                 const req = getGameRosterRequirement(createSquadForm.game_slug);
                 return (
                   <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#242C3D] flex items-center justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Required Squad Lineup:</span>
+                    <span className="text-slate-500 dark:text-slate-400">Required Team Lineup:</span>
                     <span className="font-bold text-[#E56A10] bg-[#E56A10]/10 px-2 py-0.5 rounded border border-[#E56A10]/30">{req.label}</span>
                   </div>
                 );
               })()}
 
               <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#242C3D]">
-                You will be assigned as Squad Captain and receive a unique invite code to share with teammates.
+                You will be assigned as Team Captain and receive a unique invite code to share with teammates.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -1593,7 +1613,7 @@ export default function DashboardPage() {
                   className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
                 >
                   {isSubmittingSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  Create Squad
+                  Create Team
                 </button>
               </div>
             </form>
@@ -1601,7 +1621,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL 5: Join Squad via Code */}
+      {/* MODAL 5: Join Team via Code */}
       {isJoinSquadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
@@ -1609,7 +1629,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#E56A10]" />
                 <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
-                  Join Squad via Code
+                  Join Team via Code
                 </h3>
               </div>
               <button
@@ -1623,7 +1643,7 @@ export default function DashboardPage() {
             <form onSubmit={handleJoinSquad} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
-                  Squad Invite Code *
+                  Team Invite Code *
                 </label>
                 <input
                   type="text"
@@ -1636,7 +1656,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#242C3D]">
-                Ask your squad captain for their 6-character squad code. Joining links your player profile to their competitive tournament roster.
+                Ask your team captain for their 6-character team code. Joining links your player profile to their competitive tournament roster.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -1653,7 +1673,7 @@ export default function DashboardPage() {
                   className="px-5 py-2 bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
                 >
                   {isJoiningSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
-                  Join Squad
+                  Join Team
                 </button>
               </div>
             </form>

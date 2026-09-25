@@ -19,7 +19,7 @@ import {
 
 interface FaqItem {
   id: string;
-  category: "squad" | "escrow" | "matches" | "disputes" | "rules";
+  category: "team" | "wallet" | "matches" | "disputes" | "rules";
   categoryLabel: string;
   question: string;
   answer: string;
@@ -27,36 +27,36 @@ interface FaqItem {
 
 const FAQS: FaqItem[] = [
   {
-    id: "faq-squad-create",
-    category: "squad",
-    categoryLabel: "Squad Management",
-    question: "How do I form a tactical squad and invite teammates?",
+    id: "faq-team-create",
+    category: "team",
+    categoryLabel: "Team Management",
+    question: "How do I form a competitive team and invite teammates?",
     answer:
-      "Team creation is strictly anchored within game hubs (e.g. Games → Valorant → Create Squad). Once created, the squad captain receives a unique 6-character cryptographic invite code (e.g. SR7X4K). Teammates enter this code from their Dashboard to instantly join the roster for ₹0.",
+      "Team creation is strictly anchored within game hubs (e.g. Games → Valorant → Create Team). Once created, the team captain receives a unique 6-character cryptographic invite code (e.g. SR7X4K). Teammates enter this code from their game hub or Dashboard to instantly join the roster for free.",
   },
   {
-    id: "faq-squad-limits",
-    category: "squad",
-    categoryLabel: "Squad Management",
+    id: "faq-team-limits",
+    category: "team",
+    categoryLabel: "Team Management",
     question: "Can captains remove members or transfer captaincy?",
     answer:
-      "Yes. Squad captains possess full roster administration controls in their Dashboard, including kicking inactive members, setting in-game handles, or disbanding the squad entirely provided the squad is not currently active in a live tournament bracket.",
+      "Yes. Team captains possess full roster administration controls on the game page, including kicking inactive members, setting in-game handles, or disbanding the team entirely provided the team is not currently active in a live tournament bracket.",
   },
   {
-    id: "faq-escrow-payout",
-    category: "escrow",
-    categoryLabel: "Escrow & Payments",
-    question: "How does the AMETHEUS Platform Escrow Guarantee operate?",
+    id: "faq-wallet-payout",
+    category: "wallet",
+    categoryLabel: "Competitive Wallet & Payouts",
+    question: "How does the AMETHEUS Platform Prize Vault Guarantee operate?",
     answer:
-      "Every tournament entry fee is deposited into a secure escrow holding vault before bracket generation. Upon final match verification by certified arbiters, prize pool funds disburse automatically directly to the registered winners' escrow accounts within 30 minutes.",
+      "Every tournament entry fee is deposited into a secure prize holding vault before bracket generation. Upon final match verification by certified arbiters, prize pool funds disburse automatically directly to the registered winners' wallet accounts within 30 minutes.",
   },
   {
-    id: "faq-escrow-refund",
-    category: "escrow",
-    categoryLabel: "Escrow & Payments",
+    id: "faq-wallet-refund",
+    category: "wallet",
+    categoryLabel: "Competitive Wallet & Payouts",
     question: "What happens if a tournament is cancelled by the organizer?",
     answer:
-      "If a tournament is cancelled in accordance with platform regulations, 100% of collected entry fees are automatically refunded from the escrow vault to the original payment methods within 2 hours, logged tamper-evidently to the SHA-256 audit ledger.",
+      "If a tournament is cancelled in accordance with platform regulations, 100% of collected entry fees are automatically refunded from the prize vault to the original payment methods within 2 hours, logged tamper-evidently to the SHA-256 audit ledger.",
   },
   {
     id: "faq-match-checkin",
@@ -64,7 +64,7 @@ const FAQS: FaqItem[] = [
     categoryLabel: "Match Day Operations",
     question: "What is the check-in protocol and forfeit grace period?",
     answer:
-      "All participating squads must check in within their Match Lobby before scheduled match time. A strict 15-minute grace countdown begins at the scheduled match hour. If a roster fails to check in before the timer expires, the match automatically records a forfeit loss.",
+      "All participating teams must check in within their Match Lobby before scheduled match time. A strict 15-minute grace countdown begins at the scheduled match hour. If a roster fails to check in before the timer expires, the match automatically records a forfeit loss.",
   },
   {
     id: "faq-match-creds",
@@ -103,12 +103,12 @@ const FAQS: FaqItem[] = [
 export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [expandedFaq, setExpandedFaq] = useState<string | null>("faq-squad-create");
+  const [expandedFaq, setExpandedFaq] = useState<string | null>("faq-team-create");
 
   const categories = [
     { id: "all", label: "All Questions" },
-    { id: "squad", label: "Squad Management" },
-    { id: "escrow", label: "Escrow & Payments" },
+    { id: "team", label: "Team Management" },
+    { id: "wallet", label: "Competitive Wallet & Payouts" },
     { id: "matches", label: "Match Operations" },
     { id: "disputes", label: "Disputes & Arbitration" },
     { id: "rules", label: "Anti-Cheat & Rules" },
@@ -136,7 +136,7 @@ export default function HelpPage() {
             Platform Help Center
           </h1>
           <p className="mt-2 text-sm sm:text-base text-[#565E74] max-w-2xl leading-relaxed">
-            Everything you need to know about tactical squad creation, bank-grade escrow prize distribution, match day check-in protocols, and dispute arbitration.
+            Everything you need to know about competitive team creation, prize vault distribution, match day check-in protocols, and dispute arbitration.
           </p>
 
           {/* Search Bar */}

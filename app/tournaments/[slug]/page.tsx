@@ -4,10 +4,8 @@ import { useEffect, use, useState } from "react";
 import { getTournamentBySlug, getTournamentMatches, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
 import Link from "next/link";
 import Image from "next/image";
-import { useTeamStore } from "@/lib/store/team-store";
 import BracketTree from "@/components/tournament/BracketTree";
 import RegisterTournamentModal from "@/components/tournament/RegisterTournamentModal";
-import JoinTeamModal from "@/components/team/JoinTeamModal";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
 import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
 import { MatchLobbyInfo, BracketMatch } from "@/types";
@@ -73,13 +71,11 @@ export default function TournamentDetailPage({ params }: Props) {
   }, [resolvedParams.slug]);
 
   const activeTourn = tournament;
-  const { teams, findTeamByCode } = useTeamStore(activeTourn?.gameSlug);
 
   const [activeTab, setActiveTab] = useState<
     "overview" | "schedule" | "prizes" | "bracket" | "matches" | "rosters"
   >("overview");
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [selectedBracketMatch, setSelectedBracketMatch] = useState<MatchLobbyInfo | null>(null);
   const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<MatchLobbyInfo | null>(null);
@@ -293,7 +289,7 @@ export default function TournamentDetailPage({ params }: Props) {
                   <strong className="text-[#0F172A] dark:text-white">Discipline:</strong> {currentTournament.gameName}
                 </div>
                 <div>
-                  <strong className="text-[#0F172A] dark:text-white">{isSoloGame ? "Contender Lock:" : "Squad Lock:"}</strong> {currentTournament.rosterLockTime}
+                  <strong className="text-[#0F172A] dark:text-white">{isSoloGame ? "Contender Lock:" : "Roster Lock:"}</strong> {currentTournament.rosterLockTime}
                 </div>
                 <div>
                   <strong className="text-[#0F172A] dark:text-white">Launch:</strong> {currentTournament.startsAt}
@@ -309,7 +305,7 @@ export default function TournamentDetailPage({ params }: Props) {
                     Entry Fee Structure
                   </span>
                   <span className="font-bold text-sm text-[#0F172A] dark:text-white">
-                    {isSoloGame ? "Solo Athlete Contender" : "Squad Registration"}
+                    {isSoloGame ? "Solo Athlete Contender" : "Team Registration"}
                   </span>
                 </div>
                 <span className="px-2 py-0.5 bg-[#E56A10]/10 text-[#E56A10] text-[10px] font-mono font-bold rounded">
@@ -321,7 +317,7 @@ export default function TournamentDetailPage({ params }: Props) {
                 <div className="p-3 bg-white dark:bg-[#161A24] rounded border border-[#E56A10]/30">
                   <div className="flex items-baseline justify-between">
                     <span className="text-[11px] font-mono font-bold text-[#E56A10] uppercase">
-                      {isSoloGame ? "Solo Entry" : "Captain Slot (Host)"}
+                      {isSoloGame ? "Solo Entry" : "Team Entry Pass"}
                     </span>
                     <span className="font-headline font-bold text-xl text-[#E56A10]">
                       {currentTournament.entryFee}
@@ -329,8 +325,8 @@ export default function TournamentDetailPage({ params }: Props) {
                   </div>
                   <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] mt-0.5">
                     {isSoloGame
-                      ? "Direct individual contender entry. No squad or team required."
-                      : `Single payment pays for all ${currentTournament.maxTeamSize || 5} team seats.`}
+                      ? "Direct individual contender entry. No team required."
+                      : `Single entry pass covers the entire team roster.`}
                   </p>
                 </div>
 
@@ -338,14 +334,14 @@ export default function TournamentDetailPage({ params }: Props) {
                   <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded border border-emerald-500/30">
                     <div className="flex items-baseline justify-between">
                       <span className="text-[11px] font-mono font-bold text-emerald-800 dark:text-emerald-400 uppercase">
-                        Teammate Slots ({(currentTournament.maxTeamSize || 5) - 1} Players)
+                        Team Roster ({currentTournament.maxTeamSize || 5} Players)
                       </span>
                       <span className="font-headline font-bold text-lg text-emerald-700 dark:text-emerald-400">
-                        ₹0 Free
+                        Included
                       </span>
                     </div>
                     <p className="text-[10px] text-emerald-900 dark:text-emerald-300 mt-0.5">
-                      Join instantly using Captain&apos;s 6-character squad code.
+                      Roster is managed directly on the {currentTournament.gameName} game page.
                     </p>
                   </div>
                 )}
@@ -361,25 +357,15 @@ export default function TournamentDetailPage({ params }: Props) {
                   </button>
                 ) : isRegistered ? (
                   <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 font-bold text-xs rounded text-center font-mono">
-                    ✓ {isSoloGame ? "YOU ARE REGISTERED AS A CONTENDER" : "YOUR SQUAD IS REGISTERED & SEEDED"}
+                    ✓ {isSoloGame ? "YOU ARE REGISTERED AS A CONTENDER" : "YOUR TEAM IS REGISTERED & SEEDED"}
                   </div>
                 ) : (
-                  <>
-                    <button
-                      onClick={() => setIsRegisterModalOpen(true)}
-                      className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs cursor-pointer"
-                    >
-                      {isSoloGame ? "Register as Contender" : "Register Squad"} — {currentTournament.entryFee}
-                    </button>
-                    {!isSoloGame && (
-                      <button
-                        onClick={() => setIsJoinModalOpen(true)}
-                        className="w-full py-2 bg-white dark:bg-[#161A24] hover:bg-[#F1F3F5] dark:hover:bg-[#202534] border border-[#CBD5E1] dark:border-[#242C3D] text-[#0F172A] dark:text-white font-bold text-xs uppercase tracking-wider rounded transition-colors cursor-pointer"
-                      >
-                        Join Squad with Code — ₹0
-                      </button>
-                    )}
-                  </>
+                  <button
+                    onClick={() => setIsRegisterModalOpen(true)}
+                    className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs cursor-pointer"
+                  >
+                    {isSoloGame ? "Register as Contender" : "Register Team"} — {currentTournament.entryFee}
+                  </button>
                 )}
               </div>
             </div>
@@ -401,7 +387,7 @@ export default function TournamentDetailPage({ params }: Props) {
 
             <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
               <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
-                {isSoloGame ? "Contender Format" : "Squad Composition"}
+                {isSoloGame ? "Contender Format" : "Team Composition"}
               </span>
               <div className="text-2xl font-bold font-headline text-[#0F172A] dark:text-white mt-0.5">
                 {isSoloGame ? "1v1 Solo" : `${currentTournament.maxTeamSize || 5} Players`}
@@ -763,7 +749,7 @@ export default function TournamentDetailPage({ params }: Props) {
                 <div className="col-span-2 text-center text-[#64748B] py-8 text-xs font-mono">
                   {isSoloGame
                     ? "No confirmed contenders yet. Register to secure your tournament slot!"
-                    : "No confirmed squads yet. Be the first captain to register your roster!"}
+                    : "No confirmed teams yet. Be the first captain to register your roster!"}
                 </div>
               )}
             </div>
@@ -776,20 +762,9 @@ export default function TournamentDetailPage({ params }: Props) {
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         tournament={currentTournament as any}
-        userTeams={teams}
         onRegistrationSuccess={() => {
           setIsRegistered(true);
         }}
-      />
-
-      {/* Join Team Modal */}
-      <JoinTeamModal
-        isOpen={isJoinModalOpen}
-        onClose={() => setIsJoinModalOpen(false)}
-        gameSlug={currentTournament.gameSlug}
-        gameName={currentTournament.gameName}
-        findTeamByCode={findTeamByCode}
-        onTeamJoined={() => {}}
       />
 
       {/* Match Lobby Modal */}

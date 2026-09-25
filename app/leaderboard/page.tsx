@@ -493,11 +493,11 @@ export default function LeaderboardPage() {
             <div className="bg-white dark:bg-[#121622] p-5 rounded-xl border border-slate-200 dark:border-[#242C3D] shadow-xs flex items-center justify-between transition-colors">
               <div>
                 <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 font-bold">
-                  Verified Squads
+                  Verified Teams
                 </div>
                 <div className="text-2xl font-bold font-headline text-slate-900 dark:text-white">{stats.verified_squads}</div>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-1 font-bold">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Verified &amp; Squad Locked
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Verified &amp; Team Locked
                 </span>
               </div>
               <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] flex items-center justify-center text-slate-700 dark:text-slate-300">
@@ -595,7 +595,7 @@ export default function LeaderboardPage() {
                     : "text-slate-600 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
-                Franchise Squads
+                Franchise Teams
               </button>
               <button
                 onClick={() => setSelectedType("players")}
@@ -635,7 +635,7 @@ export default function LeaderboardPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search squad name, tag, or captain..."
+                placeholder="Search team name, tag, or captain..."
                 className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10] font-mono"
               />
               {searchQuery && (
@@ -838,7 +838,7 @@ export default function LeaderboardPage() {
                 Standings Matrix
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Competitive ranking and rating breakdown ({filteredEntries.length} squads matched)
+                Competitive ranking and rating breakdown ({filteredEntries.length} teams matched)
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -874,7 +874,7 @@ export default function LeaderboardPage() {
                 <div className="py-10 text-center text-slate-500 dark:text-slate-400 font-mono text-xs space-y-2">
                   <Ban className="w-8 h-8 mx-auto text-slate-400" />
                   <div className="text-slate-900 dark:text-white font-bold text-sm mt-2">No Disqualified Entries</div>
-                  <p>No squads or players have been removed from leaderboard standings.</p>
+                  <p>No teams or players have been removed from leaderboard standings.</p>
                 </div>
               ) : (
                 disqualifiedList.map((dq) => (
@@ -910,7 +910,7 @@ export default function LeaderboardPage() {
               <thead>
                 <tr className="bg-slate-100 dark:bg-[#161A24] border-b border-slate-200 dark:border-[#242C3D] text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px]">
                   <th className="py-3 px-4 w-16">Rank</th>
-                  <th className="py-3 px-4">Squad / Captain</th>
+                  <th className="py-3 px-4">Team / Captain</th>
                   <th className="py-3 px-4">Game Title</th>
                   <th className="py-3 px-4 text-center">Matches</th>
                   <th className="py-3 px-4 text-center">Win Rate</th>
@@ -924,7 +924,7 @@ export default function LeaderboardPage() {
                 {filteredEntries.length === 0 ? (
                   <tr>
                     <td colSpan={isSuperAdmin ? 9 : 8} className="py-8 text-center text-slate-500 dark:text-slate-400 font-mono">
-                      No squads matched your current criteria or game filter.
+                      No teams matched your current criteria or game filter.
                     </td>
                   </tr>
                 ) : (
@@ -1112,7 +1112,7 @@ export default function LeaderboardPage() {
 
               <div className="p-2.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-lg text-[11px] font-mono text-rose-700 dark:text-rose-400 flex items-start gap-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-600" />
-                This will immediately remove the squad from all visible leaderboard standings. The record will be preserved in the Disqualified archive for auditing.
+                This will immediately remove the team from all visible leaderboard standings. The record will be preserved in the Disqualified archive for auditing.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -1308,7 +1308,7 @@ export default function LeaderboardPage() {
 
                 <div>
                   <label className="block text-xs font-mono text-slate-900 dark:text-slate-200 uppercase font-bold mb-1">
-                    Verified Squads *
+                    Verified Teams *
                   </label>
                   <input
                     type="text"
@@ -1403,7 +1403,7 @@ export default function LeaderboardPage() {
                     onChange={(e) => setEntryForm({ ...entryForm, type: e.target.value as "team" | "player" })}
                     className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="team">Franchise Squad</option>
+                    <option value="team">Franchise Team</option>
                     <option value="player">Individual Athlete</option>
                   </select>
                 </div>
@@ -1445,7 +1445,7 @@ export default function LeaderboardPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-mono text-slate-900 dark:text-slate-200 uppercase font-bold mb-1">
-                    Squad / Contender Name *
+                    Team / Contender Name *
                   </label>
                   <input
                     type="text"

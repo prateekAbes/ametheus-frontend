@@ -282,7 +282,7 @@ export default function AdminCockpitPage() {
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
   const [approvingWithdrawal, setApprovingWithdrawal] = useState<WithdrawalRequest | null>(null);
   const [payoutReference, setPayoutReference] = useState("");
-  const [approvalNotes, setApprovalNotes] = useState("Approved and disbursed via UPI escrow gateway");
+  const [approvalNotes, setApprovalNotes] = useState("Approved and disbursed via UPI payout gateway");
 
   // Persona & Avatar Pool State
   const [personaPool, setPersonaPool] = useState<PersonaPool>({
@@ -487,7 +487,7 @@ export default function AdminCockpitPage() {
     }
   };
 
-  const handleSetUserRole = async (userId: string, newRole: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN" | "TOURNAMENT_ADMIN" | "MATCH_ARBITER" | "COMMUNITY_MODERATOR", username: string) => {
+  const handleSetUserRole = async (userId: string, newRole: "PLAYER" | "ORGANIZER" | "SUPER_ADMIN", username: string) => {
     try {
       await setUserRole(userId, newRole as any);
       setActionMessage(`User @${username} role updated to ${newRole}.`);
@@ -1584,7 +1584,7 @@ export default function AdminCockpitPage() {
                     : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
                 }`}
               >
-                <Wallet className="w-3.5 h-3.5" /> Escrow Approvals
+                <Wallet className="w-3.5 h-3.5" /> Payout Approvals
                 {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length > 0 && (
                   <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
                     {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length}
@@ -2111,29 +2111,23 @@ export default function AdminCockpitPage() {
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-2 border-t border-slate-200">
                         <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                          <span className="text-[#64748B] block text-[9px] uppercase">Entry Fee</span>
-                          <span className="text-emerald-700 font-bold">
-                            {game.entry_fee_inr ? `₹${game.entry_fee_inr.toLocaleString("en-IN")}` : "FREE"}
-                          </span>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
                           <span className="text-[#64748B] block text-[9px] uppercase">Prize Pool</span>
                           <span className="text-[#E56A10] font-bold">
                             ₹{(game.prize_pool_inr || 0).toLocaleString("en-IN")}
                           </span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                          <span className="text-[#64748B] block text-[9px] uppercase">Squad Format</span>
+                          <span className="text-[#64748B] block text-[9px] uppercase">Team Format</span>
                           <span className="text-slate-900 font-bold">
-                            {game.is_team_game
+                            {game.is_team_game && (game.max_team_size || 1) > 1
                               ? `${game.min_team_size}-${game.max_team_size} Athletes`
-                              : "1v1 Solo"}
+                              : "Solo (1v1)"}
                           </span>
                         </div>
-                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                          <span className="text-[#64748B] block text-[9px] uppercase">Teams Enrolled</span>
+                        <div className="bg-slate-50 p-2 rounded border border-slate-200 col-span-2">
+                          <span className="text-[#64748B] block text-[9px] uppercase">Active Teams</span>
                           <span className="text-blue-700 font-bold">
-                            {game.teams_count || 0} Squads
+                            {game.teams_count || 0} Teams Registered
                           </span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded border border-slate-200 col-span-2">
@@ -2596,9 +2590,6 @@ export default function AdminCockpitPage() {
                           >
                             <option value="PLAYER">Player (Standard)</option>
                             <option value="ORGANIZER">Organizer</option>
-                            <option value="COMMUNITY_MODERATOR">Community Moderator</option>
-                            <option value="MATCH_ARBITER">Match Arbiter</option>
-                            <option value="TOURNAMENT_ADMIN">Tournament Admin</option>
                             <option value="SUPER_ADMIN">Super Admin</option>
                           </select>
                         ) : (
@@ -2927,7 +2918,7 @@ export default function AdminCockpitPage() {
           </div>
         )}
 
-        {/* TAB 8: PAYOUT APPROVALS & ESCROW WITHDRAWALS */}
+        {/* TAB 8: PAYOUT APPROVALS & WITHDRAWALS */}
         {activeTab === "withdrawals" && isSuperAdmin && (
           <div className="space-y-6">
             {/* Header / Filter Toolbar */}
@@ -2937,7 +2928,7 @@ export default function AdminCockpitPage() {
                   <DollarSign className="w-5 h-5 text-[#E56A10]" /> Tournament Prize Payout Approvals
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                  All athlete withdrawals require Super Admin verification before UPI / IMPS escrow release.
+                  All athlete withdrawals require Super Admin verification before UPI / IMPS payout release.
                 </p>
               </div>
             </div>
@@ -4170,19 +4161,6 @@ export default function AdminCockpitPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Entry Fee (₹ INR)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={gameForm.entry_fee_inr ?? 0}
-                    onChange={(e) => setGameForm({ ...gameForm, entry_fee_inr: parseInt(e.target.value) || 0 })}
-                    placeholder="0 = Free"
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
-                </div>
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
@@ -4682,7 +4660,7 @@ export default function AdminCockpitPage() {
                     }`}>
                       {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1
                         ? "SOLO CONTENDER (1v1)"
-                        : `SQUAD / CLAN (${tournForm.min_team_size}v${tournForm.max_team_size})`}
+                        : `TEAM (${tournForm.min_team_size}v${tournForm.max_team_size})`}
                     </span>
                   </div>
 
@@ -4746,9 +4724,9 @@ export default function AdminCockpitPage() {
                         <Users className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="font-bold text-xs text-slate-900 font-mono">Team / Squad Tournament</div>
+                        <div className="font-bold text-xs text-slate-900 font-mono">Team Tournament</div>
                         <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-                          Designed for squad games (Valorant 5v5, BGMI 4v4). Captain registers squad and invites teammates via invite code.
+                          Designed for team games (Valorant 5v5, BGMI 4v4). Captain registers team and invites teammates via invite code.
                         </p>
                       </div>
                     </button>
@@ -4875,7 +4853,7 @@ export default function AdminCockpitPage() {
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Registration Lock Time *" : "Squad / Lineup Lock Time *"}
+                    {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Registration Lock Time *" : "Team / Lineup Lock Time *"}
                   </label>
                   <input
                     type="text"
@@ -4916,7 +4894,7 @@ export default function AdminCockpitPage() {
                 <div className="grid grid-cols-3 gap-2 sm:col-span-2">
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Max Contenders" : "Max Squads"}
+                      {Number(tournForm.min_team_size) === 1 && Number(tournForm.max_team_size) === 1 ? "Max Contenders" : "Max Teams"}
                     </label>
                     <input
                       type="number"
@@ -5276,7 +5254,7 @@ export default function AdminCockpitPage() {
               </div>
 
               <div className="p-3 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-500 dark:text-slate-400">
-                <span className="text-[#E56A10] font-bold">Auto-Rank Calculation:</span> The leaderboard engine will automatically aggregate match results and rank all qualifying squads and players in real-time.
+                <span className="text-[#E56A10] font-bold">Auto-Rank Calculation:</span> The leaderboard engine will automatically aggregate match results and rank all qualifying teams and players in real-time.
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-[#242C3D]">

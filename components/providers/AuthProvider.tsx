@@ -62,19 +62,11 @@ function AuthSync({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // User-scoped localStorage keys — multiple accounts never share state
+    // User-scoped localStorage keys
     const storageKey = `ametheus_user_profile_${user.id}`;
     const identityKey = `ametheus_gamer_identity_${user.id}`;
 
-    // 1. Instant paint from user-scoped cache
-    try {
-      const cached = localStorage.getItem(storageKey);
-      if (cached) {
-        setProfile(JSON.parse(cached));
-      }
-    } catch {}
-
-    // 2. Sync with backend (upsert user record)
+    // 1. Sync with backend (upsert user record)
     const email =
       user.primaryEmailAddress?.emailAddress || `${user.id}@ametheus.gg`;
     const username =

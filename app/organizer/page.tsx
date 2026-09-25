@@ -228,7 +228,7 @@ export default function OrganizerCockpitPage() {
                   }`}>
                     {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1
                       ? "SOLO CONTENDER (1v1)"
-                      : `SQUAD / CLAN (${formData.min_team_size}v${formData.max_team_size})`}
+                      : `TEAM (${formData.min_team_size}v${formData.max_team_size})`}
                   </span>
                 </div>
 
@@ -292,9 +292,9 @@ export default function OrganizerCockpitPage() {
                       <Users className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="font-bold text-xs text-slate-900 font-mono">Team / Squad Tournament</div>
+                      <div className="font-bold text-xs text-slate-900 font-mono">Team Tournament</div>
                       <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-                        For squad games (Valorant 5v5, BGMI 4v4). Captain registers squad and invites teammates.
+                        For team games (Valorant 5v5, BGMI 4v4). Captain registers team and invites teammates.
                       </p>
                     </div>
                   </button>
@@ -338,7 +338,7 @@ export default function OrganizerCockpitPage() {
 
               <div className="space-y-1">
                 <label className="text-slate-700 uppercase font-semibold">
-                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Registration Lock Time" : "Squad Lock Time"}
+                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Registration Lock Time" : "Team Lock Time"}
                 </label>
                 <input
                   type="text"
@@ -351,7 +351,7 @@ export default function OrganizerCockpitPage() {
 
               <div className="space-y-1">
                 <label className="text-slate-700 uppercase font-semibold">
-                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Max Contenders" : "Max Squads"}
+                  {Number(formData.min_team_size) === 1 && Number(formData.max_team_size) === 1 ? "Max Contenders" : "Max Teams"}
                 </label>
                 <input
                   type="number"
@@ -477,7 +477,7 @@ export default function OrganizerCockpitPage() {
                       <span className="text-slate-900 dark:text-white font-bold">{t.prize_pool}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block">Squads Enrolled</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block">Teams Enrolled</span>
                       <span className="text-slate-900 dark:text-white font-bold">
                         {t.registered_teams} / {t.max_teams}
                       </span>

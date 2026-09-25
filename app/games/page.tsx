@@ -83,7 +83,7 @@ export default function GamesDirectoryPage() {
                 SUPPORTED COMPETITIVE DISCIPLINES
               </h1>
               <p className="text-sm text-[#475569] dark:text-[#94A3B8] max-w-3xl leading-relaxed">
-                Explore sanctioned esports tournaments across official competitive titles. Select your game to enter dedicated hubs, view rulebooks, deploy anti-cheat verifications, and manage verified squad lineups.
+                Explore sanctioned esports tournaments across official competitive titles. Select your game to enter dedicated hubs, view rulebooks, deploy anti-cheat verifications, and manage verified team lineups.
               </p>
             </div>
 
@@ -103,7 +103,7 @@ export default function GamesDirectoryPage() {
                 </div>
                 <div className="p-3 bg-white dark:bg-[#161A24] rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
                   <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
-                    Active Squads
+                    Active Teams
                   </span>
                   <span className="text-2xl font-bold font-headline text-[#E56A10] block tabular-nums">
                     {games.reduce((acc, g) => acc + (g.teamsCount || 0), 0)}
@@ -234,10 +234,10 @@ export default function GamesDirectoryPage() {
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        {game.teamsCount || 0} SQUADS
+                        {game.teamsCount || 0} TEAMS
                       </span>
-                      <span className="bg-black/60 px-2 py-0.5 rounded text-[11px]">
-                        {game.entryFeeInr > 0 ? `ENTRY ₹${game.entryFeeInr}` : "FREE ENTRY"}
+                      <span className="bg-black/60 px-2 py-0.5 rounded text-[11px] text-[#CBD5E1]">
+                        {game.antiCheat}
                       </span>
                     </div>
                   </div>
@@ -267,7 +267,7 @@ export default function GamesDirectoryPage() {
                           Game Format
                         </span>
                         <span className="text-xs font-bold text-[#0F172A] dark:text-white font-mono block mt-0.5">
-                          {game.isTeamGame ? `${game.minTeamSize}v${game.minTeamSize} Squad` : "Solo 1v1"}
+                          {game.isTeamGame && game.maxTeamSize > 1 ? `${game.maxTeamSize}v${game.maxTeamSize} Team` : "Solo (1v1)"}
                         </span>
                       </div>
                     </div>
