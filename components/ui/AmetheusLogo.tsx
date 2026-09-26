@@ -8,13 +8,13 @@ interface AmetheusLogoProps {
 
 export default function AmetheusLogo({
   className = "h-8 w-auto",
-  width = 260,
+  width = 172,
   height = 36,
 }: AmetheusLogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 260 36"
+      viewBox="0 0 172 36"
       role="img"
       aria-labelledby="ametheus-logo-title"
       width={width}

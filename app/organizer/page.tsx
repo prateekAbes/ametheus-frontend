@@ -352,7 +352,6 @@ export default function OrganizerCockpitPage() {
                   >
                     <option value="Best of 1">Best of 1</option>
                     <option value="Best of 3">Best of 3</option>
-                    <option value="Best of 5">Best of 5</option>
                   </select>
                 </div>
               </div>

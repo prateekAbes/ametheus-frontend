@@ -308,3 +308,58 @@ export async function updateTournamentStageFormats(
   });
 }
 
+export interface TournamentHistoryResponse {
+  tournament_id: string;
+  tournament_name: string;
+  tournament_status: string;
+  live_stream_url?: string;
+  stages: Array<{
+    stage_id: string;
+    stage_name: string;
+    stage_order: number;
+    stage_format: string;
+    rounds: Array<{
+      round_id: string;
+      round_name: string;
+      round_order: number;
+      series_format: string;
+      matches: Array<any>;
+    }>;
+  }>;
+  matches: Array<any>;
+}
+
+export interface TeamJourneyStep {
+  match_id: string;
+  stage_id?: string;
+  stage_name: string;
+  round_id?: string;
+  round_name: string;
+  match_number: number;
+  series_format: string;
+  opponent_id?: string;
+  opponent_name?: string;
+  score: string;
+  result: "WIN" | "LOSS" | "DRAW" | "PENDING";
+  status: string;
+  scheduled_time?: string;
+  advancement?: any;
+}
+
+export interface TeamJourneyResponse {
+  tournament_id: string;
+  tournament_name: string;
+  team_id: string;
+  team_name: string;
+  journey: TeamJourneyStep[];
+}
+
+export async function getTournamentHistory(tournamentId: string): Promise<TournamentHistoryResponse> {
+  return apiClient<TournamentHistoryResponse>(`/tournaments/${tournamentId}/history`);
+}
+
+export async function getTeamJourney(tournamentId: string, teamId: string): Promise<TeamJourneyResponse> {
+  return apiClient<TeamJourneyResponse>(`/tournaments/${tournamentId}/teams/${teamId}/journey`);
+}
+
+

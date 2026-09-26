@@ -99,26 +99,6 @@ export async function getMyWithdrawals(): Promise<WithdrawalRequest[]> {
   return apiClient<WithdrawalRequest[]>("/wallet/withdrawals/my");
 }
 
-export async function getAdminWithdrawals(): Promise<WithdrawalRequest[]> {
-  return apiClient<WithdrawalRequest[]>("/admin/payouts");
-}
-
-export async function approveWithdrawal(id: string, payload?: any): Promise<{ status: string; message: string }> {
-  const outgoingUtr = typeof payload === "string" ? payload : payload?.payout_reference || payload?.outgoing_utr || "APPROVED_BY_ADMIN";
-  return apiClient(`/admin/payouts/${id}/complete`, {
-    method: "POST",
-    body: JSON.stringify({ outgoing_utr: outgoingUtr }),
-  });
-}
-
-export async function rejectWithdrawal(id: string, payload?: any): Promise<{ status: string; message: string }> {
-  const reason = typeof payload === "string" ? payload : payload?.reason || payload?.rejection_reason || "Declined by admin";
-  return apiClient(`/admin/payouts/${id}/reject`, {
-    method: "POST",
-    body: JSON.stringify({ rejection_reason: reason }),
-  });
-}
-
 export async function depositFunds(amountInr: number): Promise<{
   payment_id: string;
   amount_inr: number;

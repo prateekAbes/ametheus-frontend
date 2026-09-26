@@ -165,17 +165,17 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
-        <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 md:pl-8 md:pr-10 lg:pr-14 xl:pr-16 flex items-center justify-between gap-2 lg:gap-3">
-          {/* Brand Logo (Enlarged Stitch Brandmark) */}
-          <div className="flex items-center gap-2.5 shrink-0">
+        <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2 lg:gap-3">
+          {/* Brand Logo */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <Link
               href="/"
               onClick={closeAllDropdowns}
-              className="flex items-center gap-2 group py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] rounded"
+              className="flex items-center gap-1.5 group py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] rounded"
             >
               <AmetheusLogo className="h-7 sm:h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]" />
             </Link>
-            <span className="hidden 2xl:inline-flex px-2 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase">
+            <span className="hidden sm:inline-flex px-1.5 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase whitespace-nowrap">
               PRO ARENA
             </span>
           </div>

@@ -141,16 +141,6 @@ export default function Footer() {
                   <span className="text-[#FF0000] font-bold">●</span> YouTube Channel
                 </a>
               </li>
-              <li>
-                <a
-                  href={SOCIAL_LINKS.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <span className="text-[#E56A10] font-bold">●</span> Official Website (ametheus.gg)
-                </a>
-              </li>
               {hasPrivileges && (
                 <li className="pt-2">
                   <Link href="/admin" className="text-xs text-[#E56A10] hover:underline font-mono font-medium">

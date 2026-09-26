@@ -68,6 +68,25 @@ import {
   deleteMatchAdmin,
   markMatchLiveAdmin,
   completeMatchAdmin,
+  getTournamentStages,
+  createTournamentStage,
+  updateTournamentStage,
+  deleteTournamentStage,
+  reorderTournamentStages,
+  createStageRound,
+  updateStageRound,
+  deleteStageRound,
+  createStageMatch,
+  swapMatchTeams,
+  getMatchAdvancementOptions,
+  advanceMatchWinner,
+  revertMatchAdvancement,
+  updateTournamentStream,
+  getWalletAuditLogs,
+  WalletAuditSummary,
+  WalletAuditLogItem,
+  AdminTournamentStage,
+  AdminStageRound,
   TournamentRegisteredRostersResponse,
   RegisteredRosterTeam,
   AdminMatchSetupItem,
@@ -97,7 +116,14 @@ import {
   Game,
   GameCreatePayload,
 } from "@/lib/api/games";
-import { getTournaments, Tournament } from "@/lib/api/tournaments";
+import {
+  getTournaments,
+  Tournament,
+  getTournamentHistory,
+  getTeamJourney,
+  TournamentHistoryResponse,
+  TeamJourneyResponse,
+} from "@/lib/api/tournaments";
 import {
   createTournament,
   updateTournament,
@@ -114,11 +140,7 @@ import {
   LeaderboardCategoryCreatePayload,
 } from "@/lib/api/leaderboard";
 import {
-  getAdminWithdrawals,
-  approveWithdrawal,
-  rejectWithdrawal,
   requestWithdrawal,
-  WithdrawalRequest,
 } from "@/lib/api/wallet";
 import {
   getPersonaPool,
@@ -162,7 +184,7 @@ export default function AdminCockpitPage() {
     | "leaderboards"
     | "users"
     | "audit"
-    | "withdrawals"
+    | "wallet_audit"
     | "personas"
     | "upi_accounts"
     | "payment_verifications"
@@ -306,15 +328,87 @@ export default function AdminCockpitPage() {
     description: "",
   });
 
-  // Withdrawals State (Payout Approvals)
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
-  const [withdrawalFilter, setWithdrawalFilter] = useState<"ALL" | "PENDING_APPROVAL" | "COMPLETED" | "REJECTED">("ALL");
-  const [rejectingWithdrawal, setRejectingWithdrawal] = useState<WithdrawalRequest | null>(null);
-  const [rejectReason, setRejectReason] = useState("UPI ID invalid or inactive with banking handle");
-  const [isProcessingWithdrawal, setIsProcessingWithdrawal] = useState(false);
-  const [approvingWithdrawal, setApprovingWithdrawal] = useState<WithdrawalRequest | null>(null);
-  const [payoutReference, setPayoutReference] = useState("");
-  const [approvalNotes, setApprovalNotes] = useState("Approved and disbursed via UPI payout gateway");
+  // Wallet Audit Logs State
+  const [walletAuditSummary, setWalletAuditSummary] = useState<WalletAuditSummary | null>(null);
+  const [walletAuditLoading, setWalletAuditLoading] = useState(false);
+  const [walletAuditSearch, setWalletAuditSearch] = useState("");
+  const [walletAuditTypeFilter, setWalletAuditTypeFilter] = useState("ALL");
+
+  // Dynamic Stages & Rounds Management State
+  const [tournamentStages, setTournamentStages] = useState<AdminTournamentStage[]>([]);
+  const [loadingStages, setLoadingStages] = useState(false);
+  const [isStageModalOpen, setIsStageModalOpen] = useState(false);
+  const [editingStage, setEditingStage] = useState<AdminTournamentStage | null>(null);
+  const [stageForm, setStageForm] = useState<{
+    name: string;
+    format: string;
+    series_format: string;
+    advancing_teams_count: number;
+  }>({
+    name: "",
+    format: "KNOCKOUT",
+    series_format: "BO3",
+    advancing_teams_count: 2,
+  });
+
+  // Dynamic Rounds State
+  const [isRoundModalOpen, setIsRoundModalOpen] = useState(false);
+  const [activeStageForRound, setActiveStageForRound] = useState<string | null>(null);
+  const [editingRound, setEditingRound] = useState<AdminStageRound | null>(null);
+  const [roundForm, setRoundForm] = useState<{
+    name: string;
+    series_format: string;
+    scheduled_date: string;
+    scheduled_time: string;
+  }>({
+    name: "",
+    series_format: "BO3",
+    scheduled_date: "",
+    scheduled_time: "",
+  });
+
+  // Dynamic Match Creation inside Round State
+  const [isStageMatchModalOpen, setIsStageMatchModalOpen] = useState(false);
+  const [matchTargetStageId, setMatchTargetStageId] = useState<string | null>(null);
+  const [matchTargetRoundId, setMatchTargetRoundId] = useState<string | null>(null);
+  const [stageMatchForm, setStageMatchForm] = useState<{
+    team_a_id: string;
+    team_b_id: string;
+    series_format: string;
+    scheduled_date: string;
+    scheduled_time: string;
+    youtube_live_url: string;
+  }>({
+    team_a_id: "",
+    team_b_id: "",
+    series_format: "BO3",
+    scheduled_date: "",
+    scheduled_time: "",
+    youtube_live_url: "",
+  });
+
+  // Advancement & Progression State
+  const [advancementModalMatch, setAdvancementModalMatch] = useState<any | null>(null);
+  const [advancementOptions, setAdvancementOptions] = useState<any | null>(null);
+  const [loadingAdvancementOptions, setLoadingAdvancementOptions] = useState(false);
+  const [selectedAdvancementWinnerId, setSelectedAdvancementWinnerId] = useState<string>("");
+  const [destStageId, setDestStageId] = useState("");
+  const [destRoundId, setDestRoundId] = useState("");
+  const [destMatchId, setDestMatchId] = useState("");
+  const [destSlot, setDestSlot] = useState<"team_a" | "team_b">("team_a");
+  const [isSubmittingAdvancement, setIsSubmittingAdvancement] = useState(false);
+
+  // Tournament Stream State
+  const [tournamentLiveStreamUrl, setTournamentLiveStreamUrl] = useState("");
+  const [isSavingTournamentStream, setIsSavingTournamentStream] = useState(false);
+
+  // Tournament History & Journey State
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [tournamentHistoryData, setTournamentHistoryData] = useState<TournamentHistoryResponse | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedJourneyTeamId, setSelectedJourneyTeamId] = useState<string>("");
+  const [teamJourneyData, setTeamJourneyData] = useState<TeamJourneyResponse | null>(null);
+  const [loadingJourney, setLoadingJourney] = useState(false);
 
   // Persona & Avatar Pool State
   const [personaPool, setPersonaPool] = useState<PersonaPool>({
@@ -399,7 +493,7 @@ export default function AdminCockpitPage() {
   // Live Matches Command Center State
   const [liveDashboard, setLiveDashboard] = useState<LiveDashboardData | null>(null);
   const [isLoadingLiveDash, setIsLoadingLiveDash] = useState(false);
-  const [liveDashTab, setLiveDashTab] = useState<"builder" | "scheduled" | "live" | "completed" | "ready">("builder");
+  const [liveDashTab, setLiveDashTab] = useState<"stages" | "builder" | "scheduled" | "live" | "completed" | "ready">("stages");
 
   // Selected Tournament in Live Matches
   const [selectedLiveTournamentId, setSelectedLiveTournamentId] = useState<string>("");
@@ -518,6 +612,13 @@ export default function AdminCockpitPage() {
         setBuilderTeam1Id("");
         setBuilderTeam2Id("");
       }
+      try {
+        const res = await getTournamentStages(tournamentId);
+        setTournamentStages(res.stages || []);
+        if (res.live_stream_url) {
+          setTournamentLiveStreamUrl(res.live_stream_url);
+        }
+      } catch (_) {}
     } catch (err: any) {
       console.warn("Failed to load registered rosters:", err);
       setRostersData(null);
@@ -592,7 +693,7 @@ export default function AdminCockpitPage() {
         gamesRes,
         tournRes,
         catsRes,
-        withdrawalsRes,
+        walletAuditRes,
         personaRes,
         upiRes,
         paymentsRes,
@@ -607,7 +708,7 @@ export default function AdminCockpitPage() {
         getGames(),
         getTournaments(),
         getLeaderboardCategories(),
-        getAdminWithdrawals(),
+        getWalletAuditLogs(),
         getPersonaPool(),
         getAdminUpiAccounts(),
         getAdminPayments(),
@@ -661,8 +762,8 @@ export default function AdminCockpitPage() {
       if (catsRes.status === "fulfilled" && Array.isArray(catsRes.value)) {
         setLeaderboardCategories(catsRes.value);
       }
-      if (withdrawalsRes.status === "fulfilled" && Array.isArray(withdrawalsRes.value)) {
-        setWithdrawals(withdrawalsRes.value);
+      if (walletAuditRes.status === "fulfilled" && walletAuditRes.value) {
+        setWalletAuditSummary(walletAuditRes.value);
       }
       if (personaRes.status === "fulfilled" && personaRes.value && Array.isArray(personaRes.value.names)) {
         setPersonaPool(personaRes.value);
@@ -1239,46 +1340,314 @@ export default function AdminCockpitPage() {
     }
   };
 
-  // Withdrawal Payout Approval Handlers
-  const handleApprovePayout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!approvingWithdrawal) return;
-    setIsProcessingWithdrawal(true);
+  // ── Wallet Audit Logs Handlers ───────────────────────────────────────────────
+  const loadWalletAuditLogs = useCallback(
+    async (search?: string, type?: string) => {
+      setWalletAuditLoading(true);
+      try {
+        const data = await getWalletAuditLogs({
+          search: search !== undefined ? search : walletAuditSearch,
+          txn_type: type !== undefined ? type : walletAuditTypeFilter,
+        });
+        setWalletAuditSummary(data);
+      } catch (err: any) {
+        console.error("Failed to load wallet audit logs:", err);
+      } finally {
+        setWalletAuditLoading(false);
+      }
+    },
+    [walletAuditSearch, walletAuditTypeFilter]
+  );
+
+  // ── Dynamic Tournament Stages & Rounds Handlers ──────────────────────────────
+  const handleLoadStages = useCallback(async (tournamentId: string) => {
+    if (!tournamentId) {
+      setTournamentStages([]);
+      return;
+    }
+    setLoadingStages(true);
     try {
-      await approveWithdrawal(approvingWithdrawal.id, {
-        payout_reference: payoutReference || `UPI/${Date.now().toString().slice(-8)}`,
-        admin_notes: approvalNotes,
-      });
-      setActionMessage(`Payout of ₹${approvingWithdrawal.amount.toLocaleString("en-IN")} to @${approvingWithdrawal.user_name} approved!`);
-      setApprovingWithdrawal(null);
-      setPayoutReference("");
-      await loadAdminData();
-      setTimeout(() => setActionMessage(""), 5000);
+      const res = await getTournamentStages(tournamentId);
+      setTournamentStages(res.stages || []);
+      if (res.live_stream_url) {
+        setTournamentLiveStreamUrl(res.live_stream_url);
+      }
     } catch (err: any) {
-      setActionMessage(err?.message || "Failed to approve payout.");
-      setTimeout(() => setActionMessage(""), 6000);
+      console.error("Failed to load stages:", err);
     } finally {
-      setIsProcessingWithdrawal(false);
+      setLoadingStages(false);
+    }
+  }, []);
+
+  const handleCreateStage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLiveTournamentId) return;
+    try {
+      await createTournamentStage(selectedLiveTournamentId, stageForm);
+      setActionMessage(`Stage "${stageForm.name}" created!`);
+      setIsStageModalOpen(false);
+      setStageForm({ name: "", format: "KNOCKOUT", series_format: "BO3", advancing_teams_count: 2 });
+      await handleLoadStages(selectedLiveTournamentId);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to create stage");
     }
   };
 
-  const handleRejectPayout = async (e: React.FormEvent) => {
+  const handleUpdateStage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectingWithdrawal) return;
-    setIsProcessingWithdrawal(true);
+    if (!selectedLiveTournamentId || !editingStage) return;
     try {
-      await rejectWithdrawal(rejectingWithdrawal.id, {
-        admin_notes: rejectReason,
+      await updateTournamentStage(selectedLiveTournamentId, editingStage.stage_id, stageForm);
+      setActionMessage(`Stage "${stageForm.name}" updated!`);
+      setEditingStage(null);
+      await handleLoadStages(selectedLiveTournamentId);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to update stage");
+    }
+  };
+
+  const handleDeleteStage = async (stageId: string, stageName: string) => {
+    if (!selectedLiveTournamentId) return;
+    if (!confirm(`Delete stage "${stageName}"? All its rounds and matches will also be deleted.`)) return;
+    try {
+      await deleteTournamentStage(selectedLiveTournamentId, stageId);
+      setActionMessage(`Stage "${stageName}" deleted.`);
+      await handleLoadStages(selectedLiveTournamentId);
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete stage");
+    }
+  };
+
+  const handleMoveStage = async (index: number, direction: "UP" | "DOWN") => {
+    if (!selectedLiveTournamentId || tournamentStages.length < 2) return;
+    const targetIndex = direction === "UP" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= tournamentStages.length) return;
+
+    const reordered = [...tournamentStages];
+    const temp = reordered[index];
+    reordered[index] = reordered[targetIndex];
+    reordered[targetIndex] = temp;
+
+    const stageIds = reordered.map((s) => s.stage_id);
+    try {
+      await reorderTournamentStages(selectedLiveTournamentId, stageIds);
+      setTournamentStages(reordered);
+      setActionMessage("Stages reordered!");
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to reorder stages");
+    }
+  };
+
+  const handleCreateRound = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLiveTournamentId || !activeStageForRound) return;
+    try {
+      await createStageRound(selectedLiveTournamentId, activeStageForRound, roundForm);
+      setActionMessage(`Round "${roundForm.name}" created!`);
+      setIsRoundModalOpen(false);
+      setActiveStageForRound(null);
+      setRoundForm({ name: "", series_format: "BO3", scheduled_date: "", scheduled_time: "" });
+      await handleLoadStages(selectedLiveTournamentId);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to create round");
+    }
+  };
+
+  const handleUpdateRound = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLiveTournamentId || !activeStageForRound || !editingRound) return;
+    try {
+      await updateStageRound(selectedLiveTournamentId, activeStageForRound, editingRound.round_id, roundForm);
+      setActionMessage(`Round "${roundForm.name}" updated!`);
+      setEditingRound(null);
+      setActiveStageForRound(null);
+      await handleLoadStages(selectedLiveTournamentId);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to update round");
+    }
+  };
+
+  const handleDeleteRound = async (stageId: string, roundId: string, roundName: string) => {
+    if (!selectedLiveTournamentId) return;
+    if (!confirm(`Delete round "${roundName}"? All matches in this round will be deleted.`)) return;
+    try {
+      await deleteStageRound(selectedLiveTournamentId, stageId, roundId);
+      setActionMessage(`Round "${roundName}" deleted.`);
+      await handleLoadStages(selectedLiveTournamentId);
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete round");
+    }
+  };
+
+  const handleCreateStageMatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLiveTournamentId || !matchTargetStageId || !matchTargetRoundId) return;
+    const teamA = rostersData?.teams?.find((t) => t.team_id === stageMatchForm.team_a_id);
+    const teamB = rostersData?.teams?.find((t) => t.team_id === stageMatchForm.team_b_id);
+
+    try {
+      await createStageMatch(selectedLiveTournamentId, matchTargetStageId, matchTargetRoundId, {
+        team_a_id: stageMatchForm.team_a_id || undefined,
+        team_b_id: stageMatchForm.team_b_id || undefined,
+        team_a_name: teamA?.team_name || (stageMatchForm.team_a_id ? "Team A" : "TBD"),
+        team_b_name: teamB?.team_name || (stageMatchForm.team_b_id ? "Team B" : "TBD"),
+        series_format: stageMatchForm.series_format,
+        scheduled_date: stageMatchForm.scheduled_date || undefined,
+        scheduled_time: stageMatchForm.scheduled_time || undefined,
+        youtube_live_url: stageMatchForm.youtube_live_url || undefined,
       });
-      setActionMessage(`Withdrawal request rejected and ₹${rejectingWithdrawal.amount.toLocaleString("en-IN")} refunded to @${rejectingWithdrawal.user_name}'s wallet.`);
-      setRejectingWithdrawal(null);
+      setActionMessage("Match scheduled inside round!");
+      setIsStageMatchModalOpen(false);
+      setMatchTargetStageId(null);
+      setMatchTargetRoundId(null);
+      setStageMatchForm({ team_a_id: "", team_b_id: "", series_format: "BO3", scheduled_date: "", scheduled_time: "", youtube_live_url: "" });
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      await handleLoadStages(selectedLiveTournamentId);
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to create match");
+    }
+  };
+
+  const handleSwapTeams = async (matchId: string) => {
+    try {
+      await swapMatchTeams(matchId);
+      setActionMessage("Teams swapped successfully (Team 1 ⇄ Team 2)!");
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      if (selectedLiveTournamentId) {
+        await handleLoadStages(selectedLiveTournamentId);
+      }
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to swap match teams");
+    }
+  };
+
+  const handleOpenAdvancementModal = async (match: any) => {
+    setAdvancementModalMatch(match);
+    setSelectedAdvancementWinnerId(match.winner_team_id || match.team_a_id || "");
+    setLoadingAdvancementOptions(true);
+    try {
+      const options = await getMatchAdvancementOptions(match.id);
+      setAdvancementOptions(options);
+      if (options.suggested?.stage_id) {
+        setDestStageId(options.suggested.stage_id);
+        setDestRoundId(options.suggested.round_id);
+        setDestMatchId(options.suggested.match_id || "");
+        setDestSlot(options.suggested.slot || "team_a");
+      }
+    } catch (err: any) {
+      console.error("Failed to load advancement options:", err);
+    } finally {
+      setLoadingAdvancementOptions(false);
+    }
+  };
+
+  const handleAdvanceWinner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!advancementModalMatch) return;
+    if (!destStageId || !destRoundId || !destMatchId) {
+      alert("Please select destination Stage, Round, and Match.");
+      return;
+    }
+    setIsSubmittingAdvancement(true);
+    try {
+      await advanceMatchWinner(advancementModalMatch.id, {
+        winner_team_id: selectedAdvancementWinnerId || undefined,
+        destination_stage_id: destStageId,
+        destination_round_id: destRoundId,
+        destination_match_id: destMatchId,
+        destination_slot: destSlot,
+      });
+      setActionMessage("Winner advanced to destination match successfully!");
+      setAdvancementModalMatch(null);
+      setAdvancementOptions(null);
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      if (selectedLiveTournamentId) {
+        await handleLoadStages(selectedLiveTournamentId);
+      }
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to advance winner");
+    } finally {
+      setIsSubmittingAdvancement(false);
+    }
+  };
+
+  const handleRevertAdvancement = async (matchId: string) => {
+    if (!confirm("Revert this advancement? The team will be removed from the destination match slot.")) return;
+    try {
+      await revertMatchAdvancement(matchId);
+      setActionMessage("Advancement reverted cleanly!");
+      const dash = await getLiveMatchesDashboard();
+      setLiveDashboard(dash);
+      if (selectedLiveTournamentId) {
+        await handleLoadStages(selectedLiveTournamentId);
+      }
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to revert advancement");
+    }
+  };
+
+  const handleSaveTournamentStream = async () => {
+    if (!selectedLiveTournamentId) return;
+    setIsSavingTournamentStream(true);
+    try {
+      await updateTournamentStream(selectedLiveTournamentId, tournamentLiveStreamUrl);
+      setActionMessage("Tournament permanent live stream URL updated!");
       await loadAdminData();
       setTimeout(() => setActionMessage(""), 5000);
     } catch (err: any) {
-      setActionMessage(err?.message || "Failed to reject withdrawal.");
-      setTimeout(() => setActionMessage(""), 6000);
+      alert(err?.message || "Failed to update live stream URL");
     } finally {
-      setIsProcessingWithdrawal(false);
+      setIsSavingTournamentStream(false);
+    }
+  };
+
+  const handleOpenHistoryModal = async () => {
+    if (!selectedLiveTournamentId) return;
+    setIsHistoryModalOpen(true);
+    setLoadingHistory(true);
+    try {
+      const history = await getTournamentHistory(selectedLiveTournamentId);
+      setTournamentHistoryData(history);
+    } catch (err: any) {
+      console.error("Failed to load tournament history:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleSelectJourneyTeam = async (teamId: string) => {
+    if (!selectedLiveTournamentId || !teamId) {
+      setSelectedJourneyTeamId("");
+      setTeamJourneyData(null);
+      return;
+    }
+    setSelectedJourneyTeamId(teamId);
+    setLoadingJourney(true);
+    try {
+      const journey = await getTeamJourney(selectedLiveTournamentId, teamId);
+      setTeamJourneyData(journey);
+    } catch (err: any) {
+      console.error("Failed to load team journey:", err);
+    } finally {
+      setLoadingJourney(false);
     }
   };
 
@@ -1419,6 +1788,10 @@ export default function AdminCockpitPage() {
   const handleApprovePayment = async (paymentId: string) => {
     if (!confirm("Approve this payment? This will credit the player wallet / mark team PAID.")) return;
     setIsProcessingPayment(true);
+    // Optimistic update so UI reflects immediately
+    setAdminPayments((prev) =>
+      prev.map((p) => (p.id === paymentId ? { ...p, status: "APPROVED" as any } : p))
+    );
     try {
       await approvePayment(paymentId);
       setActionMessage("Payment approved successfully.");
@@ -1426,6 +1799,8 @@ export default function AdminCockpitPage() {
       setAdminPayments(payments);
       setTimeout(() => setActionMessage(""), 5000);
     } catch (err: any) {
+      const payments = await getAdminPayments();
+      setAdminPayments(payments);
       setActionMessage(err?.message || "Failed to approve payment.");
       setTimeout(() => setActionMessage(""), 6000);
     } finally {
@@ -1436,9 +1811,14 @@ export default function AdminCockpitPage() {
   const handleRejectPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectingPayment) return;
+    const targetId = rejectingPayment.id;
     setIsProcessingPayment(true);
+    // Optimistic update so UI reflects immediately
+    setAdminPayments((prev) =>
+      prev.map((p) => (p.id === targetId ? { ...p, status: "REJECTED" as any } : p))
+    );
     try {
-      await rejectPayment(rejectingPayment.id, paymentRejectReason);
+      await rejectPayment(targetId, paymentRejectReason);
       setActionMessage("Payment rejected.");
       setRejectingPayment(null);
       setPaymentRejectReason("");
@@ -1446,6 +1826,8 @@ export default function AdminCockpitPage() {
       setAdminPayments(payments);
       setTimeout(() => setActionMessage(""), 5000);
     } catch (err: any) {
+      const payments = await getAdminPayments();
+      setAdminPayments(payments);
       setActionMessage(err?.message || "Failed to reject payment.");
       setTimeout(() => setActionMessage(""), 6000);
     } finally {
@@ -1822,19 +2204,17 @@ export default function AdminCockpitPage() {
                 )}
               </button>
               <button
-                onClick={() => setActiveTab("withdrawals")}
+                onClick={() => {
+                  setActiveTab("wallet_audit");
+                  loadWalletAuditLogs();
+                }}
                 className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === "withdrawals"
+                  activeTab === "wallet_audit"
                     ? "bg-[#E56A10] text-white shadow-xs"
                     : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
                 }`}
               >
-                <Wallet className="w-3.5 h-3.5" /> Payout Approvals
-                {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length > 0 && (
-                  <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-bold rounded-full">
-                    {withdrawals.filter((w) => w.status === "PENDING_APPROVAL").length}
-                  </span>
-                )}
+                <Scale className="w-3.5 h-3.5" /> Wallet Audit Logs
               </button>
               <button
                 onClick={() => setActiveTab("personas")}
@@ -3194,173 +3574,238 @@ export default function AdminCockpitPage() {
           </div>
         )}
 
-        {/* TAB 8: PAYOUT APPROVALS & WITHDRAWALS */}
-        {activeTab === "withdrawals" && isSuperAdmin && (
+        {/* TAB 8: WALLET & LEDGER AUDIT LOGS */}
+        {activeTab === "wallet_audit" && isSuperAdmin && (
           <div className="space-y-6">
             {/* Header / Filter Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs">
               <div>
                 <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-[#E56A10]" /> Tournament Prize Payout Approvals
+                  <Scale className="w-5 h-5 text-[#E56A10]" /> Wallet &amp; Ledger Audit Logs
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                  All athlete withdrawals require Super Admin verification before UPI / IMPS payout release.
+                  Comprehensive double-entry transaction ledger tracking all user credits, debits, tournament fees, prize payouts, and system net positions.
                 </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadWalletAuditLogs()}
+                  disabled={walletAuditLoading}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-700 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {walletAuditLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" />
+                  )}
+                  <span>Refresh Ledger</span>
+                </button>
               </div>
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
-              {(["ALL", "PENDING_APPROVAL", "COMPLETED", "REJECTED"] as const).map((filterKey) => {
-                const count =
-                  filterKey === "ALL"
-                    ? withdrawals.length
-                    : withdrawals.filter((w) => w.status === filterKey).length;
-                return (
-                  <button
-                    key={filterKey}
-                    onClick={() => setWithdrawalFilter(filterKey)}
-                    className={`px-3 py-1.5 rounded-lg border font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                      withdrawalFilter === filterKey
-                        ? "bg-[#E56A10] text-white border-[#E56A10] shadow-xs"
-                        : "bg-white dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-[#242C3D] hover:border-slate-400"
-                    }`}
-                  >
-                    <span>{filterKey.replace("_", " ")}</span>
-                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${
-                      withdrawalFilter === filterKey ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-[#202534] text-slate-600 dark:text-slate-400"
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Aggregate Summary Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">
+                  <span>System Balance</span>
+                  <Wallet className="w-4 h-4 text-[#E56A10]" />
+                </div>
+                <div
+                  className={`text-lg font-bold font-mono mt-1 ${
+                    (walletAuditSummary?.system_aggregate_balance ?? 0) < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {(walletAuditSummary?.system_aggregate_balance ?? 0) < 0
+                    ? `-₹${Math.abs(walletAuditSummary?.system_aggregate_balance ?? 0).toLocaleString("en-IN")}`
+                    : `₹${(walletAuditSummary?.system_aggregate_balance ?? 0).toLocaleString("en-IN")}`}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">Aggregate user wallets</div>
+              </div>
+
+              <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">
+                  <span>Total Credited</span>
+                  <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="text-lg font-bold font-mono mt-1 text-emerald-600 dark:text-emerald-400">
+                  +₹{(walletAuditSummary?.total_credited_inr ?? 0).toLocaleString("en-IN")}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">Deposits, prizes &amp; bonuses</div>
+              </div>
+
+              <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">
+                  <span>Total Debited</span>
+                  <DollarSign className="w-4 h-4 text-rose-500" />
+                </div>
+                <div className="text-lg font-bold font-mono mt-1 text-rose-600 dark:text-rose-400">
+                  -₹{(walletAuditSummary?.total_debited_inr ?? 0).toLocaleString("en-IN")}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">Entry fees &amp; payouts</div>
+              </div>
+
+              <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">
+                  <span>Users Count</span>
+                  <Users className="w-4 h-4 text-blue-500" />
+                </div>
+                <div className="text-lg font-bold font-mono mt-1 text-slate-900 dark:text-white">
+                  {(walletAuditSummary?.total_users ?? 0).toLocaleString("en-IN")}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">Athletes with wallets</div>
+              </div>
+
+              <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">
+                  <span>Total Txns</span>
+                  <Activity className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="text-lg font-bold font-mono mt-1 text-slate-900 dark:text-white">
+                  {(walletAuditSummary?.total_transactions ?? 0).toLocaleString("en-IN")}
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5">Recorded ledger entries</div>
+              </div>
             </div>
 
-            {/* Withdrawals List */}
-            {(() => {
-              const filtered = withdrawals.filter((w) =>
-                withdrawalFilter === "ALL" ? true : w.status === withdrawalFilter
-              );
+            {/* Search & Filter Toolbar */}
+            <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-4 rounded-xl shadow-xs flex flex-col sm:flex-row items-center gap-3">
+              <div className="flex-1 w-full relative">
+                <input
+                  type="text"
+                  value={walletAuditSearch}
+                  onChange={(e) => setWalletAuditSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      loadWalletAuditLogs(walletAuditSearch, walletAuditTypeFilter);
+                    }
+                  }}
+                  placeholder="Search by User ID, Username, or Reference..."
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
 
-              if (filtered.length === 0) {
-                return (
-                  <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-12 rounded-xl text-center space-y-4 shadow-xs">
-                    <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
-                      <ShieldCheck className="w-8 h-8" />
-                    </div>
-                    <div className="space-y-1.5 max-w-md mx-auto">
-                      <h4 className="font-headline font-bold text-slate-900 dark:text-white text-lg">
-                        {withdrawalFilter === "ALL"
-                          ? "No Payout Requests Queued"
-                          : `No ${withdrawalFilter.replace("_", " ")} Requests`}
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed">
-                        All athlete prize money withdrawals have been certified and settled via UPI. When tournament winners submit a withdrawal from their Dashboard, it appears here for two-factor approval.
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
+              <div className="w-full sm:w-56">
+                <select
+                  value={walletAuditTypeFilter}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setWalletAuditTypeFilter(newType);
+                    loadWalletAuditLogs(walletAuditSearch, newType);
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="ALL">All Transaction Types</option>
+                  <option value="DEPOSIT">Deposits</option>
+                  <option value="ENTRY_FEE">Tournament Entry Fees</option>
+                  <option value="PRIZE_PAYOUT">Prize Payouts</option>
+                  <option value="WITHDRAWAL">Withdrawals</option>
+                  <option value="REFUND">Refunds</option>
+                  <option value="BONUS">Bonuses</option>
+                  <option value="ADJUSTMENT">Adjustments</option>
+                </select>
+              </div>
 
-              return (
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                          <th className="p-3.5">Athlete / Gamer</th>
-                          <th className="p-3.5">Amount (INR)</th>
-                          <th className="p-3.5">Destination UPI ID</th>
-                          <th className="p-3.5">Requested At</th>
-                          <th className="p-3.5">Status</th>
-                          <th className="p-3.5">Reference / Notes</th>
-                          <th className="p-3.5 text-right">Approval Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-800">
-                        {filtered.map((w) => (
-                          <tr key={w.id} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="p-3.5">
-                              <span className="font-bold text-slate-900 block font-headline">
-                                @{w.user_name || "Gamer"}
-                              </span>
-                              <span className="text-[11px] text-slate-500 block">
-                                {w.account_holder_name || w.user_email || "Account Holder"}
-                              </span>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-sm text-[#E56A10]">
-                                ₹{w.amount.toLocaleString("en-IN")}
-                              </span>
-                            </td>
-                            <td className="p-3.5">
-                              <span className="font-bold text-slate-900 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded tracking-wide">
-                                {w.upi_id}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-slate-500 text-[11px]">
-                              {w.created_at ? new Date(w.created_at).toLocaleString("en-IN") : "Recent"}
-                            </td>
-                            <td className="p-3.5">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                                  w.status === "PENDING_APPROVAL"
-                                    ? "bg-amber-50 text-amber-700 border-amber-300"
-                                    : w.status === "COMPLETED"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                                    : "bg-rose-50 text-rose-700 border-rose-300"
-                                }`}
-                              >
-                                {w.status.replace("_", " ")}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-slate-500 text-[11px] max-w-[200px] truncate">
-                              {w.payout_reference ? (
-                                <span className="text-emerald-700 font-bold block truncate">
-                                  Ref: {w.payout_reference}
-                                </span>
-                              ) : (
-                                w.notes || "Standard prize withdrawal"
-                              )}
-                            </td>
-                            <td className="p-3.5 text-right">
-                              {w.status === "PENDING_APPROVAL" ? (
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => {
-                                      setApprovingWithdrawal(w);
-                                      setPayoutReference(`UPI/${Date.now().toString().slice(-8)}`);
-                                    }}
-                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-                                  >
-                                    <Check className="w-3 h-3" /> Approve
-                                  </button>
-                                  <button
-                                    onClick={() => setRejectingWithdrawal(w)}
-                                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-[11px] transition-colors cursor-pointer flex items-center gap-1"
-                                  >
-                                    <X className="w-3 h-3" /> Reject
-                                  </button>
-                                </div>
-                              ) : w.status === "COMPLETED" ? (
-                                <span className="text-[11px] text-emerald-600 font-bold flex items-center justify-end gap-1">
-                                  <CheckCircle className="w-3.5 h-3.5" /> Settled
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic">
-                                  Refunded
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              <button
+                onClick={() => loadWalletAuditLogs(walletAuditSearch, walletAuditTypeFilter)}
+                className="w-full sm:w-auto px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer"
+              >
+                Filter
+              </button>
+            </div>
+
+            {/* Audit Logs Table */}
+            <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl overflow-hidden shadow-xs">
+              {walletAuditLoading ? (
+                <div className="p-12 text-center text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#E56A10]" />
+                  <span>Loading ledger records...</span>
                 </div>
-              );
-            })()}
+              ) : (walletAuditSummary?.transactions?.length ?? 0) === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <Scale className="w-10 h-10 text-slate-400 mx-auto" />
+                  <h4 className="font-headline font-bold text-slate-900 dark:text-white text-base">
+                    No Ledger Transactions Found
+                  </h4>
+                  <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                    No transactions match the current search or filter criteria. Ledger entries are automatically written upon deposits, entry fee payments, and payouts.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-[#161B26] text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-[#242C3D]">
+                        <th className="p-3.5">Timestamp</th>
+                        <th className="p-3.5">User</th>
+                        <th className="p-3.5">Txn Type</th>
+                        <th className="p-3.5">Amount (INR)</th>
+                        <th className="p-3.5">Balance Transition</th>
+                        <th className="p-3.5">Description / Ref</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D] text-slate-800 dark:text-slate-200">
+                      {walletAuditSummary?.transactions.map((txn: WalletAuditLogItem) => (
+                        <tr key={txn.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181F2E]/60 transition-colors">
+                          <td className="p-3.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
+                            {txn.created_at ? new Date(txn.created_at).toLocaleString("en-IN") : "Recent"}
+                          </td>
+                          <td className="p-3.5 font-bold text-slate-900 dark:text-white">
+                            <div>@{txn.username || "athlete"}</div>
+                            <div className="text-[10px] text-slate-400 font-normal truncate max-w-[120px]">
+                              {txn.user_id}
+                            </div>
+                          </td>
+                          <td className="p-3.5">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                txn.txn_type === "DEPOSIT" || txn.txn_type === "BONUS" || txn.txn_type === "REFUND"
+                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
+                                  : txn.txn_type === "PRIZE_PAYOUT"
+                                  ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-800"
+                                  : txn.txn_type === "ENTRY_FEE"
+                                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800"
+                                  : txn.txn_type === "WITHDRAWAL" || txn.txn_type === "PAYOUT"
+                                  ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800"
+                                  : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800"
+                              }`}
+                            >
+                              {txn.txn_type}
+                            </span>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap font-bold">
+                            <span
+                              className={
+                                ["DEPOSIT", "PRIZE_PAYOUT", "BONUS", "REFUND"].includes(txn.txn_type)
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-rose-600 dark:text-rose-400"
+                              }
+                            >
+                              {["DEPOSIT", "PRIZE_PAYOUT", "BONUS", "REFUND"].includes(txn.txn_type) ? "+" : "-"}₹{txn.amount_inr.toLocaleString("en-IN")}
+                            </span>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap text-slate-500 dark:text-slate-400 text-[11px]">
+                            ₹{txn.balance_before_inr.toLocaleString("en-IN")} &rarr;{" "}
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              ₹{txn.balance_after_inr.toLocaleString("en-IN")}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-slate-600 dark:text-slate-300 max-w-[260px] truncate">
+                            <span>{txn.description || "System ledger transfer"}</span>
+                            {txn.reference_id && (
+                              <span className="block text-[10px] text-slate-400 truncate">
+                                Ref: {txn.reference_id}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -3707,12 +4152,53 @@ export default function AdminCockpitPage() {
                     </div>
                   );
                 })()}
+
+                {/* Permanent Live Stream URL & Tournament Controls */}
+                {selectedLiveTournamentId && (
+                  <div className="pt-3 border-t border-slate-200 dark:border-[#2E384D] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                    <div className="flex-1 flex items-center gap-2">
+                      <Radio className="w-4 h-4 text-rose-500 shrink-0" />
+                      <div className="flex-1 relative">
+                        <input
+                          type="url"
+                          value={tournamentLiveStreamUrl}
+                          onChange={(e) => setTournamentLiveStreamUrl(e.target.value)}
+                          placeholder="Tournament Live Stream URL (Permanent broadcast link inherited by all matches)"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                      <button
+                        onClick={handleSaveTournamentStream}
+                        disabled={isSavingTournamentStream}
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        {isSavingTournamentStream ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Tv className="w-3.5 h-3.5" />
+                        )}
+                        <span>Save Stream URL</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleOpenHistoryModal}
+                        className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trophy className="w-3.5 h-3.5" />
+                        <span>Timeline &amp; Journey</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Inner Sub-Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               {([
+                { id: "stages", label: "Dynamic Stages & Rounds", count: tournamentStages.length, color: "emerald" },
                 { id: "builder", label: "Matchup Builder & Rosters", count: rostersData?.teams?.length ?? 0, color: "amber" },
                 {
                   id: "scheduled",
@@ -3746,6 +4232,406 @@ export default function AdminCockpitPage() {
                 </button>
               ))}
             </div>
+
+            {/* SUB-TAB 0: DYNAMIC STAGES & ROUNDS ENGINE */}
+            {liveDashTab === "stages" && (
+              <div className="space-y-6">
+                {!selectedLiveTournamentId ? (
+                  <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                    <Layers className="w-10 h-10 text-slate-400 mx-auto" />
+                    <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                      Please Select a Tournament
+                    </h4>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                      Select a tournament from the dropdown above to create, reorder, and configure custom stages, formats (Knockout, Round Robin, Swiss, etc.), and rounds.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Header Bar */}
+                    <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-[#E56A10]" /> Tournament Stages &amp; Format Architecture
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          Admin-controlled multi-stage structure. Add unlimited stages with Knockout, Round Robin, Swiss, or Group Stage formats and strict BO1 / BO3 series.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setEditingStage(null);
+                          setStageForm({
+                            name: `Stage ${tournamentStages.length + 1}`,
+                            format: "KNOCKOUT",
+                            series_format: "BO3",
+                            advancing_teams_count: 2,
+                          });
+                          setIsStageModalOpen(true);
+                        }}
+                        className="px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add Custom Stage</span>
+                      </button>
+                    </div>
+
+                    {/* Stages List */}
+                    {loadingStages ? (
+                      <div className="p-12 text-center text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#E56A10]" />
+                        <span>Loading tournament stages...</span>
+                      </div>
+                    ) : tournamentStages.length === 0 ? (
+                      <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-10 text-center space-y-3">
+                        <Layers className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white">
+                          No Stages Defined Yet
+                        </h4>
+                        <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                          You have full control over the tournament structure. Create custom stages (e.g. Stage 1: Swiss, Stage 2: Group Stage, Stage 3: Knockouts) or use the Matchup Builder tab to auto-generate default fixtures.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setEditingStage(null);
+                            setStageForm({
+                              name: "Stage 1 - Qualifiers",
+                              format: "KNOCKOUT",
+                              series_format: "BO3",
+                              advancing_teams_count: 2,
+                            });
+                            setIsStageModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                        >
+                          Create Stage 1
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {tournamentStages.map((stg, sIdx) => {
+                          const stageMatches = allMatches.filter(
+                            (m: any) =>
+                              m.tournament_id === selectedLiveTournamentId &&
+                              (m.stage_id === stg.stage_id || m.stage === stg.name)
+                          );
+
+                          return (
+                            <div
+                              key={stg.stage_id}
+                              className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl overflow-hidden shadow-xs"
+                            >
+                              {/* Stage Header */}
+                              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border-b border-slate-200 dark:border-[#242C3D] flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <span className="px-2.5 py-1 rounded bg-[#E56A10] text-white text-xs font-mono font-bold uppercase">
+                                    Stage {sIdx + 1}
+                                  </span>
+                                  <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white">
+                                    {stg.name}
+                                  </h4>
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                    {stg.format.replace(/_/g, " ")}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-slate-100 dark:bg-[#1E2538] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#2E384D]">
+                                    {stg.series_format || "BO3"}
+                                  </span>
+                                  {stg.advancing_teams_count && (
+                                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                                      Top {stg.advancing_teams_count} Advance
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {/* Reorder Buttons */}
+                                  {sIdx > 0 && (
+                                    <button
+                                      onClick={() => handleMoveStage(sIdx, "UP")}
+                                      className="px-2 py-1 bg-white dark:bg-[#1E2538] border border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 text-xs font-mono font-bold rounded cursor-pointer hover:border-[#E56A10]"
+                                      title="Move Stage Up"
+                                    >
+                                      &uarr; Up
+                                    </button>
+                                  )}
+                                  {sIdx < tournamentStages.length - 1 && (
+                                    <button
+                                      onClick={() => handleMoveStage(sIdx, "DOWN")}
+                                      className="px-2 py-1 bg-white dark:bg-[#1E2538] border border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 text-xs font-mono font-bold rounded cursor-pointer hover:border-[#E56A10]"
+                                      title="Move Stage Down"
+                                    >
+                                      &darr; Down
+                                    </button>
+                                  )}
+
+                                  {/* Add Round Button */}
+                                  <button
+                                    onClick={() => {
+                                      setActiveStageForRound(stg.stage_id);
+                                      setEditingRound(null);
+                                      setRoundForm({
+                                        name: `Round ${(stg.rounds?.length || 0) + 1}`,
+                                        series_format: stg.series_format || "BO3",
+                                        scheduled_date: "",
+                                        scheduled_time: "",
+                                      });
+                                      setIsRoundModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-mono font-bold uppercase flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Add Round</span>
+                                  </button>
+
+                                  {/* Edit Stage Button */}
+                                  <button
+                                    onClick={() => {
+                                      setEditingStage(stg);
+                                      setStageForm({
+                                        name: stg.name,
+                                        format: stg.format,
+                                        series_format: stg.series_format || "BO3",
+                                        advancing_teams_count: stg.advancing_teams_count || 2,
+                                      });
+                                      setIsStageModalOpen(true);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                                    title="Edit Stage"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+
+                                  {/* Delete Stage Button */}
+                                  <button
+                                    onClick={() => handleDeleteStage(stg.stage_id, stg.name)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-500 cursor-pointer"
+                                    title="Delete Stage"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Stage Content: Rounds */}
+                              <div className="p-4 space-y-4">
+                                {(stg.rounds || []).length === 0 ? (
+                                  <div className="p-6 text-center border border-dashed border-slate-200 dark:border-[#2E384D] rounded-lg">
+                                    <p className="text-xs text-slate-400 font-mono">
+                                      No rounds in this stage yet. Click &quot;Add Round&quot; above to schedule rounds and match fixtures.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  stg.rounds.map((rnd) => {
+                                    const roundMatches = stageMatches.filter(
+                                      (m: any) => m.round_id === rnd.round_id || m.round_name === rnd.name
+                                    );
+
+                                    return (
+                                      <div
+                                        key={rnd.round_id}
+                                        className="bg-slate-50/60 dark:bg-[#161B26]/60 border border-slate-200 dark:border-[#242C3D] rounded-xl p-4 space-y-3"
+                                      >
+                                        {/* Round Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-[#242C3D] pb-2">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-bold text-xs font-mono text-slate-900 dark:text-white uppercase">
+                                              {rnd.name}
+                                            </span>
+                                            <span className="px-2 py-0.2 bg-slate-200 dark:bg-[#20283C] text-slate-700 dark:text-slate-300 rounded text-[10px] font-mono font-bold">
+                                              {rnd.series_format || stg.series_format || "BO3"}
+                                            </span>
+                                            {(rnd.scheduled_date || rnd.scheduled_time) && (
+                                              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {rnd.scheduled_date} {rnd.scheduled_time}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              onClick={() => {
+                                                setMatchTargetStageId(stg.stage_id);
+                                                setMatchTargetRoundId(rnd.round_id);
+                                                setStageMatchForm({
+                                                  team_a_id: "",
+                                                  team_b_id: "",
+                                                  series_format: rnd.series_format || stg.series_format || "BO3",
+                                                  scheduled_date: rnd.scheduled_date || "",
+                                                  scheduled_time: rnd.scheduled_time || "",
+                                                  youtube_live_url: "",
+                                                });
+                                                setIsStageMatchModalOpen(true);
+                                              }}
+                                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-mono font-bold uppercase flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <Plus className="w-3 h-3" />
+                                              <span>Add Match</span>
+                                            </button>
+
+                                            <button
+                                              onClick={() => {
+                                                setActiveStageForRound(stg.stage_id);
+                                                setEditingRound(rnd);
+                                                setRoundForm({
+                                                  name: rnd.name,
+                                                  series_format: rnd.series_format || "BO3",
+                                                  scheduled_date: rnd.scheduled_date || "",
+                                                  scheduled_time: rnd.scheduled_time || "",
+                                                });
+                                                setIsRoundModalOpen(true);
+                                              }}
+                                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                                              title="Edit Round"
+                                            >
+                                              <Edit3 className="w-3.5 h-3.5" />
+                                            </button>
+
+                                            <button
+                                              onClick={() => handleDeleteRound(stg.stage_id, rnd.round_id, rnd.name)}
+                                              className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"
+                                              title="Delete Round"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Matches in Round */}
+                                        {roundMatches.length === 0 ? (
+                                          <div className="p-3 text-center text-xs text-slate-400 font-mono">
+                                            No matches created in this round. Click &quot;Add Match&quot; to assign pairings.
+                                          </div>
+                                        ) : (
+                                          <div className="grid grid-cols-1 gap-2.5">
+                                            {roundMatches.map((m: any, mIdx: number) => {
+                                              const teamAName = m.team_a?.name || m.team_a_name || "TBD";
+                                              const teamBName = m.team_b?.name || m.team_b_name || "TBD";
+                                              const hasAdvancement = !!m.advancement?.destination_match_id;
+
+                                              return (
+                                                <div
+                                                  key={m.id || mIdx}
+                                                  className="bg-white dark:bg-[#111520] border border-slate-200 dark:border-[#2E384D] rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs hover:border-[#E56A10]/60 transition-colors"
+                                                >
+                                                  <div className="flex-1 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono">
+                                                      <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#1E2538] text-slate-700 dark:text-slate-300 font-bold">
+                                                        M{m.match_number || mIdx + 1}
+                                                      </span>
+                                                      <span className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-bold">
+                                                        {m.series_format || "BO3"}
+                                                      </span>
+                                                      <span
+                                                        className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase ${
+                                                          m.status === "LIVE"
+                                                            ? "bg-rose-600 text-white animate-pulse"
+                                                            : m.status === "COMPLETED"
+                                                            ? "bg-emerald-50 text-emerald-700 border border-emerald-300"
+                                                            : "bg-blue-50 text-blue-700"
+                                                        }`}
+                                                      >
+                                                        {m.status}
+                                                      </span>
+                                                      {m.youtube_live_url && (
+                                                        <span className="text-rose-500 font-bold flex items-center gap-1">
+                                                          <Tv className="w-3 h-3" /> Match Stream
+                                                        </span>
+                                                      )}
+                                                      {hasAdvancement && (
+                                                        <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1">
+                                                          <Trophy className="w-3 h-3" /> Advanced: {m.advancement?.destination_slot === "team_a" ? "Slot 1" : "Slot 2"}
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    <div className="font-headline font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                                      <span className={m.winner_team_id === (m.team_a?.id || m.team_a_id) ? "text-[#E56A10]" : ""}>
+                                                        {teamAName}
+                                                      </span>
+                                                      <span className="text-xs font-mono px-2 py-0.5 bg-slate-100 dark:bg-[#1A2234] rounded text-slate-600 dark:text-slate-300">
+                                                        {m.team_a?.score ?? m.score_a ?? 0} : {m.team_b?.score ?? m.score_b ?? 0}
+                                                      </span>
+                                                      <span className={m.winner_team_id === (m.team_b?.id || m.team_b_id) ? "text-[#E56A10]" : ""}>
+                                                        {teamBName}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+
+                                                  {/* Match Action Controls */}
+                                                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                                                    {/* Swap Teams Button */}
+                                                    <button
+                                                      onClick={() => handleSwapTeams(m.id)}
+                                                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#1E2538] dark:hover:bg-[#283248] text-slate-700 dark:text-slate-300 rounded text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                      title="Swap Team 1 and Team 2"
+                                                    >
+                                                      <ArrowLeftRight className="w-3 h-3 text-[#E56A10]" />
+                                                      <span>Swap</span>
+                                                    </button>
+
+                                                    {/* Advance Winner Button */}
+                                                    <button
+                                                      onClick={() => handleOpenAdvancementModal(m)}
+                                                      className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                      title="Advance Winner to Next Stage/Round/Match"
+                                                    >
+                                                      <Trophy className="w-3 h-3" />
+                                                      <span>Advance</span>
+                                                    </button>
+
+                                                    {/* Revert Advancement Button */}
+                                                    {hasAdvancement && (
+                                                      <button
+                                                        onClick={() => handleRevertAdvancement(m.id)}
+                                                        className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                        title="Revert previous advancement"
+                                                      >
+                                                        <span>↩ Revert</span>
+                                                      </button>
+                                                    )}
+
+                                                    {/* Delete Match Button */}
+                                                    <button
+                                                      onClick={async () => {
+                                                        if (!confirm(`Delete match ${teamAName} vs ${teamBName}?`)) return;
+                                                        try {
+                                                          await deleteMatchAdmin(m.id);
+                                                          const dash = await getLiveMatchesDashboard();
+                                                          setLiveDashboard(dash);
+                                                          if (selectedLiveTournamentId) {
+                                                            await handleLoadStages(selectedLiveTournamentId);
+                                                          }
+                                                        } catch (err: any) {
+                                                          alert(err?.message || "Failed to delete match");
+                                                        }
+                                                      }}
+                                                      className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"
+                                                      title="Delete Match"
+                                                    >
+                                                      <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* SUB-TAB 1: MATCHUP BUILDER & REGISTERED ROSTERS */}
             {liveDashTab === "builder" && (
@@ -3807,7 +4693,6 @@ export default function AdminCockpitPage() {
                             >
                               <option value="BO1">Best of 1 (BO1)</option>
                               <option value="BO3">Best of 3 (BO3)</option>
-                              <option value="BO5">Best of 5 (BO5)</option>
                             </select>
                           </div>
 
@@ -4102,7 +4987,6 @@ export default function AdminCockpitPage() {
                                     >
                                       <option value="BO1">BO1</option>
                                       <option value="BO3">BO3</option>
-                                      <option value="BO5">BO5</option>
                                     </select>
 
                                     {/* Remove match button */}
@@ -4505,6 +5389,37 @@ export default function AdminCockpitPage() {
 
                           {/* Action Buttons */}
                           <div className="flex items-center gap-2 flex-wrap shrink-0">
+                            {/* Swap Teams Button */}
+                            <button
+                              onClick={() => handleSwapTeams(m.id)}
+                              className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1 cursor-pointer"
+                              title="Swap Team 1 and Team 2"
+                            >
+                              <ArrowLeftRight className="w-3.5 h-3.5 text-[#E56A10]" />
+                              <span>Swap</span>
+                            </button>
+
+                            {/* Advance Winner Button */}
+                            <button
+                              onClick={() => handleOpenAdvancementModal(m)}
+                              className="px-2.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Advance Winner to Next Stage/Round/Match"
+                            >
+                              <Trophy className="w-3.5 h-3.5" />
+                              <span>Advance</span>
+                            </button>
+
+                            {/* Revert Advancement Button */}
+                            {m.advancement?.destination_match_id && (
+                              <button
+                                onClick={() => handleRevertAdvancement(m.id)}
+                                className="px-2.5 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Revert previous advancement"
+                              >
+                                <span>↩ Revert</span>
+                              </button>
+                            )}
+
                             {/* Mark as Live Button */}
                             <button
                               onClick={() => {
@@ -4709,10 +5624,31 @@ export default function AdminCockpitPage() {
                             </div>
                           </div>
 
-                          <div className="text-right text-xs font-mono">
-                            <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 font-bold uppercase">
+                          <div className="flex items-center gap-2 flex-wrap shrink-0">
+                            <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 text-xs font-mono font-bold uppercase">
                               Final Result Certified
                             </span>
+
+                            {/* Advance Winner Button */}
+                            <button
+                              onClick={() => handleOpenAdvancementModal(m)}
+                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-mono font-bold uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Advance Winner to Next Stage/Round/Match"
+                            >
+                              <Trophy className="w-3.5 h-3.5" />
+                              <span>Advance</span>
+                            </button>
+
+                            {/* Revert Advancement Button */}
+                            {m.advancement?.destination_match_id && (
+                              <button
+                                onClick={() => handleRevertAdvancement(m.id)}
+                                className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Revert previous advancement"
+                              >
+                                <span>↩ Revert</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -4962,7 +5898,6 @@ export default function AdminCockpitPage() {
                     >
                       <option value="BO1">Best of 1 (BO1)</option>
                       <option value="BO3">Best of 3 (BO3)</option>
-                      <option value="BO5">Best of 5 (BO5)</option>
                     </select>
                   </div>
                 </div>
@@ -5035,89 +5970,232 @@ export default function AdminCockpitPage() {
 
       </main>
 
-      {/* Payout Approval Modal */}
-      {approvingWithdrawal && (
+      {/* MODAL: MATCH WINNER ADVANCEMENT */}
+      {advancementModalMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <Trophy className="w-5 h-5 text-purple-600" />
                 <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
-                  Certify & Disburse Payout
+                  Advance Match Winner
                 </h3>
               </div>
               <button
-                onClick={() => setApprovingWithdrawal(null)}
-                className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                onClick={() => {
+                  setAdvancementModalMatch(null);
+                  setAdvancementOptions(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleApprovePayout} className="space-y-4">
-              <div className="bg-slate-50 dark:bg-[#161B26] p-3.5 rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 dark:text-slate-400">Athlete:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">@{approvingWithdrawal.user_name}</span>
+            <form onSubmit={handleAdvanceWinner} className="space-y-4">
+              {/* Match Overview */}
+              <div className="bg-slate-50 dark:bg-[#161B26] p-3.5 rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-2 text-xs font-mono">
+                <div className="font-bold text-slate-900 dark:text-white">
+                  Source Match: {advancementModalMatch.team_a?.name || advancementModalMatch.team_a_name || "Team 1"} vs {advancementModalMatch.team_b?.name || advancementModalMatch.team_b_name || "Team 2"}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 dark:text-slate-400">Payout Amount:</span>
-                  <span className="font-bold text-[#E56A10] text-sm">₹{approvingWithdrawal.amount.toLocaleString("en-IN")}</span>
+                <div className="text-[11px] text-slate-500">
+                  {advancementModalMatch.stage_name || advancementModalMatch.stage} • {advancementModalMatch.round_name || `Round ${advancementModalMatch.round_number || 1}`}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 dark:text-slate-400">Destination UPI ID:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{approvingWithdrawal.upi_id}</span>
-                </div>
-                {approvingWithdrawal.account_holder_name && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Account Name:</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{approvingWithdrawal.account_holder_name}</span>
-                  </div>
-                )}
               </div>
 
+              {/* Select Winner Team */}
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
-                  IMPS / UTR Payout Reference *
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Select Winner to Advance *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  value={payoutReference}
-                  onChange={(e) => setPayoutReference(e.target.value)}
-                  placeholder="e.g. UPI/2026/88491023 or IMPS-109248"
-                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
-                />
+                  value={selectedAdvancementWinnerId}
+                  onChange={(e) => setSelectedAdvancementWinnerId(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="">-- Choose Winning Team --</option>
+                  {(advancementModalMatch.team_a?.id || advancementModalMatch.team_a_id) && (
+                    <option value={advancementModalMatch.team_a?.id || advancementModalMatch.team_a_id}>
+                      {advancementModalMatch.team_a?.name || advancementModalMatch.team_a_name || "Team 1"}
+                    </option>
+                  )}
+                  {(advancementModalMatch.team_b?.id || advancementModalMatch.team_b_id) && (
+                    <option value={advancementModalMatch.team_b?.id || advancementModalMatch.team_b_id}>
+                      {advancementModalMatch.team_b?.name || advancementModalMatch.team_b_name || "Team 2"}
+                    </option>
+                  )}
+                </select>
               </div>
 
+              {/* Suggested Destination Card */}
+              {loadingAdvancementOptions ? (
+                <div className="p-4 text-center text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#E56A10]" />
+                  <span>Calculating suggested bracket slot...</span>
+                </div>
+              ) : advancementOptions?.suggested?.stage_id ? (
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 rounded-xl space-y-1.5 text-xs font-mono">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" /> Engine Suggested Slot:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDestStageId(advancementOptions.suggested.stage_id);
+                        setDestRoundId(advancementOptions.suggested.round_id);
+                        setDestMatchId(advancementOptions.suggested.match_id || "");
+                        setDestSlot(advancementOptions.suggested.slot || "team_a");
+                      }}
+                      className="px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      Use Suggestion
+                    </button>
+                  </div>
+                  <div className="text-slate-700 dark:text-slate-300 text-[11px]">
+                    {advancementOptions.suggested.stage_name} &rarr; {advancementOptions.suggested.round_name} &rarr; Match #{advancementOptions.suggested.match_number} ({advancementOptions.suggested.slot === "team_a" ? "Slot 1 / Team A" : "Slot 2 / Team B"})
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Destination Stage */}
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
-                  Admin Audit Note
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Destination Stage *
                 </label>
-                <input
-                  type="text"
-                  value={approvalNotes}
-                  onChange={(e) => setApprovalNotes(e.target.value)}
-                  placeholder="Disbursed via official banking channel"
-                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#E56A10]"
-                />
+                <select
+                  required
+                  value={destStageId}
+                  onChange={(e) => {
+                    const stgId = e.target.value;
+                    setDestStageId(stgId);
+                    setDestRoundId("");
+                    setDestMatchId("");
+                  }}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="">-- Choose Stage --</option>
+                  {(advancementOptions?.available_destinations || []).map((s: any) => (
+                    <option key={s.stage_id} value={s.stage_id}>
+                      {s.stage_name}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {/* Destination Round */}
+              {destStageId && (
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Destination Round *
+                  </label>
+                  <select
+                    required
+                    value={destRoundId}
+                    onChange={(e) => {
+                      const rndId = e.target.value;
+                      setDestRoundId(rndId);
+                      setDestMatchId("");
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="">-- Choose Round --</option>
+                    {(() => {
+                      const stg = (advancementOptions?.available_destinations || []).find(
+                        (s: any) => s.stage_id === destStageId
+                      );
+                      return (stg?.rounds || []).map((r: any) => (
+                        <option key={r.round_id} value={r.round_id}>
+                          {r.round_name}
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              )}
+
+              {/* Destination Match */}
+              {destRoundId && (
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Destination Match *
+                  </label>
+                  <select
+                    required
+                    value={destMatchId}
+                    onChange={(e) => setDestMatchId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="">-- Choose Match --</option>
+                    {(() => {
+                      const stg = (advancementOptions?.available_destinations || []).find(
+                        (s: any) => s.stage_id === destStageId
+                      );
+                      const rnd = (stg?.rounds || []).find((r: any) => r.round_id === destRoundId);
+                      return (rnd?.matches || []).map((m: any) => (
+                        <option key={m.match_id} value={m.match_id}>
+                          Match #{m.match_number} ({m.team_a_name || "TBD"} vs {m.team_b_name || "TBD"})
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              )}
+
+              {/* Destination Slot */}
+              {destMatchId && (
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Destination Slot *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <label className={`p-2.5 rounded-lg border flex items-center gap-2 cursor-pointer ${
+                      destSlot === "team_a" ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold" : "border-slate-300 dark:border-[#2E384D]"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="destSlot"
+                        checked={destSlot === "team_a"}
+                        onChange={() => setDestSlot("team_a")}
+                        className="text-purple-600"
+                      />
+                      <span>Slot 1 (Team A)</span>
+                    </label>
+                    <label className={`p-2.5 rounded-lg border flex items-center gap-2 cursor-pointer ${
+                      destSlot === "team_b" ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold" : "border-slate-300 dark:border-[#2E384D]"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="destSlot"
+                        checked={destSlot === "team_b"}
+                        onChange={() => setDestSlot("team_b")}
+                        className="text-purple-600"
+                      />
+                      <span>Slot 2 (Team B)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setApprovingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  onClick={() => {
+                    setAdvancementModalMatch(null);
+                    setAdvancementOptions(null);
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessingWithdrawal}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  disabled={isSubmittingAdvancement || !destMatchId || !selectedAdvancementWinnerId}
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Certify Payout
+                  {isSubmittingAdvancement ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trophy className="w-3.5 h-3.5" />}
+                  Confirm Advancement
                 </button>
               </div>
             </form>
@@ -5125,65 +6203,481 @@ export default function AdminCockpitPage() {
         </div>
       )}
 
-      {/* Payout Rejection Modal */}
-      {rejectingWithdrawal && (
+      {/* MODAL: STAGE CREATE / EDIT */}
+      {isStageModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <Layers className="w-5 h-5 text-[#E56A10]" />
                 <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
-                  Reject Withdrawal Request
+                  {editingStage ? "Edit Stage" : "Create Tournament Stage"}
                 </h3>
               </div>
-              <button
-                onClick={() => setRejectingWithdrawal(null)}
-                className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white cursor-pointer"
-              >
+              <button onClick={() => setIsStageModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleRejectPayout} className="space-y-4">
-              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-mono text-rose-800 dark:text-rose-300 space-y-1">
-                <div className="font-bold">Refund Notice:</div>
-                <p>
-                  Rejecting this request will immediately refund ₹{rejectingWithdrawal.amount.toLocaleString("en-IN")} back to @{rejectingWithdrawal.user_name}&apos;s wallet balance.
-                </p>
+            <form onSubmit={editingStage ? handleUpdateStage : handleCreateStage} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Stage Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={stageForm.name}
+                  onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+                  placeholder="e.g. Stage 1 - Swiss Qualifiers"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-800 dark:text-slate-200 font-bold mb-1">
-                  Rejection Reason (Sent to User) *
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Stage Format *
                 </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="e.g. UPI ID invalid or bank rejected beneficiary handle"
-                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+                <select
+                  value={stageForm.format}
+                  onChange={(e) => setStageForm({ ...stageForm, format: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="KNOCKOUT">Knockout / Single Elimination</option>
+                  <option value="ROUND_ROBIN">Single Round Robin</option>
+                  <option value="DOUBLE_ROUND_ROBIN">Double Round Robin</option>
+                  <option value="DOUBLE_ELIMINATION">Double Elimination</option>
+                  <option value="SWISS">Swiss System</option>
+                  <option value="GROUP_STAGE">Group Stage</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Series Format (Strictly BO1 or BO3) *
+                </label>
+                <select
+                  value={stageForm.series_format}
+                  onChange={(e) => setStageForm({ ...stageForm, series_format: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="BO1">Best of 1 (BO1)</option>
+                  <option value="BO3">Best of 3 (BO3)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Advancing Teams Count
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={stageForm.advancing_teams_count}
+                  onChange={(e) => setStageForm({ ...stageForm, advancing_teams_count: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setRejectingWithdrawal(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                  onClick={() => setIsStageModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessingWithdrawal}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer"
                 >
-                  {isProcessingWithdrawal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                  Reject & Refund
+                  {editingStage ? "Update Stage" : "Create Stage"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ROUND CREATE / EDIT */}
+      {isRoundModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-[#E56A10]" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                  {editingRound ? "Edit Round" : "Add Round to Stage"}
+                </h3>
+              </div>
+              <button onClick={() => setIsRoundModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={editingRound ? handleUpdateRound : handleCreateRound} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Round Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={roundForm.name}
+                  onChange={(e) => setRoundForm({ ...roundForm, name: e.target.value })}
+                  placeholder="e.g. Round 1, Quarter Finals, Semifinals"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Series Format (Strictly BO1 or BO3) *
+                </label>
+                <select
+                  value={roundForm.series_format}
+                  onChange={(e) => setRoundForm({ ...roundForm, series_format: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="BO1">Best of 1 (BO1)</option>
+                  <option value="BO3">Best of 3 (BO3)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Scheduled Date
+                  </label>
+                  <input
+                    type="date"
+                    value={roundForm.scheduled_date}
+                    onChange={(e) => setRoundForm({ ...roundForm, scheduled_date: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Time
+                  </label>
+                  <input
+                    type="text"
+                    value={roundForm.scheduled_time}
+                    onChange={(e) => setRoundForm({ ...roundForm, scheduled_time: e.target.value })}
+                    placeholder="10:00 AM"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRoundModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                >
+                  {editingRound ? "Update Round" : "Create Round"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: STAGE ROUND MATCH CREATE */}
+      {isStageMatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Gamepad2 className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                  Add Match to Round
+                </h3>
+              </div>
+              <button onClick={() => setIsStageMatchModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStageMatchSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Team 1
+                </label>
+                <select
+                  value={stageMatchForm.team_a_id}
+                  onChange={(e) => setStageMatchForm({ ...stageMatchForm, team_a_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="">-- TBD / Prior Match Progression --</option>
+                  {(rostersData?.teams || []).map((t) => (
+                    <option key={t.team_id} value={t.team_id}>
+                      {t.team_name} [{t.team_tag}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Team 2
+                </label>
+                <select
+                  value={stageMatchForm.team_b_id}
+                  onChange={(e) => setStageMatchForm({ ...stageMatchForm, team_b_id: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="">-- TBD / Prior Match Progression --</option>
+                  {(rostersData?.teams || []).map((t) => (
+                    <option key={t.team_id} value={t.team_id}>
+                      {t.team_name} [{t.team_tag}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Series Format (Strictly BO1 or BO3) *
+                </label>
+                <select
+                  value={stageMatchForm.series_format}
+                  onChange={(e) => setStageMatchForm({ ...stageMatchForm, series_format: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                >
+                  <option value="BO1">Best of 1 (BO1)</option>
+                  <option value="BO3">Best of 3 (BO3)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Scheduled Date
+                  </label>
+                  <input
+                    type="date"
+                    value={stageMatchForm.scheduled_date}
+                    onChange={(e) => setStageMatchForm({ ...stageMatchForm, scheduled_date: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Time
+                  </label>
+                  <input
+                    type="text"
+                    value={stageMatchForm.scheduled_time}
+                    onChange={(e) => setStageMatchForm({ ...stageMatchForm, scheduled_time: e.target.value })}
+                    placeholder="10:00 AM"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  YouTube Live URL (Match Specific Override)
+                </label>
+                <input
+                  type="url"
+                  value={stageMatchForm.youtube_live_url}
+                  onChange={(e) => setStageMatchForm({ ...stageMatchForm, youtube_live_url: e.target.value })}
+                  placeholder="https://youtube.com/live/... (Leave blank to inherit tournament stream)"
+                  className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStageMatchModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                >
+                  Add Match
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TOURNAMENT HISTORY & TEAM JOURNEY TIMELINE */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-purple-600" />
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                  Tournament Progression Timeline &amp; Journey
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsHistoryModalOpen(false);
+                  setTournamentHistoryData(null);
+                  setSelectedJourneyTeamId("");
+                  setTeamJourneyData(null);
+                }}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Team Journey Filter Picker */}
+            <div className="p-3 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+              <span className="font-bold text-slate-700 dark:text-slate-300 uppercase">
+                Filter by Team Journey:
+              </span>
+              <select
+                value={selectedJourneyTeamId}
+                onChange={(e) => handleSelectJourneyTeam(e.target.value)}
+                className="px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+              >
+                <option value="">-- Complete Tournament Timeline --</option>
+                {(rostersData?.teams || []).map((t) => (
+                  <option key={t.team_id} value={t.team_id}>
+                    {t.team_name} [{t.team_tag}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Content: Team Journey or Full Timeline */}
+            {loadingHistory || loadingJourney ? (
+              <div className="p-12 text-center text-slate-400 font-mono text-xs flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                <span>Loading progression timeline...</span>
+              </div>
+            ) : selectedJourneyTeamId && teamJourneyData ? (
+              /* Single Team Journey View */
+              <div className="space-y-4">
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl text-xs font-mono">
+                  <span className="font-bold text-purple-800 dark:text-purple-300">
+                    Journey of {teamJourneyData.team_name}
+                  </span>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Total Matches: {teamJourneyData.journey?.length || 0} • Team ID: {teamJourneyData.team_id}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {(teamJourneyData.journey || []).map((step, idx) => (
+                    <div
+                      key={step.match_id || idx}
+                      className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono ${
+                        step.result === "WIN"
+                          ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
+                          : step.result === "LOSS"
+                          ? "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800"
+                          : "bg-slate-50 dark:bg-[#161B26] border-slate-200 dark:border-[#2E384D]"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="text-[11px] font-bold text-slate-500">
+                          {step.stage_name} &rarr; {step.round_name}
+                        </div>
+                        <div className="font-headline font-bold text-sm text-slate-900 dark:text-white">
+                          VS {step.opponent_name || "TBD"}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Score: {step.score || "0 - 0"} ({step.series_format})
+                        </div>
+                      </div>
+
+                      <div>
+                        <span
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold uppercase border ${
+                            step.result === "WIN"
+                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border-emerald-300"
+                              : step.result === "LOSS"
+                              ? "bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 border-rose-300"
+                              : "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 border-blue-300"
+                          }`}
+                        >
+                          {step.result}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : tournamentHistoryData ? (
+              /* Full Tournament Stage by Stage Timeline */
+              <div className="space-y-6">
+                {(tournamentHistoryData.stages || []).map((stg) => (
+                  <div key={stg.stage_id} className="border border-slate-200 dark:border-[#2E384D] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#2E384D] pb-2 text-xs font-mono">
+                      <span className="font-bold text-slate-900 dark:text-white uppercase font-headline">
+                        {stg.stage_name} ({stg.stage_format})
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-[#1E2538] text-[10px] font-bold">
+                        {stg.rounds[0]?.series_format || "BO3"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(stg.rounds || []).map((rnd) => (
+                        <div key={rnd.round_id} className="bg-slate-50 dark:bg-[#161B26] p-3 rounded-lg space-y-2">
+                          <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 font-mono uppercase">
+                            {rnd.round_name}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {(rnd.matches || []).map((m: any) => (
+                              <div
+                                key={m.match_id}
+                                className="bg-white dark:bg-[#111520] border border-slate-200 dark:border-[#2E384D] p-2.5 rounded text-xs font-mono space-y-1"
+                              >
+                                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                  <span>M{m.match_number}</span>
+                                  <span className={m.status === "COMPLETED" ? "text-emerald-500 font-bold" : ""}>
+                                    {m.status}
+                                  </span>
+                                </div>
+                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                  <span className={m.winner_team_id === m.team_a_id ? "text-[#E56A10]" : ""}>
+                                    {m.team_a_name || "TBD"}
+                                  </span>
+                                  {" "}vs{" "}
+                                  <span className={m.winner_team_id === m.team_b_id ? "text-[#E56A10]" : ""}>
+                                    {m.team_b_name || "TBD"}
+                                  </span>
+                                </div>
+                                {m.status === "COMPLETED" && (
+                                  <div className="text-[10px] text-slate-500">
+                                    Score: {m.score_a} : {m.score_b}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs font-mono text-slate-400">
+                No timeline progression data available for this tournament yet.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -6557,7 +8051,6 @@ export default function AdminCockpitPage() {
                     >
                       <option value="Best of 1">Best of 1</option>
                       <option value="Best of 3">Best of 3</option>
-                      <option value="Best of 5">Best of 5</option>
                     </select>
                   </div>
                 </div>
