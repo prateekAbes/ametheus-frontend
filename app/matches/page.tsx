@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { MatchLobbyInfo } from "@/types";
 import { getMatches, Match as ApiMatch } from "@/lib/api/matches";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
@@ -10,14 +9,10 @@ import LiveTickerBar from "@/components/match/LiveTickerBar";
 import { useMatchTicker, TickerEvent } from "@/lib/hooks/useMatchTicker";
 import {
   Gamepad2,
-  Clock,
-  CheckCircle,
-  Shield,
   Server,
-  ArrowRight,
-  Filter,
   FileCheck,
-  RefreshCw,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
 
 function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
@@ -29,11 +24,14 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
     gameName: m.game_name || "Valorant",
     stage: m.stage || "Competitive Bracket Match",
     format: m.format || "Standard Match",
-    scheduledTime: m.scheduled_time || "Today, 8:00 PM IST",
+    scheduledTime: m.scheduled_time || m.scheduled_at || "Today, 8:00 PM IST",
     status: (m.status as any) || "CHECK_IN_OPEN",
     serverRegion: m.server_region || "AWS Mumbai (ap-south-1)",
     lobbyCode: m.lobby_code || "AMETHEUS-LOBBY-01",
     lobbyPassword: m.lobby_password || "AMT_MATCH_PASS_99",
+    scheduledAt: m.scheduled_at,
+    liveLink: m.live_link,
+    order: m.order,
     teamA: {
       id: m.team_a?.tag || "t-a",
       name: m.team_a?.name || "TBD (Slot 1)",
@@ -57,6 +55,162 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
       ],
     },
   };
+}
+
+/** Returns a live countdown string "T-Xh Ym Zs" or null if past/no scheduledAt */
+function useCountdown(scheduledAt?: string): string | null {
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (!scheduledAt) return null;
+  const diff = new Date(scheduledAt).getTime() - now;
+  if (diff <= 0) return null;
+
+  const totalSecs = Math.floor(diff / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `T-${h}h ${m}m ${s}s`;
+  if (m > 0) return `T-${m}m ${s}s`;
+  return `T-${s}s`;
+}
+
+function isMatchLive(match: MatchLobbyInfo): boolean {
+  const status = (match.status as string).toUpperCase();
+  if (status === "LIVE" || status === "IN_PROGRESS") return true;
+  if (match.scheduledAt) {
+    const diff = new Date(match.scheduledAt).getTime() - Date.now();
+    if (diff <= 0) return true;
+  }
+  return false;
+}
+
+/** Per-card component so each card has its own countdown hook */
+function MatchCard({
+  match,
+  onEnterLobby,
+  onSubmitEvidence,
+}: {
+  match: MatchLobbyInfo;
+  onEnterLobby: () => void;
+  onSubmitEvidence: () => void;
+}) {
+  const countdown = useCountdown(match.scheduledAt);
+  const live = isMatchLive(match);
+  const statusLabel = (match.status as string);
+
+  return (
+    <div className="bg-white dark:bg-[#121622] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] shadow-sm p-6 hover:border-[#CBD5E1] dark:hover:border-[#E56A10] transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+
+      {/* Left Details */}
+      <div className="flex flex-col gap-2 min-w-[280px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status badge: LIVE NOW pulsing OR normal status */}
+          {live ? (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+              LIVE NOW
+            </span>
+          ) : (
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+              statusLabel === "CHECK_IN_OPEN"
+                ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-800"
+                : statusLabel === "COMPLETED"
+                ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700"
+                : "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800"
+            }`}>
+              {statusLabel}
+            </span>
+          )}
+
+          {/* Countdown badge: only shown when future and not live */}
+          {!live && countdown && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-800">
+              {countdown}
+            </span>
+          )}
+
+          <span className="px-2 py-0.5 bg-[#EFF4FF] dark:bg-[#161A24] border border-[#D3E4FE] dark:border-[#242C3D] text-[#0B1C30] dark:text-slate-200 rounded text-[10px] font-mono uppercase font-bold">
+            {match.gameName}
+          </span>
+        </div>
+        <h3 className="font-headline font-bold text-lg text-[#0B1C30] dark:text-white">{match.stage}</h3>
+        <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono">{match.tournamentTitle}</div>
+        <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono">{match.format}</div>
+        <div className="flex items-center gap-1.5 text-xs text-[#565E74] dark:text-slate-400 font-mono mt-1">
+          <Server className="w-3.5 h-3.5 text-[#E56A10]" />
+          <span>{match.serverRegion}</span>
+        </div>
+      </div>
+
+      {/* Match Teams VS Section */}
+      <div className="flex items-center justify-center gap-6 sm:gap-10 py-4 px-6 bg-[#EFF4FF] dark:bg-[#161A24] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] flex-1 max-w-xl">
+        {/* Team A */}
+        <div className="flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
+            {match.teamA.tag}
+          </div>
+          <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamA.name}</span>
+          <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamA.tag}]</span>
+        </div>
+
+        {/* Center Score / Versus */}
+        <div className="flex flex-col items-center">
+          {match.teamA.score !== undefined && match.teamB.score !== undefined ? (
+            <div className="text-2xl font-mono font-bold text-[#0B1C30] dark:text-white">
+              {match.teamA.score} : {match.teamB.score}
+            </div>
+          ) : (
+            <div className="text-base font-headline font-bold text-[#565E74] dark:text-slate-400">VS</div>
+          )}
+          <span className="text-[10px] text-[#565E74] dark:text-slate-400 font-mono mt-1">{match.scheduledTime}</span>
+        </div>
+
+        {/* Team B */}
+        <div className="flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
+            {match.teamB.tag}
+          </div>
+          <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamB.name}</span>
+          <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamB.tag}]</span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap lg:flex-col items-center justify-end gap-2.5">
+        {/* Watch Live button — only when liveLink is provided */}
+        {match.liveLink && (
+          <a
+            href={match.liveLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
+          >
+            <Radio className="w-4 h-4 animate-pulse" />
+            Watch Live
+            <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
+          </a>
+        )}
+        <button
+          onClick={onEnterLobby}
+          className="w-full sm:w-auto px-4 py-2 bg-[#0B0E16] dark:bg-[#1A2234] hover:bg-[#161A24] dark:hover:bg-[#232D42] text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer border border-transparent dark:border-[#242C3D]"
+        >
+          <Server className="w-4 h-4 text-[#E56A10]" />
+          Enter Lobby Room
+        </button>
+        <button
+          onClick={onSubmitEvidence}
+          className="w-full sm:w-auto px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+        >
+          <FileCheck className="w-4 h-4" />
+          Submit Evidence
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function MatchesPage() {
@@ -175,90 +329,15 @@ export default function MatchesPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {filteredMatches.map((match) => (
-            <div
-              key={match.id}
-              className="bg-white dark:bg-[#121622] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] shadow-sm p-6 hover:border-[#CBD5E1] dark:hover:border-[#E56A10] transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-            >
-              {/* Left Details */}
-              <div className="flex flex-col gap-2 min-w-[280px]">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                      match.status === "LIVE"
-                        ? "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800"
-                        : match.status === "CHECK_IN_OPEN"
-                        ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-800"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700"
-                    }`}
-                  >
-                    {match.status}
-                  </span>
-                  <span className="px-2 py-0.5 bg-[#EFF4FF] dark:bg-[#161A24] border border-[#D3E4FE] dark:border-[#242C3D] text-[#0B1C30] dark:text-slate-200 rounded text-[10px] font-mono uppercase font-bold">
-                    {match.gameName}
-                  </span>
-                </div>
-                <h3 className="font-headline font-bold text-lg text-[#0B1C30] dark:text-white">{match.stage}</h3>
-                <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono">{match.tournamentTitle}</div>
-                <div className="flex items-center gap-1.5 text-xs text-[#565E74] dark:text-slate-400 font-mono mt-1">
-                  <Server className="w-3.5 h-3.5 text-[#E56A10]" />
-                  <span>{match.serverRegion}</span>
-                </div>
-              </div>
-
-              {/* Match Teams VS Section */}
-              <div className="flex items-center justify-center gap-6 sm:gap-10 py-4 px-6 bg-[#EFF4FF] dark:bg-[#161A24] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] flex-1 max-w-xl">
-                {/* Team A */}
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
-                    {match.teamA.tag}
-                  </div>
-                  <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamA.name}</span>
-                  <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamA.tag}]</span>
-                </div>
-
-                {/* Center Score / Versus */}
-                <div className="flex flex-col items-center">
-                  {match.teamA.score !== undefined && match.teamB.score !== undefined ? (
-                    <div className="text-2xl font-mono font-bold text-[#0B1C30] dark:text-white">
-                      {match.teamA.score} : {match.teamB.score}
-                    </div>
-                  ) : (
-                    <div className="text-base font-headline font-bold text-[#565E74] dark:text-slate-400">VS</div>
-                  )}
-                  <span className="text-[10px] text-[#565E74] dark:text-slate-400 font-mono mt-1">{match.scheduledTime}</span>
-                </div>
-
-                {/* Team B */}
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
-                    {match.teamB.tag}
-                  </div>
-                  <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamB.name}</span>
-                  <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamB.tag}]</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap lg:flex-col items-center justify-end gap-2.5">
-                <button
-                  onClick={() => setActiveLobbyMatch(match)}
-                  className="w-full sm:w-auto px-4 py-2 bg-[#0B0E16] dark:bg-[#1A2234] hover:bg-[#161A24] dark:hover:bg-[#232D42] text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer border border-transparent dark:border-[#242C3D]"
-                >
-                  <Server className="w-4 h-4 text-[#E56A10]" />
-                  Enter Lobby Room
-                </button>
-                <button
-                  onClick={() => setActiveEvidenceMatch(match)}
-                  className="w-full sm:w-auto px-4 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
-                >
-                  <FileCheck className="w-4 h-4" />
-                  Submit Evidence
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              <MatchCard
+                key={match.id}
+                match={match}
+                onEnterLobby={() => setActiveLobbyMatch(match)}
+                onSubmitEvidence={() => setActiveEvidenceMatch(match)}
+              />
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Modals */}

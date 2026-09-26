@@ -217,3 +217,77 @@ export async function registerForTournament(
 export async function getMyTournamentRegistrations(): Promise<any[]> {
   return apiClient<any[]>("/tournaments/my-registrations");
 }
+
+export interface TournamentRegistrationStatus {
+  is_registered: boolean;
+  registration?: {
+    id: string;
+    tournament_id: string;
+    team_id?: string;
+    player_id?: string;
+    payment_method: string;
+    payment_status: string;
+    payment_id?: string;
+    utr?: string;
+    registered_at?: string;
+    check_in_status?: string;
+  };
+}
+
+export interface TournamentRegisterUpiResponse {
+  payment_id: string;
+  registration_id: string;
+  tournament_id: string;
+  tournament_title: string;
+  amount_inr: number;
+  amount_paise: number;
+  account_code: string;
+  upi_id: string;
+  payee_name: string;
+  qr_url?: string;
+  upi_uri: string;
+  status: string;
+}
+
+export async function getTournamentRegistrationStatus(
+  tournamentId: string,
+  teamId?: string
+): Promise<TournamentRegistrationStatus> {
+  const query = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
+  return apiClient<TournamentRegistrationStatus>(`/tournaments/${tournamentId}/registration-status${query}`);
+}
+
+export async function registerForTournamentUpi(
+  tournamentId: string,
+  teamId?: string
+): Promise<TournamentRegisterUpiResponse> {
+  return apiClient<TournamentRegisterUpiResponse>(`/tournaments/${tournamentId}/register-upi`, {
+    method: "POST",
+    body: JSON.stringify(teamId ? { team_id: teamId } : {}),
+  });
+}
+
+export async function submitTournamentUtr(
+  tournamentId: string,
+  payload: { payment_id: string; utr: string; screenshot_url?: string }
+): Promise<{ status: string; message: string; payment_id: string; utr: string }> {
+  return apiClient(`/tournaments/${tournamentId}/submit-upi-utr`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTournamentStageFormats(
+  tournamentId: string,
+  payload: {
+    tournament_type?: string;
+    match_format?: string;
+    stage_formats?: Record<string, string>;
+  }
+): Promise<{ status: string; message: string; tournament_id: string }> {
+  return apiClient(`/tournaments/admin/tournaments/${tournamentId}/stage-formats`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+

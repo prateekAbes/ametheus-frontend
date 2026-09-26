@@ -60,7 +60,16 @@ import {
   Dispute,
 } from "@/lib/api/admin";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
-import { getMatches, Match } from "@/lib/api/matches";
+import {
+  getMatches,
+  Match,
+  getLiveMatchesDashboard,
+  pairMatchTeams,
+  updateMatchSchedule,
+  updateMatchStatus,
+  updateMatchScore,
+  LiveDashboardData,
+} from "@/lib/api/matches";
 import {
   getGames,
   createGame,
@@ -141,6 +150,7 @@ export default function AdminCockpitPage() {
     | "payment_verifications"
     | "payouts_ledger"
     | "dev_data"
+    | "live_matches"
   >("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
@@ -364,6 +374,26 @@ export default function AdminCockpitPage() {
   const [selectedUserWallet, setSelectedUserWallet] = useState<UserWalletSummary | null>(null);
   const [isLoadingUserWallet, setIsLoadingUserWallet] = useState(false);
 
+  // Live Matches Command Center State
+  const [liveDashboard, setLiveDashboard] = useState<LiveDashboardData | null>(null);
+  const [isLoadingLiveDash, setIsLoadingLiveDash] = useState(false);
+  const [liveDashTab, setLiveDashTab] = useState<"ready" | "scheduled" | "live" | "completed">("ready");
+  // Team pairing wizard state
+  const [pairTournamentId, setPairTournamentId] = useState("");
+  const [pairTeamAId, setPairTeamAId] = useState("");
+  const [pairTeamBId, setPairTeamBId] = useState("");
+  const [pairStage, setPairStage] = useState("Quarterfinals");
+  const [pairFormat, setPairFormat] = useState("Best of 3");
+  const [pairScheduledAt, setPairScheduledAt] = useState("");
+  const [isPairing, setIsPairing] = useState(false);
+  // Match score/status edit state
+  const [editMatchId, setEditMatchId] = useState<string | null>(null);
+  const [editScoreA, setEditScoreA] = useState("");
+  const [editScoreB, setEditScoreB] = useState("");
+  const [editLiveLink, setEditLiveLink] = useState("");
+  const [editMatchStatus, setEditMatchStatus] = useState("");
+  const [isEditingMatch, setIsEditingMatch] = useState(false);
+
   const handleOpenUserWallet = async (userId: string) => {
     setIsLoadingUserWallet(true);
     try {
@@ -465,6 +495,13 @@ export default function AdminCockpitPage() {
       }
       if (payoutsRes.status === "fulfilled" && Array.isArray(payoutsRes.value)) {
         setAdminPayouts(payoutsRes.value);
+      }
+      // Live dashboard (best-effort)
+      try {
+        const dash = await getLiveMatchesDashboard();
+        setLiveDashboard(dash);
+      } catch (_) {
+        // non-fatal — backend may not have this endpoint deployed yet
       }
     } catch (err) {
       console.warn("Admin fetch fallback:", err);
@@ -1496,6 +1533,21 @@ export default function AdminCockpitPage() {
             {disputes.filter((d) => d.status === "OPEN").length > 0 && (
               <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] rounded-full">
                 {disputes.filter((d) => d.status === "OPEN").length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("live_matches")}
+            className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === "live_matches"
+                ? "bg-[#E56A10] text-white shadow-xs"
+                : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" /> Live Matches
+            {liveDashboard && liveDashboard.live_now && liveDashboard.live_now.length > 0 && (
+              <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[9px] font-bold rounded-full animate-pulse">
+                {liveDashboard.live_now.length}
               </span>
             )}
           </button>
@@ -3323,6 +3375,339 @@ export default function AdminCockpitPage() {
             </div>
           </div>
         )}
+
+        {/* TAB: LIVE MATCHES COMMAND CENTER */}
+        {activeTab === "live_matches" && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs">
+              <div>
+                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-[#E56A10]" /> Live Matches Command Center
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                  Pair teams, schedule matches, update live scores, and manage match lifecycle.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setIsLoadingLiveDash(true);
+                  try {
+                    const dash = await getLiveMatchesDashboard();
+                    setLiveDashboard(dash);
+                  } catch (_) {}
+                  finally { setIsLoadingLiveDash(false); }
+                }}
+                disabled={isLoadingLiveDash}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                {isLoadingLiveDash ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" />}
+                Refresh Dashboard
+              </button>
+            </div>
+
+            {/* Inner 4-tab nav */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {([
+                { id: "ready", label: "Ready to Pair", count: liveDashboard?.ready_for_match_creation?.length ?? 0, color: "amber" },
+                { id: "scheduled", label: "Scheduled", count: liveDashboard?.scheduled?.length ?? 0, color: "blue" },
+                { id: "live", label: "Live Now", count: liveDashboard?.live_now?.length ?? 0, color: "rose" },
+                { id: "completed", label: "Completed", count: liveDashboard?.completed?.length ?? 0, color: "slate" },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setLiveDashTab(t.id)}
+                  className={`px-4 py-2 font-mono text-xs font-bold uppercase rounded transition-colors whitespace-nowrap cursor-pointer border ${
+                    liveDashTab === t.id
+                      ? "bg-[#E56A10] text-white border-transparent"
+                      : "bg-white dark:bg-[#161A24] border-[#D3E4FE] dark:border-[#242C3D] text-[#565E74] dark:text-slate-300 hover:text-[#0B1C30] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1E2538]"
+                  }`}
+                >
+                  {t.label} {t.count > 0 && <span className="ml-1">({t.count})</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* READY FOR MATCH CREATION (Team Pairing Wizard) */}
+            {liveDashTab === "ready" && (
+              <div className="space-y-4">
+                {/* Pairing Wizard */}
+                <div className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-6 space-y-4">
+                  <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-[#E56A10]" /> Team Pairing Wizard
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Tournament ID</label>
+                      <input value={pairTournamentId} onChange={(e) => setPairTournamentId(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                        placeholder="tournament_id" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Team A ID</label>
+                      <input value={pairTeamAId} onChange={(e) => setPairTeamAId(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                        placeholder="team_a_id" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Team B ID</label>
+                      <input value={pairTeamBId} onChange={(e) => setPairTeamBId(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                        placeholder="team_b_id" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Stage</label>
+                      <select value={pairStage} onChange={(e) => setPairStage(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
+                        {["Group Stage", "Round of 16", "Quarterfinals", "Semifinals", "Grand Final"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Format</label>
+                      <select value={pairFormat} onChange={(e) => setPairFormat(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
+                        {["Best of 1", "Best of 3", "Best of 5"].map((f) => (
+                          <option key={f}>{f}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Scheduled At (UTC)</label>
+                      <input type="datetime-local" value={pairScheduledAt} onChange={(e) => setPairScheduledAt(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      disabled={isPairing || !pairTournamentId || !pairTeamAId || !pairTeamBId}
+                      onClick={async () => {
+                        setIsPairing(true);
+                        try {
+                          await pairMatchTeams({
+                            tournament_id: pairTournamentId,
+                            team_a_id: pairTeamAId,
+                            team_b_id: pairTeamBId,
+                            stage: pairStage,
+                            format: pairFormat,
+                            scheduled_at: pairScheduledAt || undefined,
+                          });
+                          setActionMessage("Match created successfully!");
+                          setPairTeamAId(""); setPairTeamBId(""); setPairScheduledAt("");
+                          const dash = await getLiveMatchesDashboard();
+                          setLiveDashboard(dash);
+                        } catch (err: any) {
+                          setActionMessage(err?.message || "Failed to create match");
+                        } finally {
+                          setIsPairing(false);
+                          setTimeout(() => setActionMessage(""), 4000);
+                        }
+                      }}
+                      className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      Create Match
+                    </button>
+                  </div>
+                </div>
+                {/* Ready teams list */}
+                {liveDashboard?.ready_for_match_creation && liveDashboard.ready_for_match_creation.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">Registered Teams Without Matches</p>
+                    {liveDashboard.ready_for_match_creation.map((t: any) => (
+                      <div key={t.id || t._id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-lg p-3 flex items-center justify-between gap-4 text-xs font-mono">
+                        <span className="font-bold text-slate-900 dark:text-white">{t.name} <span className="text-slate-400">[{t.tag}]</span></span>
+                        <span className="text-slate-500 dark:text-slate-400">{t.tournament_title}</span>
+                        <button onClick={() => { setPairTeamAId(t.id || t._id); setPairTournamentId(t.tournament_id || ""); }}
+                          className="px-2 py-1 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] rounded text-slate-700 dark:text-slate-300 cursor-pointer">
+                          Use as Team A
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No teams waiting for match creation.</p>
+                )}
+              </div>
+            )}
+
+            {/* SCHEDULED MATCHES */}
+            {liveDashTab === "scheduled" && (
+              <div className="space-y-3">
+                {liveDashboard?.scheduled && liveDashboard.scheduled.length > 0 ? liveDashboard.scheduled.map((m: any) => (
+                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} vs {m.team_b?.name}</span>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString() : "Not scheduled"}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800">
+                          {m.status}
+                        </span>
+                      </div>
+                    </div>
+                    {editMatchId === m.id ? (
+                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Status</label>
+                            <select value={editMatchStatus} onChange={(e) => setEditMatchStatus(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
+                              {["CHECK_IN_OPEN", "SCHEDULED", "LIVE", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => <option key={s}>{s}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Live Link</label>
+                            <input value={editLiveLink} onChange={(e) => setEditLiveLink(e.target.value)} placeholder="https://..."
+                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setEditMatchId(null)} className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1F2637] hover:bg-slate-200 dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded cursor-pointer">Cancel</button>
+                          <button
+                            disabled={isEditingMatch}
+                            onClick={async () => {
+                              setIsEditingMatch(true);
+                              try {
+                                if (editMatchStatus) await updateMatchStatus(m.id, editMatchStatus, editLiveLink || undefined);
+                                setEditMatchId(null);
+                                const dash = await getLiveMatchesDashboard();
+                                setLiveDashboard(dash);
+                              } catch (err: any) {
+                                setActionMessage(err?.message || "Failed to update match");
+                              } finally {
+                                setIsEditingMatch(false);
+                                setTimeout(() => setActionMessage(""), 4000);
+                              }
+                            }}
+                            className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded cursor-pointer disabled:opacity-50 flex items-center gap-1">
+                            {isEditingMatch ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditMatchId(m.id); setEditMatchStatus(m.status); setEditLiveLink(m.live_link || ""); }}
+                        className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-700 dark:text-slate-300 rounded cursor-pointer">
+                        Edit Status / Live Link
+                      </button>
+                    )}
+                  </div>
+                )) : (
+                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No scheduled matches.</p>
+                )}
+              </div>
+            )}
+
+            {/* LIVE NOW */}
+            {liveDashTab === "live" && (
+              <div className="space-y-3">
+                {liveDashboard?.live_now && liveDashboard.live_now.length > 0 ? liveDashboard.live_now.map((m: any) => (
+                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-rose-300 dark:border-rose-900/60 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} <span className="text-[#E56A10] font-mono">vs</span> {m.team_b?.name}</span>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {m.team_a?.score !== undefined && <span className="text-xl font-mono font-bold text-slate-900 dark:text-white">{m.team_a.score} : {m.team_b?.score}</span>}
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" /> LIVE
+                        </span>
+                      </div>
+                    </div>
+                    {/* Score update form */}
+                    {editMatchId === m.id ? (
+                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">{m.team_a?.name} Score</label>
+                            <input type="number" min={0} value={editScoreA} onChange={(e) => setEditScoreA(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">{m.team_b?.name} Score</label>
+                            <input type="number" min={0} value={editScoreB} onChange={(e) => setEditScoreB(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Status</label>
+                            <select value={editMatchStatus} onChange={(e) => setEditMatchStatus(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
+                              {["IN_PROGRESS", "LIVE", "COMPLETED", "PENDING_VERIFICATION"].map((s) => <option key={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setEditMatchId(null)} className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1F2637] hover:bg-slate-200 dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded cursor-pointer">Cancel</button>
+                          <button
+                            disabled={isEditingMatch}
+                            onClick={async () => {
+                              setIsEditingMatch(true);
+                              try {
+                                const scoreA = parseInt(editScoreA);
+                                const scoreB = parseInt(editScoreB);
+                                if (!isNaN(scoreA) && !isNaN(scoreB)) {
+                                  await updateMatchScore(m.id, scoreA, scoreB);
+                                }
+                                if (editMatchStatus) await updateMatchStatus(m.id, editMatchStatus);
+                                setEditMatchId(null);
+                                const dash = await getLiveMatchesDashboard();
+                                setLiveDashboard(dash);
+                              } catch (err: any) {
+                                setActionMessage(err?.message || "Failed to update match");
+                              } finally {
+                                setIsEditingMatch(false);
+                                setTimeout(() => setActionMessage(""), 4000);
+                              }
+                            }}
+                            className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded cursor-pointer disabled:opacity-50 flex items-center gap-1">
+                            {isEditingMatch ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Update Score
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditMatchId(m.id); setEditScoreA(String(m.team_a?.score ?? "")); setEditScoreB(String(m.team_b?.score ?? "")); setEditMatchStatus(m.status); }}
+                        className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-700 dark:text-slate-300 rounded cursor-pointer">
+                        Update Score / Status
+                      </button>
+                    )}
+                  </div>
+                )) : (
+                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No matches live right now.</p>
+                )}
+              </div>
+            )}
+
+            {/* COMPLETED MATCHES */}
+            {liveDashTab === "completed" && (
+              <div className="space-y-3">
+                {liveDashboard?.completed && liveDashboard.completed.length > 0 ? liveDashboard.completed.map((m: any) => (
+                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} vs {m.team_b?.name}</span>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {m.team_a?.score !== undefined && (
+                          <span className="text-lg font-mono font-bold text-slate-900 dark:text-white">{m.team_a.score} : {m.team_b?.score}</span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                          {m.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No completed matches yet.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       {/* Payout Approval Modal */}

@@ -174,6 +174,9 @@ export interface MatchLobbyInfo {
   lobbyPassword: string;
   disputeNotes?: string;
   evidenceUrl?: string;
+  scheduledAt?: string;
+  liveLink?: string;
+  order?: number;
 }
 
 export interface AdminAuditLog {

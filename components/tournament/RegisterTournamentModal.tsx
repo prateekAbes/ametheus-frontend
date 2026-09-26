@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { registerForTournament } from "@/lib/api/tournaments";
+import {
+  registerForTournament,
+  registerForTournamentUpi,
+  submitTournamentUtr,
+  getTournamentRegistrationStatus,
+  TournamentRegisterUpiResponse,
+  TournamentRegistrationStatus,
+} from "@/lib/api/tournaments";
 import { getWallet } from "@/lib/api/wallet";
 import { getMyTeams } from "@/lib/api/teams";
 import { Team } from "@/types";
@@ -18,6 +25,9 @@ import {
   Users,
   ArrowRight,
   Loader2,
+  CheckCircle,
+  Copy,
+  QrCode,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
@@ -63,6 +73,16 @@ export default function RegisterTournamentModal({
   const [error, setError] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
+  // Direct UPI & Existing Registration State
+  const [existingReg, setExistingReg] = useState<TournamentRegistrationStatus["registration"] | null>(null);
+  const [isCheckingReg, setIsCheckingReg] = useState(false);
+  const [paymentMethodTab, setPaymentMethodTab] = useState<"WALLET" | "UPI">("WALLET");
+  const [upiData, setUpiData] = useState<TournamentRegisterUpiResponse | null>(null);
+  const [isLoadingUpi, setIsLoadingUpi] = useState(false);
+  const [utrInput, setUtrInput] = useState("");
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [upiSubmittedSuccess, setUpiSubmittedSuccess] = useState(false);
+
   const gameSlug = (tournament.gameSlug || tournament.game_slug || "").toLowerCase();
   const requiredTeamSize = Number(tournament.min_team_size ?? tournament.minTeamSize ?? 1);
   const maxTeamSize = Number(tournament.max_team_size ?? tournament.maxTeamSize ?? (requiredTeamSize > 1 ? requiredTeamSize : 5));
@@ -76,6 +96,22 @@ export default function RegisterTournamentModal({
       ? `${requiredTeamSize} Players Required`
       : `${requiredTeamSize}-${maxTeamSize} Players Required`;
 
+  // Check existing registration on open & team selection
+  useEffect(() => {
+    if (!isOpen || !tournament.id) return;
+    setIsCheckingReg(true);
+    getTournamentRegistrationStatus(tournament.id, isSolo ? undefined : selectedTeamId || undefined)
+      .then((res) => {
+        if (res?.is_registered && res.registration) {
+          setExistingReg(res.registration);
+        } else {
+          setExistingReg(null);
+        }
+      })
+      .catch(() => setExistingReg(null))
+      .finally(() => setIsCheckingReg(false));
+  }, [isOpen, tournament.id, selectedTeamId, isSolo]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -83,6 +119,10 @@ export default function RegisterTournamentModal({
     setError("");
     setStep("SELECT_TEAM");
     setIsTeamsLoading(true);
+    setPaymentMethodTab("WALLET");
+    setUpiData(null);
+    setUtrInput("");
+    setUpiSubmittedSuccess(false);
 
     // Fetch authoritative teams directly from MongoDB
     getMyTeams(gameSlug)
@@ -209,11 +249,57 @@ export default function RegisterTournamentModal({
 
     try {
       await registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id);
+      setUpiSubmittedSuccess(false);
       setStep("SUCCESS");
       onRegistrationSuccess();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Tournament registration failed";
       setError(msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const initUpiPayment = async () => {
+    setIsLoadingUpi(true);
+    setError("");
+    try {
+      const data = await registerForTournamentUpi(tournament.id, isSolo ? undefined : selectedTeam?.id);
+      setUpiData(data);
+    } catch (err: any) {
+      setError(err?.message || "Failed to initialize direct UPI payment account.");
+    } finally {
+      setIsLoadingUpi(false);
+    }
+  };
+
+  const handleCopyUpi = () => {
+    if (upiData?.upi_id) {
+      navigator.clipboard.writeText(upiData.upi_id);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2500);
+    }
+  };
+
+  const handleSubmitUtr = async () => {
+    if (!upiData) return;
+    const clean = utrInput.trim();
+    if (!clean || clean.length < 6) {
+      setError("Please enter a valid UPI Reference / UTR Number (minimum 6 digits).");
+      return;
+    }
+    setIsProcessing(true);
+    setError("");
+    try {
+      await submitTournamentUtr(tournament.id, {
+        payment_id: upiData.payment_id,
+        utr: clean,
+      });
+      setUpiSubmittedSuccess(true);
+      setStep("SUCCESS");
+      onRegistrationSuccess();
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit UPI UTR. Please verify the reference and try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -244,6 +330,31 @@ export default function RegisterTournamentModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Existing Registration Guard Banner */}
+        {existingReg && (
+          <div
+            className={`p-4 rounded-xl border mb-4 text-xs font-mono space-y-1.5 ${
+              existingReg.payment_status === "PAID" || existingReg.payment_status === "FREE"
+                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+                : "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+            }`}
+          >
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>
+                {existingReg.payment_status === "PAID" || existingReg.payment_status === "FREE"
+                  ? "Already Registered & Confirmed"
+                  : "Registration Pending Admin Verification"}
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              {existingReg.payment_status === "PAID" || existingReg.payment_status === "FREE"
+                ? "Your entry for this tournament is locked in. Match room credentials will appear before the scheduled start."
+                : `Your registration with payment reference (${existingReg.utr || "Submitted"}) is awaiting admin verification. Your slot is held.`}
+            </p>
+          </div>
+        )}
 
         {step === "SELECT_TEAM" && (
           <div className="flex flex-col gap-4">
@@ -437,11 +548,11 @@ export default function RegisterTournamentModal({
               </button>
               <button
                 type="button"
-                disabled={!isSolo && activeTeams.length === 0}
+                disabled={Boolean(existingReg) || (!isSolo && activeTeams.length === 0)}
                 onClick={handleProceedToCheckout}
                 className="px-5 py-2.5 bg-[#E56A10] disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-sm cursor-pointer"
               >
-                Proceed to Checkout ({tournament.entryFee})
+                {existingReg ? "Already Registered (Locked)" : `Proceed to Checkout (${tournament.entryFee})`}
               </button>
             </div>
           </div>
@@ -485,76 +596,235 @@ export default function RegisterTournamentModal({
               </div>
             </div>
 
-            {/* Insufficient balance prompt or secure deduction confirmation */}
-            {walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance ? (
-              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs space-y-2">
-                <div className="text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  Insufficient Wallet Balance
-                </div>
-                <p className="text-slate-600 dark:text-slate-300 font-mono text-[11px] leading-relaxed">
-                  Entry fee requires ₹{tournament.entryFeeNum}. Your available balance is ₹{walletBalance.toLocaleString()}. Please top up your wallet in the dashboard to register.
-                </p>
-                <Link
-                  href="/dashboard"
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-[11px] font-bold uppercase rounded shadow-xs"
-                >
-                  <Wallet className="w-3.5 h-3.5" />
-                  Top Up Wallet in Dashboard →
-                </Link>
-              </div>
-            ) : (
-              <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-1.5">
-                <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
-                  <Wallet className="w-3.5 h-3.5 text-[#E56A10]" />
-                  Direct Wallet Balance Deduction • Instant Registration
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                  The entry fee will be deducted directly from your competitive wallet balance.
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
+            {/* Payment Method Switcher (Wallet vs Direct UPI) */}
+            <div className="flex rounded-lg border border-slate-200 dark:border-[#242C3D] p-1 bg-slate-100 dark:bg-[#161B26]">
               <button
                 type="button"
-                onClick={() => setStep("SELECT_TEAM")}
-                className="px-4 py-2 bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
+                onClick={() => setPaymentMethodTab("WALLET")}
+                className={`flex-1 py-2 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                  paymentMethodTab === "WALLET"
+                    ? "bg-white dark:bg-[#20283C] text-[#E56A10] shadow-xs"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
               >
-                Back
+                <Wallet className="w-3.5 h-3.5" />
+                Wallet Balance
               </button>
               <button
                 type="button"
-                disabled={isProcessing || (walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance)}
-                onClick={() => handleTournamentPayment()}
-                className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                onClick={() => {
+                  setPaymentMethodTab("UPI");
+                  if (!upiData && !isLoadingUpi) {
+                    initUpiPayment();
+                  }
+                }}
+                className={`flex-1 py-2 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                  paymentMethodTab === "UPI"
+                    ? "bg-white dark:bg-[#20283C] text-[#E56A10] shadow-xs"
+                    : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                }`}
               >
-                {isProcessing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CreditCard className="w-4 h-4" />
-                )}
-                <span>{isProcessing ? "Processing..." : `Confirm Wallet Deduction`}</span>
+                <QrCode className="w-3.5 h-3.5" />
+                Direct UPI (QR / VPA)
               </button>
             </div>
+
+            {paymentMethodTab === "WALLET" ? (
+              <>
+                {/* Insufficient balance prompt or secure deduction confirmation */}
+                {walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance ? (
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs space-y-2">
+                    <div className="text-amber-800 dark:text-amber-300 font-bold flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      Insufficient Wallet Balance
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300 font-mono text-[11px] leading-relaxed">
+                      Entry fee requires ₹{tournament.entryFeeNum}. Your available balance is ₹{walletBalance.toLocaleString()}. You can switch to <strong>Direct UPI</strong> above to pay instantly via QR code without topping up.
+                    </p>
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentMethodTab("UPI");
+                          if (!upiData && !isLoadingUpi) initUpiPayment();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-[11px] font-bold uppercase rounded shadow-xs cursor-pointer"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        Pay with Direct UPI Instead →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg p-3 flex flex-col items-center text-center gap-1.5">
+                    <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
+                      <Wallet className="w-3.5 h-3.5 text-[#E56A10]" />
+                      Direct Wallet Balance Deduction • Instant Registration
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      The entry fee will be deducted directly from your competitive wallet balance.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
+                  <button
+                    type="button"
+                    onClick={() => setStep("SELECT_TEAM")}
+                    className="px-4 py-2 bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isProcessing || (walletBalance !== null && (tournament.entryFeeNum || 0) > walletBalance)}
+                    onClick={() => handleTournamentPayment()}
+                    className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    <span>{isProcessing ? "Processing..." : "Confirm Wallet Deduction"}</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* DIRECT UPI SECTION */
+              <div className="space-y-4">
+                {isLoadingUpi ? (
+                  <div className="p-8 text-center bg-slate-50 dark:bg-[#161B26] rounded-xl border border-slate-200 dark:border-[#242C3D] space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#E56A10] mx-auto" />
+                    <p className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                      Generating official UPI QR &amp; payment reference...
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-3 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg space-y-2 font-mono text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Official UPI ID:</span>
+                        <div className="flex items-center gap-1.5">
+                          <code className="text-[#E56A10] font-bold text-xs bg-white dark:bg-[#0B0E16] px-2 py-0.5 rounded border border-slate-200 dark:border-[#242C3D]">
+                            {upiData?.upi_id || "Loading..."}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={handleCopyUpi}
+                            className="p-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 cursor-pointer"
+                            title="Copy UPI ID"
+                          >
+                            {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Payee Name:</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{upiData?.payee_name || "Ametheus Esports"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Payee Code:</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{upiData?.account_code || "UPI001"}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-slate-200 dark:border-[#242C3D] pt-2">
+                        <span className="text-slate-500 dark:text-slate-400 font-bold">Exact Amount:</span>
+                        <span className="font-bold text-base text-[#E56A10]">₹{upiData?.amount_inr ?? tournament.entryFeeNum}</span>
+                      </div>
+                    </div>
+
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center p-3 bg-white dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg">
+                      <img
+                        src={
+                          upiData?.qr_url ||
+                          `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                            upiData?.upi_uri || `upi://pay?pa=${upiData?.upi_id}&pn=Ametheus&am=${tournament.entryFeeNum}&cu=INR`
+                          )}`
+                        }
+                        alt="Official UPI QR Code"
+                        className="w-40 h-40 object-contain rounded-md border border-slate-200 dark:border-slate-700 bg-white"
+                      />
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-2 text-center">
+                        Scan with GPay, PhonePe, Paytm, BHIM, or any banking UPI app
+                      </span>
+                    </div>
+
+                    {/* UTR Input */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-mono font-bold uppercase text-slate-800 dark:text-slate-200">
+                        12-Digit UPI Ref / UTR Number
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={24}
+                        value={utrInput}
+                        onChange={(e) => setUtrInput(e.target.value)}
+                        placeholder="e.g. 524018294821"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:border-[#E56A10] outline-hidden shadow-xs"
+                      />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        Enter the 12-digit transaction ID from your payment confirmation screen or bank SMS.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
+                      <button
+                        type="button"
+                        onClick={() => setStep("SELECT_TEAM")}
+                        className="px-4 py-2 bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-bold uppercase tracking-wider rounded cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessing || !utrInput.trim()}
+                        onClick={handleSubmitUtr}
+                        className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#D45900] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        <span>{isProcessing ? "Submitting..." : "Submit UTR & Register"}</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {step === "SUCCESS" && (
           <div className="flex flex-col items-center text-center py-6">
-            <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 shadow-sm">
+            <div
+              className={`w-14 h-14 rounded-full border flex items-center justify-center mb-4 shadow-sm ${
+                upiSubmittedSuccess
+                  ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400"
+                  : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
               <Check className="w-8 h-8" />
             </div>
 
             <h4 className="font-headline font-bold text-xl text-slate-900 dark:text-white mb-1">
-              Registration Confirmed!
+              {upiSubmittedSuccess ? "Registration Submitted for Verification!" : "Registration Confirmed!"}
             </h4>
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
-              {isSolo ? (
-                <>You have been confirmed as a solo contender for <strong className="text-slate-900 dark:text-white">{tournament.title}</strong> with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+              {upiSubmittedSuccess ? (
+                <>
+                  Your direct UPI transaction reference (<code className="text-[#E56A10] font-bold">{utrInput}</code>) has been submitted to tournament administrators. Your slot is held and will be confirmed once payment verification finishes.
+                </>
+              ) : isSolo ? (
+                <>
+                  You have been confirmed as a solo contender for <strong className="text-slate-900 dark:text-white">{tournament.title}</strong> with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.
+                </>
               ) : (
-                <>Your team <strong className="text-slate-900 dark:text-white">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.</>
+                <>
+                  Your team <strong className="text-slate-900 dark:text-white">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.
+                </>
               )}
             </p>
 
@@ -562,7 +832,7 @@ export default function RegisterTournamentModal({
               onClick={onClose}
               className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-sm cursor-pointer"
             >
-              View Tournament Bracket
+              {upiSubmittedSuccess ? "Done" : "View Tournament Bracket"}
             </button>
           </div>
         )}
