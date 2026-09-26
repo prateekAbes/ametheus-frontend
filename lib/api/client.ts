@@ -68,7 +68,8 @@ export async function apiClient<T>(
   if (response.status === 401 && authTokenGetter && !_isRetry) {
     try {
       const freshToken = await authTokenGetter({ skipCache: true });
-      if (freshToken) {
+      const currentToken = headers["Authorization"] ? headers["Authorization"].replace(/^Bearer\s+/i, "") : null;
+      if (freshToken && freshToken !== currentToken) {
         headers["Authorization"] = `Bearer ${freshToken}`;
         response = await fetch(url, {
           ...fetchOptions,

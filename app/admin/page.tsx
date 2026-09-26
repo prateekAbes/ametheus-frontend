@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -376,7 +376,11 @@ export default function AdminCockpitPage() {
     }
   };
 
+  const isFetchingAdminDataRef = useRef(false);
+
   const loadAdminData = useCallback(async () => {
+    if (isFetchingAdminDataRef.current) return;
+    isFetchingAdminDataRef.current = true;
     try {
       const [
         profileRes,
@@ -466,11 +470,12 @@ export default function AdminCockpitPage() {
       console.warn("Admin fetch fallback:", err);
     } finally {
       setIsLoading(false);
+      isFetchingAdminDataRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    if (isAuthLoaded) {
+    if (isAuthLoaded && isSignedIn) {
       loadAdminData();
     }
   }, [isAuthLoaded, isSignedIn, loadAdminData]);

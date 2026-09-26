@@ -43,12 +43,19 @@ export default function NotificationsDropdown() {
     }
   }, [isLoaded, isSignedIn, getToken]);
 
+  const fetchNotifsRef = useRef(fetchNotifs);
+  useEffect(() => {
+    fetchNotifsRef.current = fetchNotifs;
+  }, [fetchNotifs]);
+
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    fetchNotifs();
-    const interval = setInterval(fetchNotifs, 30000); // 30s poll
+    fetchNotifsRef.current();
+    const interval = setInterval(() => {
+      fetchNotifsRef.current();
+    }, 30000); // 30s poll
     return () => clearInterval(interval);
-  }, [isLoaded, isSignedIn, fetchNotifs]);
+  }, [isLoaded, isSignedIn]);
 
   // Handle click outside or global close event to close dropdown
   useEffect(() => {
