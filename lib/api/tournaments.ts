@@ -35,6 +35,11 @@ export interface Tournament {
   prizes: Array<{ place?: string; rank?: string; badge?: string; share?: string; amount?: string; prize?: string; distribution?: string }>;
   bracket_rounds: Record<string, unknown>[];
   registered_rosters: Record<string, unknown>[];
+  match_format?: string;
+  series_format?: string;
+  has_live_matches?: boolean;
+  live_matches_count?: number;
+  live_matches?: any[];
 }
 
 export interface NormalizedTournament {
@@ -62,6 +67,11 @@ export interface NormalizedTournament {
   announcementText?: string;
   rankRequirement: string;
   format: string;
+  matchFormat?: string;
+  seriesFormat?: string;
+  hasLiveMatches?: boolean;
+  liveMatchesCount?: number;
+  liveMatches?: any[];
   bannerUrl: string;
   badgeColor: string;
   description: string;
@@ -78,12 +88,14 @@ export function normalizeTournament(t: any): NormalizedTournament {
       ? "COMING SOON"
       : t.status === "REGISTRATION_OPEN"
       ? "REGISTRATION OPEN"
-      : t.status === "LIVE"
-      ? "BRACKET LIVE"
+      : t.status === "REGISTRATION_CLOSED"
+      ? "REGISTRATION CLOSED"
       : t.status === "COMPLETED"
       ? "FINAL RESULTS"
-      : t.status === "DRAFT"
-      ? "DRAFT MODE"
+      : t.status === "CANCELLED"
+      ? "CANCELLED"
+      : t.status === "LIVE"
+      ? "REGISTRATION CLOSED"
       : t.statusLabel || t.status || "UPCOMING";
 
   const rawRules = t.rules || [];
@@ -182,6 +194,11 @@ export function normalizeTournament(t: any): NormalizedTournament {
     prizes,
     bracketRounds,
     registeredRosters: t.registered_rosters || t.registeredRosters || [],
+    matchFormat: t.match_format || t.matchFormat || "SINGLE_ELIMINATION",
+    seriesFormat: t.series_format || t.seriesFormat || "BO3",
+    hasLiveMatches: Boolean(t.has_live_matches ?? t.hasLiveMatches ?? (Array.isArray(t.live_matches) && t.live_matches.length > 0)),
+    liveMatchesCount: t.live_matches_count ?? t.liveMatchesCount ?? (Array.isArray(t.live_matches) ? t.live_matches.length : 0),
+    liveMatches: t.live_matches || t.liveMatches || [],
   };
 }
 

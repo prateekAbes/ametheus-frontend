@@ -90,7 +90,7 @@ export interface Tournament {
   prizePoolNum: number;
   entryFee: string;
   entryFeeNum: number;
-  status: "COMING_SOON" | "REGISTRATION_OPEN" | "CHECK_IN" | "LIVE" | "COMPLETED" | string;
+  status: "COMING_SOON" | "REGISTRATION_OPEN" | "REGISTRATION_CLOSED" | "COMPLETED" | "CANCELLED" | string;
   statusLabel: string;
   startsAt: string;
   rosterLockTime: string;
@@ -108,6 +108,14 @@ export interface Tournament {
   match_format?: string;
   tournamentType?: string;
   matchFormat?: string;
+  series_format?: string;
+  seriesFormat?: string;
+  has_live_matches?: boolean;
+  hasLiveMatches?: boolean;
+  live_matches_count?: number;
+  liveMatchesCount?: number;
+  live_matches?: any[];
+  liveMatches?: any[];
   bannerUrl: string;
   badgeColor?: string;
   description: string;
@@ -153,8 +161,14 @@ export interface MatchLobbyInfo {
   gameName: string;
   stage: string;
   format: string;
+  matchType?: string;
+  match_type?: string;
+  seriesFormat?: string;
+  series_format?: string;
+  youtubeLiveUrl?: string;
+  youtube_live_url?: string;
   scheduledTime: string;
-  status: "CHECK_IN_OPEN" | "LIVE" | "PENDING_VERIFICATION" | "DISPUTED" | "COMPLETED";
+  status: "CHECK_IN_OPEN" | "SCHEDULED" | "LIVE" | "PENDING_VERIFICATION" | "DISPUTED" | "COMPLETED" | string;
   teamA: {
     id: string;
     name: string;

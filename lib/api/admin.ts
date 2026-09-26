@@ -189,3 +189,138 @@ export async function getUserWalletSummary(userId: string): Promise<UserWalletSu
   return apiClient<UserWalletSummary>(`/admin/users/${userId}/wallet-summary`);
 }
 
+export interface RegisteredRosterMember {
+  user_id: string;
+  username: string;
+  game_id?: string;
+  role?: string;
+}
+
+export interface RegisteredRosterTeam {
+  team_id: string;
+  team_name: string;
+  team_tag: string;
+  captain: {
+    user_id: string;
+    username: string;
+    game_id?: string;
+  };
+  members: RegisteredRosterMember[];
+}
+
+export interface TournamentRegisteredRostersResponse {
+  tournament_id: string;
+  tournament_title: string;
+  game_name: string;
+  game_slug: string;
+  match_format: string;
+  series_format: string;
+  status: string;
+  total_registered: number;
+  teams: RegisteredRosterTeam[];
+}
+
+export interface AdminMatchCreatePayload {
+  tournament_id: string;
+  team1_id: string;
+  team2_id: string;
+  match_type: string;
+  series_format?: string;
+  scheduled_at: string;
+  youtube_live_url?: string;
+  round_number?: number;
+  match_number?: number;
+}
+
+export interface AdminMatchUpdatePayload {
+  team1_id?: string;
+  team2_id?: string;
+  match_type?: string;
+  series_format?: string;
+  scheduled_at?: string;
+  youtube_live_url?: string;
+  status?: string;
+}
+
+export interface AdminMarkMatchLivePayload {
+  youtube_live_url: string;
+}
+
+export interface AdminCompleteMatchPayload {
+  team1_score: number;
+  team2_score: number;
+  winner_id: string;
+}
+
+export async function closeTournamentRegistration(
+  tournamentId: string
+): Promise<{ status: string; message: string; tournament_id: string; tournament_status: string }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/close-registration`, {
+    method: "POST",
+  });
+}
+
+export async function getTournamentRegisteredRosters(
+  tournamentId: string
+): Promise<TournamentRegisteredRostersResponse> {
+  return apiClient<TournamentRegisteredRostersResponse>(`/admin/tournaments/${tournamentId}/registered-rosters`);
+}
+
+export async function generateMatchStructure(
+  tournamentId: string,
+  payload: { match_format: string; series_format?: string }
+): Promise<{ status: string; message: string; tournament_id: string; match_format: string; matches_created: number }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/generate-match-structure`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createMatchAdmin(
+  payload: AdminMatchCreatePayload
+): Promise<{ status: string; message: string; match_id: string }> {
+  return apiClient("/admin/matches", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateMatchDetailsAdmin(
+  matchId: string,
+  payload: AdminMatchUpdatePayload
+): Promise<{ status: string; message: string; match_id: string }> {
+  return apiClient(`/admin/matches/${matchId}/update`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteMatchAdmin(
+  matchId: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function markMatchLiveAdmin(
+  matchId: string,
+  payload: AdminMarkMatchLivePayload
+): Promise<{ status: string; message: string; match_id: string; youtube_live_url: string }> {
+  return apiClient(`/admin/matches/${matchId}/mark-live`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completeMatchAdmin(
+  matchId: string,
+  payload: AdminCompleteMatchPayload
+): Promise<{ status: string; message: string; match_id: string; winner_id: string }> {
+  return apiClient(`/admin/matches/${matchId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+

@@ -18,6 +18,8 @@ import {
   Lock,
   Radio,
   Swords,
+  Tv,
+  ExternalLink,
 } from "lucide-react";
 
 interface Props {
@@ -269,6 +271,77 @@ export default function TournamentDetailPage({ params }: Props) {
                     <span className="font-bold text-[#E56A10]">{currentTournament.registrationOpenDate}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Live Matches Broadcast Banner */}
+          {((currentTournament.liveMatches && currentTournament.liveMatches.length > 0) || matches.some((m: any) => m.status === "LIVE" || m.status === "IN_PROGRESS")) && (
+            <div className="mb-6 p-5 rounded-2xl bg-gradient-to-r from-rose-600/15 via-rose-500/10 to-transparent border border-rose-500/40 shadow-sm space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 text-white font-mono font-bold text-xs rounded-full uppercase tracking-wider animate-pulse shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                    🔴 LIVE NOW
+                  </span>
+                  <span className="font-headline font-bold text-sm sm:text-base text-slate-900 dark:text-white uppercase">
+                    Official Broadcast In Progress
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                  {currentTournament.matchFormat || "Tournament Bracket"} • Certified Real-Time Feeds
+                </span>
+              </div>
+
+              {/* List of active live matches */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                {(matches.filter((m: any) => m.status === "LIVE" || m.status === "IN_PROGRESS").length > 0
+                  ? matches.filter((m: any) => m.status === "LIVE" || m.status === "IN_PROGRESS")
+                  : (currentTournament.liveMatches || [])
+                ).map((lm: any, idx: number) => {
+                  const teamAName = lm.team_a?.name || lm.teamA?.name || "Team 1";
+                  const teamBName = lm.team_b?.name || lm.teamB?.name || "Team 2";
+                  const stage = lm.match_type || lm.stage || "CHAMPIONSHIP";
+                  const seriesFmt = lm.series_format || lm.format || "BO3";
+                  const streamUrl = lm.youtube_live_url || lm.live_link || lm.liveLink;
+
+                  return (
+                    <div
+                      key={lm.id || idx}
+                      className="bg-white dark:bg-[#161B26] border border-rose-300 dark:border-rose-900/60 rounded-xl p-3.5 flex flex-col justify-between gap-2.5 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">{stage}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#20283C] font-bold text-slate-700 dark:text-slate-300">{seriesFmt}</span>
+                      </div>
+
+                      <div className="font-headline font-bold text-sm text-slate-900 dark:text-white flex items-center justify-between">
+                        <span className="truncate">{teamAName}</span>
+                        <span className="px-2 py-0.5 bg-slate-100 dark:bg-[#20283C] text-xs font-mono font-bold rounded shrink-0 mx-2">
+                          {lm.team_a?.score ?? lm.teamA?.score ?? 0} : {lm.team_b?.score ?? lm.teamB?.score ?? 0}
+                        </span>
+                        <span className="truncate">{teamBName}</span>
+                      </div>
+
+                      {streamUrl ? (
+                        <a
+                          href={streamUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                        >
+                          <Radio className="w-3.5 h-3.5 animate-pulse" />
+                          <span>[ 📺 WATCH HERE ]</span>
+                          <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
+                        </a>
+                      ) : (
+                        <div className="text-center py-1 text-[11px] font-mono text-slate-400">
+                          Live In Arena Lobby
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

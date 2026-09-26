@@ -156,9 +156,16 @@ export default function HomePage() {
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-4">
-                      <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-[#E56A10] text-white">
-                        {t.statusLabel || t.status}
-                      </span>
+                      {t.hasLiveMatches ? (
+                        <span className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-rose-600 text-white animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                          🔴 LIVE NOW
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-[#E56A10] text-white">
+                          {t.statusLabel || t.status}
+                        </span>
+                      )}
                       <span className="text-xs text-[#64748B] dark:text-slate-400 font-mono">
                         {t.startsAt}
                       </span>
@@ -206,12 +213,21 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <Link
-                    href={`/tournaments/${t.slug || t.id}`}
-                    className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#C95B0A] text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block"
-                  >
-                    View Tournament Details
-                  </Link>
+                  {t.hasLiveMatches ? (
+                    <Link
+                      href={`/tournaments/${t.slug || t.id}`}
+                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block font-mono animate-pulse shadow-sm"
+                    >
+                      🔴 LIVE HERE
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/tournaments/${t.slug || t.id}`}
+                      className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#C95B0A] text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block"
+                    >
+                      View Tournament Details
+                    </Link>
+                  )}
                 </div>
               );
             })}

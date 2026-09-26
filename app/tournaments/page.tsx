@@ -285,15 +285,24 @@ function TournamentsContent() {
                       </span>
                     </div>
                     <div className="absolute top-3 right-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border backdrop-blur-xs ${
-                          tournament.status === "LIVE"
-                            ? "bg-emerald-600/90 text-white border-emerald-400"
-                            : "bg-black/75 text-orange-300 border-orange-400/50"
-                        }`}
-                      >
-                        {tournament.statusLabel}
-                      </span>
+                      {tournament.hasLiveMatches ? (
+                        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white border border-rose-400 backdrop-blur-xs animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                          🔴 LIVE MATCHES NOW
+                        </span>
+                      ) : (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border backdrop-blur-xs ${
+                            tournament.status === "REGISTRATION_OPEN"
+                              ? "bg-emerald-600/90 text-white border-emerald-400"
+                              : tournament.status === "REGISTRATION_CLOSED"
+                              ? "bg-blue-600/90 text-white border-blue-400"
+                              : "bg-black/75 text-orange-300 border-orange-400/50"
+                          }`}
+                        >
+                          {tournament.statusLabel}
+                        </span>
+                      )}
                     </div>
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
                       <span className="text-slate-300">{tournament.registeredTeams} / {tournament.maxTeams} TEAMS</span>
@@ -334,13 +343,24 @@ function TournamentsContent() {
 
                 {/* Footer Action */}
                 <div className="p-5 pt-0">
-                  <Link
-                    href={`/tournaments/${tournament.slug}`}
-                    className="w-full py-2.5 bg-slate-900 dark:bg-[#1A2234] hover:bg-slate-800 dark:hover:bg-[#232D42] text-white text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all font-mono shadow-xs border border-transparent dark:border-[#242C3D]"
-                  >
-                    <span>View Hub &amp; Bracket</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-[#E56A10]" />
-                  </Link>
+                  {tournament.hasLiveMatches ? (
+                    <Link
+                      href={`/tournaments/${tournament.slug}`}
+                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all font-mono shadow-md border border-rose-500 animate-pulse"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                      <span>🔴 LIVE HERE</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-white" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/tournaments/${tournament.slug}`}
+                      className="w-full py-2.5 bg-slate-900 dark:bg-[#1A2234] hover:bg-slate-800 dark:hover:bg-[#232D42] text-white text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all font-mono shadow-xs border border-transparent dark:border-[#242C3D]"
+                    >
+                      <span>View Hub &amp; Bracket</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#E56A10]" />
+                    </Link>
+                  )}
                 </div>
               </article>
             ))}

@@ -8,6 +8,9 @@ export interface Match {
   game_name: string;
   stage: string;
   format: string;
+  match_type?: string;
+  series_format?: string;
+  youtube_live_url?: string;
   scheduled_time: string;
   scheduled_at?: string;
   live_link?: string;

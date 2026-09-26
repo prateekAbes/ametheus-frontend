@@ -22,15 +22,15 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
     tournamentTitle: m.tournament_title || "Championship",
     gameSlug: m.game_slug || "valorant",
     gameName: m.game_name || "Valorant",
-    stage: m.stage || "Competitive Bracket Match",
-    format: m.format || "Standard Match",
+    stage: m.match_type || m.stage || "Competitive Bracket Match",
+    format: m.series_format || m.format || "Standard Match",
     scheduledTime: m.scheduled_time || m.scheduled_at || "Today, 8:00 PM IST",
     status: (m.status as any) || "CHECK_IN_OPEN",
     serverRegion: m.server_region || "AWS Mumbai (ap-south-1)",
     lobbyCode: m.lobby_code || "AMETHEUS-LOBBY-01",
     lobbyPassword: m.lobby_password || "AMT_MATCH_PASS_99",
     scheduledAt: m.scheduled_at,
-    liveLink: m.live_link,
+    liveLink: m.youtube_live_url || m.live_link,
     order: m.order,
     teamA: {
       id: m.team_a?.tag || "t-a",
@@ -187,11 +187,11 @@ function MatchCard({
             href={match.liveLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
+            className="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm animate-pulse"
           >
             <Radio className="w-4 h-4 animate-pulse" />
-            Watch Live
-            <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
+            [ 📺 WATCH HERE ]
+            <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
           </a>
         )}
         <button

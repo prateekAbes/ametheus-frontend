@@ -41,6 +41,10 @@ import {
   CreditCard,
   ArrowUpRight,
   Upload,
+  Radio,
+  Tv,
+  ExternalLink,
+  Play,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -53,6 +57,16 @@ import {
   getDisputes,
   resolveDispute,
   getUserWalletSummary,
+  closeTournamentRegistration,
+  getTournamentRegisteredRosters,
+  generateMatchStructure,
+  createMatchAdmin,
+  updateMatchDetailsAdmin,
+  deleteMatchAdmin,
+  markMatchLiveAdmin,
+  completeMatchAdmin,
+  TournamentRegisteredRostersResponse,
+  RegisteredRosterTeam,
   UserWalletSummary,
   AuditLog,
   AdminUser,
@@ -381,8 +395,51 @@ export default function AdminCockpitPage() {
   // Live Matches Command Center State
   const [liveDashboard, setLiveDashboard] = useState<LiveDashboardData | null>(null);
   const [isLoadingLiveDash, setIsLoadingLiveDash] = useState(false);
-  const [liveDashTab, setLiveDashTab] = useState<"ready" | "scheduled" | "live" | "completed">("ready");
-  // Team pairing wizard state
+  const [liveDashTab, setLiveDashTab] = useState<"builder" | "scheduled" | "live" | "completed" | "ready">("builder");
+
+  // Selected Tournament in Live Matches
+  const [selectedLiveTournamentId, setSelectedLiveTournamentId] = useState<string>("");
+  const [rostersData, setRostersData] = useState<TournamentRegisteredRostersResponse | null>(null);
+  const [isLoadingRosters, setIsLoadingRosters] = useState(false);
+
+  // Automatic Match Structure Generator State
+  const [genMatchFormat, setGenMatchFormat] = useState("SINGLE_ELIMINATION");
+  const [genSeriesFormat, setGenSeriesFormat] = useState("BO3");
+  const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
+
+  // Matchup Builder State
+  const [builderTeam1Id, setBuilderTeam1Id] = useState("");
+  const [builderTeam2Id, setBuilderTeam2Id] = useState("");
+  const [builderMatchType, setBuilderMatchType] = useState("QUALIFIER");
+  const [builderSeriesFormat, setBuilderSeriesFormat] = useState("BO3");
+  const [builderScheduledAt, setBuilderScheduledAt] = useState("");
+  const [builderYoutubeUrl, setBuilderYoutubeUrl] = useState("");
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+
+  // Mark as Live Modal / Prompt State
+  const [markLiveModalMatch, setMarkLiveModalMatch] = useState<any | null>(null);
+  const [markLiveYoutubeUrl, setMarkLiveYoutubeUrl] = useState("");
+  const [isMarkingLive, setIsMarkingLive] = useState(false);
+
+  // Complete Match Modal State
+  const [completeMatchModalObj, setCompleteMatchModalObj] = useState<any | null>(null);
+  const [completeScore1, setCompleteScore1] = useState<string>("0");
+  const [completeScore2, setCompleteScore2] = useState<string>("0");
+  const [completeWinnerId, setCompleteWinnerId] = useState<string>("");
+  const [isCompletingMatch, setIsCompletingMatch] = useState(false);
+
+  // Edit Match Modal State
+  const [editMatchModalObj, setEditMatchModalObj] = useState<any | null>(null);
+  const [editMatchTeam1Id, setEditMatchTeam1Id] = useState("");
+  const [editMatchTeam2Id, setEditMatchTeam2Id] = useState("");
+  const [editMatchType, setEditMatchType] = useState("QUALIFIER");
+  const [editMatchSeriesFormat, setEditMatchSeriesFormat] = useState("BO3");
+  const [editMatchScheduledAt, setEditMatchScheduledAt] = useState("");
+  const [editMatchYoutubeUrl, setEditMatchYoutubeUrl] = useState("");
+  const [isSavingMatchEdit, setIsSavingMatchEdit] = useState(false);
+  const [isDeletingMatchId, setIsDeletingMatchId] = useState<string | null>(null);
+
+  // Legacy team pairing wizard & inline edit state compatibility
   const [pairTournamentId, setPairTournamentId] = useState("");
   const [pairTeamAId, setPairTeamAId] = useState("");
   const [pairTeamBId, setPairTeamBId] = useState("");
@@ -390,13 +447,41 @@ export default function AdminCockpitPage() {
   const [pairFormat, setPairFormat] = useState("Best of 3");
   const [pairScheduledAt, setPairScheduledAt] = useState("");
   const [isPairing, setIsPairing] = useState(false);
-  // Match score/status edit state
   const [editMatchId, setEditMatchId] = useState<string | null>(null);
   const [editScoreA, setEditScoreA] = useState("");
   const [editScoreB, setEditScoreB] = useState("");
   const [editLiveLink, setEditLiveLink] = useState("");
   const [editMatchStatus, setEditMatchStatus] = useState("");
   const [isEditingMatch, setIsEditingMatch] = useState(false);
+
+  const fetchTournamentRosters = useCallback(async (tournamentId: string) => {
+    if (!tournamentId) {
+      setRostersData(null);
+      return;
+    }
+    setIsLoadingRosters(true);
+    try {
+      const data = await getTournamentRegisteredRosters(tournamentId);
+      setRostersData(data);
+      if (data.match_format) setGenMatchFormat(data.match_format);
+      if (data.series_format) setGenSeriesFormat(data.series_format);
+      if (data.teams && data.teams.length >= 2) {
+        setBuilderTeam1Id(data.teams[0].team_id);
+        setBuilderTeam2Id(data.teams[1].team_id);
+      } else if (data.teams && data.teams.length === 1) {
+        setBuilderTeam1Id(data.teams[0].team_id);
+        setBuilderTeam2Id("");
+      } else {
+        setBuilderTeam1Id("");
+        setBuilderTeam2Id("");
+      }
+    } catch (err: any) {
+      console.warn("Failed to load registered rosters:", err);
+      setRostersData(null);
+    } finally {
+      setIsLoadingRosters(false);
+    }
+  }, []);
 
   const handleOpenUserWallet = async (userId: string) => {
     setIsLoadingUserWallet(true);
@@ -481,6 +566,16 @@ export default function AdminCockpitPage() {
       }
       if (tournRes.status === "fulfilled" && Array.isArray(tournRes.value)) {
         setTournaments(tournRes.value);
+        setSelectedLiveTournamentId((prev) => {
+          if (!prev) {
+            const regClosedTourn = tournRes.value.find((t: any) => t.status === "REGISTRATION_CLOSED") || tournRes.value[0];
+            if (regClosedTourn) {
+              fetchTournamentRosters(regClosedTourn.id);
+              return regClosedTourn.id;
+            }
+          }
+          return prev;
+        });
       }
       if (catsRes.status === "fulfilled" && Array.isArray(catsRes.value)) {
         setLeaderboardCategories(catsRes.value);
@@ -2834,7 +2929,7 @@ export default function AdminCockpitPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="p-4 pt-0 flex items-center gap-2 border-t border-slate-100 mt-2">
+                    <div className="p-4 pt-0 flex items-center gap-2 border-t border-slate-100 mt-2 flex-wrap">
                       {tourn.status === "COMING_SOON" && (
                         <button
                           onClick={() => handlePublishTournament(tourn.id, tourn.title)}
@@ -2844,11 +2939,42 @@ export default function AdminCockpitPage() {
                           <Sparkles className="w-3.5 h-3.5" /> Publish Live
                         </button>
                       )}
+                      {tourn.status === "REGISTRATION_OPEN" && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Close registrations for "${tourn.title}"? This makes the tournament ready for Matchup Builder & Live Matches.`)) return;
+                            try {
+                              await closeTournamentRegistration(tourn.id);
+                              setActionMessage(`Registrations closed for ${tourn.title}! Tournament is ready in Live Matches.`);
+                              loadAdminData();
+                            } catch (err: any) {
+                              alert(err?.message || "Failed to close registration");
+                            }
+                          }}
+                          className="py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                          title="Close Registration & Enable Live Matches"
+                        >
+                          <Lock className="w-3.5 h-3.5" /> Close Reg
+                        </button>
+                      )}
+                      {tourn.status === "REGISTRATION_CLOSED" && (
+                        <button
+                          onClick={() => {
+                            setSelectedLiveTournamentId(tourn.id);
+                            fetchTournamentRosters(tourn.id);
+                            setActiveTab("live_matches");
+                          }}
+                          className="py-2 px-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                          title="Manage Live Matches & Bracket"
+                        >
+                          <Activity className="w-3.5 h-3.5" /> Live Center
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenEditTournament(tourn)}
-                        className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className="flex-1 py-2 bg-slate-50 border border-slate-200 hover:border-[#E56A10] hover:text-white text-slate-700 text-xs font-mono font-bold uppercase rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-w-[130px]"
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Rules & Config
+                        <Edit3 className="w-3.5 h-3.5 text-[#E56A10]" /> Edit Rules &amp; Config
                       </button>
                       <Link
                         href={`/tournaments/${tourn.slug || tourn.id}`}
@@ -3391,332 +3517,1100 @@ export default function AdminCockpitPage() {
         {/* TAB: LIVE MATCHES COMMAND CENTER */}
         {activeTab === "live_matches" && (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs">
-              <div>
-                <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-[#E56A10]" /> Live Matches Command Center
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                  Pair teams, schedule matches, update live scores, and manage match lifecycle.
-                </p>
+            {/* Header & Tournament Selector Bar */}
+            <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-[#E56A10]" /> Live Matches Command Center
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                    Matchup Builder, competition bracket structures, YouTube live stream broadcast, and verified match scoring.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={async () => {
+                      setIsLoadingLiveDash(true);
+                      try {
+                        const dash = await getLiveMatchesDashboard();
+                        setLiveDashboard(dash);
+                        if (selectedLiveTournamentId) {
+                          await fetchTournamentRosters(selectedLiveTournamentId);
+                        }
+                      } catch (_) {}
+                      finally { setIsLoadingLiveDash(false); }
+                    }}
+                    disabled={isLoadingLiveDash}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    {isLoadingLiveDash ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" />}
+                    Refresh
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={async () => {
-                  setIsLoadingLiveDash(true);
-                  try {
-                    const dash = await getLiveMatchesDashboard();
-                    setLiveDashboard(dash);
-                  } catch (_) {}
-                  finally { setIsLoadingLiveDash(false); }
-                }}
-                disabled={isLoadingLiveDash}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                {isLoadingLiveDash ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" />}
-                Refresh Dashboard
-              </button>
+
+              {/* Tournament Selector & Actions */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex-1 space-y-1">
+                  <label className="block text-[11px] font-mono font-bold uppercase text-slate-600 dark:text-slate-400">
+                    Select Tournament (Available for Match Scheduling)
+                  </label>
+                  <select
+                    value={selectedLiveTournamentId}
+                    onChange={(e) => {
+                      const tId = e.target.value;
+                      setSelectedLiveTournamentId(tId);
+                      fetchTournamentRosters(tId);
+                    }}
+                    className="w-full bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg px-3 py-2 text-xs font-mono text-slate-900 dark:text-white font-bold focus:border-[#E56A10] focus:outline-none"
+                  >
+                    <option value="">-- All Tournaments (Overview) --</option>
+                    {tournaments.map((t) => {
+                      const isClosed = t.status === "REGISTRATION_CLOSED";
+                      const isOpen = t.status === "REGISTRATION_OPEN";
+                      return (
+                        <option key={t.id} value={t.id}>
+                          {isClosed ? "🔒 [REG CLOSED] " : isOpen ? "🟢 [REG OPEN] " : `[${t.status}] `}
+                          {t.title} ({t.game_slug || "ESPORTS"} • {t.registered_teams || 0}/{t.max_teams} Teams)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Tournament Quick Summary & Close Registration Action */}
+                {selectedLiveTournamentId && (() => {
+                  const currentT = tournaments.find((t) => t.id === selectedLiveTournamentId);
+                  if (!currentT) return null;
+                  const isRegOpen = currentT.status === "REGISTRATION_OPEN";
+                  const isRegClosed = currentT.status === "REGISTRATION_CLOSED";
+
+                  return (
+                    <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                      <div className="text-right hidden lg:block text-xs font-mono">
+                        <div className="font-bold text-slate-900 dark:text-white">
+                          {currentT.title}
+                        </div>
+                        <div className="text-slate-500 dark:text-slate-400 text-[10px]">
+                          Format: <span className="text-[#E56A10] font-bold">{currentT.match_format || currentT.format || "SINGLE_ELIMINATION"}</span> •
+                          Status: <span className={isRegClosed ? "text-blue-500 font-bold" : "text-emerald-500 font-bold"}>{currentT.status}</span>
+                        </div>
+                      </div>
+
+                      {isRegOpen && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Close registration for "${currentT.title}"? This makes all verified teams ready for match generation.`)) return;
+                            try {
+                              await closeTournamentRegistration(currentT.id);
+                              setActionMessage(`Registrations closed for ${currentT.title}!`);
+                              loadAdminData();
+                              fetchTournamentRosters(currentT.id);
+                            } catch (err: any) {
+                              alert(err?.message || "Failed to close registration");
+                            }
+                          }}
+                          className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-mono font-bold uppercase rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Close Registration to lock rosters and schedule matches"
+                        >
+                          <Lock className="w-3.5 h-3.5" /> Close Registration
+                        </button>
+                      )}
+
+                      {isRegClosed && (
+                        <span className="px-3 py-1.5 bg-blue-500/10 text-blue-500 border border-blue-500/30 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5" /> Registration Closed
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
 
-            {/* Inner 4-tab nav */}
+            {/* Inner Sub-Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               {([
-                { id: "ready", label: "Ready to Pair", count: liveDashboard?.ready_for_match_creation?.length ?? 0, color: "amber" },
-                { id: "scheduled", label: "Scheduled", count: liveDashboard?.scheduled?.length ?? 0, color: "blue" },
-                { id: "live", label: "Live Now", count: liveDashboard?.live_now?.length ?? 0, color: "rose" },
-                { id: "completed", label: "Completed", count: liveDashboard?.completed?.length ?? 0, color: "slate" },
+                { id: "builder", label: "Matchup Builder & Rosters", count: rostersData?.teams?.length ?? 0, color: "amber" },
+                {
+                  id: "scheduled",
+                  label: "Scheduled",
+                  count: (liveDashboard?.scheduled || []).filter((m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId).length,
+                  color: "blue",
+                },
+                {
+                  id: "live",
+                  label: "Live Now",
+                  count: (liveDashboard?.live_now || []).filter((m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId).length,
+                  color: "rose",
+                },
+                {
+                  id: "completed",
+                  label: "Completed",
+                  count: (liveDashboard?.completed || []).filter((m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId).length,
+                  color: "slate",
+                },
               ] as const).map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setLiveDashTab(t.id)}
+                  onClick={() => setLiveDashTab(t.id as any)}
                   className={`px-4 py-2 font-mono text-xs font-bold uppercase rounded transition-colors whitespace-nowrap cursor-pointer border ${
                     liveDashTab === t.id
-                      ? "bg-[#E56A10] text-white border-transparent"
+                      ? "bg-[#E56A10] text-white border-transparent shadow-sm"
                       : "bg-white dark:bg-[#161A24] border-[#D3E4FE] dark:border-[#242C3D] text-[#565E74] dark:text-slate-300 hover:text-[#0B1C30] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1E2538]"
                   }`}
                 >
-                  {t.label} {t.count > 0 && <span className="ml-1">({t.count})</span>}
+                  {t.label} {t.count > 0 && <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] bg-black/20 text-white">({t.count})</span>}
                 </button>
               ))}
             </div>
 
-            {/* READY FOR MATCH CREATION (Team Pairing Wizard) */}
-            {liveDashTab === "ready" && (
-              <div className="space-y-4">
-                {/* Pairing Wizard */}
-                <div className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-6 space-y-4">
-                  <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-[#E56A10]" /> Team Pairing Wizard
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Tournament ID</label>
-                      <input value={pairTournamentId} onChange={(e) => setPairTournamentId(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                        placeholder="tournament_id" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Team A ID</label>
-                      <input value={pairTeamAId} onChange={(e) => setPairTeamAId(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                        placeholder="team_a_id" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Team B ID</label>
-                      <input value={pairTeamBId} onChange={(e) => setPairTeamBId(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                        placeholder="team_b_id" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Stage</label>
-                      <select value={pairStage} onChange={(e) => setPairStage(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
-                        {["Group Stage", "Round of 16", "Quarterfinals", "Semifinals", "Grand Final"].map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Format</label>
-                      <select value={pairFormat} onChange={(e) => setPairFormat(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
-                        {["Best of 1", "Best of 3", "Best of 5"].map((f) => (
-                          <option key={f}>{f}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Scheduled At (UTC)</label>
-                      <input type="datetime-local" value={pairScheduledAt} onChange={(e) => setPairScheduledAt(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button
-                      disabled={isPairing || !pairTournamentId || !pairTeamAId || !pairTeamBId}
-                      onClick={async () => {
-                        setIsPairing(true);
-                        try {
-                          await pairMatchTeams({
-                            tournament_id: pairTournamentId,
-                            team_a_id: pairTeamAId,
-                            team_b_id: pairTeamBId,
-                            stage: pairStage,
-                            format: pairFormat,
-                            scheduled_at: pairScheduledAt || undefined,
-                          });
-                          setActionMessage("Match created successfully!");
-                          setPairTeamAId(""); setPairTeamBId(""); setPairScheduledAt("");
-                          const dash = await getLiveMatchesDashboard();
-                          setLiveDashboard(dash);
-                        } catch (err: any) {
-                          setActionMessage(err?.message || "Failed to create match");
-                        } finally {
-                          setIsPairing(false);
-                          setTimeout(() => setActionMessage(""), 4000);
-                        }
-                      }}
-                      className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {isPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                      Create Match
-                    </button>
-                  </div>
-                </div>
-                {/* Ready teams list */}
-                {liveDashboard?.ready_for_match_creation && liveDashboard.ready_for_match_creation.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold">Registered Teams Without Matches</p>
-                    {liveDashboard.ready_for_match_creation.map((t: any) => (
-                      <div key={t.id || t._id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-lg p-3 flex items-center justify-between gap-4 text-xs font-mono">
-                        <span className="font-bold text-slate-900 dark:text-white">{t.name} <span className="text-slate-400">[{t.tag}]</span></span>
-                        <span className="text-slate-500 dark:text-slate-400">{t.tournament_title}</span>
-                        <button onClick={() => { setPairTeamAId(t.id || t._id); setPairTournamentId(t.tournament_id || ""); }}
-                          className="px-2 py-1 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] rounded text-slate-700 dark:text-slate-300 cursor-pointer">
-                          Use as Team A
-                        </button>
-                      </div>
-                    ))}
+            {/* SUB-TAB 1: MATCHUP BUILDER & REGISTERED ROSTERS */}
+            {liveDashTab === "builder" && (
+              <div className="space-y-6">
+                {!selectedLiveTournamentId ? (
+                  <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                    <Trophy className="w-10 h-10 text-slate-400 mx-auto" />
+                    <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                      Please Select a Tournament
+                    </h4>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                      Select a tournament from the dropdown above to inspect real registered rosters, automatically generate competition match structures, or manually build custom matchups.
+                    </p>
                   </div>
                 ) : (
-                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No teams waiting for match creation.</p>
-                )}
-              </div>
-            )}
+                  <>
+                    {/* Top Row: Structure Generator & Manual Matchup Builder */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left: Competition Structure Generator */}
+                      <div className="lg:col-span-5 bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-5 space-y-4 shadow-xs">
+                        <div className="border-b border-slate-100 dark:border-[#242C3D] pb-3">
+                          <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-[#E56A10]" /> Match Structure Generator
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                            Automatically create the official tournament bracket &amp; schedule from confirmed rosters.
+                          </p>
+                        </div>
 
-            {/* SCHEDULED MATCHES */}
-            {liveDashTab === "scheduled" && (
-              <div className="space-y-3">
-                {liveDashboard?.scheduled && liveDashboard.scheduled.length > 0 ? liveDashboard.scheduled.map((m: any) => (
-                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} vs {m.team_b?.name}</span>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format} · {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString() : "Not scheduled"}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800">
-                          {m.status}
-                        </span>
-                      </div>
-                    </div>
-                    {editMatchId === m.id ? (
-                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Status</label>
-                            <select value={editMatchStatus} onChange={(e) => setEditMatchStatus(e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
-                              {["CHECK_IN_OPEN", "SCHEDULED", "LIVE", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => <option key={s}>{s}</option>)}
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Tournament Match Format (8 Competition Structures)
+                            </label>
+                            <select
+                              value={genMatchFormat}
+                              onChange={(e) => setGenMatchFormat(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="SINGLE_ELIMINATION">Single Elimination</option>
+                              <option value="DOUBLE_ELIMINATION">Double Elimination</option>
+                              <option value="CONSOLATION">Consolation Bracket</option>
+                              <option value="SINGLE_ROUND_ROBIN">Single Round Robin</option>
+                              <option value="DOUBLE_ROUND_ROBIN">Double Round Robin</option>
+                              <option value="SWISS">Swiss System</option>
+                              <option value="LADDER">Ladder Tournament</option>
+                              <option value="GROUP_STAGE_KNOCKOUT">Group Stage + Knockout</option>
                             </select>
                           </div>
-                          <div>
-                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Live Link</label>
-                            <input value={editLiveLink} onChange={(e) => setEditLiveLink(e.target.value)} placeholder="https://..."
-                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => setEditMatchId(null)} className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1F2637] hover:bg-slate-200 dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded cursor-pointer">Cancel</button>
-                          <button
-                            disabled={isEditingMatch}
-                            onClick={async () => {
-                              setIsEditingMatch(true);
-                              try {
-                                if (editMatchStatus) await updateMatchStatus(m.id, editMatchStatus, editLiveLink || undefined);
-                                setEditMatchId(null);
-                                const dash = await getLiveMatchesDashboard();
-                                setLiveDashboard(dash);
-                              } catch (err: any) {
-                                setActionMessage(err?.message || "Failed to update match");
-                              } finally {
-                                setIsEditingMatch(false);
-                                setTimeout(() => setActionMessage(""), 4000);
-                              }
-                            }}
-                            className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded cursor-pointer disabled:opacity-50 flex items-center gap-1">
-                            {isEditingMatch ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setEditMatchId(m.id); setEditMatchStatus(m.status); setEditLiveLink(m.live_link || ""); }}
-                        className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-700 dark:text-slate-300 rounded cursor-pointer">
-                        Edit Status / Live Link
-                      </button>
-                    )}
-                  </div>
-                )) : (
-                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No scheduled matches.</p>
-                )}
-              </div>
-            )}
 
-            {/* LIVE NOW */}
-            {liveDashTab === "live" && (
-              <div className="space-y-3">
-                {liveDashboard?.live_now && liveDashboard.live_now.length > 0 ? liveDashboard.live_now.map((m: any) => (
-                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-rose-300 dark:border-rose-900/60 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} <span className="text-[#E56A10] font-mono">vs</span> {m.team_b?.name}</span>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {m.team_a?.score !== undefined && <span className="text-xl font-mono font-bold text-slate-900 dark:text-white">{m.team_a.score} : {m.team_b?.score}</span>}
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" /> LIVE
-                        </span>
-                      </div>
-                    </div>
-                    {/* Score update form */}
-                    {editMatchId === m.id ? (
-                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#242C3D]">
-                        <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">{m.team_a?.name} Score</label>
-                            <input type="number" min={0} value={editScoreA} onChange={(e) => setEditScoreA(e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">{m.team_b?.name} Score</label>
-                            <input type="number" min={0} value={editScoreB} onChange={(e) => setEditScoreB(e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">Status</label>
-                            <select value={editMatchStatus} onChange={(e) => setEditMatchStatus(e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]">
-                              {["IN_PROGRESS", "LIVE", "COMPLETED", "PENDING_VERIFICATION"].map((s) => <option key={s}>{s}</option>)}
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Series Format (Per Match Length)
+                            </label>
+                            <select
+                              value={genSeriesFormat}
+                              onChange={(e) => setGenSeriesFormat(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="BO1">Best of 1 (BO1)</option>
+                              <option value="BO3">Best of 3 (BO3)</option>
+                              <option value="BO5">Best of 5 (BO5)</option>
                             </select>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => setEditMatchId(null)} className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1F2637] hover:bg-slate-200 dark:hover:bg-[#283248] border border-slate-300 dark:border-[#2E384D] text-slate-800 dark:text-slate-200 rounded cursor-pointer">Cancel</button>
-                          <button
-                            disabled={isEditingMatch}
-                            onClick={async () => {
-                              setIsEditingMatch(true);
-                              try {
-                                const scoreA = parseInt(editScoreA);
-                                const scoreB = parseInt(editScoreB);
-                                if (!isNaN(scoreA) && !isNaN(scoreB)) {
-                                  await updateMatchScore(m.id, scoreA, scoreB);
+
+                          <div className="pt-2">
+                            <button
+                              disabled={isGeneratingStructure || (rostersData?.teams?.length || 0) < 2}
+                              onClick={async () => {
+                                if (!selectedLiveTournamentId) return;
+                                if (!confirm(`Generate "${genMatchFormat}" structure for ${rostersData?.teams?.length || 0} registered teams? Existing scheduled matches will be synchronized.`)) return;
+                                setIsGeneratingStructure(true);
+                                try {
+                                  const res = await generateMatchStructure(selectedLiveTournamentId, {
+                                    match_format: genMatchFormat,
+                                    series_format: genSeriesFormat,
+                                  });
+                                  setActionMessage(`Match structure generated! Created ${res.matches_created} matches.`);
+                                  const dash = await getLiveMatchesDashboard();
+                                  setLiveDashboard(dash);
+                                  setLiveDashTab("scheduled");
+                                } catch (err: any) {
+                                  alert(err?.message || "Failed to generate match structure");
+                                } finally {
+                                  setIsGeneratingStructure(false);
                                 }
-                                if (editMatchStatus) await updateMatchStatus(m.id, editMatchStatus);
-                                setEditMatchId(null);
+                              }}
+                              className="w-full py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                            >
+                              {isGeneratingStructure ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-4 h-4" />
+                              )}
+                              <span>Generate Structure ({rostersData?.teams?.length || 0} Teams)</span>
+                            </button>
+                            {(rostersData?.teams?.length || 0) < 2 && (
+                              <p className="text-[10px] text-amber-500 font-mono mt-1 text-center">
+                                At least 2 registered teams are required to generate structure.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Manual Matchup Builder */}
+                      <div className="lg:col-span-7 bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-5 space-y-4 shadow-xs">
+                        <div className="border-b border-slate-100 dark:border-[#242C3D] pb-3">
+                          <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <Plus className="w-4 h-4 text-[#E56A10]" /> Manual Matchup Builder
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                            Pair specific registered teams, assign match stage, conflict-checked schedule, and YouTube live broadcast URL.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Team 1 *
+                            </label>
+                            <select
+                              value={builderTeam1Id}
+                              onChange={(e) => setBuilderTeam1Id(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="">-- Select Team 1 --</option>
+                              {(rostersData?.teams || []).map((t) => (
+                                <option key={t.team_id} value={t.team_id}>
+                                  {t.team_name} [{t.team_tag}]
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Team 2 *
+                            </label>
+                            <select
+                              value={builderTeam2Id}
+                              onChange={(e) => setBuilderTeam2Id(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="">-- Select Team 2 --</option>
+                              {(rostersData?.teams || []).map((t) => (
+                                <option key={t.team_id} value={t.team_id} disabled={t.team_id === builderTeam1Id}>
+                                  {t.team_name} [{t.team_tag}] {t.team_id === builderTeam1Id ? "(Selected as Team 1)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Match Type / Stage *
+                            </label>
+                            <select
+                              value={builderMatchType}
+                              onChange={(e) => setBuilderMatchType(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="QUALIFIER">Qualifier</option>
+                              <option value="ROUND_OF_32">Round of 32</option>
+                              <option value="ROUND_OF_16">Round of 16</option>
+                              <option value="QUARTER_FINAL">Quarter Final</option>
+                              <option value="SEMI_FINAL">Semi Final</option>
+                              <option value="THIRD_PLACE">3rd Place Playoff</option>
+                              <option value="FINAL">Final</option>
+                              <option value="GRAND_FINAL">Grand Final</option>
+                              <option value="ROUND_1">Round 1</option>
+                              <option value="ROUND_2">Round 2</option>
+                              <option value="ROUND_3">Round 3</option>
+                              <option value="GROUP_STAGE">Group Stage</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Series Format *
+                            </label>
+                            <select
+                              value={builderSeriesFormat}
+                              onChange={(e) => setBuilderSeriesFormat(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            >
+                              <option value="BO1">Best of 1 (BO1)</option>
+                              <option value="BO3">Best of 3 (BO3)</option>
+                              <option value="BO5">Best of 5 (BO5)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              Schedule Date &amp; Time (Conflict Detection) *
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={builderScheduledAt}
+                              onChange={(e) => setBuilderScheduledAt(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
+                              YouTube Live URL (Optional Now / Required when Live)
+                            </label>
+                            <input
+                              type="url"
+                              value={builderYoutubeUrl}
+                              onChange={(e) => setBuilderYoutubeUrl(e.target.value)}
+                              placeholder="https://www.youtube.com/watch?v=..."
+                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                          <button
+                            disabled={isCreatingMatch || !builderTeam1Id || !builderTeam2Id || builderTeam1Id === builderTeam2Id || !builderScheduledAt}
+                            onClick={async () => {
+                              if (!selectedLiveTournamentId) return;
+                              if (builderTeam1Id === builderTeam2Id) {
+                                alert("Team 1 and Team 2 must be different teams.");
+                                return;
+                              }
+                              setIsCreatingMatch(true);
+                              try {
+                                await createMatchAdmin({
+                                  tournament_id: selectedLiveTournamentId,
+                                  team1_id: builderTeam1Id,
+                                  team2_id: builderTeam2Id,
+                                  match_type: builderMatchType,
+                                  series_format: builderSeriesFormat,
+                                  scheduled_at: builderScheduledAt,
+                                  youtube_live_url: builderYoutubeUrl.trim() || undefined,
+                                });
+                                setActionMessage("Match successfully scheduled!");
+                                setBuilderScheduledAt("");
+                                setBuilderYoutubeUrl("");
                                 const dash = await getLiveMatchesDashboard();
                                 setLiveDashboard(dash);
+                                setLiveDashTab("scheduled");
                               } catch (err: any) {
-                                setActionMessage(err?.message || "Failed to update match");
+                                alert(err?.message || "Failed to schedule match. Check for schedule conflicts.");
                               } finally {
-                                setIsEditingMatch(false);
-                                setTimeout(() => setActionMessage(""), 4000);
+                                setIsCreatingMatch(false);
                               }
                             }}
-                            className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded cursor-pointer disabled:opacity-50 flex items-center gap-1">
-                            {isEditingMatch ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Update Score
+                            className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                          >
+                            {isCreatingMatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                            Schedule Match
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <button onClick={() => { setEditMatchId(m.id); setEditScoreA(String(m.team_a?.score ?? "")); setEditScoreB(String(m.team_b?.score ?? "")); setEditMatchStatus(m.status); }}
-                        className="px-3 py-1.5 text-xs font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-700 dark:text-slate-300 rounded cursor-pointer">
-                        Update Score / Status
-                      </button>
-                    )}
-                  </div>
-                )) : (
-                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No matches live right now.</p>
+                    </div>
+
+                    {/* Bottom: Real Registered Rosters Inspection */}
+                    <div className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-5 space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#242C3D] flex-wrap gap-2">
+                        <div>
+                          <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                            <Users className="w-4 h-4 text-[#E56A10]" /> Verified Registered Rosters ({rostersData?.teams?.length || 0} Teams)
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                            Real teams and verified player handles fetched directly from MongoDB registrations. Zero mock data.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => fetchTournamentRosters(selectedLiveTournamentId)}
+                          disabled={isLoadingRosters}
+                          className="px-3 py-1 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] text-slate-700 dark:text-slate-300 text-xs font-mono font-bold rounded flex items-center gap-1 cursor-pointer"
+                        >
+                          {isLoadingRosters ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                          Refresh Rosters
+                        </button>
+                      </div>
+
+                      {isLoadingRosters ? (
+                        <div className="py-8 text-center text-xs font-mono text-slate-500 flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#E56A10]" />
+                          Loading real player rosters from database...
+                        </div>
+                      ) : (rostersData?.teams || []).length === 0 ? (
+                        <div className="py-8 text-center text-xs font-mono text-slate-400 dark:text-slate-500">
+                          No teams have completed paid registration for this tournament yet.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {rostersData!.teams.map((t) => (
+                            <div
+                              key={t.team_id}
+                              className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl p-4 space-y-3 flex flex-col justify-between"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                    {t.team_name}
+                                  </div>
+                                  <span className="px-2 py-0.5 bg-slate-200 dark:bg-[#242C3D] text-slate-800 dark:text-slate-200 text-[10px] font-mono font-bold rounded">
+                                    {t.team_tag}
+                                  </span>
+                                </div>
+
+                                <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1">
+                                  Captain: <strong className="text-slate-800 dark:text-slate-200">{t.captain?.username || "Captain"}</strong>
+                                  {t.captain?.game_id && <span className="text-[#E56A10] ml-1">({t.captain.game_id})</span>}
+                                </div>
+
+                                {/* Members list */}
+                                <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-[#242C3D] space-y-1">
+                                  <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block">
+                                    Roster ({t.members.length} Players):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {t.members.map((m, idx) => (
+                                      <span
+                                        key={m.user_id || idx}
+                                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-white dark:bg-[#1E2538] border border-slate-200 dark:border-[#2E384D] text-slate-700 dark:text-slate-300"
+                                      >
+                                        {m.username} {m.game_id ? `[${m.game_id}]` : ""}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-200 dark:border-[#242C3D] flex items-center gap-2">
+                                <button
+                                  onClick={() => setBuilderTeam1Id(t.team_id)}
+                                  className="flex-1 py-1 bg-white dark:bg-[#1E2538] hover:bg-slate-100 dark:hover:bg-[#252E46] border border-slate-300 dark:border-[#2E384D] text-[10px] font-mono font-bold rounded text-slate-800 dark:text-slate-200 cursor-pointer"
+                                >
+                                  Use as Team 1
+                                </button>
+                                <button
+                                  onClick={() => setBuilderTeam2Id(t.team_id)}
+                                  className="flex-1 py-1 bg-white dark:bg-[#1E2538] hover:bg-slate-100 dark:hover:bg-[#252E46] border border-slate-300 dark:border-[#2E384D] text-[10px] font-mono font-bold rounded text-slate-800 dark:text-slate-200 cursor-pointer"
+                                >
+                                  Use as Team 2
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
 
-            {/* COMPLETED MATCHES */}
-            {liveDashTab === "completed" && (
-              <div className="space-y-3">
-                {liveDashboard?.completed && liveDashboard.completed.length > 0 ? liveDashboard.completed.map((m: any) => (
-                  <div key={m.id} className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-4">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">{m.team_a?.name} vs {m.team_b?.name}</span>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">{m.stage} · {m.format}</div>
+            {/* SUB-TAB 2: SCHEDULED MATCHES */}
+            {liveDashTab === "scheduled" && (
+              <div className="space-y-4">
+                {(() => {
+                  const scheduledList = (liveDashboard?.scheduled || []).filter(
+                    (m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId
+                  );
+
+                  if (scheduledList.length === 0) {
+                    return (
+                      <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                        <Calendar className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                          No Scheduled Matches
+                        </h4>
+                        <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                          No matches are currently scheduled for this tournament. Switch to the &quot;Matchup Builder &amp; Rosters&quot; tab to generate a tournament bracket or schedule individual fixtures.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        {m.team_a?.score !== undefined && (
-                          <span className="text-lg font-mono font-bold text-slate-900 dark:text-white">{m.team_a.score} : {m.team_b?.score}</span>
-                        )}
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
-                          {m.status}
-                        </span>
-                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-4">
+                      {scheduledList.map((m: any) => (
+                        <div
+                          key={m.id}
+                          className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] hover:border-[#CBD5E1] dark:hover:border-[#E56A10] rounded-xl p-5 shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800">
+                                {m.match_type || m.stage || "QUALIFIER"}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#242C3D]">
+                                {m.series_format || m.format || "BO3"}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                {m.tournament_title}
+                              </span>
+                            </div>
+
+                            <div className="text-base font-bold font-headline text-slate-900 dark:text-white flex items-center gap-2">
+                              <span>{m.team_a?.name || "TBD"}</span>
+                              <span className="text-[#E56A10] font-mono text-xs">VS</span>
+                              <span>{m.team_b?.name || "TBD"}</span>
+                            </div>
+
+                            <div className="text-xs font-mono text-slate-500 dark:text-slate-400 flex items-center gap-4 flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                {m.scheduled_at ? new Date(m.scheduled_at).toLocaleString() : m.scheduled_time || "TBD"}
+                              </span>
+                              {(m.youtube_live_url || m.live_link) && (
+                                <a
+                                  href={m.youtube_live_url || m.live_link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-rose-600 hover:text-rose-700 underline flex items-center gap-1 font-bold"
+                                >
+                                  <Tv className="w-3.5 h-3.5" /> Stream Configured
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 flex-wrap shrink-0">
+                            {/* Mark as Live Button */}
+                            <button
+                              onClick={() => {
+                                setMarkLiveModalMatch(m);
+                                setMarkLiveYoutubeUrl(m.youtube_live_url || m.live_link || "");
+                              }}
+                              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                            >
+                              <Radio className="w-3.5 h-3.5 animate-pulse" />
+                              <span>Mark as Live</span>
+                            </button>
+
+                            {/* Edit Match Button */}
+                            <button
+                              onClick={() => {
+                                setEditMatchModalObj(m);
+                                setEditMatchTeam1Id(m.team_a?.id || m.team_a_id || "");
+                                setEditMatchTeam2Id(m.team_b?.id || m.team_b_id || "");
+                                setEditMatchType(m.match_type || m.stage || "QUALIFIER");
+                                setEditMatchSeriesFormat(m.series_format || m.format || "BO3");
+                                setEditMatchScheduledAt(m.scheduled_at ? new Date(m.scheduled_at).toISOString().slice(0, 16) : "");
+                                setEditMatchYoutubeUrl(m.youtube_live_url || m.live_link || "");
+                              }}
+                              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1A2234] dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1 cursor-pointer"
+                              title="Edit Match Details"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+
+                            {/* Delete Match Button */}
+                            <button
+                              disabled={isDeletingMatchId === m.id}
+                              onClick={async () => {
+                                if (!confirm(`Delete scheduled match ${m.team_a?.name} vs ${m.team_b?.name}?`)) return;
+                                setIsDeletingMatchId(m.id);
+                                try {
+                                  await deleteMatchAdmin(m.id);
+                                  setActionMessage("Match removed.");
+                                  const dash = await getLiveMatchesDashboard();
+                                  setLiveDashboard(dash);
+                                } catch (err: any) {
+                                  alert(err?.message || "Failed to delete match");
+                                } finally {
+                                  setIsDeletingMatchId(null);
+                                }
+                              }}
+                              className="p-2 bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-200 border border-rose-300 dark:border-rose-900 rounded-lg text-xs cursor-pointer"
+                              title="Delete Fixture"
+                            >
+                              {isDeletingMatchId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )) : (
-                  <p className="text-xs font-mono text-slate-400 dark:text-slate-500 text-center py-8">No completed matches yet.</p>
-                )}
+                  );
+                })()}
               </div>
             )}
+
+            {/* SUB-TAB 3: LIVE MATCHES */}
+            {liveDashTab === "live" && (
+              <div className="space-y-4">
+                {(() => {
+                  const liveList = (liveDashboard?.live_now || []).filter(
+                    (m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId
+                  );
+
+                  if (liveList.length === 0) {
+                    return (
+                      <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                        <Radio className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                          No Matches Currently Live
+                        </h4>
+                        <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                          Matches transition to Live when an admin clicks &quot;Mark as Live&quot; in the Scheduled tab and configures the YouTube stream URL.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-4">
+                      {liveList.map((m: any) => (
+                        <div
+                          key={m.id}
+                          className="bg-white dark:bg-[#121622] border border-rose-400/60 dark:border-rose-900 rounded-xl p-5 shadow-sm space-y-4"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white shadow-xs animate-pulse">
+                                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                                  🔴 LIVE MATCH
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#242C3D]">
+                                  {m.match_type || m.stage || "MATCH"}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-[#1A2234] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#242C3D]">
+                                  {m.series_format || m.format || "BO3"}
+                                </span>
+                                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                                  {m.tournament_title}
+                                </span>
+                              </div>
+
+                              <div className="text-lg font-bold font-headline text-slate-900 dark:text-white flex items-center gap-3 pt-1">
+                                <span className="text-base sm:text-lg">{m.team_a?.name || "Team 1"}</span>
+                                <span className="px-3 py-1 bg-slate-100 dark:bg-[#1A2234] border border-slate-300 dark:border-[#242C3D] rounded font-mono font-bold text-slate-900 dark:text-white">
+                                  {m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}
+                                </span>
+                                <span className="text-base sm:text-lg">{m.team_b?.name || "Team 2"}</span>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 flex-wrap shrink-0">
+                              {(m.youtube_live_url || m.live_link) && (
+                                <a
+                                  href={m.youtube_live_url || m.live_link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors shadow-xs"
+                                >
+                                  <Tv className="w-3.5 h-3.5" />
+                                  <span>[ 📺 WATCH HERE ]</span>
+                                </a>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  setCompleteMatchModalObj(m);
+                                  setCompleteScore1(String(m.team_a?.score ?? 0));
+                                  setCompleteScore2(String(m.team_b?.score ?? 0));
+                                  setCompleteWinnerId(m.team_a?.id || m.team_a_id || "");
+                                }}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                              >
+                                <Trophy className="w-3.5 h-3.5" />
+                                <span>[ 🏆 COMPLETE MATCH ]</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* SUB-TAB 4: COMPLETED MATCHES */}
+            {liveDashTab === "completed" && (
+              <div className="space-y-4">
+                {(() => {
+                  const compList = (liveDashboard?.completed || []).filter(
+                    (m: any) => !selectedLiveTournamentId || m.tournament_id === selectedLiveTournamentId
+                  );
+
+                  if (compList.length === 0) {
+                    return (
+                      <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                        <CheckCircle className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                          No Completed Matches Yet
+                        </h4>
+                        <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                          Completed fixtures and certified tournament winner progressions will appear here.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-3">
+                      {compList.map((m: any) => (
+                        <div
+                          key={m.id}
+                          className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {m.match_type || m.stage || "COMPLETED"}
+                              </span>
+                              <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                                {m.tournament_title}
+                              </span>
+                            </div>
+                            <div className="font-headline font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                              <span className={m.winner_team_id === (m.team_a?.id || m.team_a_id) ? "text-[#E56A10] font-black" : ""}>
+                                {m.team_a?.name}
+                              </span>
+                              <span className="font-mono text-xs px-2 py-0.5 bg-slate-100 dark:bg-[#1E2538] rounded">
+                                {m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}
+                              </span>
+                              <span className={m.winner_team_id === (m.team_b?.id || m.team_b_id) ? "text-[#E56A10] font-black" : ""}>
+                                {m.team_b?.name}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right text-xs font-mono">
+                            <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 font-bold uppercase">
+                              Final Result Certified
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MODAL: MARK AS LIVE WITH YOUTUBE STREAM */}
+        {markLiveModalMatch && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+                <div className="flex items-center gap-2">
+                  <Radio className="w-5 h-5 text-rose-600 animate-pulse" />
+                  <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                    Mark Match As Live
+                  </h3>
+                </div>
+                <button onClick={() => setMarkLiveModalMatch(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl text-xs font-mono">
+                  <div className="font-bold text-slate-900 dark:text-white">
+                    {markLiveModalMatch.team_a?.name} vs {markLiveModalMatch.team_b?.name}
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
+                    {markLiveModalMatch.stage || markLiveModalMatch.match_type} • {markLiveModalMatch.tournament_title}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    YouTube Live Stream URL *
+                  </label>
+                  <input
+                    type="url"
+                    value={markLiveYoutubeUrl}
+                    onChange={(e) => setMarkLiveYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-1">
+                    This live stream will be broadcast to all public viewers on the public tournament card &amp; View Hub.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setMarkLiveModalMatch(null)}
+                  className="px-4 py-2 border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono font-bold uppercase text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1E2538] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isMarkingLive || !markLiveYoutubeUrl.trim()}
+                  onClick={async () => {
+                    setIsMarkingLive(true);
+                    try {
+                      await markMatchLiveAdmin(markLiveModalMatch.id, {
+                        youtube_live_url: markLiveYoutubeUrl.trim(),
+                      });
+                      setActionMessage("Match marked as LIVE! Tournament status preserved as REGISTRATION_CLOSED.");
+                      setMarkLiveModalMatch(null);
+                      const dash = await getLiveMatchesDashboard();
+                      setLiveDashboard(dash);
+                      setLiveDashTab("live");
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to mark match live");
+                    } finally {
+                      setIsMarkingLive(false);
+                    }
+                  }}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                >
+                  {isMarkingLive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Radio className="w-3.5 h-3.5" />}
+                  <span>Go Live</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: COMPLETE MATCH WITH WINNER & SCORES */}
+        {completeMatchModalObj && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                    Complete Match &amp; Finalize Score
+                  </h3>
+                </div>
+                <button onClick={() => setCompleteMatchModalObj(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1 truncate">
+                      {completeMatchModalObj.team_a?.name || "Team 1"} Score
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={completeScore1}
+                      onChange={(e) => setCompleteScore1(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1 truncate">
+                      {completeMatchModalObj.team_b?.name || "Team 2"} Score
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={completeScore2}
+                      onChange={(e) => setCompleteScore2(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-sm font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Select Match Winner *
+                  </label>
+                  <select
+                    value={completeWinnerId}
+                    onChange={(e) => setCompleteWinnerId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                  >
+                    <option value="">-- Choose Winning Team --</option>
+                    <option value={completeMatchModalObj.team_a?.id || completeMatchModalObj.team_a_id}>
+                      🏆 {completeMatchModalObj.team_a?.name} [{completeMatchModalObj.team_a?.tag}]
+                    </option>
+                    <option value={completeMatchModalObj.team_b?.id || completeMatchModalObj.team_b_id}>
+                      🏆 {completeMatchModalObj.team_b?.name} [{completeMatchModalObj.team_b?.tag}]
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setCompleteMatchModalObj(null)}
+                  className="px-4 py-2 border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono font-bold uppercase text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1E2538] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isCompletingMatch || !completeWinnerId}
+                  onClick={async () => {
+                    setIsCompletingMatch(true);
+                    try {
+                      await completeMatchAdmin(completeMatchModalObj.id, {
+                        team1_score: parseInt(completeScore1) || 0,
+                        team2_score: parseInt(completeScore2) || 0,
+                        winner_id: completeWinnerId,
+                      });
+                      setActionMessage("Match completed! Bracket advanced.");
+                      setCompleteMatchModalObj(null);
+                      const dash = await getLiveMatchesDashboard();
+                      setLiveDashboard(dash);
+                      setLiveDashTab("completed");
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to complete match");
+                    } finally {
+                      setIsCompletingMatch(false);
+                    }
+                  }}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                >
+                  {isCompletingMatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Record &amp; Advance Bracket</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: EDIT SCHEDULED MATCH DETAILS */}
+        {editMatchModalObj && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-[#E56A10]" />
+                  <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                    Edit Match Fixture
+                  </h3>
+                </div>
+                <button onClick={() => setEditMatchModalObj(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Match Stage
+                    </label>
+                    <select
+                      value={editMatchType}
+                      onChange={(e) => setEditMatchType(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                    >
+                      <option value="QUALIFIER">Qualifier</option>
+                      <option value="ROUND_OF_32">Round of 32</option>
+                      <option value="ROUND_OF_16">Round of 16</option>
+                      <option value="QUARTER_FINAL">Quarter Final</option>
+                      <option value="SEMI_FINAL">Semi Final</option>
+                      <option value="THIRD_PLACE">3rd Place Playoff</option>
+                      <option value="FINAL">Final</option>
+                      <option value="GRAND_FINAL">Grand Final</option>
+                      <option value="ROUND_1">Round 1</option>
+                      <option value="ROUND_2">Round 2</option>
+                      <option value="GROUP_STAGE">Group Stage</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Series Format
+                    </label>
+                    <select
+                      value={editMatchSeriesFormat}
+                      onChange={(e) => setEditMatchSeriesFormat(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                    >
+                      <option value="BO1">Best of 1 (BO1)</option>
+                      <option value="BO3">Best of 3 (BO3)</option>
+                      <option value="BO5">Best of 5 (BO5)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Scheduled At
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editMatchScheduledAt}
+                    onChange={(e) => setEditMatchScheduledAt(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    YouTube Live URL
+                  </label>
+                  <input
+                    type="url"
+                    value={editMatchYoutubeUrl}
+                    onChange={(e) => setEditMatchYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-[#242C3D]">
+                <button
+                  type="button"
+                  onClick={() => setEditMatchModalObj(null)}
+                  className="px-4 py-2 border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono font-bold uppercase text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1E2538] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingMatchEdit}
+                  onClick={async () => {
+                    setIsSavingMatchEdit(true);
+                    try {
+                      await updateMatchDetailsAdmin(editMatchModalObj.id, {
+                        match_type: editMatchType,
+                        series_format: editMatchSeriesFormat,
+                        scheduled_at: editMatchScheduledAt || undefined,
+                        youtube_live_url: editMatchYoutubeUrl.trim() || undefined,
+                      });
+                      setActionMessage("Match details updated successfully.");
+                      setEditMatchModalObj(null);
+                      const dash = await getLiveMatchesDashboard();
+                      setLiveDashboard(dash);
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to update match");
+                    } finally {
+                      setIsSavingMatchEdit(false);
+                    }
+                  }}
+                  className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                >
+                  {isSavingMatchEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -5138,13 +6032,13 @@ export default function AdminCockpitPage() {
                     Tournament Status
                   </label>
                   <select
-                    value={tournForm.status === "ONGOING" ? "LIVE" : tournForm.status}
+                    value={tournForm.status === "LIVE" || tournForm.status === "ONGOING" ? "REGISTRATION_CLOSED" : tournForm.status}
                     onChange={(e) => setTournForm({ ...tournForm, status: e.target.value })}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="REGISTRATION_OPEN">Registration Open</option>
+                    <option value="REGISTRATION_CLOSED">Registration Closed</option>
                     <option value="COMING_SOON">Coming Soon (Upcoming / Teaser)</option>
-                    <option value="LIVE">Live (Ongoing Matches)</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>
                   </select>
@@ -5205,19 +6099,23 @@ export default function AdminCockpitPage() {
                       value={tournForm.tournament_type || "Single Elimination"}
                       onChange={(e) => {
                         const newType = e.target.value;
-                        const matchFmt = tournForm.match_format || "Best of 1";
+                        const matchFmt = tournForm.match_format || "Best of 3";
                         setTournForm({
                           ...tournForm,
                           tournament_type: newType,
-                          format: newType === "Custom" ? tournForm.format : `${newType} Bracket (${matchFmt})`,
+                          format: newType === "Custom" ? tournForm.format : `${newType} (${matchFmt})`,
                         });
                       }}
                       className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                     >
                       <option value="Single Elimination">Single Elimination</option>
                       <option value="Double Elimination">Double Elimination</option>
-                      <option value="Round Robin">Round Robin</option>
+                      <option value="Consolation Bracket">Consolation Bracket</option>
+                      <option value="Single Round Robin">Single Round Robin</option>
+                      <option value="Double Round Robin">Double Round Robin</option>
                       <option value="Swiss System">Swiss System</option>
+                      <option value="Ladder Tournament">Ladder Tournament</option>
+                      <option value="Group Stage + Knockout">Group Stage + Knockout</option>
                       <option value="Custom">Custom</option>
                     </select>
                   </div>
