@@ -15,6 +15,8 @@ export interface CreateTournamentPayload {
   max_team_size?: number;
   rank_requirement?: string;
   format?: string;
+  tournament_type?: string;
+  match_format?: string;
   banner_url?: string;
   description: string;
   rules?: string[];
@@ -39,6 +41,8 @@ export interface UpdateTournamentPayload {
   max_team_size?: number;
   rank_requirement?: string;
   format?: string;
+  tournament_type?: string;
+  match_format?: string;
   banner_url?: string;
   description?: string;
   rules?: string[];

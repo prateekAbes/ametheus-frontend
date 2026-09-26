@@ -242,7 +242,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
             {/* Roster Format & Mode Highlights (No Entry Fee) */}
             <div className="flex items-center gap-6 lg:border-l border-[#E2E8F0] dark:border-[#242C3D] lg:pl-8 shrink-0 w-full lg:w-auto justify-between lg:justify-start">
               <div className="flex flex-col">
-                <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">Roster Format</span>
+                <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase">Max Team Size</span>
                 <span className="text-2xl font-bold font-headline text-slate-900 dark:text-white">
                   {isSoloGame ? "Solo (1v1)" : `${game.maxTeamSize} Players`}
                 </span>

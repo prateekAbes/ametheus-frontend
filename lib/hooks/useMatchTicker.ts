@@ -12,11 +12,15 @@ export interface TickerEvent {
   data?: unknown;
 }
 
-function getWsUrl(): string {
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+function getWsUrl(useApiPrefix = false): string {
   const base = process.env.NEXT_PUBLIC_API_URL || "https://ametheus.duckdns.org";
   const wsProto = base.startsWith("https") ? "wss" : "ws";
   const host = base.replace(/^https?:\/\//, "").replace(/\/+$/, "");
-  return `${wsProto}://${host}/ws/ticker`;
+  return useApiPrefix
+    ? `${wsProto}://${host}/api/v1/ws/ticker`
+    : `${wsProto}://${host}/ws/ticker`;
 }
 
 export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
@@ -25,24 +29,32 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const connectRef = useRef<() => void>(() => {});
+  const retryCountRef = useRef(0);
+  const tryPrefixRef = useRef(false);
+  const isDestroyedRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || isDestroyedRef.current) return;
+
+    if (retryCountRef.current >= MAX_RECONNECT_ATTEMPTS) {
+      // Reached maximum retry budget — cleanly stop to avoid infinite spamming
+      return;
+    }
 
     try {
-      const url = getWsUrl();
+      const url = getWsUrl(tryPrefixRef.current);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setIsConnected(true);
+        retryCountRef.current = 0; // reset on successful connection
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
         // Keepalive ping every 25s
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "ping" }));
+            ws.send("ping");
           }
         }, 25000);
       };
@@ -52,7 +64,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
           const data = JSON.parse(event.data);
           const tickerItem: TickerEvent = {
             id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            event: data.event || "UNKNOWN",
+            event: data.event || data.type || "UNKNOWN",
             timestamp: new Date().toLocaleTimeString(),
             data: data.data || data,
           };
@@ -61,36 +73,56 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
             onEvent(tickerItem);
           }
         } catch {
-          // Ignore non-json frames
+          // Ignore non-json frames (e.g. "pong")
         }
       };
 
       ws.onclose = () => {
         setIsConnected(false);
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        // Reconnect with 5 second delay
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectRef.current();
-        }, 5000);
+
+        if (isDestroyedRef.current) return;
+
+        retryCountRef.current += 1;
+        if (retryCountRef.current < MAX_RECONNECT_ATTEMPTS) {
+          // Alternate prefix attempt
+          tryPrefixRef.current = !tryPrefixRef.current;
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+          const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 16000);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, delay);
+        }
       };
 
       ws.onerror = () => {
-        ws.close();
+        // Will trigger onclose automatically
+        try {
+          ws.close();
+        } catch {
+          // ignore
+        }
       };
     } catch {
-      // Reconnection handled by onclose
+      // Fallback handled by max retry limit
     }
   }, [onEvent]);
 
   useEffect(() => {
-    connectRef.current = connect;
+    isDestroyedRef.current = false;
+    retryCountRef.current = 0;
     connect();
 
     return () => {
+      isDestroyedRef.current = true;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          wsRef.current.close();
+        } catch {
+          // ignore
+        }
       }
     };
   }, [connect]);

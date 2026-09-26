@@ -100,9 +100,15 @@ export default function ContactPage() {
               <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
                 <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_EMAIL}
               </a>
-              <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
-                <Phone className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_PHONE}
-              </a>
+              {SUPPORT_PHONE ? (
+                <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
+                  <Phone className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_PHONE}
+                </a>
+              ) : (
+                <a href="https://discord.gg/U59y39QnF" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
+                  <span className="text-[#5865F2] font-bold text-xs">●</span> Discord: discord.gg/U59y39QnF
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -191,7 +197,7 @@ export default function ContactPage() {
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#E56A10] transition-colors"
                   >
                     <option value="MATCH_DISPUTE">Match Dispute &amp; Evidence</option>
-                    <option value="ESCROW_PAYMENT">Reserved Payment / Refund</option>
+                    <option value="PAYMENT_PROTECTION">Reserved Payment / Prize Protection</option>
                     <option value="ORGANIZER_PARTNERSHIP">Organizer Certification</option>
                     <option value="ANTI_CHEAT">Anti-Cheat &amp; Fair Play Report</option>
                     <option value="TECHNICAL_BUG">Platform Bug / Glitch</option>

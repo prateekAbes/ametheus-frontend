@@ -1,19 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 52" width="280" height="52" fill="none">
-  <!-- Centered composite logo with tight canvas margins and prominent size -->
-  <g transform="translate(140, 26)">
-    <!-- Total width of logo is ~250px, shifted left by 125px to be centered exactly at (0,0) -->
-    <g transform="translate(-125, -21)">
-      <!-- AMETHEUS Mythic Flame & Solar Sigil (Enlarged to 36x40) -->
-      <g transform="translate(0, 0)">
-        <polygon points="18,0 36,37 25,37 18,19 11,37 0,37" fill="#E56A10" />
-        <polygon points="18,6 27,31 18,24 9,31" fill="#F59E0B" />
-        <circle cx="18" cy="14" r="3.5" fill="#FFFFFF" />
-        <path d="M2 39 L34 39" stroke="#E56A10" stroke-width="2.8" stroke-linecap="round"/>
-      </g>
-      <!-- Wordmark - Scaled up font-size 28, ultra-bold Space Grotesk -->
-      <text x="48" y="31" font-family="'Space Grotesk', 'Inter', -apple-system, sans-serif" font-weight="900" font-size="28" letter-spacing="2.2" fill="#F1F5F9">AMETHEUS</text>
-      <!-- Trailing Solar Accent Dot -->
-      <circle cx="242" cy="21" r="4.2" fill="#E56A10" />
-    </g>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 260 36"
+  role="img"
+  aria-labelledby="ametheus-logo-title"
+>
+  <title id="ametheus-logo-title">Ametheus</title>
+
+  <!-- Mark: 28×28 coordinate space, offset (2, 7.5) to center in 36px tall lockup -->
+  <g transform="translate(2, 7.5)">
+    <polygon points="3,8 25,8 27,3 5,3" fill="#FF4E3A" />
+    <polygon points="7,16 21,16 23,11 9,11" fill="#FF4E3A" />
+    <polygon points="11,24 17,24 19,19 13,19" fill="#FF4E3A" />
   </g>
+
+  <!-- Wordmark — white for primary dark-background use -->
+  <text
+    x="42"
+    y="26"
+    fill="#FFFFFF"
+    font-family="Unbounded, Arial, sans-serif"
+    font-size="21"
+    font-weight="700"
+    letter-spacing="-1.5"
+  >
+    AMETHEUS
+  </text>
 </svg>

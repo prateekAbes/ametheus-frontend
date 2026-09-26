@@ -124,10 +124,27 @@ export function initFirstLaunchPersona(
   const key = userId ? `ametheus_gamer_identity_${userId}` : "ametheus_gamer_identity";
 
   // 1. Authenticated Clerk user — always use their real identity, NEVER generate random
-  if (isAuthenticated || (currentDisplayName && currentDisplayName.trim() !== "")) {
+  if (isAuthenticated) {
+    if (!currentDisplayName && !currentAvatar) {
+      // Do not synthesize random persona for authenticated user without displayName
+      return null;
+    }
     const existing = {
-      gamerTag: currentDisplayName || "Gamer",
-      avatarUrl: currentAvatar || generateRandomGamingAvatar(currentDisplayName),
+      gamerTag: currentDisplayName || "Player",
+      avatarUrl: currentAvatar || "",
+      clanTag: "AMX",
+      isNew: false,
+    };
+    try {
+      localStorage.setItem(key, JSON.stringify(existing));
+    } catch {}
+    return existing;
+  }
+
+  if (currentDisplayName && currentDisplayName.trim() !== "") {
+    const existing = {
+      gamerTag: currentDisplayName,
+      avatarUrl: currentAvatar || "",
       clanTag: "AMX",
       isNew: false,
     };

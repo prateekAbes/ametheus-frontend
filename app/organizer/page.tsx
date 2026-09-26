@@ -49,6 +49,8 @@ export default function OrganizerCockpitPage() {
     max_team_size: 5,
     rank_requirement: "Open to All Ranks",
     format: "Single Elimination Bracket",
+    tournament_type: "Single Elimination",
+    match_format: "Best of 1",
     description: "Sanctioned competitive esports tournament. Strict anti-cheat verification and automated brackets.",
     rules: ["Competitive rulebook", "Anti-cheat verification mandatory", "Check-in mandatory prior to match start"],
   });
@@ -309,6 +311,52 @@ export default function OrganizerCockpitPage() {
                 </div>
               </div>
 
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="space-y-1">
+                  <label className="text-slate-700 uppercase font-semibold text-xs">Tournament Structure *</label>
+                  <select
+                    value={(formData as any).tournament_type || "Single Elimination"}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      const matchFmt = (formData as any).match_format || "Best of 1";
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        tournament_type: newType,
+                        format: newType === "Custom" ? prev.format : `${newType} Bracket (${matchFmt})`,
+                      }));
+                    }}
+                    className="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:border-[#E56A10] outline-none transition-colors text-sm font-medium"
+                  >
+                    <option value="Single Elimination">Single Elimination</option>
+                    <option value="Double Elimination">Double Elimination</option>
+                    <option value="Round Robin">Round Robin</option>
+                    <option value="Swiss System">Swiss System</option>
+                    <option value="Custom">Custom</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-700 uppercase font-semibold text-xs">Match Format *</label>
+                  <select
+                    value={(formData as any).match_format || "Best of 1"}
+                    onChange={(e) => {
+                      const newMatchFmt = e.target.value;
+                      const tType = (formData as any).tournament_type || "Single Elimination";
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        match_format: newMatchFmt,
+                        format: tType === "Custom" ? prev.format : `${tType} Bracket (${newMatchFmt})`,
+                      }));
+                    }}
+                    className="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:border-[#E56A10] outline-none transition-colors text-sm font-medium"
+                  >
+                    <option value="Best of 1">Best of 1</option>
+                    <option value="Best of 3">Best of 3</option>
+                    <option value="Best of 5">Best of 5</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-slate-700 uppercase font-semibold">Prize Pool (INR ₹)</label>
                 <input
@@ -374,7 +422,7 @@ export default function OrganizerCockpitPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-slate-700 uppercase font-semibold">Required Team Size (Roster Min)</label>
+                  <label className="text-slate-700 uppercase font-semibold">Required Team Size</label>
                   <input
                     type="number"
                     min={1}
@@ -386,7 +434,7 @@ export default function OrganizerCockpitPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-700 uppercase font-semibold">Max Team Size (Roster Max)</label>
+                  <label className="text-slate-700 uppercase font-semibold">Max Team Size</label>
                   <input
                     type="number"
                     min={1}

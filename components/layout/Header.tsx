@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import AmetheusLogo from "@/components/ui/AmetheusLogo";
 import {
   Search,
   Shield,
@@ -168,15 +168,12 @@ export default function Header() {
         <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 md:pl-8 md:pr-10 lg:pr-14 xl:pr-16 flex items-center justify-between gap-2 lg:gap-3">
           {/* Brand Logo (Enlarged Stitch Brandmark) */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <Link href="/" onClick={closeAllDropdowns} className="flex items-center gap-2 group py-1">
-              <Image
-                src="/brand/ametheus-logo.svg"
-                alt="AMETHEUS"
-                width={175}
-                height={34}
-                className="h-7 sm:h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]"
-                priority
-              />
+            <Link
+              href="/"
+              onClick={closeAllDropdowns}
+              className="flex items-center gap-2 group py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] rounded"
+            >
+              <AmetheusLogo className="h-7 sm:h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]" />
             </Link>
             <span className="hidden 2xl:inline-flex px-2 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase">
               PRO ARENA
@@ -192,7 +189,7 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   onClick={closeAllDropdowns}
-                  className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium ${
+                  className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                     active
                       ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
                       : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
@@ -209,7 +206,7 @@ export default function Header() {
               <Link
                 href="/dashboard"
                 onClick={closeAllDropdowns}
-                className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium ${
+                className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                   isActive("/dashboard")
                     ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
                     : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
@@ -226,7 +223,7 @@ export default function Header() {
                 <Link
                   href="/organizer"
                   onClick={closeAllDropdowns}
-                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-semibold ${
+                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                     isActive("/organizer")
                       ? "bg-[#E56A10]/20 text-[#E56A10] border-[#E56A10]/40 font-bold"
                       : "text-[#E56A10] border-transparent hover:bg-[#161A24]"
@@ -240,7 +237,7 @@ export default function Header() {
                   <Link
                     href="/admin"
                     onClick={closeAllDropdowns}
-                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-bold ${
+                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-bold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                       isActive("/admin")
                         ? "bg-[#E56A10] text-white border-transparent shadow-xs"
                         : "bg-[#E56A10]/15 text-[#FFB68F] border-[#E56A10]/40 hover:bg-[#E56A10]/25"
@@ -383,7 +380,7 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={() => setIsProfileDropdownOpen((prev) => !prev)}
-                  className="flex items-center gap-2 px-2 xl:px-2.5 py-1 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all cursor-pointer group shrink-0"
+                  className="flex items-center gap-2 px-2 xl:px-2.5 py-1 rounded-lg bg-[#161A24]/70 hover:bg-[#161A24] border border-[#242C3D] hover:border-[#E56A10]/50 transition-all cursor-pointer group shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10]"
                   aria-expanded={isProfileDropdownOpen}
                   aria-label="User profile menu"
                 >

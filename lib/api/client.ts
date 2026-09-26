@@ -45,16 +45,30 @@ export async function apiClient<T>(
     ...(options.headers as Record<string, string> || {}),
   };
 
+  const isProtected = cleanEndpoint.startsWith("/admin/") || cleanEndpoint === "/auth/me";
+
   // Inject Bearer token if available
   if (!headers["Authorization"] && authTokenGetter) {
     try {
-      const token = await authTokenGetter();
+      let token = await authTokenGetter();
+      // If token not ready yet on protected route, retry once after short delay
+      if (!token && isProtected) {
+        await new Promise((res) => setTimeout(res, 200));
+        token = await authTokenGetter();
+      }
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
     } catch {
       // Fallback or guest request
     }
+  }
+
+  // Prevent sending guaranteed-to-fail unauthenticated requests to protected APIs
+  if (isProtected && !headers["Authorization"]) {
+    throw new ApiError(401, {
+      message: "Authentication token not yet ready. Please wait for session to initialize.",
+    });
   }
 
   const { _isRetry, ...fetchOptions } = options;

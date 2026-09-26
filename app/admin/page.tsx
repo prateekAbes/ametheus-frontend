@@ -235,6 +235,8 @@ export default function AdminCockpitPage() {
     announcement_text: string;
     rank_requirement: string;
     format: string;
+    tournament_type: string;
+    match_format: string;
     description: string;
     banner_url: string;
     rules: string[];
@@ -259,6 +261,8 @@ export default function AdminCockpitPage() {
     announcement_text: "",
     rank_requirement: "Open to All Ranks",
     format: "Single Elimination Bracket",
+    tournament_type: "Single Elimination",
+    match_format: "Best of 1",
     description: "Sanctioned competitive esports tournament with strict anti-cheat and automated brackets.",
     banner_url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
     rules: ["Competitive MR12 rulebook", "Anti-cheat verification mandatory", "15-minute grace check-in"],
@@ -831,6 +835,8 @@ export default function AdminCockpitPage() {
       announcement_text: "",
       rank_requirement: "Open to All Ranks",
       format: isSoloInitial ? "1v1 Solo Championship" : "Single Elimination Bracket",
+      tournament_type: "Single Elimination",
+      match_format: "Best of 1",
       description: "",
       banner_url: "",
       rules: [],
@@ -873,6 +879,8 @@ export default function AdminCockpitPage() {
       announcement_text: t.announcement_text || "",
       rank_requirement: t.rank_requirement || "Open to All Ranks",
       format: t.format || (isSolo ? "1v1 Solo Championship" : "Single Elimination Bracket"),
+      tournament_type: (t as any).tournament_type || (t as any).tournamentType || "Single Elimination",
+      match_format: (t as any).match_format || (t as any).matchFormat || "Best of 1",
       description: t.description || "",
       banner_url: t.banner_url || "",
       rules: parsedRules.length > 0 ? parsedRules : ["Standard competitive rules apply"],
@@ -948,6 +956,8 @@ export default function AdminCockpitPage() {
           announcement_text: tournForm.announcement_text,
           rank_requirement: tournForm.rank_requirement,
           format: tournForm.format,
+          tournament_type: tournForm.tournament_type,
+          match_format: tournForm.match_format,
           description: tournForm.description,
           banner_url: tournForm.banner_url,
           rules: tournForm.rules,
@@ -972,6 +982,8 @@ export default function AdminCockpitPage() {
           announcement_text: tournForm.announcement_text,
           rank_requirement: tournForm.rank_requirement,
           format: tournForm.format,
+          tournament_type: tournForm.tournament_type,
+          match_format: tournForm.match_format,
           description: tournForm.description,
           banner_url: tournForm.banner_url,
           rules: tournForm.rules,
@@ -4392,8 +4404,8 @@ export default function AdminCockpitPage() {
 
       {/* Add / Edit Game Modal */}
       {isGameModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 my-8 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xs">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto overscroll-contain p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <h3 className="text-base font-bold uppercase font-mono text-slate-900 dark:text-white flex items-center gap-2">
                 <Gamepad2 className="w-5 h-5 text-[#E56A10]" />
@@ -5184,18 +5196,69 @@ export default function AdminCockpitPage() {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                    Tournament Format
-                  </label>
-                  <input
-                    type="text"
-                    value={tournForm.format}
-                    onChange={(e) => setTournForm({ ...tournForm, format: e.target.value })}
-                    placeholder="e.g. Single Elimination Bracket"
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                      Tournament Structure *
+                    </label>
+                    <select
+                      value={tournForm.tournament_type || "Single Elimination"}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        const matchFmt = tournForm.match_format || "Best of 1";
+                        setTournForm({
+                          ...tournForm,
+                          tournament_type: newType,
+                          format: newType === "Custom" ? tournForm.format : `${newType} Bracket (${matchFmt})`,
+                        });
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    >
+                      <option value="Single Elimination">Single Elimination</option>
+                      <option value="Double Elimination">Double Elimination</option>
+                      <option value="Round Robin">Round Robin</option>
+                      <option value="Swiss System">Swiss System</option>
+                      <option value="Custom">Custom</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                      Match Format *
+                    </label>
+                    <select
+                      value={tournForm.match_format || "Best of 1"}
+                      onChange={(e) => {
+                        const newMatchFmt = e.target.value;
+                        const tType = tournForm.tournament_type || "Single Elimination";
+                        setTournForm({
+                          ...tournForm,
+                          match_format: newMatchFmt,
+                          format: tType === "Custom" ? tournForm.format : `${tType} Bracket (${newMatchFmt})`,
+                        });
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    >
+                      <option value="Best of 1">Best of 1</option>
+                      <option value="Best of 3">Best of 3</option>
+                      <option value="Best of 5">Best of 5</option>
+                    </select>
+                  </div>
                 </div>
+
+                {tournForm.tournament_type === "Custom" && (
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
+                      Custom Format Description
+                    </label>
+                    <input
+                      type="text"
+                      value={tournForm.format}
+                      onChange={(e) => setTournForm({ ...tournForm, format: e.target.value })}
+                      placeholder="e.g. Quad Elimination / Special Exhibition"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
@@ -5295,7 +5358,7 @@ export default function AdminCockpitPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      Required Team Size (Roster Min)
+                      Required Team Size
                     </label>
                     <input
                       type="number"
@@ -5308,7 +5371,7 @@ export default function AdminCockpitPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      Max Team Size (Roster Max)
+                      Max Team Size
                     </label>
                     <input
                       type="number"

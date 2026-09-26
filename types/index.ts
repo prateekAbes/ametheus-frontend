@@ -104,6 +104,10 @@ export interface Tournament {
   announcementText?: string;
   rankRequirement: string;
   format?: string;
+  tournament_type?: string;
+  match_format?: string;
+  tournamentType?: string;
+  matchFormat?: string;
   bannerUrl: string;
   badgeColor?: string;
   description: string;

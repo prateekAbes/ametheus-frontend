@@ -326,7 +326,7 @@ export default function HomePage() {
               Register Tournament
             </h3>
             <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-              Choose an active tournament. Verify your roster eligibility, accept rules, and complete registration with secure platform escrow checkout (₹50–₹60).
+              Choose an active tournament. Verify your team eligibility, accept rules, and complete registration with secure platform tournament entry checkout (₹50–₹60).
             </p>
           </div>
 
