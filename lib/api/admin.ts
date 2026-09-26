@@ -197,15 +197,22 @@ export interface RegisteredRosterMember {
 }
 
 export interface RegisteredRosterTeam {
+  id?: string;
   team_id: string;
+  name?: string;
   team_name: string;
+  tag?: string;
   team_tag: string;
   captain: {
     user_id: string;
     username: string;
     game_id?: string;
   };
+  captain_username?: string;
   members: RegisteredRosterMember[];
+  member_handles?: string[];
+  is_paired?: boolean;
+  is_solo?: boolean;
 }
 
 export interface TournamentRegisteredRostersResponse {
@@ -215,9 +222,36 @@ export interface TournamentRegisteredRostersResponse {
   game_slug: string;
   match_format: string;
   series_format: string;
-  status: string;
-  total_registered: number;
+  status?: string;
+  tournament_status?: string;
+  total_registered?: number;
+  total_teams?: number;
   teams: RegisteredRosterTeam[];
+  rosters?: RegisteredRosterTeam[];
+}
+
+export interface AdminMatchSetupItem {
+  id?: string;
+  round_number?: number;
+  match_number?: number;
+  stage: string;
+  match_type: string;
+  series_format: string;
+  team_a_id?: string | null;
+  team_b_id?: string | null;
+  team_a_name?: string | null;
+  team_b_name?: string | null;
+  scheduled_date?: string;
+  scheduled_time?: string;
+  scheduled_at?: string | null;
+  youtube_live_url?: string;
+  status?: string;
+}
+
+export interface AdminSaveLiveStructurePayload {
+  match_format: string;
+  series_format: string;
+  matches: AdminMatchSetupItem[];
 }
 
 export interface AdminMatchCreatePayload {
@@ -269,8 +303,23 @@ export async function getTournamentRegisteredRosters(
 export async function generateMatchStructure(
   tournamentId: string,
   payload: { match_format: string; series_format?: string }
-): Promise<{ status: string; message: string; tournament_id: string; match_format: string; matches_created: number }> {
+): Promise<{
+  status: string;
+  message: string;
+  bracket?: any[];
+  matches?: AdminMatchSetupItem[];
+}> {
   return apiClient(`/admin/tournaments/${tournamentId}/generate-match-structure`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function saveLiveMatchStructure(
+  tournamentId: string,
+  payload: AdminSaveLiveStructurePayload
+): Promise<{ status: string; message: string; total_matches: number; bracket_rounds: any[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/save-live-structure`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -45,6 +45,8 @@ import {
   Tv,
   ExternalLink,
   Play,
+  ArrowLeftRight,
+  Save,
 } from "lucide-react";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
@@ -60,6 +62,7 @@ import {
   closeTournamentRegistration,
   getTournamentRegisteredRosters,
   generateMatchStructure,
+  saveLiveMatchStructure,
   createMatchAdmin,
   updateMatchDetailsAdmin,
   deleteMatchAdmin,
@@ -67,6 +70,7 @@ import {
   completeMatchAdmin,
   TournamentRegisteredRostersResponse,
   RegisteredRosterTeam,
+  AdminMatchSetupItem,
   UserWalletSummary,
   AuditLog,
   AdminUser,
@@ -454,22 +458,61 @@ export default function AdminCockpitPage() {
   const [editMatchStatus, setEditMatchStatus] = useState("");
   const [isEditingMatch, setIsEditingMatch] = useState(false);
 
+  // Complete Live Match Setup & Scheduling State
+  const [preparedMatches, setPreparedMatches] = useState<AdminMatchSetupItem[]>([]);
+  const [bulkDate, setBulkDate] = useState<string>("");
+  const [bulkTime, setBulkTime] = useState<string>("10:00");
+  const [bulkInterval, setBulkInterval] = useState<number>(30);
+  const [isSavingLiveStructure, setIsSavingLiveStructure] = useState(false);
+
   const fetchTournamentRosters = useCallback(async (tournamentId: string) => {
     if (!tournamentId) {
       setRostersData(null);
+      setPreparedMatches([]);
       return;
     }
     setIsLoadingRosters(true);
     try {
       const data = await getTournamentRegisteredRosters(tournamentId);
-      setRostersData(data);
+      // Ensure teams list is populated from either teams or rosters
+      const rawTeams = (data.teams && data.teams.length > 0 ? data.teams : data.rosters) || [];
+      const normalizedTeams: RegisteredRosterTeam[] = rawTeams.map((t: any) => ({
+        id: t.id || t.team_id,
+        team_id: t.team_id || t.id,
+        name: t.name || t.team_name || "Team",
+        team_name: t.team_name || t.name || "Team",
+        tag: t.tag || t.team_tag || "TEAM",
+        team_tag: t.team_tag || t.tag || "TEAM",
+        captain: t.captain || {
+          user_id: "",
+          username: t.captain_username || "Captain",
+          game_id: t.captain_username || "",
+        },
+        captain_username: t.captain?.username || t.captain_username || "Captain",
+        members: Array.isArray(t.members)
+          ? t.members.map((m: any) => (typeof m === "string" ? { user_id: "", username: m, role: "PLAYER" } : m))
+          : [],
+        member_handles: t.member_handles || [],
+        is_paired: t.is_paired || false,
+        is_solo: t.is_solo || false,
+      }));
+
+      const normalizedData: TournamentRegisteredRostersResponse = {
+        ...data,
+        teams: normalizedTeams,
+        rosters: normalizedTeams,
+        total_registered: normalizedTeams.length,
+        total_teams: normalizedTeams.length,
+      };
+
+      setRostersData(normalizedData);
       if (data.match_format) setGenMatchFormat(data.match_format);
       if (data.series_format) setGenSeriesFormat(data.series_format);
-      if (data.teams && data.teams.length >= 2) {
-        setBuilderTeam1Id(data.teams[0].team_id);
-        setBuilderTeam2Id(data.teams[1].team_id);
-      } else if (data.teams && data.teams.length === 1) {
-        setBuilderTeam1Id(data.teams[0].team_id);
+      if (normalizedTeams.length >= 2) {
+        setBuilderTeam1Id(normalizedTeams[0].team_id);
+        setBuilderTeam2Id(normalizedTeams[1].team_id);
+      } else if (normalizedTeams.length === 1) {
+        setBuilderTeam1Id(normalizedTeams[0].team_id);
         setBuilderTeam2Id("");
       } else {
         setBuilderTeam1Id("");
@@ -482,6 +525,44 @@ export default function AdminCockpitPage() {
       setIsLoadingRosters(false);
     }
   }, []);
+
+  const applyBulkSchedule = () => {
+    if (preparedMatches.length === 0) return;
+    if (!bulkDate) {
+      alert("Please select a date for scheduling.");
+      return;
+    }
+    let startMinutes = 10 * 60; // 10:00 AM
+    if (bulkTime) {
+      const parts = bulkTime.split(":");
+      if (parts.length >= 2) {
+        let h = parseInt(parts[0], 10);
+        let m = parseInt(parts[1], 10);
+        if (bulkTime.toLowerCase().includes("pm") && h < 12) h += 12;
+        if (bulkTime.toLowerCase().includes("am") && h === 12) h = 0;
+        if (!isNaN(h) && !isNaN(m)) startMinutes = h * 60 + m;
+      }
+    }
+
+    const updated = preparedMatches.map((match, idx) => {
+      const totalMinutes = startMinutes + idx * bulkInterval;
+      const hours24 = Math.floor(totalMinutes / 60) % 24;
+      const mins = totalMinutes % 60;
+      const period = hours24 >= 12 ? "PM" : "AM";
+      const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+      const timeFormatted = `${String(hours12).padStart(2, "0")}:${String(mins).padStart(2, "0")} ${period}`;
+      const isoDateTime = `${bulkDate}T${String(hours24).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
+
+      return {
+        ...match,
+        scheduled_date: bulkDate,
+        scheduled_time: timeFormatted,
+        scheduled_at: isoDateTime,
+      };
+    });
+
+    setPreparedMatches(updated);
+  };
 
   const handleOpenUserWallet = async (userId: string) => {
     setIsLoadingUserWallet(true);
@@ -3735,17 +3816,20 @@ export default function AdminCockpitPage() {
                               disabled={isGeneratingStructure || (rostersData?.teams?.length || 0) < 2}
                               onClick={async () => {
                                 if (!selectedLiveTournamentId) return;
-                                if (!confirm(`Generate "${genMatchFormat}" structure for ${rostersData?.teams?.length || 0} registered teams? Existing scheduled matches will be synchronized.`)) return;
                                 setIsGeneratingStructure(true);
                                 try {
                                   const res = await generateMatchStructure(selectedLiveTournamentId, {
                                     match_format: genMatchFormat,
                                     series_format: genSeriesFormat,
                                   });
-                                  setActionMessage(`Match structure generated! Created ${res.matches_created} matches.`);
-                                  const dash = await getLiveMatchesDashboard();
-                                  setLiveDashboard(dash);
-                                  setLiveDashTab("scheduled");
+                                  if (res.matches && res.matches.length > 0) {
+                                    setPreparedMatches(res.matches);
+                                    setActionMessage(`Generated ${res.matches.length} matchups! Review, assign dates/times, and add YouTube stream links below.`);
+                                  } else {
+                                    setActionMessage("Match structure generated!");
+                                    const dash = await getLiveMatchesDashboard();
+                                    setLiveDashboard(dash);
+                                  }
                                 } catch (err: any) {
                                   alert(err?.message || "Failed to generate match structure");
                                 } finally {
@@ -3770,159 +3854,494 @@ export default function AdminCockpitPage() {
                         </div>
                       </div>
 
-                      {/* Right: Manual Matchup Builder */}
+                      {/* Right: Overview & Workflow Guide Card */}
                       <div className="lg:col-span-7 bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-5 space-y-4 shadow-xs">
-                        <div className="border-b border-slate-100 dark:border-[#242C3D] pb-3">
-                          <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                            <Plus className="w-4 h-4 text-[#E56A10]" /> Manual Matchup Builder
-                          </h4>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                            Pair specific registered teams, assign match stage, conflict-checked schedule, and YouTube live broadcast URL.
-                          </p>
+                        <div className="border-b border-slate-100 dark:border-[#242C3D] pb-3 flex items-center justify-between">
+                          <div>
+                            <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                              <Radio className="w-4 h-4 text-[#E56A10]" /> Live Match Setup Command
+                            </h4>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                              Prepare the entire live match schedule in a single atomic operation.
+                            </p>
+                          </div>
+                          {preparedMatches.length > 0 && (
+                            <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[11px] font-mono font-bold rounded">
+                              {preparedMatches.length} Matches Ready
+                            </span>
+                          )}
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              Team 1 *
-                            </label>
-                            <select
-                              value={builderTeam1Id}
-                              onChange={(e) => setBuilderTeam1Id(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            >
-                              <option value="">-- Select Team 1 --</option>
-                              {(rostersData?.teams || []).map((t) => (
-                                <option key={t.team_id} value={t.team_id}>
-                                  {t.team_name} [{t.team_tag}]
-                                </option>
-                              ))}
-                            </select>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                          <div className="bg-slate-50 dark:bg-[#161B26] p-3 rounded-lg border border-slate-200 dark:border-[#2E384D]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Teams</span>
+                            <span className="text-base font-bold text-slate-900 dark:text-white mt-0.5 block">
+                              {rostersData?.teams?.length || 0}
+                            </span>
                           </div>
-
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              Team 2 *
-                            </label>
-                            <select
-                              value={builderTeam2Id}
-                              onChange={(e) => setBuilderTeam2Id(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            >
-                              <option value="">-- Select Team 2 --</option>
-                              {(rostersData?.teams || []).map((t) => (
-                                <option key={t.team_id} value={t.team_id} disabled={t.team_id === builderTeam1Id}>
-                                  {t.team_name} [{t.team_tag}] {t.team_id === builderTeam1Id ? "(Selected as Team 1)" : ""}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="bg-slate-50 dark:bg-[#161B26] p-3 rounded-lg border border-slate-200 dark:border-[#2E384D]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Format</span>
+                            <span className="text-xs font-bold text-[#E56A10] truncate mt-0.5 block">
+                              {genMatchFormat.replace(/_/g, " ")}
+                            </span>
                           </div>
-
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              Match Type / Stage *
-                            </label>
-                            <select
-                              value={builderMatchType}
-                              onChange={(e) => setBuilderMatchType(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            >
-                              <option value="QUALIFIER">Qualifier</option>
-                              <option value="ROUND_OF_32">Round of 32</option>
-                              <option value="ROUND_OF_16">Round of 16</option>
-                              <option value="QUARTER_FINAL">Quarter Final</option>
-                              <option value="SEMI_FINAL">Semi Final</option>
-                              <option value="THIRD_PLACE">3rd Place Playoff</option>
-                              <option value="FINAL">Final</option>
-                              <option value="GRAND_FINAL">Grand Final</option>
-                              <option value="ROUND_1">Round 1</option>
-                              <option value="ROUND_2">Round 2</option>
-                              <option value="ROUND_3">Round 3</option>
-                              <option value="GROUP_STAGE">Group Stage</option>
-                            </select>
+                          <div className="bg-slate-50 dark:bg-[#161B26] p-3 rounded-lg border border-slate-200 dark:border-[#2E384D]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Series</span>
+                            <span className="text-base font-bold text-slate-900 dark:text-white mt-0.5 block">
+                              {genSeriesFormat}
+                            </span>
                           </div>
-
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              Series Format *
-                            </label>
-                            <select
-                              value={builderSeriesFormat}
-                              onChange={(e) => setBuilderSeriesFormat(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            >
-                              <option value="BO1">Best of 1 (BO1)</option>
-                              <option value="BO3">Best of 3 (BO3)</option>
-                              <option value="BO5">Best of 5 (BO5)</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              Schedule Date &amp; Time (Conflict Detection) *
-                            </label>
-                            <input
-                              type="datetime-local"
-                              value={builderScheduledAt}
-                              onChange={(e) => setBuilderScheduledAt(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 uppercase font-bold mb-1">
-                              YouTube Live URL (Optional Now / Required when Live)
-                            </label>
-                            <input
-                              type="url"
-                              value={builderYoutubeUrl}
-                              onChange={(e) => setBuilderYoutubeUrl(e.target.value)}
-                              placeholder="https://www.youtube.com/watch?v=..."
-                              className="w-full px-3 py-2 bg-white dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
-                            />
+                          <div className="bg-slate-50 dark:bg-[#161B26] p-3 rounded-lg border border-slate-200 dark:border-[#2E384D]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">Live Stream</span>
+                            <span className="text-xs font-bold text-rose-500 mt-0.5 block">
+                              Per-Match
+                            </span>
                           </div>
                         </div>
 
-                        <div className="flex justify-end pt-2">
-                          <button
-                            disabled={isCreatingMatch || !builderTeam1Id || !builderTeam2Id || builderTeam1Id === builderTeam2Id || !builderScheduledAt}
-                            onClick={async () => {
-                              if (!selectedLiveTournamentId) return;
-                              if (builderTeam1Id === builderTeam2Id) {
-                                alert("Team 1 and Team 2 must be different teams.");
-                                return;
-                              }
-                              setIsCreatingMatch(true);
-                              try {
-                                await createMatchAdmin({
-                                  tournament_id: selectedLiveTournamentId,
-                                  team1_id: builderTeam1Id,
-                                  team2_id: builderTeam2Id,
-                                  match_type: builderMatchType,
-                                  series_format: builderSeriesFormat,
-                                  scheduled_at: builderScheduledAt,
-                                  youtube_live_url: builderYoutubeUrl.trim() || undefined,
-                                });
-                                setActionMessage("Match successfully scheduled!");
-                                setBuilderScheduledAt("");
-                                setBuilderYoutubeUrl("");
-                                const dash = await getLiveMatchesDashboard();
-                                setLiveDashboard(dash);
-                                setLiveDashTab("scheduled");
-                              } catch (err: any) {
-                                alert(err?.message || "Failed to schedule match. Check for schedule conflicts.");
-                              } finally {
-                                setIsCreatingMatch(false);
-                              }
-                            }}
-                            className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
-                          >
-                            {isCreatingMatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                            Schedule Match
-                          </button>
+                        <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg text-[11px] font-mono text-slate-600 dark:text-slate-400 space-y-1">
+                          <div className="font-bold text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" /> One-Operation Live Match Preparation:
+                          </div>
+                          <div>1. Select competition structure &amp; click <strong>Generate Structure</strong>.</div>
+                          <div>2. Bulk-schedule all matches with starting time &amp; interval.</div>
+                          <div>3. Add individual YouTube Live URL per match (or edit pairings).</div>
+                          <div>4. Click <strong>Save Complete Live Match Setup</strong> to persist all matches.</div>
                         </div>
                       </div>
                     </div>
+
+                    {/* COMPLETE LIVE MATCH SETUP & BULK SCHEDULING WORKSPACE */}
+                    {preparedMatches.length > 0 ? (
+                      <div className="bg-white dark:bg-[#121622] border-2 border-[#E56A10]/40 rounded-xl p-6 space-y-6 shadow-md">
+                        {/* Workspace Header */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#242C3D]">
+                          <div>
+                            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded bg-[#E56A10]/10 text-[#E56A10] font-mono text-[11px] font-bold uppercase mb-1">
+                              <Sparkles className="w-3.5 h-3.5" /> Complete Matchup Structure ({preparedMatches.length} Matches)
+                            </div>
+                            <h3 className="font-headline font-bold text-lg text-slate-900 dark:text-white uppercase">
+                              Review &amp; Schedule Live Matches
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                              Review all generated pairings, bulk assign date/time, add YouTube live stream links per match, and save the complete live setup.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                            <button
+                              onClick={async () => {
+                                if (!confirm("Are you sure you want to regenerate the matchup structure? Current unsaved edits will be replaced.")) return;
+                                setIsGeneratingStructure(true);
+                                try {
+                                  const res = await generateMatchStructure(selectedLiveTournamentId, {
+                                    match_format: genMatchFormat,
+                                    series_format: genSeriesFormat,
+                                  });
+                                  if (res.matches && res.matches.length > 0) {
+                                    setPreparedMatches(res.matches);
+                                  }
+                                } catch (err: any) {
+                                  alert(err?.message || "Failed to regenerate");
+                                } finally {
+                                  setIsGeneratingStructure(false);
+                                }
+                              }}
+                              disabled={isGeneratingStructure}
+                              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1E2538] dark:hover:bg-[#252E46] border border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-[#E56A10]" />
+                              Regenerate
+                            </button>
+
+                            <button
+                              onClick={async () => {
+                                if (!selectedLiveTournamentId) return;
+                                setIsSavingLiveStructure(true);
+                                try {
+                                  const res = await saveLiveMatchStructure(selectedLiveTournamentId, {
+                                    match_format: genMatchFormat,
+                                    series_format: genSeriesFormat,
+                                    matches: preparedMatches,
+                                  });
+                                  alert(res.message);
+                                  const dash = await getLiveMatchesDashboard();
+                                  setLiveDashboard(dash);
+                                  await fetchTournamentRosters(selectedLiveTournamentId);
+                                  setLiveDashTab("scheduled");
+                                } catch (err: any) {
+                                  alert(err?.message || "Failed to save live structure");
+                                } finally {
+                                  setIsSavingLiveStructure(false);
+                                }
+                              }}
+                              disabled={isSavingLiveStructure}
+                              className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                            >
+                              {isSavingLiveStructure ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                              <span>Save Complete Live Match Setup</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Bulk Date & Time Scheduling Bar */}
+                        <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl space-y-3">
+                          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-slate-900 dark:text-white">
+                            <Clock className="w-4 h-4 text-[#E56A10]" />
+                            Bulk Schedule All Matches (Date + Starting Time + Interval)
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                            <div>
+                              <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                Date *
+                              </label>
+                              <input
+                                type="date"
+                                value={bulkDate}
+                                onChange={(e) => setBulkDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                Starting Time *
+                              </label>
+                              <input
+                                type="text"
+                                value={bulkTime}
+                                onChange={(e) => setBulkTime(e.target.value)}
+                                placeholder="10:00 AM"
+                                className="w-full px-3 py-2 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                Time Interval (Per Match)
+                              </label>
+                              <select
+                                value={bulkInterval}
+                                onChange={(e) => setBulkInterval(Number(e.target.value))}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                              >
+                                <option value={15}>15 Minutes</option>
+                                <option value={30}>30 Minutes</option>
+                                <option value={45}>45 Minutes</option>
+                                <option value={60}>60 Minutes (1 Hour)</option>
+                                <option value={90}>90 Minutes (1.5 Hours)</option>
+                                <option value={120}>120 Minutes (2 Hours)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <button
+                                onClick={applyBulkSchedule}
+                                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <Clock className="w-3.5 h-3.5" />
+                                Apply Schedule
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            Automatically assigns sequential schedule across all {preparedMatches.length} matches. You can manually adjust individual dates and times below.
+                          </p>
+                        </div>
+
+                        {/* All Matches Cards / List */}
+                        <div className="space-y-3">
+                          {preparedMatches.map((m, idx) => {
+                            return (
+                              <div
+                                key={m.id || idx}
+                                className="bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl p-4 space-y-3 transition-colors hover:border-[#E56A10]/50"
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-[#242C3D] pb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-[#E56A10] text-white text-[10px] font-mono font-bold uppercase">
+                                      M{m.match_number || idx + 1}
+                                    </span>
+                                    <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                                      {m.stage || `Round ${m.round_number || 1}`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {/* Stage / Match Type selector */}
+                                    <select
+                                      value={m.match_type}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) => (i === idx ? { ...item, match_type: val } : item))
+                                        );
+                                      }}
+                                      className="px-2 py-1 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded text-[11px] font-mono text-slate-800 dark:text-slate-200"
+                                    >
+                                      <option value="QUALIFIER">Qualifier</option>
+                                      <option value="ROUND_OF_32">Round of 32</option>
+                                      <option value="ROUND_OF_16">Round of 16</option>
+                                      <option value="QUARTER_FINAL">Quarter Final</option>
+                                      <option value="SEMI_FINAL">Semi Final</option>
+                                      <option value="THIRD_PLACE">3rd Place Playoff</option>
+                                      <option value="FINAL">Final</option>
+                                      <option value="GRAND_FINAL">Grand Final</option>
+                                      <option value="GROUP_STAGE">Group Stage</option>
+                                      <option value="SWISS_ROUND">Swiss Round</option>
+                                      <option value="WINNERS_BRACKET">Winners Bracket</option>
+                                      <option value="LOSERS_BRACKET">Losers Bracket</option>
+                                    </select>
+
+                                    {/* Series Format selector */}
+                                    <select
+                                      value={m.series_format}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) => (i === idx ? { ...item, series_format: val } : item))
+                                        );
+                                      }}
+                                      className="px-2 py-1 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded text-[11px] font-mono font-bold text-slate-800 dark:text-slate-200"
+                                    >
+                                      <option value="BO1">BO1</option>
+                                      <option value="BO3">BO3</option>
+                                      <option value="BO5">BO5</option>
+                                    </select>
+
+                                    {/* Remove match button */}
+                                    <button
+                                      onClick={() => {
+                                        setPreparedMatches((prev) => prev.filter((_, i) => i !== idx));
+                                      }}
+                                      className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500 rounded cursor-pointer transition-colors"
+                                      title="Remove this match"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Match Teams Row */}
+                                <div className="grid grid-cols-1 md:grid-cols-11 gap-3 items-center">
+                                  {/* Team 1 Selection */}
+                                  <div className="md:col-span-5">
+                                    <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                      Team 1
+                                    </label>
+                                    <select
+                                      value={m.team_a_id || ""}
+                                      onChange={(e) => {
+                                        const tId = e.target.value;
+                                        const teamObj = rostersData?.teams?.find((t) => t.team_id === tId);
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) =>
+                                            i === idx
+                                              ? {
+                                                  ...item,
+                                                  team_a_id: tId || null,
+                                                  team_a_name: teamObj ? teamObj.team_name : (tId ? "Selected Team" : "TBD"),
+                                                }
+                                              : item
+                                          )
+                                        );
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                                    >
+                                      <option value="">-- TBD / Winner of prior match --</option>
+                                      {(rostersData?.teams || []).map((t) => (
+                                        <option key={t.team_id} value={t.team_id}>
+                                          {t.team_name} [{t.team_tag}]
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Swap Button */}
+                                  <div className="md:col-span-1 text-center flex justify-center">
+                                    <button
+                                      onClick={() => {
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) =>
+                                            i === idx
+                                              ? {
+                                                  ...item,
+                                                  team_a_id: item.team_b_id,
+                                                  team_b_id: item.team_a_id,
+                                                  team_a_name: item.team_b_name,
+                                                  team_b_name: item.team_a_name,
+                                                }
+                                              : item
+                                          )
+                                        );
+                                      }}
+                                      className="p-1.5 bg-white dark:bg-[#1A2234] hover:bg-slate-100 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#2E384D] rounded-md text-slate-700 dark:text-slate-300 cursor-pointer shadow-2xs"
+                                      title="Swap Team 1 and Team 2"
+                                    >
+                                      <ArrowLeftRight className="w-3.5 h-3.5 text-[#E56A10]" />
+                                    </button>
+                                  </div>
+
+                                  {/* Team 2 Selection */}
+                                  <div className="md:col-span-5">
+                                    <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                      Team 2
+                                    </label>
+                                    <select
+                                      value={m.team_b_id || ""}
+                                      onChange={(e) => {
+                                        const tId = e.target.value;
+                                        const teamObj = rostersData?.teams?.find((t) => t.team_id === tId);
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) =>
+                                            i === idx
+                                              ? {
+                                                  ...item,
+                                                  team_b_id: tId || null,
+                                                  team_b_name: teamObj ? teamObj.team_name : (tId ? "Selected Team" : "TBD"),
+                                                }
+                                              : item
+                                          )
+                                        );
+                                      }}
+                                      className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
+                                    >
+                                      <option value="">-- TBD / Winner of prior match --</option>
+                                      {(rostersData?.teams || []).map((t) => (
+                                        <option key={t.team_id} value={t.team_id}>
+                                          {t.team_name} [{t.team_tag}]
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {/* Date, Time, and YouTube Live Stream Row */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 pt-1">
+                                  <div className="md:col-span-3">
+                                    <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                      Date
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={m.scheduled_date || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) => (i === idx ? { ...item, scheduled_date: val } : item))
+                                        );
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-3">
+                                    <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                      Time (e.g. 10:00 AM)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={m.scheduled_time || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) => (i === idx ? { ...item, scheduled_time: val } : item))
+                                        );
+                                      }}
+                                      placeholder="10:00 AM"
+                                      className="w-full px-2.5 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-6">
+                                    <label className="block text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase font-bold mb-1">
+                                      YouTube Live Stream URL (Per-Match Broadcast)
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={m.youtube_live_url || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setPreparedMatches((prev) =>
+                                          prev.map((item, i) => (i === idx ? { ...item, youtube_live_url: val } : item))
+                                        );
+                                      }}
+                                      placeholder="https://youtube.com/live/..."
+                                      className="w-full px-2.5 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Bottom Actions Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-200 dark:border-[#242C3D]">
+                          <button
+                            onClick={() => {
+                              const nextNum = preparedMatches.length + 1;
+                              setPreparedMatches((prev) => [
+                                ...prev,
+                                {
+                                  round_number: 1,
+                                  match_number: nextNum,
+                                  stage: `Match ${nextNum}`,
+                                  match_type: "QUALIFIER",
+                                  series_format: genSeriesFormat,
+                                  team_a_id: rostersData?.teams?.[0]?.team_id || null,
+                                  team_b_id: rostersData?.teams?.[1]?.team_id || null,
+                                  team_a_name: rostersData?.teams?.[0]?.team_name || "Team 1",
+                                  team_b_name: rostersData?.teams?.[1]?.team_name || "Team 2",
+                                  scheduled_date: bulkDate || "",
+                                  scheduled_time: "",
+                                  youtube_live_url: "",
+                                  status: "SCHEDULED",
+                                },
+                              ]);
+                            }}
+                            className="px-4 py-2 bg-slate-100 dark:bg-[#1A2234] hover:bg-slate-200 dark:hover:bg-[#232D42] border border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 text-xs font-mono font-bold uppercase rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-[#E56A10]" />
+                            Add Matchup
+                          </button>
+
+                          <button
+                            onClick={async () => {
+                              if (!selectedLiveTournamentId) return;
+                              setIsSavingLiveStructure(true);
+                              try {
+                                const res = await saveLiveMatchStructure(selectedLiveTournamentId, {
+                                  match_format: genMatchFormat,
+                                  series_format: genSeriesFormat,
+                                  matches: preparedMatches,
+                                });
+                                alert(res.message);
+                                const dash = await getLiveMatchesDashboard();
+                                setLiveDashboard(dash);
+                                await fetchTournamentRosters(selectedLiveTournamentId);
+                                setLiveDashTab("scheduled");
+                              } catch (err: any) {
+                                alert(err?.message || "Failed to save live structure");
+                              } finally {
+                                setIsSavingLiveStructure(false);
+                              }
+                            }}
+                            disabled={isSavingLiveStructure}
+                            className="px-6 py-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                          >
+                            {isSavingLiveStructure ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            <span>Save Complete Live Match Setup</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white dark:bg-[#121622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-8 text-center space-y-3">
+                        <Sparkles className="w-8 h-8 text-[#E56A10] mx-auto animate-pulse" />
+                        <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase">
+                          No Matchup Structure Generated Yet
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono max-w-lg mx-auto">
+                          Select your desired <strong>Tournament Match Format</strong> above and click <strong>Generate Structure</strong> to calculate and review all {rostersData?.teams?.length || 0} registered teams at once.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Bottom: Real Registered Rosters Inspection */}
                     <div className="bg-white dark:bg-[#121622] border border-[#D3E4FE] dark:border-[#242C3D] rounded-xl p-5 space-y-4 shadow-xs">
