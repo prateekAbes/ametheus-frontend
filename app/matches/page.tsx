@@ -33,7 +33,7 @@ function mapApiMatchToLobby(m: ApiMatch): MatchLobbyInfo {
     status: (m.status as any) || "CHECK_IN_OPEN",
     serverRegion: m.server_region || "AWS Mumbai (ap-south-1)",
     lobbyCode: m.lobby_code || "AMETHEUS-LOBBY-01",
-    lobbyPassword: m.lobby_password || "ESCROW_PASS_99",
+    lobbyPassword: m.lobby_password || "AMT_MATCH_PASS_99",
     teamA: {
       id: m.team_a?.tag || "t-a",
       name: m.team_a?.name || "TBD (Slot 1)",
@@ -104,8 +104,8 @@ export default function MatchesPage() {
 
   const filteredMatches = matches.filter((m) => {
     if (filterStatus === "all") return true;
-    if (filterStatus === "live") return m.status === "LIVE";
-    if (filterStatus === "upcoming") return m.status === "CHECK_IN_OPEN";
+    if (filterStatus === "live") return m.status === "LIVE" || (m.status as string) === "IN_PROGRESS";
+    if (filterStatus === "upcoming") return m.status === "CHECK_IN_OPEN" || (m.status as string) === "SCHEDULED";
     if (filterStatus === "completed") return m.status === "COMPLETED";
     return true;
   });

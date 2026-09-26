@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { getCurrentUserProfile } from "@/lib/api/auth";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/constants/support";
 
 export default function Footer() {
   const { isSignedIn } = useAuth();
@@ -99,6 +100,14 @@ export default function Footer() {
                 <Link href="/contact" className="hover:text-white transition-colors">
                   Contact Support
                 </Link>
+              </li>
+              <li className="pt-2 text-xs text-[#CBD5E1] font-mono flex flex-col gap-1">
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-[#E56A10] transition-colors flex items-center gap-1.5">
+                  <span>✉</span> {SUPPORT_EMAIL}
+                </a>
+                <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="hover:text-[#E56A10] transition-colors flex items-center gap-1.5">
+                  <span>☎</span> {SUPPORT_PHONE}
+                </a>
               </li>
               <li>
                 <Link href="/help" className="hover:text-white transition-colors">

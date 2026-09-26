@@ -32,6 +32,9 @@ interface TournamentModalData {
   entryFeeNum?: number;
   minTeamSize?: number;
   min_team_size?: number;
+  maxTeamSize?: number;
+  max_team_size?: number;
+  isSolo?: boolean;
 }
 
 interface Props {
@@ -61,12 +64,17 @@ export default function RegisterTournamentModal({
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   const gameSlug = (tournament.gameSlug || tournament.game_slug || "").toLowerCase();
-  const rosterReq = getGameRosterRequirement(gameSlug || tournament.title);
-  const isSolo =
-    !rosterReq.requiresTeam ||
-    rosterReq.min === 1 ||
-    tournament.minTeamSize === 1 ||
-    tournament.min_team_size === 1;
+  const requiredTeamSize = Number(tournament.min_team_size ?? tournament.minTeamSize ?? 1);
+  const maxTeamSize = Number(tournament.max_team_size ?? tournament.maxTeamSize ?? (requiredTeamSize > 1 ? requiredTeamSize : 5));
+  const isSolo = Boolean(
+    tournament.isSolo ||
+    (requiredTeamSize === 1 && maxTeamSize === 1) ||
+    gameSlug === "chess"
+  );
+  const rosterLabel =
+    requiredTeamSize === maxTeamSize
+      ? `${requiredTeamSize} Players Required`
+      : `${requiredTeamSize}-${maxTeamSize} Players Required`;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -154,16 +162,16 @@ export default function RegisterTournamentModal({
         setError("Please select a team to register.");
         return;
       }
-      if (selectedTeam.members.length < rosterReq.min) {
-        const missing = rosterReq.min - selectedTeam.members.length;
+      if (selectedTeam.members.length < requiredTeamSize) {
+        const missing = requiredTeamSize - selectedTeam.members.length;
         setError(
-          `Your team requires ${missing} more player${missing > 1 ? "s" : ""} to enter this ${rosterReq.formatName} tournament (Current: ${selectedTeam.members.length}/${rosterReq.min} required). Manage your roster on the game page.`
+          `Your team requires ${missing} more player${missing > 1 ? "s" : ""} to enter this tournament (Current: ${selectedTeam.members.length}/${requiredTeamSize} required). Manage your roster on the game page.`
         );
         return;
       }
-      const maxCap = selectedTeam.maxMembers ?? rosterReq.max;
+      const maxCap = selectedTeam.maxMembers ?? maxTeamSize;
       if (selectedTeam.members.length > maxCap) {
-        setError(`Your team has too many players (${selectedTeam.members.length}/${maxCap}). Maximum for this format is ${maxCap}.`);
+        setError(`Your team has too many players (${selectedTeam.members.length}/${maxCap}). Maximum allowed for this tournament is ${maxCap}.`);
         return;
       }
     }
@@ -283,7 +291,7 @@ export default function RegisterTournamentModal({
                     1. Select Your Registered Team
                   </label>
                   <span className="text-[11px] font-mono font-bold text-[#E56A10] bg-[#E56A10]/10 border border-[#E56A10]/30 px-2 py-0.5 rounded">
-                    {rosterReq.label}
+                    {rosterLabel}
                   </span>
                 </div>
 
@@ -295,9 +303,9 @@ export default function RegisterTournamentModal({
                 ) : activeTeams.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {activeTeams.map((team) => {
-                      const maxCap = team.maxMembers ?? rosterReq.max;
-                      const isFull = team.members.length >= maxCap;
-                      const isEligible = team.members.length >= rosterReq.min && !isFull;
+                      const maxCap = team.maxMembers ?? maxTeamSize;
+                      const isFull = team.members.length > maxCap;
+                      const isEligible = team.members.length >= requiredTeamSize && !isFull;
                       return (
                         <label
                           key={team.id}
@@ -325,11 +333,11 @@ export default function RegisterTournamentModal({
                                   </span>
                                 ) : isEligible ? (
                                   <span className="text-[9px] text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 font-mono font-bold px-1.5 py-0.2 rounded">
-                                    Eligible
+                                    Eligible ({team.members.length}/{requiredTeamSize})
                                   </span>
                                 ) : (
                                   <span className="text-[9px] text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/60 font-mono font-bold px-1.5 py-0.2 rounded">
-                                    {rosterReq.min - team.members.length} More Needed
+                                    {requiredTeamSize - team.members.length} More Needed
                                   </span>
                                 )}
                               </div>
@@ -402,7 +410,7 @@ export default function RegisterTournamentModal({
                 </span>
               </div>
               <span className="px-2 py-1 bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] text-[#E56A10] text-[10px] font-mono font-bold rounded shadow-xs">
-                100% ESCROW VAULT GUARANTEE
+                100% SECURE PRIZE VAULT GUARANTEE
               </span>
             </div>
 

@@ -157,7 +157,7 @@ export default function TournamentDetailPage({ params }: Props) {
       status: (bm.status as any) || "CHECK_IN_OPEN",
       serverRegion: bm.serverRegion || bm.server_region || currentTournament.serverRegion,
       lobbyCode: bm.lobby_code || `AMT-${(bm.id || "00000000").slice(0, 8).toUpperCase()}`,
-      lobbyPassword: bm.lobby_password || "ESCROW_VANGUARD_99",
+      lobbyPassword: bm.lobby_password || "AMT_VANGUARD_99",
       teamA: {
         id: teamAObj.id || teamAObj.tag || "t-a",
         name: teamAObj.name || "TBD (Slot 1)",
@@ -228,7 +228,7 @@ export default function TournamentDetailPage({ params }: Props) {
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F1F3F5] dark:bg-[#161A24] text-[#0F172A] dark:text-slate-200 border dark:border-[#242C3D] text-xs font-mono rounded">
               <Shield className="w-3.5 h-3.5 text-[#E56A10]" />
-              AMETHEUS ESCROW GUARANTEED
+              AMETHEUS SECURE PRIZE GUARANTEED
             </span>
             <span className="px-2.5 py-1 bg-[#F1F3F5] dark:bg-[#161A24] text-[#64748B] dark:text-[#94A3B8] border dark:border-[#242C3D] text-xs font-mono rounded">
               SERVER: {currentTournament.serverRegion}
@@ -309,7 +309,7 @@ export default function TournamentDetailPage({ params }: Props) {
                   </span>
                 </div>
                 <span className="px-2 py-0.5 bg-[#E56A10]/10 text-[#E56A10] text-[10px] font-mono font-bold rounded">
-                  100% SECURE ESCROW
+                  100% SECURE PRIZE VAULT
                 </span>
               </div>
 
@@ -375,13 +375,13 @@ export default function TournamentDetailPage({ params }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
             <div className="bg-[#F8F9FA] dark:bg-[#121622] p-4 rounded-lg border border-[#E2E8F0] dark:border-[#242C3D]">
               <span className="text-[10px] font-mono text-[#64748B] dark:text-[#94A3B8] uppercase block">
-                Total Prize Escrow
+                Total Prize Vault
               </span>
               <div className="text-2xl font-bold font-headline text-[#E56A10] mt-0.5 tabular-nums">
                 {currentTournament.prizePool}
               </div>
               <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-mono">
-                100% Escrow Backed
+                100% Prize Backed
               </span>
             </div>
 
@@ -459,9 +459,9 @@ export default function TournamentDetailPage({ params }: Props) {
           </div>
 
           <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-[#64748B] dark:text-[#94A3B8]">
-            <span>OFFICIAL ESCROW NODE:</span>
+            <span>OFFICIAL PRIZE NODE:</span>
             <span className="px-2 py-0.5 bg-[#F1F3F5] dark:bg-[#161A24] border dark:border-[#242C3D] text-[#0F172A] dark:text-[#E56A10] font-bold rounded">
-              ESCROW-PAID-SECURE
+              SECURE-PRIZE-VAULT
             </span>
           </div>
         </div>
@@ -526,7 +526,7 @@ export default function TournamentDetailPage({ params }: Props) {
               Prize Pool Distribution
             </h2>
             <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mb-6">
-              Total Escrow Backed: <strong className="text-[#E56A10]">{currentTournament.prizePool}</strong>. Payouts processed automatically within 30 minutes of final match verification.
+              Total Prize Vault Backed: <strong className="text-[#E56A10]">{currentTournament.prizePool}</strong>. Payouts processed automatically within 30 minutes of final match verification.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -547,7 +547,7 @@ export default function TournamentDetailPage({ params }: Props) {
                     </span>
                   </div>
                   <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                    ✓ Instant Escrow Disbursal
+                    ✓ Instant Prize Disbursal
                   </span>
                 </div>
               ))}
@@ -586,7 +586,7 @@ export default function TournamentDetailPage({ params }: Props) {
                   Tournament Match Schedule ({matches.length})
                 </h2>
                 <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                  Official escrow-verified matches with real-time scorekeeping and automated lobby routing.
+                  Official verified matches with real-time scorekeeping and automated lobby routing.
                 </p>
               </div>
               <span className="text-xs font-mono text-[#E56A10] font-bold flex items-center gap-1.5">

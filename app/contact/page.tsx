@@ -7,11 +7,13 @@ import {
   HelpCircle,
   CreditCard,
   Mail,
+  Phone,
   MessageSquare,
   Clock,
   Send,
   CheckCircle2,
 } from "lucide-react";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/constants/support";
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -46,7 +48,7 @@ export default function ContactPage() {
             CONTACT <span className="text-[#E56A10]">AMETHEUS</span> DESK
           </h1>
           <p className="mt-3 text-sm md:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-            Need arbitration on a disputed bracket match, escrow payment assistance, or organizer certification? Our live operations desk responds in real-time.
+            Need arbitration on a disputed bracket match, reserved payment assistance, or organizer certification? Our live operations desk responds in real-time.
           </p>
         </div>
       </section>
@@ -74,10 +76,10 @@ export default function ContactPage() {
               <CreditCard className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-900 uppercase font-headline">
-              Escrow &amp; Payment Vault
+              Prize &amp; Payment Vault
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Platform escrow order verification, entry fee holding receipts, team cancellation refunds, and verified prize pool payout claims.
+              Platform order verification, entry fee holding receipts, team cancellation refunds, and verified prize pool payout claims.
             </p>
             <div className="mt-auto flex items-center gap-2 text-xs text-slate-700 font-mono pt-3 border-t border-slate-100">
               <Clock className="w-3.5 h-3.5 text-[#E56A10]" /> Finance SLA: &lt; 2 hours
@@ -89,13 +91,18 @@ export default function ContactPage() {
               <MessageSquare className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-900 uppercase font-headline">
-              Official Discord &amp; Ops
+              Direct Support &amp; Ops
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Direct voice channels with tournament referees, captain lobbies, and platform community match-finding.
+              Direct communication channels with tournament referees, support desk, and platform community operations.
             </p>
-            <div className="mt-auto flex items-center gap-2 text-xs text-slate-700 font-mono pt-3 border-t border-slate-100">
-              <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> support@ametheus.gg
+            <div className="mt-auto flex flex-col gap-1.5 text-xs text-slate-700 font-mono pt-3 border-t border-slate-100">
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
+                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_EMAIL}
+              </a>
+              <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
+                <Phone className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_PHONE}
+              </a>
             </div>
           </div>
         </div>
@@ -184,7 +191,7 @@ export default function ContactPage() {
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#E56A10] transition-colors"
                   >
                     <option value="MATCH_DISPUTE">Match Dispute &amp; Evidence</option>
-                    <option value="ESCROW_PAYMENT">Escrow Payment / Refund</option>
+                    <option value="ESCROW_PAYMENT">Reserved Payment / Refund</option>
                     <option value="ORGANIZER_PARTNERSHIP">Organizer Certification</option>
                     <option value="ANTI_CHEAT">Anti-Cheat &amp; Fair Play Report</option>
                     <option value="TECHNICAL_BUG">Platform Bug / Glitch</option>

@@ -40,7 +40,7 @@ export default function AboutPage() {
               <span className="text-[10px] font-mono text-[#94A3B8] uppercase block">Platform Prize Vault</span>
               <span className="text-2xl font-bold font-headline text-white mt-1 block">₹14,50,000+</span>
               <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
-                <CheckCircle className="w-3 h-3" /> Escrow Protected
+                <CheckCircle className="w-3 h-3" /> Secure Vault Protected
               </span>
             </div>
             <div className="p-4 bg-[#10141F] border border-[#242C3D] rounded">
@@ -165,7 +165,7 @@ export default function AboutPage() {
                 <li>• Next.js 16.3.5 (Turbopack)</li>
                 <li>• Clerk Core 3 Authentication</li>
                 <li>• Tailwind CSS &amp; Lucide Icons</li>
-                <li>• Platform Escrow Engine</li>
+                <li>• Platform Prize Vault Engine</li>
                 <li>• Deployed on Vercel Global Edge</li>
               </ul>
             </div>

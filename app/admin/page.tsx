@@ -4615,14 +4615,12 @@ export default function AdminCockpitPage() {
                     onChange={(e) => {
                       const selectedVal = e.target.value;
                       const selectedGame = games.find((g) => (g.slug || g.id) === selectedVal || g.id === selectedVal);
-                      const slug = selectedGame?.slug || selectedVal;
-                      const req = getGameRosterRequirement(slug || selectedGame?.name || "");
-                      const isSolo = req.min === 1 && req.max === 1;
+                      const isSolo = Boolean(selectedGame && (!selectedGame.is_team_game || selectedGame.slug === "chess" || (selectedGame.max_team_size || 5) <= 1));
                       setTournForm((prev) => ({
                         ...prev,
                         game_id: selectedVal,
-                        min_team_size: isSolo ? 1 : req.min,
-                        max_team_size: isSolo ? 1 : req.max,
+                        min_team_size: isSolo ? 1 : (Number(prev.min_team_size) > 1 ? prev.min_team_size : 2),
+                        max_team_size: isSolo ? 1 : Math.max(Number(prev.max_team_size) || 5, Number(prev.min_team_size) || 2, 2),
                         format: isSolo ? "1v1 Solo Championship" : (prev.format.includes("Solo") ? "Single Elimination Bracket" : prev.format),
                       }));
                     }}
@@ -4706,8 +4704,8 @@ export default function AdminCockpitPage() {
                       onClick={() => {
                         const selectedGame = games.find((g) => (g.slug || g.id) === tournForm.game_id || g.id === tournForm.game_id);
                         const req = getGameRosterRequirement(selectedGame?.slug || tournForm.game_id || "");
-                        const fallbackMin = req.min > 1 ? req.min : 5;
-                        const fallbackMax = req.max > 1 ? req.max : 5;
+                        const fallbackMin = Number(tournForm.min_team_size) > 1 ? Number(tournForm.min_team_size) : (req.min > 1 ? req.min : 2);
+                        const fallbackMax = Number(tournForm.max_team_size) >= fallbackMin ? Number(tournForm.max_team_size) : Math.max(fallbackMin, req.max > 1 ? req.max : 5);
                         setTournForm((prev) => ({
                           ...prev,
                           min_team_size: fallbackMin,
@@ -4743,13 +4741,13 @@ export default function AdminCockpitPage() {
                     Tournament Status
                   </label>
                   <select
-                    value={tournForm.status}
+                    value={tournForm.status === "ONGOING" ? "LIVE" : tournForm.status}
                     onChange={(e) => setTournForm({ ...tournForm, status: e.target.value })}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:border-[#E56A10] focus:outline-hidden font-mono"
                   >
                     <option value="REGISTRATION_OPEN">Registration Open</option>
                     <option value="COMING_SOON">Coming Soon (Upcoming / Teaser)</option>
-                    <option value="ONGOING">Ongoing (Live Matches)</option>
+                    <option value="LIVE">Live (Ongoing Matches)</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>
                   </select>
@@ -4912,7 +4910,7 @@ export default function AdminCockpitPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      Min Team Size
+                      Required Team Size (Roster Min)
                     </label>
                     <input
                       type="number"
@@ -4925,7 +4923,7 @@ export default function AdminCockpitPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-mono uppercase text-slate-800 font-bold mb-1">
-                      Max Team Size
+                      Max Team Size (Roster Max)
                     </label>
                     <input
                       type="number"

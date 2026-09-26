@@ -69,8 +69,8 @@ export default function OrganizerCockpitPage() {
         setFormData((prev) => ({
           ...prev,
           game_id: firstGame.id,
-          min_team_size: isSolo ? 1 : req.min,
-          max_team_size: isSolo ? 1 : req.max,
+          min_team_size: isSolo ? 1 : (Number(prev.min_team_size) > 1 ? Number(prev.min_team_size) : (req.min > 1 ? req.min : 2)),
+          max_team_size: isSolo ? 1 : (Number(prev.max_team_size) > 1 ? Number(prev.max_team_size) : Math.max(req.max > 1 ? req.max : 5, 2)),
           format: isSolo ? "1v1 Solo Championship" : prev.format,
         }));
       }
@@ -183,13 +183,19 @@ export default function OrganizerCockpitPage() {
                     const selectedGame = games.find((g) => g.id === selectedVal || g.tag === selectedVal);
                     const req = getGameRosterRequirement(selectedGame?.tag || selectedGame?.name || selectedVal);
                     const isSolo = req.min === 1 && req.max === 1;
-                    setFormData((prev) => ({
-                      ...prev,
-                      game_id: selectedVal,
-                      min_team_size: isSolo ? 1 : req.min,
-                      max_team_size: isSolo ? 1 : req.max,
-                      format: isSolo ? "1v1 Solo Championship" : (prev.format?.includes("Solo") ? "Single Elimination Bracket" : prev.format),
-                    }));
+                    setFormData((prev) => {
+                      const curMin = Number(prev.min_team_size);
+                      const curMax = Number(prev.max_team_size);
+                      const minTeam = isSolo ? 1 : (curMin > 1 ? curMin : (req.min > 1 ? req.min : 2));
+                      const maxTeam = isSolo ? 1 : (curMax >= minTeam ? curMax : Math.max(minTeam, req.max > 1 ? req.max : 5));
+                      return {
+                        ...prev,
+                        game_id: selectedVal,
+                        min_team_size: minTeam,
+                        max_team_size: maxTeam,
+                        format: isSolo ? "1v1 Solo Championship" : (prev.format?.includes("Solo") ? "Single Elimination Bracket" : prev.format),
+                      };
+                    });
                   }}
                   className="w-full bg-slate-50 border border-slate-300 p-2.5 rounded-lg text-slate-900 focus:bg-white focus:border-[#E56A10] outline-none transition-colors"
                   required
@@ -269,8 +275,10 @@ export default function OrganizerCockpitPage() {
                     onClick={() => {
                       const selectedGame = games.find((g) => g.id === formData.game_id || g.tag === formData.game_id);
                       const req = getGameRosterRequirement(selectedGame?.tag || selectedGame?.name || formData.game_id || "");
-                      const fallbackMin = req.min > 1 ? req.min : 5;
-                      const fallbackMax = req.max > 1 ? req.max : 5;
+                      const curMin = Number(formData.min_team_size);
+                      const curMax = Number(formData.max_team_size);
+                      const fallbackMin = curMin > 1 ? curMin : (req.min > 1 ? req.min : 2);
+                      const fallbackMax = curMax >= fallbackMin ? curMax : Math.max(fallbackMin, req.max > 1 ? req.max : 5);
                       setFormData((prev) => ({
                         ...prev,
                         min_team_size: fallbackMin,
@@ -366,7 +374,7 @@ export default function OrganizerCockpitPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-slate-700 uppercase font-semibold">Min Team Size</label>
+                  <label className="text-slate-700 uppercase font-semibold">Required Team Size (Roster Min)</label>
                   <input
                     type="number"
                     min={1}
@@ -378,7 +386,7 @@ export default function OrganizerCockpitPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-slate-700 uppercase font-semibold">Max Team Size</label>
+                  <label className="text-slate-700 uppercase font-semibold">Max Team Size (Roster Max)</label>
                   <input
                     type="number"
                     min={1}

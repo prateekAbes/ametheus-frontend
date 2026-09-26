@@ -86,7 +86,7 @@ export default function DedicatedGameHubPage({ params }: Props) {
       userTeam.captain_username === userProfile.username);
 
   const rosterCount = userTeam?.members?.length || 0;
-  const isRosterReady = rosterCount >= game.minTeamSize;
+  const maxTeamCapacity = game.maxTeamSize || 5;
 
   const handleCopyCode = () => {
     if (userTeam?.invite_code) {
@@ -306,15 +306,9 @@ export default function DedicatedGameHubPage({ params }: Props) {
                 </div>
                 {userTeam && (
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border self-start sm:self-auto ${
-                      isRosterReady
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                        : "bg-amber-500/10 text-amber-600 border-amber-500/30"
-                    }`}
+                    className="px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border self-start sm:self-auto bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
                   >
-                    {isRosterReady
-                      ? "✓ READY FOR TOURNAMENTS"
-                      : `NEEDS ${game.minTeamSize - rosterCount} MORE PLAYER${game.minTeamSize - rosterCount > 1 ? "S" : ""}`}
+                    ✓ ACTIVE ROSTER ({rosterCount}/{maxTeamCapacity})
                   </span>
                 )}
               </div>

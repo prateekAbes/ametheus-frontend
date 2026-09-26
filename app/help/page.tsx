@@ -15,7 +15,10 @@ import {
   ChevronUp,
   ArrowRight,
   ExternalLink,
+  Phone,
+  Mail,
 } from "lucide-react";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/constants/support";
 
 interface FaqItem {
   id: string;
@@ -144,7 +147,7 @@ export default function HelpPage() {
             <Search className="w-4 h-4 text-[#565E74] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search help articles (e.g. escrow, invite code, forfeit, dispute)..."
+              placeholder="Search help articles (e.g. prize vault, invite code, forfeit, dispute)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-white border border-[#CBD5E1] rounded-lg text-sm text-[#0B1C30] placeholder-[#94A3B8] focus:outline-hidden focus:ring-2 focus:ring-[#E56A10] shadow-xs"
@@ -215,18 +218,26 @@ export default function HelpPage() {
         </div>
 
         {/* Support Routing Card */}
-        <div className="p-6 bg-white rounded-xl border border-[#D3E4FE] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+        <div className="p-6 bg-white rounded-xl border border-[#D3E4FE] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
             <h4 className="font-headline font-bold text-base text-[#0B1C30] uppercase">
-              Need Live Match Arbitration or Escrow Assistance?
+              Need Live Match Arbitration or Prize Vault Assistance?
             </h4>
-            <p className="text-xs text-[#565E74] font-mono mt-1">
+            <p className="text-xs text-[#565E74] font-mono">
               Our dedicated arbitration desk responds in under 15 minutes during active tournament play.
             </p>
+            <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-700">
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-1.5 hover:text-[#E56A10] transition-colors">
+                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_EMAIL}
+              </a>
+              <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-1.5 hover:text-[#E56A10] transition-colors">
+                <Phone className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_PHONE}
+              </a>
+            </div>
           </div>
           <Link
             href="/contact"
-            className="px-5 py-2.5 bg-[#0B1C30] hover:bg-[#162A45] text-white rounded font-headline font-bold text-xs uppercase tracking-wider transition-colors shrink-0 flex items-center gap-1.5"
+            className="px-5 py-2.5 bg-[#0B1C30] hover:bg-[#162A45] text-white rounded font-headline font-bold text-xs uppercase tracking-wider transition-colors shrink-0 flex items-center justify-center gap-1.5"
           >
             Escalate to Support Desk <ArrowRight className="w-3.5 h-3.5" />
           </Link>
