@@ -31,7 +31,7 @@ export default function AboutPage() {
             Sanctioned Esports Infrastructure Built for Competitive Integrity
           </h1>
           <p className="mt-4 text-sm sm:text-base text-[#94A3B8] max-w-2xl leading-relaxed">
-            AMETHEUS combines nocturnal arena intensity with daylight operational clarity. Designed from the ground up for competitive players, tactical squad captains, and tournament arbiters across India.
+            AMETHEUS combines nocturnal arena intensity with daylight operational clarity. Designed from the ground up for competitive players, tactical team captains, and tournament arbiters across India.
           </p>
 
           {/* Quick Metrics */}
@@ -118,7 +118,7 @@ export default function AboutPage() {
               3. Tamper-Evident Operational Audit Ledger
             </h3>
             <p className="text-xs text-[#475569] leading-relaxed">
-              All administrative operations, squad lineup changes, match score submissions, dispute arbitrations, and organizer promotions are securely recorded, ensuring a permanent and transparent verification trail.
+              All administrative operations, team lineup changes, match score submissions, dispute arbitrations, and organizer promotions are securely recorded, ensuring a permanent and transparent verification trail.
             </p>
             <div className="pt-2 border-t border-[#F1F3F5] text-[11px] font-mono text-emerald-700 font-bold">
               Transparent Audit Ledger // Zero Impersonation
@@ -186,7 +186,7 @@ export default function AboutPage() {
                 <li>• Riot Vanguard &amp; Hardware Anti-Cheat</li>
                 <li>• 128-Tick Competitive Servers</li>
                 <li>• 15-Minute Check-in Forfeit Grace</li>
-                <li>• Verified Squad Eligibility</li>
+                <li>• Verified Team Eligibility</li>
               </ul>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function AboutPage() {
           <div>
             <h3 className="text-xl font-bold font-headline uppercase">Ready to Compete?</h3>
             <p className="text-xs text-[#94A3B8] font-mono mt-1">
-              Browse live tournaments, register your squad, or contact platform arbiters.
+              Browse live tournaments, register your team, or contact platform arbiters.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

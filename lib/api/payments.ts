@@ -1,22 +1,5 @@
 import { apiClient } from "./client";
 
-export interface InitiatePaymentResponse {
-  payment_id: string;
-  game_id: string;
-  game_name: string;
-  team_id?: string;
-  amount_inr: number;
-  amount_paise: number;
-  payment_method: string;
-  status: string;
-  wallet_discount_inr?: number;
-  payment_account_code?: string;
-  upi_id?: string;
-  payee_name?: string;
-  qr_url?: string;
-  upi_uri?: string;
-}
-
 export interface PaymentRecord {
   id: string;
   payment_type: string;
@@ -40,27 +23,12 @@ export interface PaymentRecord {
   created_at: string;
 }
 
-export async function initiateGamePayment(
-  gameSlug: string,
-  teamId?: string,
-  paymentMethod: "UPI" | "WALLET" = "UPI"
-): Promise<InitiatePaymentResponse> {
-  return apiClient<InitiatePaymentResponse>("/payments/game/initiate", {
-    method: "POST",
-    body: JSON.stringify({
-      game_slug: gameSlug,
-      team_id: teamId,
-      payment_method: paymentMethod,
-    }),
-  });
-}
-
 export async function submitPaymentUtr(
   paymentId: string,
   utr: string,
   screenshotUrl?: string
 ): Promise<{ status: string; message: string; payment_id: string; utr: string }> {
-  return apiClient(`/payments/game/${paymentId}/submit-utr`, {
+  return apiClient(`/payments/${paymentId}/submit-utr`, {
     method: "POST",
     body: JSON.stringify({
       utr,

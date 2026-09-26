@@ -442,7 +442,7 @@ export default function TournamentDetailPage({ params }: Props) {
               { id: "prizes", label: "Prize Distribution" },
               { id: "bracket", label: "Live Bracket" },
               { id: "matches", label: `Matches (${matches.length})` },
-              { id: "rosters", label: isSoloGame ? `Contenders (${safeRosters.length})` : `Squads (${safeRosters.length})` },
+              { id: "rosters", label: isSoloGame ? `Contenders (${safeRosters.length})` : `Teams (${safeRosters.length})` },
             ].map((t) => (
               <button
                 key={t.id}
@@ -700,7 +700,7 @@ export default function TournamentDetailPage({ params }: Props) {
         {activeTab === "rosters" && (
           <div className="bg-white dark:bg-[#121622] rounded-xl p-6 border border-[#E2E8F0] dark:border-[#242C3D] shadow-xs">
             <h2 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-4">
-              {isSoloGame ? `Confirmed Contenders (${safeRosters.length})` : `Confirmed Squad Lineups (${safeRosters.length})`}
+              {isSoloGame ? `Confirmed Contenders (${safeRosters.length})` : `Confirmed Team Lineups (${safeRosters.length})`}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -730,7 +730,7 @@ export default function TournamentDetailPage({ params }: Props) {
 
                   {!isSoloGame && (
                     <div className="text-[11px] font-mono text-[#475569] dark:text-[#94A3B8] border-t border-[#E2E8F0] dark:border-[#242C3D] pt-2">
-                      <span className="text-[#64748B] dark:text-[#94A3B8] block mb-1">Squad Members:</span>
+                      <span className="text-[#64748B] dark:text-[#94A3B8] block mb-1">Team Members:</span>
                       <div className="flex flex-wrap gap-1">
                         {(roster.members || []).map((m, mIdx) => (
                           <span

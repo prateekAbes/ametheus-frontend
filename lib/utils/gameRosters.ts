@@ -1,5 +1,5 @@
 /**
- * Game-Specific Squad & Roster Requirements
+ * Game-Specific Team & Roster Requirements
  * Defines athlete counts per game mode (1 for Chess/FIFA, 3 for Smash Karts, 4 for BGMI/Mini Militia/Free Fire, 5 for Valorant/CS2/CODM).
  */
 
@@ -41,32 +41,32 @@ export const GAME_ROSTER_SPECS: Record<string, GameRosterRequirement> = {
     min: 3,
     max: 3,
     label: "3 Players (Trio Arena)",
-    formatName: "Trio (3-Player Squad)",
+    formatName: "Trio (3-Player Team)",
     shortBadge: "3P Trio",
     requiresTeam: true,
   },
   bgmi: {
     min: 4,
     max: 4,
-    label: "4 Players (Full Squad Battle Royale)",
-    formatName: "Squad (4 Players)",
-    shortBadge: "4P Squad",
+    label: "4 Players (Battle Royale Team)",
+    formatName: "Team (4 Players)",
+    shortBadge: "4P Team",
     requiresTeam: true,
   },
   "mini-militia": {
     min: 4,
     max: 4,
-    label: "4 Players (4v4 Combat Squad)",
-    formatName: "Squad (4 Players)",
-    shortBadge: "4P Squad",
+    label: "4 Players (4v4 Combat Team)",
+    formatName: "Team (4 Players)",
+    shortBadge: "4P Team",
     requiresTeam: true,
   },
   "free-fire-max": {
     min: 4,
     max: 4,
-    label: "4 Players (Battle Royale Squad)",
-    formatName: "Squad (4 Players)",
-    shortBadge: "4P Squad",
+    label: "4 Players (Battle Royale Team)",
+    formatName: "Team (4 Players)",
+    shortBadge: "4P Team",
     requiresTeam: true,
   },
   valorant: {
@@ -101,7 +101,7 @@ export function getGameRosterRequirement(gameSlugOrTitle?: string): GameRosterRe
       min: 4,
       max: 5,
       label: "4-5 Players (Team)",
-      formatName: "Squad",
+      formatName: "Team",
       shortBadge: "Team",
       requiresTeam: true,
     };
@@ -147,9 +147,9 @@ export function getGameRosterRequirement(gameSlugOrTitle?: string): GameRosterRe
   return {
     min: 4,
     max: 5,
-    label: "4-5 Players (Competitive Squad)",
-    formatName: "Squad",
-    shortBadge: "Squad",
+    label: "4-5 Players (Competitive Team)",
+    formatName: "Team",
+    shortBadge: "Team",
     requiresTeam: true,
   };
 }

@@ -214,7 +214,7 @@ export default function OrganizerCockpitPage() {
                 />
               </div>
 
-              {/* Competition Format Selector: Solo vs Squad */}
+              {/* Competition Format Selector: Solo vs Team */}
               <div className="md:col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">

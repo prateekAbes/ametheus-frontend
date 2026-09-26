@@ -103,18 +103,18 @@ export default function DashboardPage() {
   const [upiId, setUpiId] = useState("");
   const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
 
-  // Squad Modals (from previous dashboard)
-  const [isCreateSquadOpen, setIsCreateSquadOpen] = useState(false);
-  const [createSquadForm, setCreateSquadForm] = useState({
+  // Team Modals
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const [createTeamForm, setCreateTeamForm] = useState({
     name: "",
     game_slug: "valorant",
     tag: "",
   });
-  const [isSubmittingSquad, setIsSubmittingSquad] = useState(false);
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
 
-  const [isJoinSquadOpen, setIsJoinSquadOpen] = useState(false);
+  const [isJoinTeamOpen, setIsJoinTeamOpen] = useState(false);
   const [joinInviteCode, setJoinInviteCode] = useState("");
-  const [isJoiningSquad, setIsJoiningSquad] = useState(false);
+  const [isJoiningTeam, setIsJoiningTeam] = useState(false);
 
   // Check user privileges
   const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || profile?.email?.toLowerCase() || "";
@@ -200,7 +200,7 @@ export default function DashboardPage() {
             );
           } catch {}
 
-          // Teams: ONLY use DB data. Never fall back to localStorage — stale data causes phantom squads.
+          // Teams: ONLY use DB data. Never fall back to localStorage — stale data causes phantom teams.
           if (teamsRes.status === "fulfilled" && Array.isArray(teamsRes.value)) {
             setTeams(teamsRes.value);
           } else {
@@ -412,46 +412,46 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateSquad = async (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createSquadForm.name) return;
-    setIsSubmittingSquad(true);
+    if (!createTeamForm.name) return;
+    setIsSubmittingTeam(true);
     try {
-      const tag = createSquadForm.tag || createSquadForm.name.slice(0, 4).toUpperCase();
+      const tag = createTeamForm.tag || createTeamForm.name.slice(0, 4).toUpperCase();
       const newTeam = await createTeam({
-        name: createSquadForm.name,
-        game_slug: createSquadForm.game_slug,
+        name: createTeamForm.name,
+        game_slug: createTeamForm.game_slug,
         tag,
         captain_handle: profile?.display_name || user?.username || "Captain",
       });
       setTeams((prev) => [newTeam, ...prev]);
-      setIsCreateSquadOpen(false);
-      setCreateSquadForm({ name: "", game_slug: "valorant", tag: "" });
+      setIsCreateTeamOpen(false);
+      setCreateTeamForm({ name: "", game_slug: "valorant", tag: "" });
       showToast(`Team "${newTeam.name}" created! Invite code: ${newTeam.invite_code}`);
     } catch (e: any) {
       showToast(e?.message || "Failed to create team. Please try again.");
     } finally {
-      setIsSubmittingSquad(false);
+      setIsSubmittingTeam(false);
     }
   };
 
-  const handleJoinSquad = async (e: React.FormEvent) => {
+  const handleJoinTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinInviteCode.trim()) return;
-    setIsJoiningSquad(true);
+    setIsJoiningTeam(true);
     try {
       const joined = await joinTeam({
         invite_code: joinInviteCode.trim(),
         player_handle: profile?.display_name || user?.username || "Player",
       });
       setTeams((prev) => [joined, ...prev]);
-      setIsJoinSquadOpen(false);
+      setIsJoinTeamOpen(false);
       setJoinInviteCode("");
       showToast(`Successfully joined team "${joined.name}"!`);
     } catch (e: any) {
       showToast(e?.message || "Invalid team invite code");
     } finally {
-      setIsJoiningSquad(false);
+      setIsJoiningTeam(false);
     }
   };
 
@@ -633,7 +633,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick Metrics Ribbon (4 Cards — Active Squad removed per design spec) */}
+          {/* Quick Metrics Ribbon (4 Cards — Active Team removed per design spec) */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
             {/* Metric 1: Total Earnings */}
             <div className="bg-[#EFF4FF] dark:bg-[#161A24] p-4 rounded-xl flex flex-col justify-between border border-blue-100/60 dark:border-[#242C3D] hover:border-blue-200 dark:hover:border-[#E56A10] transition-colors">
@@ -907,7 +907,7 @@ export default function DashboardPage() {
 
           </div>
 
-          {/* RIGHT COLUMN: Active Squads, Escrow Wallet & Telemetry (~35% = 4 cols) */}
+          {/* RIGHT COLUMN: Active Teams, Wallet & Telemetry (~35% = 4 cols) */}
           <div className="lg:col-span-4 space-y-6">
 
             {/* SECTION: My Teams & Game Rosters */}
@@ -924,23 +924,23 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              {/* Squad List */}
+              {/* Team List */}
               <div className="space-y-2.5">
                 {teams.length > 0 ? (
-                  teams.map((squad) => {
-                    const gameSlug = squad.game_slug || (squad as any).gameSlug || "valorant";
-                    const inviteCode = squad.invite_code || (squad as any).inviteCode || "AMX001";
+                  teams.map((team) => {
+                    const gameSlug = team.game_slug || (team as any).gameSlug || "valorant";
+                    const inviteCode = team.invite_code || (team as any).inviteCode || "AMX001";
                     const rosterReq = getGameRosterRequirement(gameSlug);
-                    const memberCount = Array.isArray(squad.members) ? squad.members.length : 1;
+                    const memberCount = Array.isArray(team.members) ? team.members.length : 1;
                     const isFull = memberCount >= rosterReq.max;
-                    const isCaptain = squad.captain_id === user?.id || squad.captain_username === (profile?.display_name || user?.username);
+                    const isCaptain = team.captain_id === user?.id || team.captain_username === (profile?.display_name || user?.username);
 
                     return (
-                      <div key={squad.id || inviteCode} className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg border border-slate-200 dark:border-[#242C3D] space-y-2">
+                      <div key={team.id || inviteCode} className="bg-slate-50 dark:bg-[#161A24] p-3 rounded-lg border border-slate-200 dark:border-[#242C3D] space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <span className="font-headline text-sm font-bold text-slate-900 dark:text-white">
-                              {squad.name}
+                              {team.name}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold ${
                               isCaptain ? "bg-[#E56A10] text-white" : "bg-slate-200 dark:bg-[#202636] text-slate-700 dark:text-slate-300"
@@ -991,14 +991,14 @@ export default function DashboardPage() {
               {/* Quick Team Buttons */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
-                  onClick={() => setIsCreateSquadOpen(true)}
+                  onClick={() => setIsCreateTeamOpen(true)}
                   className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Create Team
                 </button>
                 <button
-                  onClick={() => setIsJoinSquadOpen(true)}
+                  onClick={() => setIsJoinTeamOpen(true)}
                   className="py-2 px-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-900 dark:text-white font-mono text-[11px] font-bold uppercase rounded-lg border border-slate-300 dark:border-[#242C3D] transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <Users className="w-3.5 h-3.5" />
@@ -1517,7 +1517,7 @@ export default function DashboardPage() {
       )}
 
       {/* MODAL 4: Create Team */}
-      {isCreateSquadOpen && (
+      {isCreateTeamOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
@@ -1528,14 +1528,14 @@ export default function DashboardPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setIsCreateSquadOpen(false)}
+                onClick={() => setIsCreateTeamOpen(false)}
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSquad} className="space-y-4">
+            <form onSubmit={handleCreateTeam} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Team Name *
@@ -1544,8 +1544,8 @@ export default function DashboardPage() {
                   type="text"
                   required
                   placeholder="e.g. Apex Predators"
-                  value={createSquadForm.name}
-                  onChange={(e) => setCreateSquadForm({ ...createSquadForm, name: e.target.value })}
+                  value={createTeamForm.name}
+                  onChange={(e) => setCreateTeamForm({ ...createTeamForm, name: e.target.value })}
                   className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                 />
               </div>
@@ -1556,8 +1556,8 @@ export default function DashboardPage() {
                     Game Discipline
                   </label>
                   <select
-                    value={createSquadForm.game_slug}
-                    onChange={(e) => setCreateSquadForm({ ...createSquadForm, game_slug: e.target.value })}
+                    value={createTeamForm.game_slug}
+                    onChange={(e) => setCreateTeamForm({ ...createTeamForm, game_slug: e.target.value })}
                     className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
                     <option value="valorant">Valorant</option>
@@ -1577,8 +1577,8 @@ export default function DashboardPage() {
                     type="text"
                     maxLength={4}
                     placeholder="e.g. APEX"
-                    value={createSquadForm.tag}
-                    onChange={(e) => setCreateSquadForm({ ...createSquadForm, tag: e.target.value.toUpperCase() })}
+                    value={createTeamForm.tag}
+                    onChange={(e) => setCreateTeamForm({ ...createTeamForm, tag: e.target.value.toUpperCase() })}
                     className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
@@ -1586,7 +1586,7 @@ export default function DashboardPage() {
 
               {/* Dynamic Game Roster Info */}
               {(() => {
-                const req = getGameRosterRequirement(createSquadForm.game_slug);
+                const req = getGameRosterRequirement(createTeamForm.game_slug);
                 return (
                   <div className="p-3 bg-slate-50 dark:bg-[#161A24] rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#242C3D] flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Required Team Lineup:</span>
@@ -1602,17 +1602,17 @@ export default function DashboardPage() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsCreateSquadOpen(false)}
+                  onClick={() => setIsCreateTeamOpen(false)}
                   className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingSquad}
+                  disabled={isSubmittingTeam}
                   className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
                 >
-                  {isSubmittingSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  {isSubmittingTeam ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   Create Team
                 </button>
               </div>
@@ -1622,7 +1622,7 @@ export default function DashboardPage() {
       )}
 
       {/* MODAL 5: Join Team via Code */}
-      {isJoinSquadOpen && (
+      {isJoinTeamOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#121622] rounded-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-[#242C3D] shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#242C3D] pb-3">
@@ -1633,14 +1633,14 @@ export default function DashboardPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setIsJoinSquadOpen(false)}
+                onClick={() => setIsJoinTeamOpen(false)}
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleJoinSquad} className="space-y-4">
+            <form onSubmit={handleJoinTeam} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono uppercase font-bold text-slate-900 dark:text-slate-300 mb-1">
                   Team Invite Code *
@@ -1662,17 +1662,17 @@ export default function DashboardPage() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsJoinSquadOpen(false)}
+                  onClick={() => setIsJoinTeamOpen(false)}
                   className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] border border-slate-300 dark:border-[#242C3D] text-slate-800 dark:text-slate-200 text-xs font-mono font-bold uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isJoiningSquad}
+                  disabled={isJoiningTeam}
                   className="px-5 py-2 bg-slate-900 dark:bg-[#E56A10] hover:bg-slate-800 dark:hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
                 >
-                  {isJoiningSquad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
+                  {isJoiningTeam ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
                   Join Team
                 </button>
               </div>

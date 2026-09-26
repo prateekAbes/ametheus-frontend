@@ -180,7 +180,7 @@ export interface AdminAuditLog {
   id: string;
   timestamp: string;
   operator: string;
-  role: "SUPER_ADMIN" | "TOURNAMENT_ADMIN";
+  role: "SUPER_ADMIN" | "ORGANIZER" | "PLAYER";
   action: string;
   target: string;
   ipAddress: string;

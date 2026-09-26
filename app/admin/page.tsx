@@ -2743,9 +2743,9 @@ export default function AdminCockpitPage() {
                             </span>
                           </div>
                           <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
-                            <span className="text-[#64748B] block text-[9px] uppercase">Squad Capacity</span>
+                            <span className="text-[#64748B] block text-[9px] uppercase">Team Capacity</span>
                             <span className="text-slate-700 font-bold">
-                              {tourn.registered_teams || 0} / {tourn.max_teams} Squads
+                              {tourn.registered_teams || 0} / {tourn.max_teams} Teams
                             </span>
                           </div>
                           <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
@@ -2825,7 +2825,7 @@ export default function AdminCockpitPage() {
                   <BarChart3 className="w-5 h-5 text-[#E56A10]" /> Leaderboard Categories & Dynamic Rankings
                 </h3>
                 <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  Configure custom ranking categories by game and metric. AMETHEUS automatically calculates live standings for all squads and athletes.
+                  Configure custom ranking categories by game and metric. AMETHEUS automatically calculates live standings for all teams and athletes.
                 </p>
               </div>
               <button
@@ -3500,7 +3500,7 @@ export default function AdminCockpitPage() {
                 <div className="text-center p-8 text-slate-500 dark:text-slate-400 font-mono text-xs">
                   <FileCheck className="w-12 h-12 text-[#E56A10] mx-auto mb-2 opacity-50" />
                   Evidence File: <span className="text-slate-900 dark:text-white font-bold">{inspectingEvidence}</span>
-                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8] mt-1">Uploaded and certified by squad captain.</p>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8] mt-1">Uploaded and certified by team captain.</p>
                 </div>
               )}
             </div>
@@ -4646,7 +4646,7 @@ export default function AdminCockpitPage() {
                   />
                 </div>
 
-                {/* Competition Format Selector: Solo vs Squad */}
+                {/* Competition Format Selector: Solo vs Team */}
                 <div className="sm:col-span-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-mono uppercase text-slate-800 font-bold flex items-center gap-1.5">
