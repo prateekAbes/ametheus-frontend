@@ -73,7 +73,7 @@ export default function HomePage() {
             src={isGifError ? HERO_FALLBACK_IMAGE : HERO_GIF_URL}
             alt=""
             onError={() => setIsGifError(true)}
-            className="w-full max-w-5xl h-full object-cover object-center opacity-20 sm:opacity-25 md:opacity-30 mix-blend-screen scale-110 filter saturate-150 contrast-125 transition-opacity duration-1000"
+            className="w-full max-w-5xl h-full object-cover object-center opacity-35 sm:opacity-40 md:opacity-45 mix-blend-screen scale-110 filter saturate-150 contrast-125 transition-opacity duration-1000"
           />
           {/* Soft atmospheric gradient fades to blend seamlessly into surrounding #0B0E16 */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-[#0B0E16]/80 pointer-events-none" />

@@ -642,7 +642,7 @@ export default function AdminCockpitPage() {
       const parts = bulkTime.split(":");
       if (parts.length >= 2) {
         let h = parseInt(parts[0], 10);
-        let m = parseInt(parts[1], 10);
+        const m = parseInt(parts[1], 10);
         if (bulkTime.toLowerCase().includes("pm") && h < 12) h += 12;
         if (bulkTime.toLowerCase().includes("am") && h === 12) h = 0;
         if (!isNaN(h) && !isNaN(m)) startMinutes = h * 60 + m;

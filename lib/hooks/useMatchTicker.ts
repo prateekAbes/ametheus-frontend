@@ -32,6 +32,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
   const retryCountRef = useRef(0);
   const tryPrefixRef = useRef(false);
   const isDestroyedRef = useRef(false);
+  const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     if (typeof window === "undefined" || isDestroyedRef.current) return;
@@ -90,7 +91,7 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
           // Exponential backoff: 1s, 2s, 4s, 8s, 16s
           const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 16000);
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+            connectRef.current();
           }, delay);
         }
       };
@@ -107,6 +108,10 @@ export function useMatchTicker(onEvent?: (event: TickerEvent) => void) {
       // Fallback handled by max retry limit
     }
   }, [onEvent]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     isDestroyedRef.current = false;

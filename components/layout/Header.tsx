@@ -67,7 +67,7 @@ export default function Header() {
 
   // Close search and profile dropdown on click outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         searchDropdownRef.current &&
         !searchDropdownRef.current.contains(event.target as Node)
@@ -82,7 +82,11 @@ export default function Header() {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, []);
 
   const closeAllDropdowns = () => {
