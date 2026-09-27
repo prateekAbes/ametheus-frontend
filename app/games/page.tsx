@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
 import { GameCategory } from "@/types";
 import { Shield, Search, ArrowRight, RefreshCw, AlertTriangle } from "lucide-react";
+import PageMediaVisual from "@/components/media/PageMediaVisual";
 
 export default function GamesDirectoryPage() {
   const [games, setGames] = useState<NormalizedGame[]>([]);
@@ -71,8 +72,15 @@ export default function GamesDirectoryPage() {
       </div>
 
       {/* Hero Header Section */}
-      <section className="w-full bg-white dark:bg-[#0B0E16] py-12 px-4 md:px-8 border-b border-[#E2E8F0] dark:border-[#242C3D] transition-colors">
-        <div className="max-w-[1440px] mx-auto">
+      <section className="w-full bg-[#EFF4FF] dark:bg-[#0B0E16] py-12 px-4 md:px-8 border-b border-[#E2E8F0] dark:border-[#242C3D] relative overflow-hidden transition-colors">
+        <PageMediaVisual
+          pageId="games"
+          defaultMediaUrl="https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1600&q=80"
+          defaultOpacity={0.25}
+          maskGradient="radial-gradient(ellipse 75% 75% at 75% 50%, #000 20%, transparent 100%)"
+        />
+
+        <div className="max-w-[1440px] mx-auto relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8 space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F1F3F5] dark:bg-[#161A24] border dark:border-[#242C3D] rounded text-[#E56A10] text-xs font-bold tracking-widest uppercase font-mono">

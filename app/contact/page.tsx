@@ -97,7 +97,7 @@ export default function ContactPage() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         category,
-        payment_type: showPaymentType ? paymentType : undefined,
+        payment_type: paymentType,
         description: description.trim(),
       });
       setCreatedTicket(res);
@@ -150,7 +150,7 @@ export default function ContactPage() {
                   Support Request Logged
                 </h2>
                 <p className="text-sm text-slate-600 mt-2">
-                  Thank you, <strong>{createdTicket.name}</strong>. Your ticket has been entered into the active operations queue and emailed to our support arbiters.
+                  Thank you, <strong>{createdTicket.name}</strong>. Your ticket has been entered into the active operations database and assigned to the support queue.
                 </p>
               </div>
 
@@ -181,13 +181,27 @@ export default function ContactPage() {
                 <div className="flex items-center gap-2 font-bold text-[#0B1C30]">
                   <Mail className="w-4 h-4 text-[#E56A10]" /> Confirmation &amp; Routing Details
                 </div>
-                <p className="text-slate-600 leading-relaxed">
-                  • A confirmation email has been dispatched to <strong>{email}</strong> with your Ticket ID and issue summary.
-                  <br />
-                  • A notification copy was transmitted to <strong>ametheus.gg@gmail.com</strong>.
-                  <br />
-                  • Please reference <strong>{createdTicket.ticket_id}</strong> in any future correspondence regarding this request.
-                </p>
+                {createdTicket.email_status === "SENT" ? (
+                  <p className="text-slate-600 leading-relaxed">
+                    • A confirmation email has been dispatched to <strong>{email}</strong> with your Ticket ID and issue summary.
+                    <br />
+                    • A notification copy was transmitted to <strong>ametheus.gg@gmail.com</strong>.
+                    <br />
+                    • Please reference <strong>{createdTicket.ticket_id}</strong> in any future correspondence regarding this request.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 text-slate-600 leading-relaxed">
+                    <p>
+                      • Ticket reference <strong>{createdTicket.ticket_id}</strong> is safely logged in the database and audit trail.
+                    </p>
+                    <p className="text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200">
+                      • <strong>Email Delivery Note:</strong> {createdTicket.email_error || "Live SMTP relay not configured in environment"}. Your ticket is fully active in the operations queue and visible to arbiters in the Admin Cockpit.
+                    </p>
+                    <p>
+                      • Please save your Ticket ID <strong>{createdTicket.ticket_id}</strong> for future reference.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
@@ -277,29 +291,23 @@ export default function ContactPage() {
                   </select>
                 </div>
 
-                {/* Conditional Payment Type */}
-                {showPaymentType ? (
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 font-bold mb-1.5">
-                      Payment Type / Method
-                    </label>
-                    <select
-                      value={paymentType}
-                      onChange={(e) => setPaymentType(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10] cursor-pointer"
-                    >
-                      {PAYMENT_TYPES.map((pt) => (
-                        <option key={pt.value} value={pt.value}>
-                          {pt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="hidden sm:block">
-                    {/* Placeholder for grid alignment */}
-                  </div>
-                )}
+                {/* Payment Type */}
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-700 font-bold mb-1.5">
+                    Payment Type / Method *
+                  </label>
+                  <select
+                    value={paymentType}
+                    onChange={(e) => setPaymentType(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#E56A10] cursor-pointer"
+                  >
+                    {PAYMENT_TYPES.map((pt) => (
+                      <option key={pt.value} value={pt.value}>
+                        {pt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* Description */}
                 <div className="sm:col-span-2">

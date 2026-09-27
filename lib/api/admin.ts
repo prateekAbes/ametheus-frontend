@@ -230,6 +230,35 @@ export interface TournamentRegisteredRostersResponse {
   rosters?: RegisteredRosterTeam[];
 }
 
+export interface BattleRoyalePreviewMatch {
+  match_number: number;
+  match_name: string;
+  team_count: number;
+  teams: RegisteredRosterTeam[];
+}
+
+export interface BattleRoyaleCalculationResponse {
+  tournament_id: string;
+  tournament_title: string;
+  game_name: string;
+  game_slug: string;
+  registered_teams_count: number;
+  room_capacity: number;
+  players_per_team: number;
+  max_teams_per_match: number;
+  required_matches: number;
+  teams: RegisteredRosterTeam[];
+  preview_distribution: BattleRoyalePreviewMatch[];
+  existing_matches?: any[];
+}
+
+export interface GenerateBattleRoyalePayload {
+  stage_name?: string;
+  round_name?: string;
+  balanced?: boolean;
+  custom_distribution?: { match_number: number; team_ids: string[] }[];
+}
+
 export interface AdminMatchSetupItem {
   id?: string;
   round_number?: number;
@@ -373,6 +402,32 @@ export async function getTournamentRegisteredRosters(
   tournamentId: string
 ): Promise<TournamentRegisteredRostersResponse> {
   return apiClient<TournamentRegisteredRostersResponse>(`/admin/tournaments/${tournamentId}/registered-rosters`);
+}
+
+export async function getBattleRoyaleCalculation(
+  tournamentId: string
+): Promise<BattleRoyaleCalculationResponse> {
+  return apiClient<BattleRoyaleCalculationResponse>(`/admin/tournaments/${tournamentId}/battle-royale-calc`);
+}
+
+export async function generateBattleRoyaleMatches(
+  tournamentId: string,
+  payload?: GenerateBattleRoyalePayload
+): Promise<{ status: string; message: string; matches: any[]; total_matches: number }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/generate-battle-royale-matches`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export async function rebalanceBattleRoyaleMatches(
+  tournamentId: string,
+  payload: { team_id: string; from_match_id: string; to_match_id: string }
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rebalance-battle-royale-matches`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function generateMatchStructure(

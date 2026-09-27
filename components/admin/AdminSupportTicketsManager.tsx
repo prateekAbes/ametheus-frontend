@@ -68,12 +68,16 @@ const STATUS_CONFIG: Record<
 
 const CATEGORIES = [
   { id: "ALL", label: "All Categories" },
-  { id: "wallet", label: "Wallet & Payments" },
-  { id: "tournaments", label: "Tournaments" },
-  { id: "teams", label: "Teams & Squads" },
-  { id: "rules", label: "Rules & Anti-Cheat" },
-  { id: "account", label: "Account / KYC" },
-  { id: "general", label: "General Inquiries" },
+  { id: "PAYMENT", label: "Payment & UTR" },
+  { id: "WALLET", label: "Wallet & Withdrawals" },
+  { id: "TOURNAMENT", label: "Tournaments" },
+  { id: "REGISTRATION", label: "Registration" },
+  { id: "TEAM", label: "Teams & Squads" },
+  { id: "MATCH", label: "Matches & Disputes" },
+  { id: "ACCOUNT", label: "Account & Profile" },
+  { id: "TECHNICAL_ISSUE", label: "Technical Issues" },
+  { id: "GAME_ISSUE", label: "Game Anti-Cheat" },
+  { id: "OTHER", label: "Other Inquiries" },
 ];
 
 export default function AdminSupportTicketsManager() {

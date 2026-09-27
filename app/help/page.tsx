@@ -142,19 +142,19 @@ const GUIDES: GuideItem[] = [
     summary: "Complete step-by-step instructions for paying tournament entry fees via UPI QR and verifying transaction UTR numbers.",
     steps: [
       {
-        title: "1. Select Tournament & Click Register",
+        title: "Select Tournament & Click Register",
         detail: "Navigate to Active Tournaments, choose your game qualifier, and click 'Register Team' or 'Join Tournament'.",
       },
       {
-        title: "2. Scan Official Dynamic UPI QR",
+        title: "Scan Official Dynamic UPI QR",
         detail: "The modal displays our official UPI payment QR code with the exact fee amount. Scan with GPay, PhonePe, Paytm, or BHIM.",
       },
       {
-        title: "3. Copy 12-Digit Numeric UTR / Ref Number",
+        title: "Copy 12-Digit Numeric UTR / Ref Number",
         detail: "After successful payment in your UPI app, copy the 12-digit transaction UTR number (e.g. 408198812345).",
       },
       {
-        title: "4. Paste UTR and Submit for Ledger Verification",
+        title: "Paste UTR and Submit for Ledger Verification",
         detail: "Paste the UTR into the verification field. The system logs the transaction and updates your entry to PAID upon automated verification.",
       },
     ],
@@ -168,19 +168,19 @@ const GUIDES: GuideItem[] = [
     summary: "Guide on creating teams within game hubs, distributing cryptographic invite codes, and managing player lineups.",
     steps: [
       {
-        title: "1. Navigate to Game Hub",
+        title: "Navigate to Game Hub",
         detail: "Go to Games Directory and select your competitive discipline (e.g. Valorant, BGMI, Free Fire).",
       },
       {
-        title: "2. Create Team & Set Tag",
+        title: "Create Team & Set Tag",
         detail: "Provide a unique team name and 3-5 character squad tag (e.g. 'Velocity Gaming' [VLT]).",
       },
       {
-        title: "3. Share 6-Character Cryptographic Invite Code",
+        title: "Share 6-Character Cryptographic Invite Code",
         detail: "The captain receives a unique invite code (e.g. 'X7K9PQ'). Teammates enter this code in the Game Hub to join without fees.",
       },
       {
-        title: "4. Lock Roster Before Tournament Deadline",
+        title: "Lock Roster Before Tournament Deadline",
         detail: "Ensure all core members and designated substitute have joined and verified their in-game handles before the roster lock countdown.",
       },
     ],
@@ -194,19 +194,19 @@ const GUIDES: GuideItem[] = [
     summary: "Exact schedule, 15-minute grace countdowns, server regions, and room credential distribution rules.",
     steps: [
       {
-        title: "1. Arrive at Match Lobby 15 Minutes Prior",
+        title: "Arrive at Match Lobby 15 Minutes Prior",
         detail: "Navigate to Live Match Ticker or your Tournament Hub. Open your match lobby modal before scheduled start.",
       },
       {
-        title: "2. Click 'Roster Check-In'",
+        title: "Click 'Roster Check-In'",
         detail: "Both team captains must confirm readiness. A 15-minute grace timer begins at the scheduled match minute.",
       },
       {
-        title: "3. Receive Lobby Room ID & Password",
+        title: "Receive Lobby Room ID & Password",
         detail: "Once both rosters check in, the randomized room name and password unlock on your screen.",
       },
       {
-        title: "4. Join Official AWS Mumbai Server",
+        title: "Join Official AWS Mumbai Server",
         detail: "Launch your game client, join the custom match, verify all player tags, and commence competition.",
       },
     ],
@@ -220,19 +220,19 @@ const GUIDES: GuideItem[] = [
     summary: "Standard operating procedure for submitting clean match proofs and escalating rule infractions to certified arbiters.",
     steps: [
       {
-        title: "1. Capture Full End-Game Scoreboard",
+        title: "Capture Full End-Game Scoreboard",
         detail: "Take an uncropped, full-screen screenshot displaying all player handles, combat scores, and match timestamps.",
       },
       {
-        title: "2. Submit Results via Match Center",
+        title: "Submit Results via Match Center",
         detail: "Winning captain uploads the screenshot and enters the series score (e.g. 2 - 1).",
       },
       {
-        title: "3. Opposing Captain Confirmation / Dispute Window",
+        title: "Opposing Captain Confirmation / Dispute Window",
         detail: "The opposing captain has 10 minutes to confirm or flag a dispute with accompanying evidence.",
       },
       {
-        title: "4. Rapid Arbiter Resolution",
+        title: "Rapid Arbiter Resolution",
         detail: "If disputed, official platform arbiters review proofs and server logs with an enforced 15-minute resolution SLA.",
       },
     ],

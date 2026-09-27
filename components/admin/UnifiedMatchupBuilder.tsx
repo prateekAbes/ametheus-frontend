@@ -47,6 +47,11 @@ import {
   updateMatchJoinInfo,
   triggerMatchReminder,
   closeTournamentRegistration,
+  getBattleRoyaleCalculation,
+  generateBattleRoyaleMatches,
+  rebalanceBattleRoyaleMatches,
+  BattleRoyaleCalculationResponse,
+  BattleRoyalePreviewMatch,
 } from "@/lib/api/admin";
 import { Tournament } from "@/lib/api/tournaments";
 
@@ -56,6 +61,7 @@ interface MatchItem {
   round_name?: string;
   round_number?: number;
   match_number?: number;
+  match_type?: string;
   stage?: string;
   format?: string;
   series_format?: string;
@@ -82,6 +88,11 @@ interface MatchItem {
   next_match_id?: string;
   next_match_slot?: string;
   advancement_label?: string;
+  teams?: any[];
+  team_ids?: string[];
+  room_capacity?: number;
+  players_per_team?: number;
+  max_teams?: number;
 }
 
 interface Props {
@@ -98,6 +109,7 @@ const CORE_FORMATS = [
   "Combination",
   "Swiss System",
   "Ladder Tournament",
+  "Battle Royale",
 ];
 
 const DEFAULT_ROUNDS = [
@@ -143,6 +155,15 @@ export default function UnifiedMatchupBuilder({
   // Format Switch State
   const [selectedFormat, setSelectedFormat] = useState("Knockout");
   const [isUpdatingFormat, setIsUpdatingFormat] = useState(false);
+
+  // Battle Royale Specific State
+  const [builderMode, setBuilderMode] = useState<"HEAD_TO_HEAD" | "BATTLE_ROYALE">("HEAD_TO_HEAD");
+  const [brCalcData, setBrCalcData] = useState<BattleRoyaleCalculationResponse | null>(null);
+  const [isLoadingBRCalc, setIsLoadingBRCalc] = useState(false);
+  const [isGeneratingBR, setIsGeneratingBR] = useState(false);
+  const [isRebalancingBR, setIsRebalancingBR] = useState(false);
+  const [brBalanced, setBrBalanced] = useState(false);
+  const [localBRDistribution, setLocalBRDistribution] = useState<BattleRoyalePreviewMatch[]>([]);
 
   // Close Registration Modal
   const [isCloseRegModalOpen, setIsCloseRegModalOpen] = useState(false);
@@ -233,6 +254,14 @@ export default function UnifiedMatchupBuilder({
     if (currentTournament) {
       const fmt = currentTournament.format || currentTournament.match_format || "Knockout";
       setSelectedFormat(fmt);
+      if (
+        fmt.toLowerCase().includes("battle") ||
+        fmt.toLowerCase().includes("royale") ||
+        ["bgmi", "free-fire", "free-fire-max", "pubg"].includes((currentTournament.game_slug || "").toLowerCase())
+      ) {
+        setBuilderMode("BATTLE_ROYALE");
+        loadBRData();
+      }
       setStreamUrl(currentTournament.stream_url || currentTournament.youtube_live_url || "");
       if (currentTournament.community_platform === "WHATSAPP" || currentTournament.community_platform === "DISCORD") {
         setCommunityPlatform(currentTournament.community_platform);
@@ -240,6 +269,148 @@ export default function UnifiedMatchupBuilder({
       setCommunityLink(currentTournament.community_link || "");
     }
   }, [selectedTournamentId, currentTournament]);
+
+  // Load Battle Royale Authoritative Data
+  const loadBRData = async () => {
+    if (!selectedTournamentId) return;
+    setIsLoadingBRCalc(true);
+    try {
+      const data = await getBattleRoyaleCalculation(selectedTournamentId);
+      setBrCalcData(data);
+      if (data.preview_distribution && data.preview_distribution.length > 0) {
+        setLocalBRDistribution(data.preview_distribution);
+      }
+    } catch (err) {
+      console.warn("Failed to load Battle Royale calculations:", err);
+    } finally {
+      setIsLoadingBRCalc(false);
+    }
+  };
+
+  // Toggle Even Rebalancing vs Sequential Greedy Fill
+  const handleToggleBalanced = (balanced: boolean) => {
+    setBrBalanced(balanced);
+    if (!brCalcData || !brCalcData.teams || brCalcData.teams.length === 0) return;
+
+    const allTeams = brCalcData.teams;
+    const reqMatches = brCalcData.required_matches;
+    const maxTeams = brCalcData.max_teams_per_match;
+
+    if (reqMatches === 0) return;
+
+    if (balanced) {
+      const newMatches: BattleRoyalePreviewMatch[] = Array.from({ length: reqMatches }, (_, i) => ({
+        match_number: i + 1,
+        match_name: `Match ${i + 1} Lobby`,
+        team_count: 0,
+        teams: [],
+      }));
+
+      allTeams.forEach((team, idx) => {
+        const mIdx = idx % reqMatches;
+        newMatches[mIdx].teams.push(team);
+        newMatches[mIdx].team_count = newMatches[mIdx].teams.length;
+      });
+      setLocalBRDistribution(newMatches);
+    } else {
+      const newMatches: BattleRoyalePreviewMatch[] = [];
+      for (let i = 0; i < reqMatches; i++) {
+        const startIdx = i * maxTeams;
+        const chunk = allTeams.slice(startIdx, startIdx + maxTeams);
+        newMatches.push({
+          match_number: i + 1,
+          match_name: `Match ${i + 1} Lobby`,
+          team_count: chunk.length,
+          teams: chunk,
+        });
+      }
+      setLocalBRDistribution(newMatches);
+    }
+  };
+
+  // Generate Battle Royale Matches
+  const handleGenerateBRMatches = async () => {
+    if (!selectedTournamentId) return;
+    setIsGeneratingBR(true);
+    setStatusBanner(null);
+    try {
+      const customDistribution = localBRDistribution.map((m) => ({
+        match_number: m.match_number,
+        team_ids: m.teams.map((t) => t.id || t.team_id).filter(Boolean) as string[],
+      }));
+
+      const res = await generateBattleRoyaleMatches(selectedTournamentId, {
+        stage_name: "Round 1",
+        round_name: "Round 1",
+        balanced: brBalanced,
+        custom_distribution: customDistribution.length > 0 ? customDistribution : undefined,
+      });
+
+      setStatusBanner({
+        type: "success",
+        text: `Successfully generated ${res.total_matches} Battle Royale match lobbies from actual database registrations!`,
+      });
+      await onRefreshMatches();
+      await loadBRData();
+    } catch (err: any) {
+      setStatusBanner({
+        type: "error",
+        text: err?.message || "Failed to generate Battle Royale matches.",
+      });
+    } finally {
+      setIsGeneratingBR(false);
+    }
+  };
+
+  // Rebalance a team between Battle Royale match lobbies
+  const handleMoveTeam = async (teamId: string, fromMatchNumber: number, toMatchNumber: number) => {
+    if (fromMatchNumber === toMatchNumber) return;
+
+    const dbMatchA = matches.find(
+      (m) =>
+        m.tournament_id === selectedTournamentId &&
+        (m.format === "Battle Royale" || m.match_type === "BATTLE_ROYALE") &&
+        m.match_number === fromMatchNumber
+    );
+    const dbMatchB = matches.find(
+      (m) =>
+        m.tournament_id === selectedTournamentId &&
+        (m.format === "Battle Royale" || m.match_type === "BATTLE_ROYALE") &&
+        m.match_number === toMatchNumber
+    );
+
+    setLocalBRDistribution((prev) => {
+      const copy = prev.map((m) => ({ ...m, teams: [...m.teams] }));
+      const fromMatch = copy.find((m) => m.match_number === fromMatchNumber);
+      const toMatch = copy.find((m) => m.match_number === toMatchNumber);
+      if (!fromMatch || !toMatch) return prev;
+
+      const teamIndex = fromMatch.teams.findIndex((t) => (t.id || t.team_id) === teamId);
+      if (teamIndex === -1) return prev;
+
+      const [team] = fromMatch.teams.splice(teamIndex, 1);
+      fromMatch.team_count = fromMatch.teams.length;
+      toMatch.teams.push(team);
+      toMatch.team_count = toMatch.teams.length;
+      return copy;
+    });
+
+    if (dbMatchA && dbMatchB) {
+      setIsRebalancingBR(true);
+      try {
+        await rebalanceBattleRoyaleMatches(selectedTournamentId, {
+          team_id: teamId,
+          from_match_id: dbMatchA.id,
+          to_match_id: dbMatchB.id,
+        });
+        await onRefreshMatches();
+      } catch (err: any) {
+        console.warn("Failed to persist team rebalance to DB:", err);
+      } finally {
+        setIsRebalancingBR(false);
+      }
+    }
+  };
 
   // Derive dynamic list of rounds from existing matches + default rounds ("Round 1") + custom rounds
   const allRounds = useMemo(() => {
@@ -299,6 +470,10 @@ export default function UnifiedMatchupBuilder({
     try {
       await updateTournamentFormat(selectedTournamentId, newFormat);
       setSelectedFormat(newFormat);
+      if (newFormat === "Battle Royale") {
+        setBuilderMode("BATTLE_ROYALE");
+        loadBRData();
+      }
       setStatusBanner({
         type: "success",
         text: `Tournament format updated to "${newFormat}". All completed matches and bracket history preserved!`,
@@ -831,6 +1006,52 @@ export default function UnifiedMatchupBuilder({
             <p className="text-[10px] font-mono text-slate-400">
               * Protected link: Visible only to authenticated, confirmed tournament participants on their match/tournament dashboard.
             </p>
+
+            {/* Matchup Builder Mode Tabs */}
+            <div className="pt-3 border-t border-slate-200 dark:border-[#2E384D] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBuilderMode("HEAD_TO_HEAD")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer ${
+                    builderMode === "HEAD_TO_HEAD"
+                      ? "bg-[#E56A10] text-white shadow-xs"
+                      : "bg-slate-100 hover:bg-slate-200 dark:bg-[#161B26] dark:hover:bg-[#1F2637] text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Standard 1v1 Builder</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBuilderMode("BATTLE_ROYALE");
+                    loadBRData();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-all cursor-pointer ${
+                    builderMode === "BATTLE_ROYALE"
+                      ? "bg-[#E56A10] text-white shadow-xs"
+                      : "bg-slate-100 hover:bg-slate-200 dark:bg-[#161B26] dark:hover:bg-[#1F2637] text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Battle Royale Match Builder</span>
+                  {brCalcData && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-black/20 text-white font-mono">
+                      {brCalcData.required_matches} Lobbies
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {builderMode === "BATTLE_ROYALE" && (
+                <div className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>DB Source Active: {brCalcData?.registered_teams_count ?? registeredTeamsList.length} Confirmed Lineups</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -871,6 +1092,309 @@ export default function UnifiedMatchupBuilder({
           <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
             Please select a tournament from the dropdown above to manage registered teams, create matches round-by-round, and control live series scoring.
           </p>
+        </div>
+      ) : builderMode === "BATTLE_ROYALE" ? (
+        <div className="space-y-6">
+          {/* 1. TOP STATS RIBBON (5 METRICS AS SPECIFIED) */}
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#E56A10]/10 text-[#E56A10] border border-[#E56A10]/30">
+                    Live Database Calculation
+                  </span>
+                  <span className="text-xs font-mono text-slate-500">
+                    {brCalcData?.game_name || currentTournament?.game_name || "Battle Royale"}
+                  </span>
+                </div>
+                <h3 className="font-headline font-black text-lg text-slate-900 dark:text-white uppercase mt-1">
+                  Battle Royale Match Builder
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadBRData}
+                  disabled={isLoadingBRCalc}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#161B26] dark:hover:bg-[#1F2637] border border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBRCalc ? "animate-spin text-[#E56A10]" : ""}`} />
+                  <span>Refresh Registered Data</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Prominent 5-Metric Ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 pt-2">
+              {/* Metric 1: Registered Teams */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl">
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500 dark:text-slate-400">
+                  Registered Teams
+                </div>
+                <div className="text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
+                  {brCalcData?.registered_teams_count ?? registeredTeamsList.length}
+                </div>
+                <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                  ● Confirmed in DB
+                </div>
+              </div>
+
+              {/* Metric 2: Room Capacity */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl">
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500 dark:text-slate-400">
+                  Room Capacity
+                </div>
+                <div className="text-2xl font-black font-mono text-[#E56A10] mt-1">
+                  {brCalcData?.room_capacity ?? 100}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  Players per Room
+                </div>
+              </div>
+
+              {/* Metric 3: Players Per Team */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl">
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500 dark:text-slate-400">
+                  Players Per Team
+                </div>
+                <div className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400 mt-1">
+                  {brCalcData?.players_per_team ?? 4}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  Active Squad Size
+                </div>
+              </div>
+
+              {/* Metric 4: Capacity */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl">
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500 dark:text-slate-400">
+                  Capacity
+                </div>
+                <div className="text-2xl font-black font-mono text-purple-600 dark:text-purple-400 mt-1">
+                  {brCalcData?.max_teams_per_match ?? 25}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  Teams / Match
+                </div>
+              </div>
+
+              {/* Metric 5: Required Matches */}
+              <div className="p-4 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#2E384D] rounded-xl col-span-2 sm:col-span-1">
+                <div className="text-[10px] font-mono uppercase font-bold text-slate-500 dark:text-slate-400">
+                  Required Matches
+                </div>
+                <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                  {brCalcData?.required_matches ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  Lobbies Needed
+                </div>
+              </div>
+            </div>
+
+            {/* Formula Banner & Controls */}
+            <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-lg text-xs font-mono text-blue-800 dark:text-blue-300 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="font-bold">Authoritative Mathematical Formula:</span>
+                <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80">
+                  Capacity = floor(Room Capacity {brCalcData?.room_capacity ?? 100} ÷ Squad Size {brCalcData?.players_per_team ?? 4}) = <strong className="text-blue-900 dark:text-white font-bold">{brCalcData?.max_teams_per_match ?? 25} Teams/Match</strong>
+                  {" • "}
+                  Required Matches = ceil({brCalcData?.registered_teams_count ?? registeredTeamsList.length} Actual Registered Teams ÷ {brCalcData?.max_teams_per_match ?? 25}) = <strong className="text-blue-900 dark:text-white font-bold">{brCalcData?.required_matches ?? 0} Matches</strong>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={brBalanced}
+                    onChange={(e) => handleToggleBalanced(e.target.checked)}
+                    className="accent-[#E56A10] cursor-pointer"
+                  />
+                  <span>Evenly Rebalance Lobbies</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateBRMatches}
+                  disabled={isGeneratingBR || (brCalcData?.registered_teams_count || 0) === 0}
+                  className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] disabled:opacity-50 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-2 cursor-pointer shadow-xs transition-colors shrink-0"
+                >
+                  {isGeneratingBR ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  <span>Generate Round 1 BR Matches</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* LOBBIES DISPLAY */}
+          <div className="space-y-4">
+            {isLoadingBRCalc ? (
+              <div className="p-12 bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl text-center space-y-3">
+                <Loader2 className="w-8 h-8 animate-spin text-[#E56A10] mx-auto" />
+                <p className="text-xs font-mono text-slate-500">
+                  Fetching registered lineups and computing room lobbies...
+                </p>
+              </div>
+            ) : localBRDistribution.length === 0 ? (
+              <div className="bg-white dark:bg-[#111622] border border-dashed border-slate-300 dark:border-[#2E384D] rounded-xl p-12 text-center space-y-3">
+                <Shield className="w-10 h-10 text-slate-400 mx-auto" />
+                <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                  No Confirmed Teams Registered
+                </h4>
+                <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                  When teams register for this tournament with confirmed payment, the Battle Royale calculation engine will automatically partition them into required match lobbies.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {localBRDistribution.map((m) => {
+                  const dbMatch = matches.find(
+                    (dm) =>
+                      dm.tournament_id === selectedTournamentId &&
+                      (dm.format === "Battle Royale" || dm.match_type === "BATTLE_ROYALE") &&
+                      dm.match_number === m.match_number
+                  );
+
+                  return (
+                    <div
+                      key={m.match_number}
+                      className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl overflow-hidden shadow-xs"
+                    >
+                      {/* Lobby Header */}
+                      <div className="p-4 bg-slate-50 dark:bg-[#161B26] border-b border-slate-200 dark:border-[#242C3D] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#E56A10]/10 text-[#E56A10] border border-[#E56A10]/30 font-mono font-black text-sm flex items-center justify-center">
+                            #{m.match_number}
+                          </div>
+                          <div>
+                            <h4 className="font-mono font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                              {m.match_name}
+                              {dbMatch?.status === "LIVE" && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-rose-600 text-white animate-pulse">
+                                  LIVE
+                                </span>
+                              )}
+                              {dbMatch?.status === "COMPLETED" && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500 text-white">
+                                  COMPLETED
+                                </span>
+                              )}
+                            </h4>
+                            <span className="text-xs font-mono text-slate-500">
+                              Assigned: <strong className="text-slate-900 dark:text-white">{m.teams.length}</strong> / {brCalcData?.max_teams_per_match ?? 25} Teams Capacity
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right Header Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {dbMatch ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditMatch(dbMatch)}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Key className="w-3.5 h-3.5 text-[#E56A10]" />
+                                <span>Room ID & Password</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenScoring(dbMatch)}
+                                className="px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                              >
+                                <Trophy className="w-3.5 h-3.5" />
+                                <span>Result / Scoring</span>
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded px-2.5 py-1">
+                              Preview (Click Generate to Save to DB)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Teams Grid in Lobby */}
+                      <div className="p-4">
+                        {m.teams.length === 0 ? (
+                          <div className="p-6 text-center text-xs font-mono text-slate-400">
+                            No teams assigned to this lobby.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {m.teams.map((team, tIdx) => {
+                              const tId = team.id || team.team_id;
+                              const tName = team.name || team.team_name || "Team";
+                              const tTag = team.tag || team.team_tag || "TEAM";
+                              const capName = team.captain_username || (team.captain as any)?.username || "Captain";
+
+                              return (
+                                <div
+                                  key={tId || tIdx}
+                                  className="p-3 bg-slate-50/80 dark:bg-[#161B26]/80 border border-slate-200 dark:border-[#242C3D] rounded-lg space-y-2 hover:border-[#E56A10]/40 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="w-5 h-5 rounded bg-slate-200 dark:bg-[#242C3D] text-slate-700 dark:text-slate-300 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                                        {tIdx + 1}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <div className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+                                          {tName} <span className="text-[#E56A10]">[{tTag}]</span>
+                                        </div>
+                                        <div className="text-[10px] font-mono text-slate-400 truncate">
+                                          Capt: @{capName}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Move to another match dropdown */}
+                                    {localBRDistribution.length > 1 && (
+                                      <div className="shrink-0 flex items-center gap-1">
+                                        <label className="text-[9px] font-mono text-slate-400 uppercase">
+                                          Move:
+                                        </label>
+                                        <select
+                                          value={m.match_number}
+                                          onChange={(e) => handleMoveTeam(tId, m.match_number, parseInt(e.target.value))}
+                                          disabled={isRebalancingBR}
+                                          className="bg-white dark:bg-[#1E2538] border border-slate-300 dark:border-[#2E384D] rounded px-1.5 py-0.5 text-[10px] font-mono font-bold text-[#E56A10] focus:outline-none cursor-pointer"
+                                        >
+                                          {localBRDistribution.map((targetM) => (
+                                            <option key={targetM.match_number} value={targetM.match_number} className={OPTION_CLASS}>
+                                              Match {targetM.match_number}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {team.member_handles && team.member_handles.length > 0 && (
+                                    <div className="text-[9px] font-mono text-slate-500 truncate border-t border-slate-200/50 dark:border-[#242C3D]/50 pt-1.5">
+                                      Roster: {team.member_handles.join(", ")}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1122,50 +1646,76 @@ export default function UnifiedMatchupBuilder({
                       </div>
 
                       {/* Match Contestants & Score */}
-                      <div className="grid grid-cols-12 items-center gap-3 py-1">
-                        {/* Team A */}
-                        <div className="col-span-5 text-right">
-                          <div
-                            className={`font-mono text-sm font-bold truncate ${
-                              m.winner_team_id && (m.winner_team_id === m.team_a_id || m.winner_team_id === teamAName)
-                                ? "text-emerald-500 font-extrabold"
-                                : "text-slate-900 dark:text-white"
-                            }`}
+                      {m.format === "Battle Royale" || m.match_type === "BATTLE_ROYALE" || ((m.teams || []).length > 2) ? (
+                        <div className="py-2.5 px-3 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Shield className="w-4 h-4 text-[#E56A10] shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-xs font-mono font-bold text-slate-900 dark:text-white truncate">
+                                Battle Royale Match Lobby ({(m.teams || []).length} Teams)
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-400 truncate">
+                                {(m.teams || []).length > 0 ? (m.teams || []).slice(0, 4).map((t: any) => t.name || t.team_name).join(", ") + ((m.teams || []).length > 4 ? ` +${(m.teams || []).length - 4} more` : "") : "Lobby"}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBuilderMode("BATTLE_ROYALE");
+                              loadBRData();
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-mono text-[#E56A10] hover:bg-[#E56A10]/10 rounded border border-[#E56A10]/30 font-bold cursor-pointer transition-colors shrink-0"
                           >
-                            {teamAName}
-                          </div>
-                          {isTeamAPlaceholder && (
-                            <span className="text-[10px] font-mono text-amber-500 italic block">
-                              (Placeholder)
-                            </span>
-                          )}
+                            Open in BR Builder →
+                          </button>
                         </div>
+                      ) : (
+                        <div className="grid grid-cols-12 items-center gap-3 py-1">
+                          {/* Team A */}
+                          <div className="col-span-5 text-right">
+                            <div
+                              className={`font-mono text-sm font-bold truncate ${
+                                m.winner_team_id && (m.winner_team_id === m.team_a_id || m.winner_team_id === teamAName)
+                                  ? "text-emerald-500 font-extrabold"
+                                  : "text-slate-900 dark:text-white"
+                              }`}
+                            >
+                              {teamAName}
+                            </div>
+                            {isTeamAPlaceholder && (
+                              <span className="text-[10px] font-mono text-amber-500 italic block">
+                                (Placeholder)
+                              </span>
+                            )}
+                          </div>
 
-                        {/* Score Box */}
-                        <div className="col-span-2 flex flex-col items-center justify-center">
-                          <div className="px-3 py-1 bg-slate-100 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg font-mono font-bold text-sm text-[#E56A10] tabular-nums">
-                            {m.score_a ?? 0} : {m.score_b ?? 0}
+                          {/* Score Box */}
+                          <div className="col-span-2 flex flex-col items-center justify-center">
+                            <div className="px-3 py-1 bg-slate-100 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg font-mono font-bold text-sm text-[#E56A10] tabular-nums">
+                              {m.score_a ?? 0} : {m.score_b ?? 0}
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Team B */}
-                        <div className="col-span-5 text-left">
-                          <div
-                            className={`font-mono text-sm font-bold truncate ${
-                              m.winner_team_id && (m.winner_team_id === m.team_b_id || m.winner_team_id === teamBName)
-                                ? "text-emerald-500 font-extrabold"
-                                : "text-slate-900 dark:text-white"
-                            }`}
-                          >
-                            {teamBName}
+                          {/* Team B */}
+                          <div className="col-span-5 text-left">
+                            <div
+                              className={`font-mono text-sm font-bold truncate ${
+                                m.winner_team_id && (m.winner_team_id === m.team_b_id || m.winner_team_id === teamBName)
+                                  ? "text-emerald-500 font-extrabold"
+                                  : "text-slate-900 dark:text-white"
+                              }`}
+                            >
+                              {teamBName}
+                            </div>
+                            {isTeamBPlaceholder && (
+                              <span className="text-[10px] font-mono text-amber-500 italic block">
+                                (Placeholder)
+                              </span>
+                            )}
                           </div>
-                          {isTeamBPlaceholder && (
-                            <span className="text-[10px] font-mono text-amber-500 italic block">
-                              (Placeholder)
-                            </span>
-                          )}
                         </div>
-                      </div>
+                      )}
 
                       {/* Advancement Destination Status */}
                       <div className="flex items-center justify-between text-[11px] font-mono pt-1.5 border-t border-slate-100/80 dark:border-[#1A2234] flex-wrap gap-2">

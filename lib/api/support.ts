@@ -48,8 +48,11 @@ export interface SupportTicketPublicResponse {
   ticket_id: string;
   name: string;
   category: string;
+  payment_type?: string | null;
   status: string;
   created_at: string;
+  email_status?: string;
+  email_error?: string | null;
   message: string;
 }
 
