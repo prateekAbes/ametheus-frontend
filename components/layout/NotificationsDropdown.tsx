@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Info,
   ExternalLink,
+  X,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -134,86 +135,113 @@ export default function NotificationsDropdown() {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 w-auto max-w-[calc(100vw-1.5rem)] bg-[#10131B] border border-[#242C3D] rounded-xl shadow-2xl z-50 overflow-hidden text-left font-sans animate-in fade-in-50 zoom-in-95">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#242C3D] bg-[#161A24]">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold font-mono tracking-wider uppercase text-white">
-                Notifications
-              </span>
-              {activeUnreadCount > 0 && (
-                <span className="px-1.5 py-0.5 bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold rounded">
-                  {activeUnreadCount} NEW
+        /* Responsive container:
+           - On mobile (<sm / <640px): fixed full-screen centered overlay with subtle dimming backdrop
+           - On desktop/tablet (>=sm): absolute dropdown anchored under notification bell */
+        <div
+          onClick={(e) => {
+            // Close when tapping the backdrop overlay on mobile
+            if (e.target === e.currentTarget) {
+              setIsOpen(false);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3.5 bg-black/65 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none sm:p-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:block sm:w-auto"
+        >
+          {/* Notification Card */}
+          <div className="w-full max-w-[calc(100vw-1.75rem)] max-w-sm sm:max-w-none sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden text-left font-sans animate-in fade-in zoom-in-95 flex flex-col max-h-[85vh] sm:max-h-none">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#242C3D] bg-[#161A24] shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold font-mono tracking-wider uppercase text-white">
+                  Notifications
                 </span>
-              )}
-            </div>
-            {activeUnreadCount > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                className="text-[11px] text-[#94A3B8] hover:text-[#E56A10] transition-colors flex items-center gap-1 font-medium cursor-pointer"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                Mark all read
-              </button>
-            )}
-          </div>
+                {activeUnreadCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 text-[10px] font-mono font-bold rounded">
+                    {activeUnreadCount} NEW
+                  </span>
+                )}
+              </div>
 
-          {/* Body */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-[#1D2330]">
-            {!isSignedIn ? (
-              <div className="p-6 text-center text-xs text-[#94A3B8]">
-                Please sign in to view your live tournament updates and notifications.
-              </div>
-            ) : activeNotifications.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#64748B]">
-                <Bell className="w-6 h-6 mx-auto mb-2 text-[#334155]" />
-                You&apos;re all caught up! No active notifications.
-              </div>
-            ) : (
-              activeNotifications.map((n) => {
-                const content = (
-                  <div
-                    key={n.id}
-                    onClick={() => handleItemClick(n)}
-                    className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-[#161A24] ${
-                      !n.is_read ? "bg-[#141822]" : ""
-                    }`}
+              <div className="flex items-center gap-2">
+                {activeUnreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="text-[11px] text-[#94A3B8] hover:text-[#E56A10] transition-colors flex items-center gap-1 font-medium cursor-pointer"
                   >
-                    <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5 shrink-0">
-                      {renderIcon(n.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className={`text-xs font-semibold truncate ${!n.is_read ? "text-white" : "text-[#CBD5E1]"}`}>
-                          {n.title}
-                        </span>
-                        {!n.is_read && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#E56A10] shrink-0" />
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span>Mark all read</span>
+                  </button>
+                )}
+
+                {/* Mobile Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="sm:hidden p-1 text-[#94A3B8] hover:text-white rounded hover:bg-[#242C3D]/60 transition-colors cursor-pointer"
+                  aria-label="Close notifications"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Notification List */}
+            <div className="max-h-[60vh] sm:max-h-80 overflow-y-auto divide-y divide-[#1D2330] scrollbar-thin">
+              {!isSignedIn ? (
+                <div className="p-6 text-center text-xs text-[#94A3B8]">
+                  Please sign in to view your live tournament updates and notifications.
+                </div>
+              ) : activeNotifications.length === 0 ? (
+                <div className="p-8 text-center text-xs text-[#64748B]">
+                  <Bell className="w-6 h-6 mx-auto mb-2 text-[#334155]" />
+                  You&apos;re all caught up! No active notifications.
+                </div>
+              ) : (
+                activeNotifications.map((n) => {
+                  const content = (
+                    <div
+                      key={n.id}
+                      onClick={() => handleItemClick(n)}
+                      className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-[#161A24] ${
+                        !n.is_read ? "bg-[#141822]" : ""
+                      }`}
+                    >
+                      <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5 shrink-0">
+                        {renderIcon(n.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <span className={`text-xs font-semibold truncate ${!n.is_read ? "text-white" : "text-[#CBD5E1]"}`}>
+                            {n.title}
+                          </span>
+                          {!n.is_read && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#E56A10] shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#94A3B8] leading-relaxed break-words line-clamp-3">
+                          {n.message}
+                        </p>
+                        {n.link && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-[#E56A10] font-mono mt-1 hover:underline">
+                            View details <ExternalLink className="w-2.5 h-2.5" />
+                          </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#94A3B8] leading-relaxed break-words line-clamp-3">
-                        {n.message}
-                      </p>
-                      {n.link && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-[#E56A10] font-mono mt-1 hover:underline">
-                          View details <ExternalLink className="w-2.5 h-2.5" />
-                        </span>
-                      )}
                     </div>
-                  </div>
-                );
-
-                if (n.link) {
-                  return (
-                    <Link key={n.id} href={n.link} onClick={() => handleItemClick(n)}>
-                      {content}
-                    </Link>
                   );
-                }
-                return content;
-              })
-            )}
+
+                  if (n.link) {
+                    return (
+                      <Link key={n.id} href={n.link} onClick={() => handleItemClick(n)}>
+                        {content}
+                      </Link>
+                    );
+                  }
+                  return content;
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

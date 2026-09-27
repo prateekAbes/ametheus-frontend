@@ -121,18 +121,6 @@ export default function Header() {
     };
   }, [isMobileMenuOpen]);
 
-  // Handle Ctrl+K shortcut for search focus
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        setIsSearchDropdownOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,9 +259,6 @@ export default function Header() {
                     }}
                     className="bg-transparent border-none outline-hidden text-xs text-white placeholder-[#64748B] w-full"
                   />
-                  <kbd className="hidden xl:inline-block px-1 py-0.5 bg-[#0B0E16] border border-[#242C3D] text-[9px] font-mono text-[#94A3B8] rounded ml-1 shrink-0">
-                    Ctrl+K
-                  </kbd>
                 </div>
               </form>
 
