@@ -246,6 +246,9 @@ export interface AdminMatchSetupItem {
   scheduled_at?: string | null;
   youtube_live_url?: string;
   status?: string;
+  next_match_id?: string;
+  next_match_slot?: string;
+  advancement_label?: string;
 }
 
 export interface AdminSaveLiveStructurePayload {
@@ -278,6 +281,9 @@ export interface AdminMatchCreatePayload {
   score_b?: number;
   winner_team_id?: string;
   games?: any[];
+  next_match_id?: string;
+  next_match_slot?: string;
+  advancement_label?: string;
   // Backwards compatibility
   team1_id?: string;
   team2_id?: string;
@@ -306,6 +312,9 @@ export interface AdminMatchUpdatePayload {
   score_b?: number;
   winner_team_id?: string;
   games?: any[];
+  next_match_id?: string;
+  next_match_slot?: string;
+  advancement_label?: string;
   // Backwards compatibility
   team1_id?: string;
   team2_id?: string;

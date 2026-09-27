@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Trophy, Users, Shield, ArrowRight, Flame, CheckCircle, Gamepad2 } from "lucide-react";
+import { Trophy, Users, Shield, ArrowRight, Flame, CheckCircle, Gamepad2, Sparkles, Layers } from "lucide-react";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
 import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
+
+const HERO_GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWFmNnN2cWJxeHoxbjlyM3cydXBnNDB1NnY2d2hkYWFxdG00MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif";
+const HERO_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80";
 
 export default function HomePage() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
+  const [isGifError, setIsGifError] = useState(false);
 
   useEffect(() => {
     getTournaments()
@@ -45,7 +49,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col w-full">
       {/* 1. Hero Section */}
-      <section className="relative overflow-hidden bg-[#0B0E16] text-[#F8FAFC] border-b border-[#242C3D] py-20 md:py-28 px-4 md:px-8">
+      <section className="relative overflow-hidden bg-[#0B0E16] text-[#F8FAFC] border-b border-[#242C3D] py-16 md:py-24 px-4 md:px-8">
         {/* Subtle grid backdrop */}
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
 
@@ -63,26 +67,50 @@ export default function HomePage() {
             The next-generation competitive esports engine. Form your roster, claim your tournament slot, play verified matches, and compete for verified prize pools.
           </p>
 
-          {/* Primary Operations CTAs */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/tournaments"
-              className="px-6 py-3 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-sm rounded uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
-            >
-              Browse Tournaments
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-
+          {/* Primary Operations CTAs: Prominent "Select Game", No "Browse Tournaments" */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/games"
-              className="px-6 py-3 bg-[#161A24] hover:bg-[#202634] text-[#F8FAFC] border border-[#242C3D] hover:border-[#E56A10] font-bold text-sm rounded uppercase tracking-wider transition-all"
+              className="px-8 py-3.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-sm rounded-lg uppercase tracking-wider transition-all flex items-center gap-2.5 shadow-lg shadow-[#E56A10]/20 hover:shadow-[#E56A10]/40 cursor-pointer"
             >
-              Select Game Hub
+              <Gamepad2 className="w-5 h-5" />
+              <span>Select Game</span>
             </Link>
+
+            <a
+              href="#pipeline"
+              className="px-6 py-3.5 bg-[#161A24] hover:bg-[#202634] text-[#F8FAFC] border border-[#242C3D] hover:border-[#E56A10] font-bold text-sm rounded-lg uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Layers className="w-4 h-4 text-[#E56A10]" />
+              <span>Competitive Pipeline</span>
+            </a>
+          </div>
+
+          {/* Hero Media: Animated GIF with guaranteed fallback image */}
+          <div className="mt-12 w-full max-w-4xl relative rounded-2xl overflow-hidden border border-[#242C3D] bg-[#121622] shadow-2xl group">
+            <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full overflow-hidden bg-[#0A0D14]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={isGifError ? HERO_FALLBACK_IMAGE : HERO_GIF_URL}
+                alt="Ametheus Tournament Arena"
+                onError={() => setIsGifError(true)}
+                className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs font-mono pointer-events-none">
+                <span className="px-3 py-1 bg-black/75 backdrop-blur-xs text-white border border-white/10 rounded font-bold uppercase flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Tournament Engine
+                </span>
+                <span className="px-3 py-1 bg-black/75 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/30 rounded font-bold uppercase">
+                  Ametheus Arena
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Live Telemetry Bar */}
-          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/60">
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/60">
             <div>
               <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
                 {prizePoolDisplay}
@@ -119,8 +147,102 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. Featured Tournaments (Daylight Canvas) */}
-      <section className="py-16 px-4 md:px-8 max-w-[1440px] mx-auto w-full">
+      {/* 2. THE COMPETITIVE PIPELINE (Position 2 - Prominently Styled) */}
+      <section id="pipeline" className="py-20 px-4 md:px-8 max-w-[1440px] mx-auto w-full border-b border-slate-200 dark:border-[#242C3D]">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-[#1C2030] text-[#E56A10] border border-amber-200 dark:border-[#E56A10]/30 rounded-full font-mono text-xs font-bold uppercase tracking-widest mb-3">
+            <Sparkles className="w-3.5 h-3.5" />
+            The Competitive Pipeline
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold font-headline text-[#0F172A] dark:text-white">
+            How AMETHEUS Works
+          </h2>
+          <p className="text-sm text-[#64748B] dark:text-slate-400 mt-2">
+            The 4-stage pipeline from roster formation to automated bracket progression and verified escrow prize payouts.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white dark:bg-[#121622] border-2 border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] p-6 rounded-xl flex flex-col justify-between transition-all hover:shadow-lg group">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-extrabold font-mono mb-4 text-base border border-slate-200 dark:border-[#242C3D] group-hover:bg-[#E56A10] group-hover:text-white transition-colors">
+                01
+              </div>
+              <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white mb-2">
+                Select Game & Form Team
+              </h3>
+              <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
+                Navigate to your game hub. Create your team to become Captain and receive an instant 6-character code (e.g. <code className="font-mono font-bold text-[#0F172A] dark:text-[#E56A10]">SR7X4K</code>). Teammates join for ₹0.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1E2538]">
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                Instant Roster Sync
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#121622] border-2 border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] p-6 rounded-xl flex flex-col justify-between transition-all hover:shadow-lg group">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-extrabold font-mono mb-4 text-base border border-slate-200 dark:border-[#242C3D] group-hover:bg-[#E56A10] group-hover:text-white transition-colors">
+                02
+              </div>
+              <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white mb-2">
+                Register Tournament
+              </h3>
+              <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
+                Choose an active tournament. Verify your team eligibility, accept rules, and complete registration with secure platform tournament entry checkout (₹50–₹60).
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1E2538]">
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                Escrow Protected Entry
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#121622] border-2 border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] p-6 rounded-xl flex flex-col justify-between transition-all hover:shadow-lg group">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-extrabold font-mono mb-4 text-base border border-slate-200 dark:border-[#242C3D] group-hover:bg-[#E56A10] group-hover:text-white transition-colors">
+                03
+              </div>
+              <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white mb-2">
+                Check-In & Play Match
+              </h3>
+              <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
+                Check in before match time. Access lobby credentials, play your match, and submit end-screen evidence for verified score entry.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1E2538]">
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                Protected Credentials
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#121622] border-2 border-slate-200 dark:border-[#242C3D] hover:border-[#E56A10] dark:hover:border-[#E56A10] p-6 rounded-xl flex flex-col justify-between transition-all hover:shadow-lg group">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-extrabold font-mono mb-4 text-base border border-slate-200 dark:border-[#242C3D] group-hover:bg-[#E56A10] group-hover:text-white transition-colors">
+                04
+              </div>
+              <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white mb-2">
+                Advance & Win Prizes
+              </h3>
+              <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
+                Dynamic tournament engine auto-advances verified winners round-by-round. Earn points, rank on the global leaderboard, and claim verified cash payouts.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1E2538]">
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                Automated Advancement
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. FEATURED TOURNAMENTS (Position 3) */}
+      <section className="py-16 px-4 md:px-8 max-w-[1440px] mx-auto w-full border-b border-slate-200 dark:border-[#242C3D]">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
           <div>
             <div className="text-xs font-bold tracking-widest text-[#E56A10] uppercase font-mono mb-1">
@@ -159,75 +281,66 @@ export default function HomePage() {
                       {t.hasLiveMatches ? (
                         <span className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-rose-600 text-white animate-pulse">
                           <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          🔴 LIVE NOW
+                          MATCHES LIVE
+                        </span>
+                      ) : t.status === "REGISTRATION_OPEN" ? (
+                        <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+                          REGISTRATION OPEN
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-[#E56A10] text-white">
-                          {t.statusLabel || t.status}
+                        <span className="px-2 py-0.5 text-[10px] rounded font-mono font-bold bg-slate-100 dark:bg-[#161A24] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#242C3D]">
+                          REGISTRATION CLOSED
                         </span>
                       )}
-                      <span className="text-xs text-[#64748B] dark:text-slate-400 font-mono">
-                        {t.startsAt}
+
+                      <span className="text-[11px] font-mono text-slate-500 font-bold uppercase">
+                        {t.gameName || t.gameSlug}
                       </span>
                     </div>
 
-                    <h3 className="font-headline font-bold text-lg text-[#0F172A] dark:text-white leading-snug mb-2">
+                    <h3 className="text-xl font-bold font-headline text-[#0F172A] dark:text-white mb-3">
                       {t.title}
                     </h3>
 
-                    <p className="text-xs text-[#64748B] dark:text-slate-400 font-mono mb-6">
-                      {t.gameName}
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-3 py-3 border-y border-[#F1F3F5] dark:border-[#242C3D] mb-6">
+                    <div className="grid grid-cols-2 gap-3 py-3 border-y border-slate-100 dark:border-[#1E2538] text-xs font-mono mb-4">
                       <div>
-                        <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
-                          Prize Pool
-                        </span>
-                        <span className="text-lg font-bold font-headline text-[#E56A10] tabular-nums">
+                        <div className="text-slate-400 text-[10px] uppercase">Prize Pool</div>
+                        <div className="font-bold text-[#E56A10] text-sm tabular-nums">
                           {t.prizePool}
-                        </span>
+                        </div>
                       </div>
                       <div>
-                        <span className="text-[10px] text-[#64748B] dark:text-slate-400 uppercase font-mono block">
-                          Entry Fee
-                        </span>
-                        <span className="text-lg font-bold font-headline text-[#0F172A] dark:text-white tabular-nums">
+                        <div className="text-slate-400 text-[10px] uppercase">Entry Fee</div>
+                        <div className="font-bold text-slate-900 dark:text-white text-sm tabular-nums">
                           {t.entryFee}
-                        </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-[#64748B] dark:text-slate-400 mb-4">
-                      <span>Registered Slots:</span>
-                      <span className="font-bold text-[#0F172A] dark:text-white font-mono">
-                        {registered} / {max} Teams
-                      </span>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="w-full h-1.5 bg-[#F1F3F5] dark:bg-[#161A24] rounded-full overflow-hidden mb-6">
-                      <div
-                        className="h-full bg-[#E56A10] rounded-full transition-all"
-                        style={{ width: `${percent}%` }}
-                      />
+                    <div className="space-y-1 mb-4">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                        <span>Slots Filled</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {registered} / {max}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-[#1E2538] h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-[#E56A10] h-full rounded-full transition-all duration-300"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {t.hasLiveMatches ? (
+                  <div className="pt-2">
                     <Link
-                      href={`/tournaments/${t.slug || t.id}`}
-                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block font-mono animate-pulse shadow-sm"
+                      href={`/tournaments/${t.slug}`}
+                      className="w-full block py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-[#E56A10] dark:hover:bg-[#E56A10] dark:hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg text-center transition-colors"
                     >
-                      🔴 LIVE HERE
+                      Enter Tournament
                     </Link>
-                  ) : (
-                    <Link
-                      href={`/tournaments/${t.slug || t.id}`}
-                      className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#C95B0A] text-white text-xs font-bold uppercase tracking-wider rounded text-center transition-colors block"
-                    >
-                      View Tournament Details
-                    </Link>
-                  )}
+                  </div>
                 </div>
               );
             })}
@@ -235,18 +348,18 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 3. Games Directory Preview (Contextual Game Hub Entry) */}
-      <section className="bg-[#F1F3F5] dark:bg-[#0B0E16]/80 py-16 px-4 md:px-8 border-y border-[#E2E8F0] dark:border-[#242C3D]">
-        <div className="max-w-[1440px] mx-auto w-full">
+      {/* 4. FEATURED GAMES (Position 4) */}
+      <section className="py-16 px-4 md:px-8 max-w-[1440px] mx-auto w-full">
+        <div>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
             <div>
               <div className="text-xs font-bold tracking-widest text-[#E56A10] uppercase font-mono mb-1">
-                Contextual Competition
+                Active Disciplines
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold font-headline text-[#0F172A] dark:text-white">
-                Disciplines & Dedicated Game Hubs
+                Esports Disciplines & Game Hubs
               </h2>
-              <p className="text-sm text-[#64748B] dark:text-slate-400 mt-1 max-w-xl">
+              <p className="text-xs text-[#64748B] dark:text-slate-400 mt-1 max-w-xl">
                 Teams are formed directly inside each game hub. Select your title to create a team, generate your 6-character code, or register.
               </p>
             </div>
@@ -304,71 +417,6 @@ export default function HomePage() {
               })}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* 4. How AMETHEUS Works */}
-      <section className="py-20 px-4 md:px-8 max-w-[1440px] mx-auto w-full">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <div className="text-xs font-bold tracking-widest text-[#E56A10] uppercase font-mono mb-2">
-            The Competitive Pipeline
-          </div>
-          <h2 className="text-3xl font-bold font-headline text-[#0F172A] dark:text-white">
-            How AMETHEUS Works
-          </h2>
-          <p className="text-sm text-[#64748B] dark:text-slate-400 mt-2">
-            From team creation to automated bracket advancement and verified prize payouts.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] p-6 rounded-lg flex flex-col">
-            <div className="w-10 h-10 rounded bg-[#0B0E16] dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-bold font-mono mb-4 text-sm border border-transparent dark:border-[#242C3D]">
-              01
-            </div>
-            <h3 className="font-headline font-bold text-base text-[#0F172A] dark:text-white mb-2">
-              Select Game & Form Team
-            </h3>
-            <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-              Navigate to your game hub. Create your team to become Captain and receive an instant 6-character code (e.g. <code className="font-mono font-bold text-[#0F172A] dark:text-[#E56A10]">SR7X4K</code>). Teammates join for ₹0.
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] p-6 rounded-lg flex flex-col">
-            <div className="w-10 h-10 rounded bg-[#0B0E16] dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-bold font-mono mb-4 text-sm border border-transparent dark:border-[#242C3D]">
-              02
-            </div>
-            <h3 className="font-headline font-bold text-base text-[#0F172A] dark:text-white mb-2">
-              Register Tournament
-            </h3>
-            <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-              Choose an active tournament. Verify your team eligibility, accept rules, and complete registration with secure platform tournament entry checkout (₹50–₹60).
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] p-6 rounded-lg flex flex-col">
-            <div className="w-10 h-10 rounded bg-[#0B0E16] dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-bold font-mono mb-4 text-sm border border-transparent dark:border-[#242C3D]">
-              03
-            </div>
-            <h3 className="font-headline font-bold text-base text-[#0F172A] dark:text-white mb-2">
-              Check-In & Play Match
-            </h3>
-            <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-              Check in 30 minutes before match time. Access lobby credentials, play your match, and submit end-screen evidence for admin score verification.
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-[#121622] border border-[#E2E8F0] dark:border-[#242C3D] p-6 rounded-lg flex flex-col">
-            <div className="w-10 h-10 rounded bg-[#0B0E16] dark:bg-[#161A24] text-[#E56A10] flex items-center justify-center font-bold font-mono mb-4 text-sm border border-transparent dark:border-[#242C3D]">
-              04
-            </div>
-            <h3 className="font-headline font-bold text-base text-[#0F172A] dark:text-white mb-2">
-              Advance & Win Prizes
-            </h3>
-            <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-              Single-elimination engine auto-advances verified winners round-by-round. Earn points, rank on the global leaderboard, and claim verified cash payouts.
-            </p>
-          </div>
         </div>
       </section>
     </div>

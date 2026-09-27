@@ -181,25 +181,25 @@ export default function RegisterTournamentModal({
   let gameIdHelper = "Please provide your full Game ID to participate.";
 
   if (gameSlug.includes("valorant")) {
-    gameIdLabel = "Game ID (Riot ID with Tagline)";
+    gameIdLabel = "Game ID";
     gameIdPlaceholder = "e.g. TenZ#0001";
-    gameIdHelper = "Please provide your full Game ID to participate (Must match your active Riot Games account).";
+    gameIdHelper = "Please provide your full Game ID to participate.";
   } else if (gameSlug.includes("counter-strike") || gameSlug.includes("cs2")) {
-    gameIdLabel = "Game ID (Steam ID64 or Profile URL)";
+    gameIdLabel = "Game ID";
     gameIdPlaceholder = "e.g. 76561198012345678 or steamcommunity.com/id/handle";
-    gameIdHelper = "Please provide your full Game ID to participate (Steam account will be whitelisted on server).";
+    gameIdHelper = "Please provide your full Game ID to participate.";
   } else if (gameSlug.includes("bgmi")) {
-    gameIdLabel = "Game ID (BGMI Character ID & IGN)";
+    gameIdLabel = "Game ID";
     gameIdPlaceholder = "e.g. 5123456789 (Phoenix)";
-    gameIdHelper = "Please provide your full Game ID to participate (Required for custom room slot).";
+    gameIdHelper = "Please provide your full Game ID to participate.";
   } else if (gameSlug.includes("free-fire") || gameSlug.includes("freefire")) {
-    gameIdLabel = "Game ID (Free Fire UID)";
+    gameIdLabel = "Game ID";
     gameIdPlaceholder = "e.g. 1234567890";
-    gameIdHelper = "Please provide your full Game ID to participate (In-game numeric player UID).";
+    gameIdHelper = "Please provide your full Game ID to participate.";
   } else if (gameSlug.includes("chess")) {
-    gameIdLabel = "Game ID (Chess.com or Lichess Username)";
+    gameIdLabel = "Game ID";
     gameIdPlaceholder = "e.g. GrandmasterBlitz";
-    gameIdHelper = "Please provide your full Game ID to participate (Used to pair your bracket clock match).";
+    gameIdHelper = "Please provide your full Game ID to participate.";
   }
 
   const handleProceedToCheckout = () => {

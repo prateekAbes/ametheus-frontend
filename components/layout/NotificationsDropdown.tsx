@@ -136,7 +136,8 @@ export default function NotificationsDropdown() {
 
       {isOpen && (
         /* Responsive container:
-           - On mobile (<sm / <640px): fixed full-screen centered overlay with subtle dimming backdrop
+           - On mobile (<sm / <640px): fixed full-screen overlay with subtle dimming backdrop,
+             positioning the card centered horizontally and starting slightly below the 64px header.
            - On desktop/tablet (>=sm): absolute dropdown anchored under notification bell */
         <div
           onClick={(e) => {
@@ -145,10 +146,10 @@ export default function NotificationsDropdown() {
               setIsOpen(false);
             }
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3.5 bg-black/65 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none sm:p-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:block sm:w-auto"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-start pt-20 pb-4 px-3.5 bg-black/70 backdrop-blur-xs sm:p-0 sm:bg-transparent sm:backdrop-blur-none sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:block sm:w-auto"
         >
           {/* Notification Card */}
-          <div className="w-full max-w-[calc(100vw-1.75rem)] max-w-sm sm:max-w-none sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden text-left font-sans animate-in fade-in zoom-in-95 flex flex-col max-h-[85vh] sm:max-h-none">
+          <div className="w-full max-w-sm sm:max-w-none sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden text-left font-sans animate-in fade-in zoom-in-95 flex flex-col max-h-[calc(100dvh-6rem)] sm:max-h-none">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#242C3D] bg-[#161A24] shrink-0">
               <div className="flex items-center gap-2">
@@ -187,7 +188,7 @@ export default function NotificationsDropdown() {
             </div>
 
             {/* Scrollable Notification List */}
-            <div className="max-h-[60vh] sm:max-h-80 overflow-y-auto divide-y divide-[#1D2330] scrollbar-thin">
+            <div className="flex-1 min-h-0 max-h-[calc(100dvh-9.5rem)] sm:max-h-80 sm:flex-none overflow-y-auto divide-y divide-[#1D2330] scrollbar-thin">
               {!isSignedIn ? (
                 <div className="p-6 text-center text-xs text-[#94A3B8]">
                   Please sign in to view your live tournament updates and notifications.
