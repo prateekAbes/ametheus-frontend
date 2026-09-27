@@ -49,6 +49,7 @@ import {
   Save,
   Bell,
   Image as ImageIcon,
+  QrCode,
 } from "lucide-react";
 import { UnifiedMatchupBuilder } from "@/components/admin/UnifiedMatchupBuilder";
 import { AdminNotificationDispatcher } from "@/components/admin/AdminNotificationDispatcher";
@@ -155,7 +156,7 @@ import {
   removePersonaAvatar,
   PersonaPool,
 } from "@/lib/api/persona";
-import { uploadImageFile } from "@/lib/api/media";
+import { uploadImageFile, resolveMediaUrl } from "@/lib/api/media";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 import {
   getAdminPayments,
@@ -173,6 +174,8 @@ import {
   createUpiAccount,
   updateUpiAccount,
   toggleUpiAccountStatus,
+  uploadUpiAccountQr,
+  uploadStandaloneUpiQr,
   UpiAccount,
 } from "@/lib/api/upi_accounts";
 
@@ -456,6 +459,10 @@ export default function AdminCockpitPage() {
     status: "ACTIVE",
   });
   const [isSubmittingUpi, setIsSubmittingUpi] = useState(false);
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [qrUploadSuccess, setQrUploadSuccess] = useState(false);
+  const [rowUploadingQrId, setRowUploadingQrId] = useState<string | null>(null);
+  const [previewQrModalUrl, setPreviewQrModalUrl] = useState<string | null>(null);
 
   // Incoming Payment Verifications State
   const [adminPayments, setAdminPayments] = useState<PaymentRecord[]>([]);
@@ -1728,6 +1735,7 @@ export default function AdminCockpitPage() {
   const handleOpenCreateUpi = () => {
     setEditingUpiAccount(null);
     setUpiForm({ code: "", upi_id: "", payee_name: "", display_name: "", qr_url: "", status: "ACTIVE" });
+    setQrUploadSuccess(false);
     setIsUpiModalOpen(true);
   };
 
@@ -1741,7 +1749,90 @@ export default function AdminCockpitPage() {
       qr_url: acct.qr_url || "",
       status: acct.status,
     });
+    setQrUploadSuccess(false);
     setIsUpiModalOpen(true);
+  };
+
+  const handleQrFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (PNG, JPG, WEBP)");
+      return;
+    }
+
+    setIsUploadingQr(true);
+    setQrUploadSuccess(false);
+
+    try {
+      if (editingUpiAccount) {
+        const res = await uploadUpiAccountQr(editingUpiAccount.id, file);
+        setUpiForm((prev) => ({ ...prev, qr_url: res.qr_url }));
+        setQrUploadSuccess(true);
+        setUpiAccounts((prev) =>
+          prev.map((acc) => (acc.id === editingUpiAccount.id ? { ...acc, qr_url: res.qr_url } : acc))
+        );
+        setActionMessage(`QR code saved into database for ${editingUpiAccount.code}!`);
+        setTimeout(() => setActionMessage(""), 5000);
+      } else {
+        const res = await uploadStandaloneUpiQr(file);
+        setUpiForm((prev) => ({ ...prev, qr_url: res.qr_url }));
+        setQrUploadSuccess(true);
+        setActionMessage("QR code saved into database (MongoDB media)!");
+        setTimeout(() => setActionMessage(""), 5000);
+      }
+    } catch (err: any) {
+      console.warn("Direct QR upload failed, falling back to uploadImageFile:", err);
+      try {
+        const fallbackRes = await uploadImageFile(file);
+        setUpiForm((prev) => ({ ...prev, qr_url: fallbackRes.url }));
+        setQrUploadSuccess(true);
+        setActionMessage("QR code saved into database via media collection!");
+        setTimeout(() => setActionMessage(""), 5000);
+      } catch (fErr: any) {
+        alert(fErr?.message || "Failed to upload QR code image");
+      }
+    } finally {
+      setIsUploadingQr(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRowQrUpload = async (acctId: string, acctCode: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (PNG, JPG, WEBP)");
+      return;
+    }
+
+    setRowUploadingQrId(acctId);
+    try {
+      const res = await uploadUpiAccountQr(acctId, file);
+      setUpiAccounts((prev) =>
+        prev.map((acc) => (acc.id === acctId ? { ...acc, qr_url: res.qr_url } : acc))
+      );
+      setActionMessage(`QR code uploaded and saved to database for ${acctCode}!`);
+      setTimeout(() => setActionMessage(""), 5000);
+    } catch (err: any) {
+      console.warn("Row QR upload failed, falling back to uploadImageFile:", err);
+      try {
+        const fallbackRes = await uploadImageFile(file);
+        await updateUpiAccount(acctId, { qr_url: fallbackRes.url });
+        setUpiAccounts((prev) =>
+          prev.map((acc) => (acc.id === acctId ? { ...acc, qr_url: fallbackRes.url } : acc))
+        );
+        setActionMessage(`QR code uploaded and saved to database for ${acctCode}!`);
+        setTimeout(() => setActionMessage(""), 5000);
+      } catch (fErr: any) {
+        alert(fErr?.message || "Failed to upload QR code");
+      }
+    } finally {
+      setRowUploadingQrId(null);
+      e.target.value = "";
+    }
   };
 
   const handleSaveUpiAccount = async (e: React.FormEvent) => {
@@ -2884,11 +2975,48 @@ export default function AdminCockpitPage() {
                           <td className="px-4 py-3 text-slate-700">{acct.payee_name}</td>
                           <td className="px-4 py-3 text-slate-500">{acct.display_name || "—"}</td>
                           <td className="px-4 py-3">
-                            {acct.qr_url ? (
-                              <img src={acct.qr_url} alt="QR" className="w-10 h-10 rounded border border-slate-200 object-contain bg-white" />
-                            ) : (
-                              <span className="text-slate-400 italic">No QR</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {acct.qr_url ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewQrModalUrl(resolveMediaUrl(acct.qr_url))}
+                                  className="group relative cursor-pointer shrink-0"
+                                  title="Click to view full-size QR"
+                                >
+                                  <img
+                                    src={resolveMediaUrl(acct.qr_url)}
+                                    alt="QR"
+                                    className="w-10 h-10 rounded border border-slate-200 object-contain bg-white hover:ring-2 hover:ring-[#E56A10] transition-all"
+                                  />
+                                  <span className="absolute inset-0 bg-black/40 rounded opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </span>
+                                </button>
+                              ) : null}
+
+                              <label
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer border shrink-0 ${
+                                  acct.qr_url
+                                    ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                                    : "bg-orange-50 hover:bg-orange-100 text-[#E56A10] border-orange-200"
+                                }`}
+                                title={acct.qr_url ? "Replace QR Image" : "Upload QR Image"}
+                              >
+                                {rowUploadingQrId === acct.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-[#E56A10]" />
+                                ) : (
+                                  <Upload className="w-3 h-3 text-[#E56A10]" />
+                                )}
+                                <span>{rowUploadingQrId === acct.id ? "Saving..." : acct.qr_url ? "Replace" : "Upload QR"}</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                                  className="hidden"
+                                  onChange={(e) => handleRowQrUpload(acct.id, acct.code, e)}
+                                  disabled={rowUploadingQrId === acct.id}
+                                />
+                              </label>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${acct.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
@@ -4377,21 +4505,100 @@ export default function AdminCockpitPage() {
                     className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold mb-1">QR Code Image URL</label>
-                  <input
-                    type="url"
-                    value={upiForm.qr_url}
-                    onChange={(e) => setUpiForm((f) => ({ ...f, qr_url: e.target.value }))}
-                    placeholder="https://... (paste QR image URL)"
-                    className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
-                  />
-                  {upiForm.qr_url && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <img src={upiForm.qr_url} alt="QR Preview" className="w-16 h-16 object-contain rounded border border-slate-200 dark:border-[#242C3D] bg-white" />
-                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">QR preview loaded</span>
+                <div className="col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-mono uppercase text-slate-500 dark:text-slate-400 font-bold">
+                      Official UPI QR Code
+                    </label>
+                    {upiForm.qr_url && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                        <Check className="w-3 h-3" /> Saved in Database
+                      </span>
+                    )}
+                  </div>
+
+                  {/* QR Image Dropzone / Upload Action */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 dark:bg-[#161A24] border border-dashed border-slate-300 dark:border-[#242C3D] rounded-xl">
+                    {upiForm.qr_url ? (
+                      <div className="relative group shrink-0">
+                        <img
+                          src={resolveMediaUrl(upiForm.qr_url)}
+                          alt="QR Preview"
+                          className="w-20 h-20 object-contain rounded-lg border border-slate-200 dark:border-[#242C3D] bg-white p-1 shadow-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPreviewQrModalUrl(resolveMediaUrl(upiForm.qr_url))}
+                          className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity cursor-pointer"
+                          title="View Full Size"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg border border-slate-200 dark:border-[#242C3D] bg-white dark:bg-[#111622] flex flex-col items-center justify-center text-slate-400 shrink-0">
+                        <QrCode className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                        <span className="text-[9px] font-mono mt-1">No QR</span>
+                      </div>
+                    )}
+
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg cursor-pointer transition-colors shadow-xs">
+                          {isUploadingQr ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Saving to Database...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>{upiForm.qr_url ? "Upload New QR Image" : "Upload QR Image"}</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/jpg"
+                            className="hidden"
+                            onChange={handleQrFileUpload}
+                            disabled={isUploadingQr}
+                          />
+                        </label>
+
+                        {upiForm.qr_url && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUpiForm((f) => ({ ...f, qr_url: "" }));
+                              setQrUploadSuccess(false);
+                            }}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-[#1F2536] dark:hover:bg-rose-950/40 dark:text-slate-400 dark:hover:text-rose-400 text-xs font-mono rounded-lg transition-colors border border-slate-200 dark:border-[#242C3D] cursor-pointer"
+                          >
+                            Remove QR
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 leading-tight">
+                        Upload official scanner image (PNG, JPG, WEBP). Automatically saved to MongoDB database.
+                      </p>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Manual URL override option */}
+                  <details className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                    <summary className="cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 select-none">
+                      Or edit direct QR image URL manually
+                    </summary>
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={upiForm.qr_url}
+                        onChange={(e) => setUpiForm((f) => ({ ...f, qr_url: e.target.value }))}
+                        placeholder="https://... or /api/v1/media/img_..."
+                        className="w-full px-3 py-2 bg-white dark:bg-[#161A24] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                      />
+                    </div>
+                  </details>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
@@ -4404,6 +4611,61 @@ export default function AdminCockpitPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── QR Code Image Lightbox Preview Modal ───────────────────────── */}
+      {previewQrModalUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setPreviewQrModalUrl(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-2xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-[#E56A10]" />
+                <h4 className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase">
+                  UPI Payment QR Code
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewQrModalUrl(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-md cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-inner flex items-center justify-center">
+              <img
+                src={previewQrModalUrl}
+                alt="Enlarged QR Code"
+                className="w-64 h-64 object-contain"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-mono">
+              <a
+                href={previewQrModalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#E56A10] hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open original
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewQrModalUrl(null)}
+                className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#161A24] dark:hover:bg-[#202534] text-slate-800 dark:text-slate-200 font-bold rounded-lg cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

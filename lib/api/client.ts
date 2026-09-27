@@ -45,6 +45,10 @@ export async function apiClient<T>(
     ...(options.headers as Record<string, string> || {}),
   };
 
+  if (options.body instanceof FormData) {
+    delete headers["Content-Type"];
+  }
+
   const isProtected = cleanEndpoint.startsWith("/admin/") || cleanEndpoint === "/auth/me";
 
   // Inject Bearer token if available

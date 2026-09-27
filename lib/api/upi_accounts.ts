@@ -52,3 +52,32 @@ export async function toggleUpiAccountStatus(id: string): Promise<{ status: stri
     method: "POST",
   });
 }
+
+export async function uploadUpiAccountQr(
+  id: string,
+  file: File
+): Promise<{ status: string; qr_url: string; media_id: string; account: UpiAccount }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiClient<{ status: string; qr_url: string; media_id: string; account: UpiAccount }>(
+    `/admin/upi-accounts/${id}/qr`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+}
+
+export async function uploadStandaloneUpiQr(
+  file: File
+): Promise<{ status: string; qr_url: string; media_id: string; filename: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiClient<{ status: string; qr_url: string; media_id: string; filename: string }>(
+    "/admin/upi-accounts/upload-qr",
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+}

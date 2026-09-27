@@ -54,7 +54,7 @@ import {
 } from "@/lib/utils/gamingIdentity";
 import { requestWithdrawal, depositFunds } from "@/lib/api/wallet";
 import { submitPaymentUtr } from "@/lib/api/payments";
-import { uploadImageFile } from "@/lib/api/media";
+import { uploadImageFile, resolveMediaUrl } from "@/lib/api/media";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 export default function DashboardPage() {
@@ -1384,7 +1384,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center justify-center p-3 bg-white dark:bg-[#11151F] border border-slate-200 dark:border-[#242C3D] rounded-lg">
                     <img
                       src={
-                        depositUpiStep.qr_url ||
+                        resolveMediaUrl(depositUpiStep.qr_url) ||
                         `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                           depositUpiStep.upi_uri || `upi://pay?pa=${depositUpiStep.upi_id}&pn=${encodeURIComponent(depositUpiStep.payee_name)}&am=${depositUpiStep.amount_inr}&cu=INR`
                         )}`

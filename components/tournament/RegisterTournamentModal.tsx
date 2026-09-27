@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/tournaments";
 import { getWallet } from "@/lib/api/wallet";
 import { getMyTeams } from "@/lib/api/teams";
+import { resolveMediaUrl } from "@/lib/api/media";
 import { Team } from "@/types";
 import {
   X,
@@ -747,7 +748,7 @@ export default function RegisterTournamentModal({
                     <div className="flex flex-col items-center justify-center p-3 bg-white dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-lg">
                       <img
                         src={
-                          upiData?.qr_url ||
+                          resolveMediaUrl(upiData?.qr_url) ||
                           `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                             upiData?.upi_uri || `upi://pay?pa=${upiData?.upi_id}&pn=Ametheus&am=${tournament.entryFeeNum}&cu=INR`
                           )}`

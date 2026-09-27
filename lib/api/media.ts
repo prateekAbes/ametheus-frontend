@@ -11,6 +11,19 @@ export interface MediaUploadResponse {
 }
 
 /**
+ * Resolves any media URL (relative /api/v1/media/..., full http/https, or base64 data)
+ * to a fully qualified URL reachable by the client browser.
+ */
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  const cleanPath = url.startsWith("/") ? url : `/${url}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
+/**
  * Uploads a local image File directly to the backend database (MongoDB).
  * Returns the persistent URL and base64 Data URL.
  * Falls back safely to base64 Data URL if backend is offline or unreachable.
