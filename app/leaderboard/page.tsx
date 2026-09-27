@@ -20,6 +20,7 @@ import {
   CustomLeaderboardEntryPayload,
 } from "@/lib/api/leaderboard";
 import { getCurrentUserProfile, UserProfile } from "@/lib/api/auth";
+import PageMediaVisual from "@/components/media/PageMediaVisual";
 import {
   Trophy,
   Shield,
@@ -396,8 +397,13 @@ export default function LeaderboardPage() {
       )}
 
       {/* 1. Header Banner */}
-      <section className="w-full bg-[#EFF4FF] dark:bg-[#0F131D] py-10 md:py-12 border-b border-slate-200 dark:border-[#242C3D] transition-colors">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+      <section className="w-full bg-[#EFF4FF] dark:bg-[#0F131D] py-10 md:py-12 border-b border-slate-200 dark:border-[#242C3D] transition-colors relative overflow-hidden">
+        <PageMediaVisual
+          pageId="leaderboard"
+          defaultMediaUrl="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"
+          defaultOpacity={0.25}
+        />
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 relative z-10">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-white dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded text-[#E56A10] text-xs font-bold font-mono tracking-wider uppercase mb-3 shadow-xs">

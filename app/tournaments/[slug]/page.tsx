@@ -8,6 +8,7 @@ import BracketTree from "@/components/tournament/BracketTree";
 import RegisterTournamentModal from "@/components/tournament/RegisterTournamentModal";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
 import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
+import PageMediaVisual from "@/components/media/PageMediaVisual";
 import { MatchLobbyInfo, BracketMatch } from "@/types";
 import {
   Shield,
@@ -238,7 +239,12 @@ export default function TournamentDetailPage({ params }: Props) {
 
       {/* 1. Hero Summary */}
       <section className="relative w-full overflow-hidden bg-white dark:bg-[#0B0E16] border-b border-[#E2E8F0] dark:border-[#242C3D] py-8 transition-colors">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+        <PageMediaVisual
+          pageId="tournament_detail"
+          defaultMediaUrl="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"
+          defaultOpacity={0.20}
+        />
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 relative z-10">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#E56A10] text-white text-xs font-mono font-bold rounded uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />

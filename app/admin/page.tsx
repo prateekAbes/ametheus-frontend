@@ -48,9 +48,11 @@ import {
   ArrowLeftRight,
   Save,
   Bell,
+  Image as ImageIcon,
 } from "lucide-react";
 import { UnifiedMatchupBuilder } from "@/components/admin/UnifiedMatchupBuilder";
 import { AdminNotificationDispatcher } from "@/components/admin/AdminNotificationDispatcher";
+import AdminPageMediaManager from "@/components/admin/AdminPageMediaManager";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
   getAuditLogs,
@@ -195,6 +197,7 @@ export default function AdminCockpitPage() {
     | "dev_data"
     | "live_matches"
     | "notifications"
+    | "page_media"
   >("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
@@ -2250,6 +2253,16 @@ export default function AdminCockpitPage() {
               >
                 <FileCheck className="w-3.5 h-3.5" /> Audit Logs
               </button>
+              <button
+                onClick={() => setActiveTab("page_media")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "page_media"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> Visual Media & Hero
+              </button>
             </>
           )}
         </div>
@@ -3306,6 +3319,11 @@ export default function AdminCockpitPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* TAB: PAGE VISUAL MEDIA & HERO ENGINE */}
+        {activeTab === "page_media" && isSuperAdmin && (
+          <AdminPageMediaManager />
         )}
 
         {/* TAB: TOURNAMENTS MANAGEMENT & ABSOLUTE ADMIN CONTROL */}

@@ -6,6 +6,7 @@ import { getMatches, Match as ApiMatch } from "@/lib/api/matches";
 import MatchLobbyModal from "@/components/match/MatchLobbyModal";
 import EvidenceSubmissionModal from "@/components/match/EvidenceSubmissionModal";
 import LiveTickerBar from "@/components/match/LiveTickerBar";
+import PageMediaVisual from "@/components/media/PageMediaVisual";
 import { useMatchTicker, TickerEvent } from "@/lib/hooks/useMatchTicker";
 import {
   Gamepad2,
@@ -267,8 +268,13 @@ export default function MatchesPage() {
   return (
     <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] min-h-screen text-[#0B1C30] dark:text-slate-100 transition-colors">
       {/* 1. Header Banner */}
-      <section className="w-full bg-[#EFF4FF] dark:bg-[#0F131D] py-10 md:py-12 border-b border-[#D3E4FE] dark:border-[#242C3D] transition-colors">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+      <section className="w-full bg-[#EFF4FF] dark:bg-[#0F131D] py-10 md:py-12 border-b border-[#D3E4FE] dark:border-[#242C3D] transition-colors relative overflow-hidden">
+        <PageMediaVisual
+          pageId="matches"
+          defaultMediaUrl="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80"
+          defaultOpacity={0.25}
+        />
+        <div className="max-w-[1440px] mx-auto px-4 md:px-8 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#E5EEFF] dark:bg-[#161A24] border border-[#CBD5E1] dark:border-[#242C3D] rounded text-[#E56A10] text-xs font-bold font-mono tracking-wider uppercase mb-3">
             <span className="w-2 h-2 rounded-full bg-[#E56A10] animate-ping" />
             LIVE TELEMETRY // MATCH HUBS

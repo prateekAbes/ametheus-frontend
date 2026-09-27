@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Trophy, Users, Shield, ArrowRight, Flame, CheckCircle, Gamepad2, Sparkles, Layers } from "lucide-react";
 import { getTournaments, normalizeTournament, NormalizedTournament, getTournamentsSummary, TournamentsSummary } from "@/lib/api/tournaments";
 import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
+import { getPageMedia, PageMediaConfig } from "@/lib/api/media";
 
 const HERO_GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWFmNnN2cWJxeHoxbjlyM3cydXBnNDB1NnY2d2hkYWFxdG00MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif";
 const HERO_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1600&q=80";
@@ -13,6 +14,7 @@ export default function HomePage() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [tournamentsSummary, setTournamentsSummary] = useState<TournamentsSummary | null>(null);
+  const [heroMedia, setHeroMedia] = useState<PageMediaConfig | null>(null);
   const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
   const [isGifError, setIsGifError] = useState(false);
@@ -32,6 +34,12 @@ export default function HomePage() {
     getTournamentsSummary()
       .then((sum) => setTournamentsSummary(sum))
       .catch(() => setTournamentsSummary(null));
+
+    getPageMedia("home")
+      .then((cfg) => {
+        if (cfg) setHeroMedia(cfg);
+      })
+      .catch(() => {});
 
     getGames()
       .then((data) => {
@@ -82,22 +90,29 @@ export default function HomePage() {
         </div>
 
         {/* Layer 3: Integrated Animated Visual Texture (Blended Behind Typography) */}
-        <div 
-          aria-hidden="true" 
-          className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center z-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_45%,#000_25%,transparent_100%)]"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={isGifError ? HERO_FALLBACK_IMAGE : HERO_GIF_URL}
-            alt=""
-            onError={() => setIsGifError(true)}
-            className="w-full max-w-5xl h-full object-cover object-center opacity-35 sm:opacity-40 md:opacity-45 mix-blend-screen scale-110 filter saturate-150 contrast-125 transition-opacity duration-1000"
-          />
-          {/* Soft atmospheric gradient fades to blend seamlessly into surrounding #0B0E16 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-[#0B0E16]/80 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0B0E16] via-transparent to-[#0B0E16] pointer-events-none" />
-          <div className="absolute inset-0 bg-[#0B0E16]/40 pointer-events-none" />
-        </div>
+        {heroMedia?.is_active !== false && (
+          <div 
+            aria-hidden="true" 
+            className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center z-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_45%,#000_25%,transparent_100%)]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={
+                isGifError
+                  ? (heroMedia?.fallback_url || HERO_FALLBACK_IMAGE)
+                  : (heroMedia?.media_url || HERO_GIF_URL)
+              }
+              alt=""
+              onError={() => setIsGifError(true)}
+              style={heroMedia?.opacity !== undefined ? { opacity: heroMedia.opacity } : undefined}
+              className={`w-full max-w-5xl h-full object-cover object-center ${heroMedia?.opacity !== undefined ? "" : "opacity-35 sm:opacity-40 md:opacity-45"} mix-blend-screen scale-110 filter saturate-150 contrast-125 transition-opacity duration-1000`}
+            />
+            {/* Soft atmospheric gradient fades to blend seamlessly into surrounding #0B0E16 */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-[#0B0E16]/80 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0B0E16] via-transparent to-[#0B0E16] pointer-events-none" />
+            <div className="absolute inset-0 bg-[#0B0E16]/40 pointer-events-none" />
+          </div>
+        )}
 
         {/* Layer 4: Main Foreground Content & Typography */}
         <div className="max-w-[1440px] mx-auto flex flex-col items-center text-center relative z-10 w-full">

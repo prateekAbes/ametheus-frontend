@@ -85,3 +85,50 @@ export async function uploadImageFile(file: File): Promise<MediaUploadResponse> 
     content_type: file.type || "image/png",
   };
 }
+
+export interface PageMediaConfig {
+  page_id: string;
+  title?: string;
+  media_type: "gif" | "image";
+  media_url: string;
+  fallback_url?: string;
+  is_active: boolean;
+  opacity?: number;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export async function getAllPageMedia(): Promise<PageMediaConfig[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/media/pages`, { cache: "no-store" });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn("Failed to fetch all page media:", e);
+  }
+  return [];
+}
+
+export async function getPageMedia(pageId: string): Promise<PageMediaConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/media/pages/${pageId}`, { cache: "no-store" });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch media for page ${pageId}:`, e);
+  }
+  return null;
+}
+
+export async function updatePageMedia(
+  pageId: string,
+  payload: Partial<PageMediaConfig>
+): Promise<PageMediaConfig> {
+  const { apiClient } = await import("./client");
+  return apiClient<PageMediaConfig>(`/media/pages/${pageId}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...payload, page_id: pageId }),
+  });
+}
