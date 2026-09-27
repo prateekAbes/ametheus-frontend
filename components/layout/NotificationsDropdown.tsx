@@ -60,7 +60,7 @@ export default function NotificationsDropdown() {
 
   // Handle click outside or global close event to close dropdown
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -68,9 +68,11 @@ export default function NotificationsDropdown() {
     const handleClose = () => setIsOpen(false);
 
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     window.addEventListener("ametheus:close_dropdowns", handleClose);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
       window.removeEventListener("ametheus:close_dropdowns", handleClose);
     };
   }, []);
@@ -136,8 +138,8 @@ export default function NotificationsDropdown() {
 
       {isOpen && (
         /* Responsive container:
-           - On mobile (<sm / <640px): fixed full-screen overlay with subtle dimming backdrop,
-             positioning the card centered horizontally and starting slightly below the 64px header.
+           - On mobile (<sm / <640px): fixed overlay covering the area below the 64px header (top-16 bottom-0),
+             centering the notification card within the available space below the header.
            - On desktop/tablet (>=sm): absolute dropdown anchored under notification bell */
         <div
           onClick={(e) => {
@@ -146,7 +148,7 @@ export default function NotificationsDropdown() {
               setIsOpen(false);
             }
           }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-start pt-20 pb-4 px-3.5 bg-black/70 backdrop-blur-xs sm:p-0 sm:bg-transparent sm:backdrop-blur-none sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:block sm:w-auto"
+          className="fixed inset-x-0 top-16 bottom-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs sm:p-0 sm:bg-transparent sm:backdrop-blur-none sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:block sm:w-auto"
         >
           {/* Notification Card */}
           <div className="w-full max-w-sm sm:max-w-none sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-2xl sm:rounded-xl shadow-2xl overflow-hidden text-left font-sans animate-in fade-in zoom-in-95 flex flex-col max-h-[calc(100dvh-6rem)] sm:max-h-none">

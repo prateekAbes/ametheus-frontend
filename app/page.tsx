@@ -48,26 +48,55 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col w-full">
-      {/* 1. Hero Section */}
-      <section className="relative overflow-hidden bg-[#0B0E16] text-[#F8FAFC] border-b border-[#242C3D] py-16 md:py-24 px-4 md:px-8">
-        {/* Subtle grid backdrop */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
+      {/* 1. Hero Section — Composite Visual with Blended Animated Texture & Typography */}
+      <section className="relative overflow-hidden bg-[#0B0E16] text-[#F8FAFC] border-b border-[#242C3D] py-20 md:py-28 px-4 md:px-8 flex flex-col items-center justify-center min-h-[580px] md:min-h-[640px]">
+        {/* Layer 1: Subtle grid backdrop */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
 
-        <div className="max-w-[1440px] mx-auto flex flex-col items-center text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#161A24] border border-[#242C3D] rounded mb-6 text-[#E56A10] text-xs font-bold tracking-widest font-mono">
+        {/* Layer 2: Ambient Background Typography (Subtle, Oversized, Non-interactive) */}
+        <div 
+          aria-hidden="true" 
+          className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-hidden z-0"
+        >
+          <span className="font-headline font-black text-[18vw] sm:text-[15vw] tracking-tighter text-white/[0.025] uppercase whitespace-nowrap leading-none transform -translate-y-6">
+            AMETHEUS
+          </span>
+        </div>
+
+        {/* Layer 3: Integrated Animated Visual Texture (Blended Behind Typography) */}
+        <div 
+          aria-hidden="true" 
+          className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center z-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_45%,#000_25%,transparent_100%)]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={isGifError ? HERO_FALLBACK_IMAGE : HERO_GIF_URL}
+            alt=""
+            onError={() => setIsGifError(true)}
+            className="w-full max-w-5xl h-full object-cover object-center opacity-20 sm:opacity-25 md:opacity-30 mix-blend-screen scale-110 filter saturate-150 contrast-125 transition-opacity duration-1000"
+          />
+          {/* Soft atmospheric gradient fades to blend seamlessly into surrounding #0B0E16 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-[#0B0E16]/80 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0B0E16] via-transparent to-[#0B0E16] pointer-events-none" />
+          <div className="absolute inset-0 bg-[#0B0E16]/40 pointer-events-none" />
+        </div>
+
+        {/* Layer 4: Main Foreground Content & Typography */}
+        <div className="max-w-[1440px] mx-auto flex flex-col items-center text-center relative z-10 w-full">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#161A24]/90 backdrop-blur-md border border-[#242C3D] rounded mb-6 text-[#E56A10] text-xs font-bold tracking-widest font-mono shadow-sm">
             <Flame className="w-4 h-4 text-[#E56A10]" />
             TIER-1 TOURNAMENT PLATFORM
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-headline max-w-4xl text-white">
-            ENTER THE <span className="text-[#E56A10]">COMPETITION.</span>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-headline max-w-4xl text-white drop-shadow-md">
+            ENTER THE <span className="text-[#E56A10] drop-shadow-[0_0_25px_rgba(229,106,16,0.35)]">COMPETITION.</span>
           </h1>
 
-          <p className="mt-6 text-base sm:text-lg text-[#94A3B8] max-w-2xl leading-relaxed">
+          <p className="mt-6 text-base sm:text-lg text-[#CBD5E1] max-w-2xl leading-relaxed drop-shadow-xs">
             The next-generation competitive esports engine. Form your roster, claim your tournament slot, play verified matches, and compete for verified prize pools.
           </p>
 
-          {/* Primary Operations CTAs: Prominent "Select Game", No "Browse Tournaments" */}
+          {/* Primary Operations CTAs: Prominent "Select Game", "Competitive Pipeline" */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/games"
@@ -79,38 +108,15 @@ export default function HomePage() {
 
             <a
               href="#pipeline"
-              className="px-6 py-3.5 bg-[#161A24] hover:bg-[#202634] text-[#F8FAFC] border border-[#242C3D] hover:border-[#E56A10] font-bold text-sm rounded-lg uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+              className="px-6 py-3.5 bg-[#161A24]/90 backdrop-blur-md hover:bg-[#202634] text-[#F8FAFC] border border-[#242C3D] hover:border-[#E56A10] font-bold text-sm rounded-lg uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
             >
               <Layers className="w-4 h-4 text-[#E56A10]" />
               <span>Competitive Pipeline</span>
             </a>
           </div>
 
-          {/* Hero Media: Animated GIF with guaranteed fallback image */}
-          <div className="mt-12 w-full max-w-4xl relative rounded-2xl overflow-hidden border border-[#242C3D] bg-[#121622] shadow-2xl group">
-            <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full overflow-hidden bg-[#0A0D14]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={isGifError ? HERO_FALLBACK_IMAGE : HERO_GIF_URL}
-                alt="Ametheus Tournament Arena"
-                onError={() => setIsGifError(true)}
-                className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E16] via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs font-mono pointer-events-none">
-                <span className="px-3 py-1 bg-black/75 backdrop-blur-xs text-white border border-white/10 rounded font-bold uppercase flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Tournament Engine
-                </span>
-                <span className="px-3 py-1 bg-black/75 backdrop-blur-xs text-[#E56A10] border border-[#E56A10]/30 rounded font-bold uppercase">
-                  Ametheus Arena
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Live Telemetry Bar */}
-          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/60">
+          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/80 bg-[#0B0E16]/60 backdrop-blur-xs rounded-xl p-4">
             <div>
               <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
                 {prizePoolDisplay}
@@ -148,8 +154,15 @@ export default function HomePage() {
       </section>
 
       {/* 2. THE COMPETITIVE PIPELINE (Position 2 - Prominently Styled) */}
-      <section id="pipeline" className="py-20 px-4 md:px-8 max-w-[1440px] mx-auto w-full border-b border-slate-200 dark:border-[#242C3D]">
-        <div className="text-center max-w-2xl mx-auto mb-14">
+      <section id="pipeline" className="relative overflow-hidden py-20 px-4 md:px-8 max-w-[1440px] mx-auto w-full border-b border-slate-200 dark:border-[#242C3D]">
+        {/* Ambient background typography */}
+        <div aria-hidden="true" className="absolute top-8 left-1/2 -translate-x-1/2 pointer-events-none select-none z-0 overflow-hidden">
+          <span className="font-headline font-black text-[14vw] sm:text-[11vw] tracking-tighter text-slate-900/[0.02] dark:text-white/[0.02] uppercase whitespace-nowrap leading-none">
+            PIPELINE
+          </span>
+        </div>
+
+        <div className="relative z-10 text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-[#1C2030] text-[#E56A10] border border-amber-200 dark:border-[#E56A10]/30 rounded-full font-mono text-xs font-bold uppercase tracking-widest mb-3">
             <Sparkles className="w-3.5 h-3.5" />
             The Competitive Pipeline

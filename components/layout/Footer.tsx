@@ -1,16 +1,28 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SOCIAL_LINKS } from "@/lib/constants/support";
 import AmetheusLogo from "@/components/ui/AmetheusLogo";
+import { getLeaderboardStats } from "@/lib/api/leaderboard";
 
 export default function Footer() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { profile } = useAuthContext();
+  const [activeContenders, setActiveContenders] = useState<string>("0");
+
+  useEffect(() => {
+    getLeaderboardStats()
+      .then((data) => {
+        if (data && data.active_contenders !== undefined) {
+          setActiveContenders(String(data.active_contenders));
+        }
+      })
+      .catch(() => setActiveContenders("0"));
+  }, []);
 
   const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || "";
   const isHardcodedAdmin = userEmail === "pk.4081988@gmail.com" || userEmail === "admin@ametheus.gg";
@@ -153,7 +165,14 @@ export default function Footer() {
         </div>
 
         <div className="pt-8 border-t border-[#242C3D] flex flex-col sm:flex-row items-center justify-between text-xs text-[#64748B] gap-4">
-          <p>© 2026 AMETHEUS Esports Platform. All rights reserved.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p>© 2026 AMETHEUS Esports Platform. All rights reserved.</p>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#121622] border border-[#242C3D] rounded font-mono text-[11px] text-[#94A3B8]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+              <span>Active Contenders:</span>
+              <span className="font-bold text-white tabular-nums">{activeContenders}</span>
+            </div>
+          </div>
           <div className="flex items-center gap-6">
             <Link href="/help" className="hover:text-[#94A3B8]">
               Terms of Competition
