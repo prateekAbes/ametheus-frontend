@@ -87,16 +87,8 @@ export async function uploadImageFile(file: File): Promise<MediaUploadResponse> 
     console.warn("Base64 upload failed, using local Data URL fallback:", err2);
   }
 
-  // Client-side local data URL fallback
-  return {
-    status: "client_fallback",
-    id: `img_${Date.now()}`,
-    url: localDataUrl,
-    data_url: localDataUrl,
-    filename: file.name,
-    size: file.size,
-    content_type: file.type || "image/png",
-  };
+  // If both multipart and base64 server storage failed, fail explicitly
+  throw new Error("Failed to store image in server media storage. Please check your network connection and try again.");
 }
 
 export interface PageMediaConfig {

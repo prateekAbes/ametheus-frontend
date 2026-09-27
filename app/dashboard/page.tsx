@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -37,6 +37,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useUser, useAuth } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { getCurrentUserProfile, updateUserProfile, UserProfile } from "@/lib/api/auth";
 import {
   getMyTeams,
@@ -60,6 +61,7 @@ import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 export default function DashboardPage() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
+  const { profile: authProfile, refreshProfile } = useAuthContext();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -72,15 +74,18 @@ export default function DashboardPage() {
   // First Launch Notification
   const [firstLaunchNotification, setFirstLaunchNotification] = useState<string | null>(null);
 
-  // Profile Edit Modal State (Steam ID and Riot ID removed as requested)
+  // Profile Edit Modal State
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     display_name: "",
     username: "",
     avatar_url: "",
   });
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wallet Modals (from previous dashboard)
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -261,14 +266,150 @@ export default function DashboardPage() {
     };
   }, [isAuthLoaded, isSignedIn, user]);
 
+  // Keep local profile in sync with AuthContext profile
+  useEffect(() => {
+    if (authProfile) {
+      setProfile(authProfile);
+    }
+  }, [authProfile]);
+
+  // Listen for broadcasted profile updates across other tabs/components
+  useEffect(() => {
+    const handleProfileUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<UserProfile>).detail;
+      if (detail) {
+        setProfile(detail);
+      }
+    };
+    window.addEventListener("ametheus:profile_updated", handleProfileUpdate);
+    return () => window.removeEventListener("ametheus:profile_updated", handleProfileUpdate);
+  }, []);
+
+  const handleOpenEditProfile = () => {
+    const currentAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
+    const currentDisplayName = profile?.display_name || user?.fullName || user?.username || "";
+    const currentUsername = profile?.username || "";
+    setProfileForm({
+      display_name: currentDisplayName,
+      username: currentUsername,
+      avatar_url: currentAvatar,
+    });
+    setAvatarPreview(currentAvatar);
+    setPendingAvatarFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setIsEditProfileOpen(true);
+  };
+
+  const handleCloseEditProfile = () => {
+    setIsEditProfileOpen(false);
+    setPendingAvatarFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // Reset so selecting the same file triggers onChange
+    if (!file) return;
+
+    // 1. Validate file type
+    const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+    if (!file.type.startsWith("image/") && !ALLOWED_TYPES.includes(file.type)) {
+      showToast("Invalid file format. Please upload a PNG, JPG, WEBP, or GIF image.");
+      return;
+    }
+
+    // 2. Validate file size (10MB max)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      showToast("File size exceeds 10MB limit. Please choose a smaller image.");
+      return;
+    }
+
+    // 3. Set instant local preview
+    const localUrl = URL.createObjectURL(file);
+    setAvatarPreview(localUrl);
+    setPendingAvatarFile(file);
+
+    // 4. Upload immediately to storage
+    setIsUploadingAvatar(true);
+    try {
+      const res = await uploadImageFile(file);
+      if (res && res.url) {
+        const persistentUrl = resolveMediaUrl(res.url);
+        setProfileForm((prev) => ({ ...prev, avatar_url: persistentUrl }));
+        setAvatarPreview(persistentUrl);
+        setPendingAvatarFile(null);
+        showToast("Image ready! Click 'Save Identity' to apply.");
+      } else {
+        throw new Error("Upload did not return a valid URL");
+      }
+    } catch (err: any) {
+      console.warn("Avatar upload failed:", err);
+      // Revert to current valid profile picture
+      const fallback = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
+      setAvatarPreview(fallback);
+      setProfileForm((prev) => ({ ...prev, avatar_url: fallback }));
+      setPendingAvatarFile(null);
+      showToast(err?.message || "Failed to upload image. Please try again.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleSelectAccountPicture = () => {
+    if (!user?.imageUrl) return;
+    setPendingAvatarFile(null);
+    setAvatarPreview(user.imageUrl);
+    setProfileForm((prev) => ({ ...prev, avatar_url: user.imageUrl }));
+    showToast("Selected original account profile picture");
+  };
+
+  const handleSelectPresetAvatar = (presetUrl: string) => {
+    setPendingAvatarFile(null);
+    setAvatarPreview(presetUrl);
+    setProfileForm((prev) => ({ ...prev, avatar_url: presetUrl }));
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingProfile) return;
+
+    if (isUploadingAvatar) {
+      showToast("Please wait for the image upload to complete...");
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
-      const updatePayload: { display_name: string; avatar_url: string; username?: string } = {
-        display_name: profileForm.display_name,
-        avatar_url: profileForm.avatar_url,
+      let finalAvatarUrl = profileForm.avatar_url;
+
+      // If a file was selected but upload is still pending, upload it now
+      if (pendingAvatarFile) {
+        try {
+          const res = await uploadImageFile(pendingAvatarFile);
+          if (res && res.url) {
+            finalAvatarUrl = resolveMediaUrl(res.url);
+          } else {
+            throw new Error("Upload failed");
+          }
+        } catch (uploadErr: any) {
+          showToast("Failed to upload profile picture. Profile was not updated.");
+          setIsSavingProfile(false);
+          return;
+        }
+      }
+
+      const updatePayload: { display_name: string; avatar_url?: string; username?: string } = {
+        display_name: profileForm.display_name.trim(),
       };
+      if (finalAvatarUrl) {
+        updatePayload.avatar_url = finalAvatarUrl;
+      }
+
       // Only send username if the user has changed it from what's stored
       const currentUsername = profile?.username || "";
       if (profileForm.username && profileForm.username !== currentUsername) {
@@ -280,8 +421,17 @@ export default function DashboardPage() {
         }
         updatePayload.username = profileForm.username.trim();
       }
+
       const updated = await updateUserProfile(updatePayload);
       setProfile(updated);
+      setProfileForm({
+        display_name: updated.display_name || "",
+        username: updated.username || "",
+        avatar_url: updated.avatar_url || "",
+      });
+      setAvatarPreview(updated.avatar_url || "");
+      setPendingAvatarFile(null);
+
       const profileStorageKey = user?.id ? `ametheus_user_profile_${user.id}` : "ametheus_user_profile";
       const identityStorageKey = user?.id ? `ametheus_gamer_identity_${user.id}` : "ametheus_gamer_identity";
       try {
@@ -297,9 +447,15 @@ export default function DashboardPage() {
         );
         window.dispatchEvent(new CustomEvent("ametheus:profile_updated", { detail: updated }));
       } catch {}
+
+      if (refreshProfile) {
+        await refreshProfile().catch(() => {});
+      }
+
       setIsEditProfileOpen(false);
       showToast("Profile settings saved successfully!");
     } catch (e: any) {
+      console.error("Profile update error:", e);
       showToast(e?.message || "Failed to update profile");
     } finally {
       setIsSavingProfile(false);
@@ -478,7 +634,7 @@ export default function DashboardPage() {
 
   // Authoritative identity: Ametheus MongoDB username > display_name > Clerk username
   const displayName = profile?.username || profile?.display_name || user?.username || user?.firstName || "Player";
-  const userAvatar = profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url;
+  const userAvatar = resolveMediaUrl(profile?.avatar_url || user?.imageUrl || GAMING_AVATAR_PRESETS[0].url);
   // Safe balance: parse from inr_balance string, guard NaN explicitly
   const balance = (() => {
     const raw = profile?.inr_balance;
@@ -624,7 +780,7 @@ export default function DashboardPage() {
               </button>
 
               <button
-                onClick={() => setIsEditProfileOpen(true)}
+                onClick={handleOpenEditProfile}
                 className="p-2.5 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#1E2538] text-slate-700 dark:text-slate-300 rounded-lg transition-colors cursor-pointer border border-slate-200 dark:border-[#242C3D]"
                 title="Edit Gamer Profile"
               >
@@ -1094,7 +1250,7 @@ export default function DashboardPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setIsEditProfileOpen(false)}
+                onClick={handleCloseEditProfile}
                 className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1159,10 +1315,7 @@ export default function DashboardPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setProfileForm({ ...profileForm, avatar_url: user.imageUrl });
-                      showToast("Selected account profile picture!");
-                    }}
+                    onClick={handleSelectAccountPicture}
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer border ${
                       profileForm.avatar_url === user.imageUrl
                         ? "bg-[#E56A10] text-white border-[#E56A10]"
@@ -1178,9 +1331,9 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#161A24] border border-slate-200 dark:border-[#242C3D] rounded-xl">
                 <div className="flex items-center gap-2.5">
                   <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 dark:border-[#242C3D] relative shrink-0 bg-white dark:bg-[#202636] flex items-center justify-center">
-                    {profileForm.avatar_url ? (
+                    {(avatarPreview || profileForm.avatar_url) ? (
                       <Image
-                        src={profileForm.avatar_url}
+                        src={resolveMediaUrl(avatarPreview || profileForm.avatar_url)}
                         alt="Custom avatar"
                         fill
                         className="object-cover"
@@ -1208,25 +1361,12 @@ export default function DashboardPage() {
                     </>
                   )}
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     className="hidden"
                     disabled={isUploadingAvatar}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setIsUploadingAvatar(true);
-                        try {
-                          const res = await uploadImageFile(file);
-                          setProfileForm((prev) => ({ ...prev, avatar_url: res.url }));
-                          showToast("Avatar uploaded and saved to DB!");
-                        } catch {
-                          showToast("Failed to upload image");
-                        } finally {
-                          setIsUploadingAvatar(false);
-                        }
-                      }
-                    }}
+                    onChange={handleAvatarFileSelect}
                   />
                 </label>
               </div>
@@ -1241,7 +1381,7 @@ export default function DashboardPage() {
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => setProfileForm({ ...profileForm, avatar_url: preset.url })}
+                      onClick={() => handleSelectPresetAvatar(preset.url)}
                       className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                         profileForm.avatar_url === preset.url
                           ? "border-[#E56A10] ring-2 ring-[#E56A10]/30 scale-95"
@@ -1267,18 +1407,32 @@ export default function DashboardPage() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsEditProfileOpen(false)}
+                  onClick={handleCloseEditProfile}
                   className="px-4 py-2 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202636] text-slate-700 dark:text-slate-300 border border-transparent dark:border-[#242C3D] text-xs font-mono uppercase rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingProfile}
+                  disabled={isSavingProfile || isUploadingAvatar}
                   className="px-5 py-2 bg-[#E56A10] hover:bg-[#C95B0A] text-white text-xs font-mono font-bold uppercase rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Save Identity
+                  {isUploadingAvatar ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Uploading Media...</span>
+                    </>
+                  ) : isSavingProfile ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Identity...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save Identity</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

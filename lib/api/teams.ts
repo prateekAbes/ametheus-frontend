@@ -51,6 +51,21 @@ export async function joinTeam(payload: JoinTeamPayload): Promise<Team> {
   });
 }
 
+export async function getTeams(params?: {
+  game_slug?: string;
+  search?: string;
+  limit?: number;
+  skip?: number;
+}): Promise<Team[]> {
+  const q = new URLSearchParams();
+  if (params?.game_slug) q.set("game_slug", params.game_slug);
+  if (params?.search) q.set("search", params.search);
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.skip) q.set("skip", String(params.skip));
+  const qs = q.toString();
+  return apiClient<Team[]>(`/teams${qs ? `?${qs}` : ""}`);
+}
+
 export async function getMyTeams(gameSlug?: string): Promise<Team[]> {
   const q = gameSlug ? `?game_slug=${encodeURIComponent(gameSlug)}` : "";
   return apiClient<Team[]>(`/teams/my-teams${q}`);

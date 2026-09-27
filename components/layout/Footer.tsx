@@ -63,6 +63,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/teams" className="hover:text-white transition-colors">
+                  Squads &amp; Teams
+                </Link>
+              </li>
+              <li>
                 <Link href="/leaderboard" className="hover:text-white transition-colors">
                   Global Leaderboard
                 </Link>
@@ -83,11 +88,16 @@ export default function Footer() {
             <ul className="flex flex-col gap-2 text-sm text-[#94A3B8]">
               <li>
                 <Link href="/help" className="hover:text-white transition-colors">
+                  Help Center
+                </Link>
+              </li>
+              <li>
+                <Link href="/help?category=wallet" className="hover:text-white transition-colors">
                   Wallet &amp; Payments Help
                 </Link>
               </li>
               <li>
-                <Link href="/help" className="hover:text-white transition-colors">
+                <Link href="/rules" className="hover:text-white transition-colors">
                   Tournament Rules
                 </Link>
               </li>

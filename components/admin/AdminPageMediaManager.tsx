@@ -26,6 +26,7 @@ const STANDARD_PAGES = [
   { id: "tournaments", title: "Tournaments Hub", desc: "Top header background on /tournaments" },
   { id: "tournament_detail", title: "Tournament Arena", desc: "Header background on tournament detail hubs" },
   { id: "matches", title: "Live Matches & Schedules", desc: "Header background on /matches live hub" },
+  { id: "teams", title: "Teams & Squads Hub", desc: "Header background on /teams squad roster hub" },
   { id: "leaderboard", title: "Global Leaderboard", desc: "Header background on /leaderboard hall of fame" },
 ];
 

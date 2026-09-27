@@ -21,6 +21,7 @@ import {
   ChevronDown,
   LogOut,
   Wallet,
+  Users,
 } from "lucide-react";
 import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 import { useTheme } from "@/components/providers/ThemeProvider";
@@ -34,6 +35,7 @@ import {
 } from "@clerk/nextjs";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
+import { resolveMediaUrl } from "@/lib/api/media";
 
 export default function Header() {
   const pathname = usePathname();
@@ -150,6 +152,7 @@ export default function Header() {
   const navLinks = [
     { href: "/tournaments", label: "Tournaments", icon: Trophy },
     { href: "/matches", label: "Matches", icon: Swords },
+    { href: "/teams", label: "Teams", icon: Users },
     { href: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
     { href: "/games", label: "Games", icon: Gamepad2 },
   ];
@@ -376,7 +379,7 @@ export default function Header() {
                   {/* Custom Esports Avatar */}
                   <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden border border-[#242C3D] group-hover:border-[#E56A10] bg-slate-900 shrink-0">
                     <img
-                      src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                      src={resolveMediaUrl(userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop")}
                       alt="Avatar"
                       className="w-full h-full object-cover"
                     />
@@ -420,7 +423,7 @@ export default function Header() {
                     <div className="p-4 bg-[#161A24]/90 border-b border-[#242C3D] flex items-center gap-3">
                       <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-[#242C3D] bg-slate-900 shrink-0">
                         <img
-                          src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                          src={resolveMediaUrl(userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop")}
                           alt="Avatar"
                           className="w-full h-full object-cover"
                         />
@@ -688,7 +691,7 @@ export default function Header() {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl overflow-hidden border border-[#242C3D] bg-slate-900 shrink-0">
                       <img
-                        src={userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                        src={resolveMediaUrl(userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop")}
                         alt="Avatar"
                         className="w-full h-full object-cover"
                       />

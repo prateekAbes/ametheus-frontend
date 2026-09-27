@@ -50,10 +50,12 @@ import {
   Bell,
   Image as ImageIcon,
   QrCode,
+  LifeBuoy,
 } from "lucide-react";
 import { UnifiedMatchupBuilder } from "@/components/admin/UnifiedMatchupBuilder";
 import { AdminNotificationDispatcher } from "@/components/admin/AdminNotificationDispatcher";
 import AdminPageMediaManager from "@/components/admin/AdminPageMediaManager";
+import AdminSupportTicketsManager from "@/components/admin/AdminSupportTicketsManager";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
   getAuditLogs,
@@ -201,6 +203,7 @@ export default function AdminCockpitPage() {
     | "live_matches"
     | "notifications"
     | "page_media"
+    | "support_tickets"
   >("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
@@ -2354,6 +2357,16 @@ export default function AdminCockpitPage() {
               >
                 <ImageIcon className="w-3.5 h-3.5" /> Visual Media & Hero
               </button>
+              <button
+                onClick={() => setActiveTab("support_tickets")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "support_tickets"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <LifeBuoy className="w-3.5 h-3.5" /> Support &amp; Tickets
+              </button>
             </>
           )}
         </div>
@@ -3452,6 +3465,11 @@ export default function AdminCockpitPage() {
         {/* TAB: PAGE VISUAL MEDIA & HERO ENGINE */}
         {activeTab === "page_media" && isSuperAdmin && (
           <AdminPageMediaManager />
+        )}
+
+        {/* TAB: SUPPORT TICKETS & DISPUTE ARBITRATION */}
+        {activeTab === "support_tickets" && isSuperAdmin && (
+          <AdminSupportTicketsManager />
         )}
 
         {/* TAB: TOURNAMENTS MANAGEMENT & ABSOLUTE ADMIN CONTROL */}

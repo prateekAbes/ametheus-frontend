@@ -66,6 +66,17 @@ function AuthSync({ children }: { children: React.ReactNode }) {
     const storageKey = `ametheus_user_profile_${user.id}`;
     const identityKey = `ametheus_gamer_identity_${user.id}`;
 
+    // 0. Instant hydration from user-scoped cache to prevent avatar flicker
+    try {
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.id === user.id || parsed.clerk_user_id === user.id || parsed.email === user.primaryEmailAddress?.emailAddress || parsed.avatar_url)) {
+          setProfile(parsed);
+        }
+      }
+    } catch {}
+
     // 1. Sync with backend (upsert user record)
     const email =
       user.primaryEmailAddress?.emailAddress || `${user.id}@ametheus.gg`;

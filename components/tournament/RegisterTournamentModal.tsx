@@ -33,6 +33,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { getGameRosterRequirement } from "@/lib/utils/gameRosters";
 
 interface TournamentModalData {
@@ -66,6 +67,7 @@ export default function RegisterTournamentModal({
   onRegistrationSuccess,
 }: Props) {
   const { user } = useUser();
+  const { profile: userProfile } = useAuthContext();
   const [fetchedTeams, setFetchedTeams] = useState<Team[]>([]);
   const [isTeamsLoading, setIsTeamsLoading] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState("");
@@ -391,14 +393,14 @@ export default function RegisterTournamentModal({
                 <div className="flex items-center gap-3 pt-1">
                   <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 border border-slate-300 dark:border-[#242C3D] shrink-0">
                     <img
-                      src={user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop"}
+                      src={resolveMediaUrl(userProfile?.avatar_url || user?.imageUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?q=80&w=200&auto=format&fit=crop")}
                       alt="Avatar"
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div>
                     <span className="font-bold text-sm text-slate-900 dark:text-white block">
-                      {user?.fullName || user?.username || "Individual Athlete"}
+                      {userProfile?.display_name || userProfile?.username || user?.fullName || user?.username || "Individual Athlete"}
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                       Competing solo • No team required

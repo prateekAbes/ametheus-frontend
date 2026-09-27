@@ -49,7 +49,13 @@ export async function apiClient<T>(
     delete headers["Content-Type"];
   }
 
-  const isProtected = cleanEndpoint.startsWith("/admin/") || cleanEndpoint === "/auth/me";
+  const isProtected =
+    cleanEndpoint.startsWith("/admin/") ||
+    cleanEndpoint === "/auth/me" ||
+    cleanEndpoint === "/auth/profile" ||
+    cleanEndpoint.startsWith("/wallet/") ||
+    cleanEndpoint.startsWith("/teams/") ||
+    (cleanEndpoint.startsWith("/tournaments/") && cleanEndpoint.includes("/register"));
 
   // Inject Bearer token if available
   if (!headers["Authorization"] && authTokenGetter) {
