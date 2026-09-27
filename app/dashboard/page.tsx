@@ -1379,10 +1379,28 @@ export default function DashboardPage() {
                       <span className="font-bold text-slate-900 dark:text-white">{depositUpiStep.payee_name}</span>
                     </div>
                   </div>
+
+                  {/* QR Code display */}
+                  <div className="flex flex-col items-center justify-center p-3 bg-white dark:bg-[#11151F] border border-slate-200 dark:border-[#242C3D] rounded-lg">
+                    <img
+                      src={
+                        depositUpiStep.qr_url ||
+                        `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                          depositUpiStep.upi_uri || `upi://pay?pa=${depositUpiStep.upi_id}&pn=${encodeURIComponent(depositUpiStep.payee_name)}&am=${depositUpiStep.amount_inr}&cu=INR`
+                        )}`
+                      }
+                      alt="Official UPI QR Code"
+                      className="w-36 h-36 object-contain rounded-md border border-slate-200 dark:border-slate-700 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-2 text-center">
+                      Scan with GPay, PhonePe, Paytm, BHIM, or any banking UPI app
+                    </span>
+                  </div>
+
                   {depositUpiStep.upi_uri && (
                     <a
                       href={depositUpiStep.upi_uri}
-                      className="block w-full text-center py-2 mt-1 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase rounded-lg transition-colors"
+                      className="block w-full text-center py-2 mt-1 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-mono text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
                     >
                       Open in UPI App
                     </a>

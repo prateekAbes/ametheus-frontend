@@ -264,10 +264,10 @@ export default function GamesDirectoryPage() {
                       </div>
                       <div>
                         <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] uppercase font-mono block">
-                          Game Format
+                          Team Size
                         </span>
                         <span className="text-xs font-bold text-[#0F172A] dark:text-white font-mono block mt-0.5">
-                          {game.isTeamGame && game.maxTeamSize > 1 ? `${game.maxTeamSize}v${game.maxTeamSize} Team` : "Solo (1v1)"}
+                          {game.isTeamGame && game.maxTeamSize > 1 ? `Max Team Size: ${game.maxTeamSize}` : "Max Team Size: 1 (Solo)"}
                         </span>
                       </div>
                     </div>

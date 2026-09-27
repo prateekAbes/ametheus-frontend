@@ -134,7 +134,7 @@ export default function NotificationsDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#10131B] border border-[#242C3D] rounded-xl shadow-2xl z-50 overflow-hidden text-left font-sans animate-in fade-in-50 zoom-in-95">
+        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 w-auto max-w-[calc(100vw-1.5rem)] bg-[#10131B] border border-[#242C3D] rounded-xl shadow-2xl z-50 overflow-hidden text-left font-sans animate-in fade-in-50 zoom-in-95">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#242C3D] bg-[#161A24]">
             <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export default function NotificationsDropdown() {
                       !n.is_read ? "bg-[#141822]" : ""
                     }`}
                   >
-                    <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5">
+                    <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5 shrink-0">
                       {renderIcon(n.type)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -192,7 +192,7 @@ export default function NotificationsDropdown() {
                           <span className="w-1.5 h-1.5 rounded-full bg-[#E56A10] shrink-0" />
                         )}
                       </div>
-                      <p className="text-[11px] text-[#94A3B8] leading-relaxed line-clamp-2">
+                      <p className="text-[11px] text-[#94A3B8] leading-relaxed break-words line-clamp-3">
                         {n.message}
                       </p>
                       {n.link && (

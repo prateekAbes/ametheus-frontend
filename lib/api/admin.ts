@@ -256,24 +256,87 @@ export interface AdminSaveLiveStructurePayload {
 
 export interface AdminMatchCreatePayload {
   tournament_id: string;
-  team1_id: string;
-  team2_id: string;
-  match_type: string;
-  series_format?: string;
-  scheduled_at: string;
-  youtube_live_url?: string;
+  team_a_id?: string;
+  team_b_id?: string;
+  team_a_name?: string;
+  team_b_name?: string;
+  team_a_placeholder?: string;
+  team_b_placeholder?: string;
+  round_name?: string;
   round_number?: number;
   match_number?: number;
+  match_type?: string;
+  stage?: string;
+  series_format?: string;
+  match_format?: string;
+  scheduled_at?: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
+  youtube_live_url?: string;
+  status?: string;
+  score_a?: number;
+  score_b?: number;
+  winner_team_id?: string;
+  games?: any[];
+  // Backwards compatibility
+  team1_id?: string;
+  team2_id?: string;
 }
 
 export interface AdminMatchUpdatePayload {
-  team1_id?: string;
-  team2_id?: string;
+  team_a_id?: string;
+  team_b_id?: string;
+  team_a_name?: string;
+  team_b_name?: string;
+  team_a_placeholder?: string;
+  team_b_placeholder?: string;
+  round_name?: string;
+  round_number?: number;
+  match_number?: number;
   match_type?: string;
+  stage?: string;
   series_format?: string;
+  match_format?: string;
   scheduled_at?: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
   youtube_live_url?: string;
   status?: string;
+  score_a?: number;
+  score_b?: number;
+  winner_team_id?: string;
+  games?: any[];
+  // Backwards compatibility
+  team1_id?: string;
+  team2_id?: string;
+}
+
+export async function updateTournamentFormat(
+  tournamentId: string,
+  format: string
+): Promise<{ status: string; message: string; format: string }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/format`, {
+    method: "PATCH",
+    body: JSON.stringify({ format }),
+  });
+}
+
+export async function sendAdminNotification(payload: {
+  user_ids: string[];
+  title: string;
+  message: string;
+  notification_type?: string;
+  link?: string;
+}): Promise<{ status: string; message: string; sent_count: number }> {
+  return apiClient("/admin/notifications/send", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function searchUsersAdmin(search?: string): Promise<AdminUser[]> {
+  const q = search ? `?search=${encodeURIComponent(search)}` : "";
+  return apiClient<AdminUser[]>(`/admin/users${q}`);
 }
 
 export interface AdminMarkMatchLivePayload {

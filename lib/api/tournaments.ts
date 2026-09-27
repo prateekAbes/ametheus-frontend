@@ -284,10 +284,34 @@ export async function registerForTournamentUpi(
   });
 }
 
+export interface TournamentUpiDetails {
+  tournament_id: string;
+  tournament_title: string;
+  entry_fee_inr: number;
+  entry_fee_paise: number;
+  account_code: string;
+  upi_id: string;
+  payee_name: string;
+  qr_url?: string;
+  upi_uri: string;
+}
+
+export async function getTournamentUpiDetails(
+  tournamentId: string
+): Promise<TournamentUpiDetails> {
+  return apiClient<TournamentUpiDetails>(`/tournaments/${tournamentId}/upi-details`);
+}
+
 export async function submitTournamentUtr(
   tournamentId: string,
-  payload: { payment_id: string; utr: string; screenshot_url?: string }
-): Promise<{ status: string; message: string; payment_id: string; utr: string }> {
+  payload: {
+    payment_id?: string;
+    utr: string;
+    team_id?: string;
+    account_code?: string;
+    screenshot_url?: string;
+  }
+): Promise<{ status: string; message: string; payment_id: string; utr: string; payment_status?: string; registration_id?: string }> {
   return apiClient(`/tournaments/${tournamentId}/submit-upi-utr`, {
     method: "POST",
     body: JSON.stringify(payload),

@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   registerForTournament,
   registerForTournamentUpi,
+  getTournamentUpiDetails,
+  TournamentUpiDetails,
   submitTournamentUtr,
   getTournamentRegistrationStatus,
   TournamentRegisterUpiResponse,
@@ -77,7 +79,7 @@ export default function RegisterTournamentModal({
   const [existingReg, setExistingReg] = useState<TournamentRegistrationStatus["registration"] | null>(null);
   const [isCheckingReg, setIsCheckingReg] = useState(false);
   const [paymentMethodTab, setPaymentMethodTab] = useState<"WALLET" | "UPI">("WALLET");
-  const [upiData, setUpiData] = useState<TournamentRegisterUpiResponse | null>(null);
+  const [upiData, setUpiData] = useState<TournamentUpiDetails | null>(null);
   const [isLoadingUpi, setIsLoadingUpi] = useState(false);
   const [utrInput, setUtrInput] = useState("");
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -264,10 +266,10 @@ export default function RegisterTournamentModal({
     setIsLoadingUpi(true);
     setError("");
     try {
-      const data = await registerForTournamentUpi(tournament.id, isSolo ? undefined : selectedTeam?.id);
+      const data = await getTournamentUpiDetails(tournament.id);
       setUpiData(data);
     } catch (err: any) {
-      setError(err?.message || "Failed to initialize direct UPI payment account.");
+      setError(err?.message || "Failed to load direct UPI payment details.");
     } finally {
       setIsLoadingUpi(false);
     }
@@ -292,8 +294,10 @@ export default function RegisterTournamentModal({
     setError("");
     try {
       await submitTournamentUtr(tournament.id, {
-        payment_id: upiData.payment_id,
+        payment_id: (upiData as any)?.payment_id,
         utr: clean,
+        team_id: isSolo ? undefined : selectedTeam?.id,
+        account_code: upiData.account_code,
       });
       setUpiSubmittedSuccess(true);
       setStep("SUCCESS");
@@ -729,7 +733,7 @@ export default function RegisterTournamentModal({
                       </div>
                       <div className="flex items-center justify-between border-t border-slate-200 dark:border-[#242C3D] pt-2">
                         <span className="text-slate-500 dark:text-slate-400 font-bold">Exact Amount:</span>
-                        <span className="font-bold text-base text-[#E56A10]">₹{upiData?.amount_inr ?? tournament.entryFeeNum}</span>
+                        <span className="font-bold text-base text-[#E56A10]">₹{upiData?.entry_fee_inr ?? tournament.entryFeeNum}</span>
                       </div>
                     </div>
 
@@ -748,6 +752,15 @@ export default function RegisterTournamentModal({
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-2 text-center">
                         Scan with GPay, PhonePe, Paytm, BHIM, or any banking UPI app
                       </span>
+                      {upiData?.upi_uri && (
+                        <a
+                          href={upiData.upi_uri}
+                          className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#E56A10]/10 hover:bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/30 rounded text-xs font-mono font-bold uppercase transition-colors"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          Open in UPI App (Mobile)
+                        </a>
+                      )}
                     </div>
 
                     {/* UTR Input */}
