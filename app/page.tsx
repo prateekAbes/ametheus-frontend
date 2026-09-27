@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Trophy, Users, Shield, ArrowRight, Flame, CheckCircle, Gamepad2, Sparkles, Layers } from "lucide-react";
-import { getTournaments, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
+import { getTournaments, normalizeTournament, NormalizedTournament, getTournamentsSummary, TournamentsSummary } from "@/lib/api/tournaments";
 import { getGames, normalizeGame, NormalizedGame } from "@/lib/api/games";
 
 const HERO_GIF_URL = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWFmNnN2cWJxeHoxbjlyM3cydXBnNDB1NnY2d2hkYWFxdG00MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif";
@@ -12,6 +12,7 @@ const HERO_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1542751371-adc384
 export default function HomePage() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([]);
   const [games, setGames] = useState<NormalizedGame[]>([]);
+  const [tournamentsSummary, setTournamentsSummary] = useState<TournamentsSummary | null>(null);
   const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
   const [isGifError, setIsGifError] = useState(false);
@@ -28,6 +29,10 @@ export default function HomePage() {
       .catch(() => setTournaments([]))
       .finally(() => setIsLoadingTournaments(false));
 
+    getTournamentsSummary()
+      .then((sum) => setTournamentsSummary(sum))
+      .catch(() => setTournamentsSummary(null));
+
     getGames()
       .then((data) => {
         if (Array.isArray(data)) {
@@ -43,8 +48,21 @@ export default function HomePage() {
   const featuredTournaments = tournaments.slice(0, 3);
   const featuredGames = games.slice(0, 6);
 
-  const totalPrizePool = tournaments.reduce((acc, t) => acc + (t.prizePoolNum || 0), 0);
-  const prizePoolDisplay = totalPrizePool > 0 ? `₹${totalPrizePool.toLocaleString()}+` : "₹0+";
+  // Scope: calculate strictly from active, upcoming, published tournaments in the database
+  const activeUpcomingTournaments = tournaments.filter((t) => {
+    const s = (t.status || "").toUpperCase();
+    return !["DELETED", "CANCELLED", "HIDDEN", "DRAFT"].includes(s);
+  });
+
+  const calculatedPrizePool = activeUpcomingTournaments.reduce((acc, t) => acc + (t.prizePoolNum || 0), 0);
+  const finalPrizePoolInr = tournamentsSummary?.total_prize_pool_inr !== undefined
+    ? tournamentsSummary.total_prize_pool_inr
+    : calculatedPrizePool;
+  const prizePoolDisplay = `₹${finalPrizePoolInr.toLocaleString("en-IN")}`;
+
+  const upcomingTournamentsCount = tournamentsSummary?.active_tournaments_count !== undefined
+    ? tournamentsSummary.active_tournaments_count
+    : activeUpcomingTournaments.length;
 
   return (
     <div className="flex flex-col w-full">
@@ -135,10 +153,10 @@ export default function HomePage() {
             </div>
             <div>
               <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
-                ₹0
+                {upcomingTournamentsCount}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
-                Team Join Cost
+                Upcoming Tournaments
               </div>
             </div>
             <div>

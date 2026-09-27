@@ -123,7 +123,16 @@ export function normalizeTournament(t: any): NormalizedTournament {
       ];
 
   const rawPrizes = t.prizes || [];
-  const prizePoolNum = t.prize_pool_inr !== undefined ? Number(t.prize_pool_inr) : (t.prizePoolNum ?? 50000);
+  let prizePoolNum = 0;
+  if (t.prize_pool_inr !== undefined && t.prize_pool_inr !== null) {
+    prizePoolNum = Number(t.prize_pool_inr) || 0;
+  } else if (typeof t.prize_pool === "string") {
+    const parsed = parseInt(t.prize_pool.replace(/[^0-9]/g, ""), 10);
+    prizePoolNum = isNaN(parsed) ? 0 : parsed;
+  } else if (typeof t.prizePoolNum === "number") {
+    prizePoolNum = t.prizePoolNum;
+  }
+
   const prizes = Array.isArray(rawPrizes) && rawPrizes.length > 0
     ? rawPrizes.map((p: any, idx: number) => ({
         rank: p.rank || p.place || (idx === 0 ? "1st Place" : idx === 1 ? "2nd Place" : `${idx + 1}th Place`),
@@ -132,9 +141,9 @@ export function normalizeTournament(t: any): NormalizedTournament {
         badge: p.badge || (idx === 0 ? "bg-amber-100 text-amber-900 border border-amber-300" : "bg-slate-100 text-slate-800 border border-slate-200"),
       }))
     : [
-        { rank: "1st Place", amount: `₹${Math.round(prizePoolNum * 0.6).toLocaleString()}`, share: "60%", badge: "bg-amber-100 text-amber-900 border border-amber-300" },
-        { rank: "2nd Place", amount: `₹${Math.round(prizePoolNum * 0.3).toLocaleString()}`, share: "30%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
-        { rank: "3rd Place", amount: `₹${Math.round(prizePoolNum * 0.1).toLocaleString()}`, share: "10%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
+        { rank: "1st Place", amount: `₹${Math.round(prizePoolNum * 0.6).toLocaleString("en-IN")}`, share: "60%", badge: "bg-amber-100 text-amber-900 border border-amber-300" },
+        { rank: "2nd Place", amount: `₹${Math.round(prizePoolNum * 0.3).toLocaleString("en-IN")}`, share: "30%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
+        { rank: "3rd Place", amount: `₹${Math.round(prizePoolNum * 0.1).toLocaleString("en-IN")}`, share: "10%", badge: "bg-slate-100 text-slate-800 border border-slate-200" },
       ];
 
   const rawRounds = Array.isArray(t.bracket_rounds) ? t.bracket_rounds : Array.isArray(t.bracketRounds) ? t.bracketRounds : [];
@@ -169,7 +178,7 @@ export function normalizeTournament(t: any): NormalizedTournament {
     title: t.title || "Championship Tournament",
     gameSlug: t.game_slug || t.gameSlug || "valorant",
     gameName: t.game_name || t.gameName || "Valorant",
-    prizePool: t.prize_pool || t.prizePool || `₹${prizePoolNum.toLocaleString()}`,
+    prizePool: t.prize_pool || t.prizePool || (prizePoolNum > 0 ? `₹${prizePoolNum.toLocaleString("en-IN")}` : "₹0"),
     prizePoolNum,
     entryFee: t.entry_fee || t.entryFee || "Free Entry",
     entryFeeNum: t.entry_fee_inr !== undefined ? Number(t.entry_fee_inr) : (t.entryFeeNum ?? 0),
@@ -412,6 +421,16 @@ export interface TournamentCommunityInfo {
 
 export async function getTournamentCommunity(tournamentId: string): Promise<TournamentCommunityInfo> {
   return apiClient<TournamentCommunityInfo>(`/tournaments/${tournamentId}/community`);
+}
+
+export interface TournamentsSummary {
+  total_prize_pool_inr: number;
+  formatted_prize_pool: string;
+  active_tournaments_count: number;
+}
+
+export async function getTournamentsSummary(): Promise<TournamentsSummary> {
+  return apiClient<TournamentsSummary>("/tournaments/summary");
 }
 
 
