@@ -16,13 +16,20 @@ import {
   Check,
   X,
   RefreshCw,
-  Hash,
   AlertCircle,
   Shield,
   Layers,
   Clock,
   Sparkles,
   ArrowRight,
+  Lock,
+  Bell,
+  Key,
+  MessageSquare,
+  Link2,
+  Send,
+  ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 import {
   getTournamentRegisteredRosters,
@@ -35,6 +42,11 @@ import {
   completeMatchAdmin,
   updateTournamentFormat,
   updateTournamentStream,
+  addTournamentRound,
+  updateTournamentCommunity,
+  updateMatchJoinInfo,
+  triggerMatchReminder,
+  closeTournamentRegistration,
 } from "@/lib/api/admin";
 import { Tournament } from "@/lib/api/tournaments";
 
@@ -63,6 +75,10 @@ interface MatchItem {
   games?: any[];
   team_a?: { id?: string; name: string; tag: string; score?: number } | null;
   team_b?: { id?: string; name: string; tag: string; score?: number } | null;
+  join_info_enabled?: boolean;
+  join_info?: Record<string, string>;
+  match_message?: string;
+  sent_reminders?: string[];
 }
 
 interface Props {
@@ -83,11 +99,19 @@ const CORE_FORMATS = [
 
 const DEFAULT_ROUNDS = [
   "Round 1",
-  "Round 2",
-  "Quarterfinals",
-  "Semifinals",
-  "Finals",
 ];
+
+const REMINDER_TYPES = [
+  { id: "1_WEEK", label: "1 Week Before" },
+  { id: "2_DAYS", label: "2 Days Before" },
+  { id: "1_DAY", label: "1 Day Before" },
+  { id: "15_MINUTES", label: "15 Minutes Before" },
+  { id: "10_MINUTES", label: "10 Minutes Before" },
+  { id: "STARTING_NOW", label: "Starting Now" },
+  { id: "STARTED", label: "Match Started" },
+];
+
+const OPTION_CLASS = "bg-white text-slate-900 dark:bg-[#161B26] dark:text-slate-100 font-sans";
 
 export default function UnifiedMatchupBuilder({
   tournaments,
@@ -108,18 +132,24 @@ export default function UnifiedMatchupBuilder({
   const [streamUrl, setStreamUrl] = useState("");
   const [isSavingStream, setIsSavingStream] = useState(false);
 
+  // Community Link State (Only Discord OR WhatsApp)
+  const [communityPlatform, setCommunityPlatform] = useState<"DISCORD" | "WHATSAPP">("DISCORD");
+  const [communityLink, setCommunityLink] = useState("");
+  const [isSavingCommunity, setIsSavingCommunity] = useState(false);
+
   // Format Switch State
   const [selectedFormat, setSelectedFormat] = useState("Knockout");
   const [isUpdatingFormat, setIsUpdatingFormat] = useState(false);
+
+  // Close Registration Modal
+  const [isCloseRegModalOpen, setIsCloseRegModalOpen] = useState(false);
+  const [isClosingReg, setIsClosingReg] = useState(false);
 
   // Active Round Selection
   const [activeRound, setActiveRound] = useState("Round 1");
   const [customRounds, setCustomRounds] = useState<string[]>([]);
   const [newRoundInput, setNewRoundInput] = useState("");
   const [isAddingRound, setIsAddingRound] = useState(false);
-
-  // Seeds View Toggle
-  const [showSeedsList, setShowSeedsList] = useState(false);
 
   // Match Creation Modal
   const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState(false);
@@ -144,6 +174,17 @@ export default function UnifiedMatchupBuilder({
   const [editScheduledTime, setEditScheduledTime] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // Edit Match - Join Info state
+  const [editJoinInfoEnabled, setEditJoinInfoEnabled] = useState(false);
+  const [editJoinCode, setEditJoinCode] = useState("");
+  const [editPartyId, setEditPartyId] = useState("");
+  const [editRoomId, setEditRoomId] = useState("");
+  const [editLobbyId, setEditLobbyId] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editJoinLink, setEditJoinLink] = useState("");
+  const [editMatchMessage, setEditMatchMessage] = useState("");
+  const [activeReminderSending, setActiveReminderSending] = useState<string | null>(null);
+
   // Complete / Enter Score Modal
   const [scoringMatch, setScoringMatch] = useState<MatchItem | null>(null);
   const [scoreA, setScoreA] = useState("0");
@@ -155,10 +196,24 @@ export default function UnifiedMatchupBuilder({
   // Action status message
   const [statusBanner, setStatusBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Fetch registered rosters when selected tournament changes
+  // Check if registration is closed
+  const isRegistrationClosed = useMemo(() => {
+    if (!currentTournament) return false;
+    return (
+      currentTournament.registration_status === "CLOSED" ||
+      Boolean(currentTournament.is_registration_closed) ||
+      currentTournament.status === "REGISTRATION_CLOSED" ||
+      currentTournament.status === "IN_PROGRESS" ||
+      currentTournament.status === "COMPLETED"
+    );
+  }, [currentTournament]);
+
+  // Fetch registered rosters and initialize stream & community when selected tournament changes
   useEffect(() => {
     if (!selectedTournamentId) {
       setRostersData(null);
+      setStreamUrl("");
+      setCommunityLink("");
       return;
     }
 
@@ -171,12 +226,20 @@ export default function UnifiedMatchupBuilder({
     if (currentTournament) {
       const fmt = currentTournament.format || currentTournament.match_format || "Knockout";
       setSelectedFormat(fmt);
+      setStreamUrl(currentTournament.stream_url || currentTournament.youtube_live_url || "");
+      if (currentTournament.community_platform === "WHATSAPP" || currentTournament.community_platform === "DISCORD") {
+        setCommunityPlatform(currentTournament.community_platform);
+      }
+      setCommunityLink(currentTournament.community_link || "");
     }
   }, [selectedTournamentId, currentTournament]);
 
-  // Derive dynamic list of rounds from existing matches + default rounds + custom rounds
+  // Derive dynamic list of rounds from existing matches + default rounds ("Round 1") + custom rounds
   const allRounds = useMemo(() => {
-    const roundSet = new Set<string>(DEFAULTR_ROUNDS_MERGE());
+    const roundSet = new Set<string>(DEFAULT_ROUNDS);
+    if (currentTournament?.custom_rounds) {
+      currentTournament.custom_rounds.forEach((r) => roundSet.add(r));
+    }
     matches
       .filter((m) => m.tournament_id === selectedTournamentId)
       .forEach((m) => {
@@ -185,11 +248,7 @@ export default function UnifiedMatchupBuilder({
       });
     customRounds.forEach((r) => roundSet.add(r));
     return Array.from(roundSet);
-
-    function DEFAULTR_ROUNDS_MERGE() {
-      return ["Round 1", "Quarterfinals", "Semifinals", "Finals"];
-    }
-  }, [matches, selectedTournamentId, customRounds]);
+  }, [matches, selectedTournamentId, customRounds, currentTournament]);
 
   // Ensure activeRound is valid
   useEffect(() => {
@@ -265,16 +324,72 @@ export default function UnifiedMatchupBuilder({
     }
   };
 
-  // Add Round
-  const handleAddCustomRound = () => {
+  // Save Tournament Community Link (Exclusive Discord OR WhatsApp)
+  const handleSaveCommunity = async () => {
+    if (!selectedTournamentId) return;
+    setIsSavingCommunity(true);
+    setStatusBanner(null);
+    try {
+      await updateTournamentCommunity(
+        selectedTournamentId,
+        communityPlatform,
+        communityLink.trim() || null
+      );
+      setStatusBanner({
+        type: "success",
+        text: `Official ${communityPlatform === "DISCORD" ? "Discord" : "WhatsApp"} link saved! Confirmed participants can now access it securely.`,
+      });
+    } catch (err: any) {
+      setStatusBanner({
+        type: "error",
+        text: err?.message || "Failed to save community link.",
+      });
+    } finally {
+      setIsSavingCommunity(false);
+    }
+  };
+
+  // Close Registration Handler
+  const handleCloseRegistration = async () => {
+    if (!selectedTournamentId) return;
+    setIsClosingReg(true);
+    try {
+      await closeTournamentRegistration(selectedTournamentId);
+      setIsCloseRegModalOpen(false);
+      setStatusBanner({
+        type: "success",
+        text: "Tournament registration has been closed! No new teams can register.",
+      });
+      await onRefreshMatches();
+    } catch (err: any) {
+      alert(err?.message || "Failed to close tournament registration");
+    } finally {
+      setIsClosingReg(false);
+    }
+  };
+
+  // Add Round and Persist to Tournament
+  const handleAddCustomRound = async () => {
     const clean = newRoundInput.trim();
     if (!clean) return;
-    if (!allRounds.includes(clean)) {
+    if (!selectedTournamentId) {
+      alert("Please select a tournament first.");
+      return;
+    }
+    try {
+      await addTournamentRound(selectedTournamentId, clean);
       setCustomRounds((prev) => [...prev, clean]);
       setActiveRound(clean);
+      setNewRoundInput("");
+      setIsAddingRound(false);
+      setStatusBanner({
+        type: "success",
+        text: `Round "${clean}" successfully added to tournament and persisted!`,
+      });
+      await onRefreshMatches();
+    } catch (err: any) {
+      alert(err?.message || "Failed to add round");
     }
-    setNewRoundInput("");
-    setIsAddingRound(false);
   };
 
   // Open Add Match modal
@@ -328,7 +443,7 @@ export default function UnifiedMatchupBuilder({
         stage: addMatchRound,
         series_format: addSeriesFormat,
         match_format: addSeriesFormat,
-        scheduled_time: addScheduledTime.trim() || "TBD",
+        scheduled_time: addScheduledTime.trim() || undefined,
       });
 
       setIsAddMatchModalOpen(false);
@@ -353,6 +468,16 @@ export default function UnifiedMatchupBuilder({
     setEditTeamBPlaceholder(m.team_b_placeholder || "");
     setEditSeriesFormat((m.series_format?.toUpperCase() === "BO3" ? "BO3" : "BO1"));
     setEditScheduledTime(m.scheduled_time || "");
+
+    // Join info
+    setEditJoinInfoEnabled(Boolean(m.join_info_enabled));
+    setEditJoinCode(m.join_info?.join_code || "");
+    setEditPartyId(m.join_info?.party_id || "");
+    setEditRoomId(m.join_info?.room_id || "");
+    setEditLobbyId(m.join_info?.lobby_id || "");
+    setEditPassword(m.join_info?.password || "");
+    setEditJoinLink(m.join_info?.join_link || "");
+    setEditMatchMessage(m.match_message || "");
   };
 
   // Submit Edit Match
@@ -369,16 +494,56 @@ export default function UnifiedMatchupBuilder({
         series_format: editSeriesFormat,
         scheduled_time: editScheduledTime.trim() || undefined,
       });
+
+      // Also persist join info
+      const joinInfoDict: Record<string, string> = {};
+      if (editJoinCode.trim()) joinInfoDict.join_code = editJoinCode.trim();
+      if (editPartyId.trim()) joinInfoDict.party_id = editPartyId.trim();
+      if (editRoomId.trim()) joinInfoDict.room_id = editRoomId.trim();
+      if (editLobbyId.trim()) joinInfoDict.lobby_id = editLobbyId.trim();
+      if (editPassword.trim()) joinInfoDict.password = editPassword.trim();
+      if (editJoinLink.trim()) joinInfoDict.join_link = editJoinLink.trim();
+
+      await updateMatchJoinInfo(editingMatch.id, {
+        join_info_enabled: editJoinInfoEnabled,
+        join_info: joinInfoDict,
+        match_message: editMatchMessage.trim() || undefined,
+      });
+
       setEditingMatch(null);
       setStatusBanner({
         type: "success",
-        text: "Match parameters updated successfully.",
+        text: "Match parameters and participant join information updated successfully.",
       });
       await onRefreshMatches();
     } catch (err: any) {
       alert(err?.message || "Failed to update match");
     } finally {
       setIsSavingEdit(false);
+    }
+  };
+
+  // Send Match Reminder
+  const handleSendReminder = async (matchId: string, reminderType: string) => {
+    setActiveReminderSending(reminderType);
+    try {
+      const res = await triggerMatchReminder(matchId, reminderType);
+      setStatusBanner({
+        type: "success",
+        text: `Reminder "${reminderType}" sent! ${res.participants_notified} confirmed participant(s) notified.`,
+      });
+      await onRefreshMatches();
+      // Update editingMatch state if open
+      if (editingMatch && editingMatch.id === matchId) {
+        setEditingMatch({
+          ...editingMatch,
+          sent_reminders: [...(editingMatch.sent_reminders || []), reminderType],
+        });
+      }
+    } catch (err: any) {
+      alert(err?.message || "Failed to send match reminder");
+    } finally {
+      setActiveReminderSending(null);
     }
   };
 
@@ -422,7 +587,7 @@ export default function UnifiedMatchupBuilder({
     setMarkComplete(m.status === "COMPLETED");
   };
 
-  // Submit Score / Winner
+  // Submit Score / Winner (Sends both payload naming conventions for 100% backend compatibility)
   const handleSaveScoring = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scoringMatch) return;
@@ -442,6 +607,9 @@ export default function UnifiedMatchupBuilder({
           team1_score: sA,
           team2_score: sB,
           winner_id: winnerTeamId,
+          score_a: sA,
+          score_b: sB,
+          winner_team_id: winnerTeamId,
         });
       } else {
         await updateMatchDetailsAdmin(scoringMatch.id, {
@@ -468,7 +636,7 @@ export default function UnifiedMatchupBuilder({
     <div className="space-y-6">
       {/* 1. AUTHORITATIVE TOP BAR */}
       <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] p-5 rounded-xl shadow-xs space-y-4">
-        {/* Tournament Selector & Stats */}
+        {/* Tournament Selector & Top Actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex-1">
             <label className="block text-[11px] font-mono font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
@@ -479,9 +647,9 @@ export default function UnifiedMatchupBuilder({
               onChange={(e) => onSelectTournament(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-white focus:border-[#E56A10] focus:outline-none"
             >
-              <option value="">-- Choose a Tournament to Manage --</option>
+              <option value="" className={OPTION_CLASS}>-- Choose a Tournament to Manage --</option>
               {tournaments.map((t) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.id} value={t.id} className={OPTION_CLASS}>
                   [{t.status}] {t.title} ({t.game_slug?.toUpperCase() || "GAME"})
                 </option>
               ))}
@@ -491,7 +659,7 @@ export default function UnifiedMatchupBuilder({
           {selectedTournamentId && (
             <div className="flex items-center gap-3 shrink-0 flex-wrap">
               {/* Total Teams Pill */}
-              <div className="px-3.5 py-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-mono">
+              <div className="px-3.5 py-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-xs font-mono">
                 <span className="text-blue-600 dark:text-blue-400 font-bold block text-[10px] uppercase">
                   Registered Teams
                 </span>
@@ -499,6 +667,27 @@ export default function UnifiedMatchupBuilder({
                   {registeredTeamsList.length} Teams
                 </span>
               </div>
+
+              {/* Registration Status & Close Button */}
+              {isRegistrationClosed ? (
+                <div className="px-3.5 py-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-lg text-xs font-mono">
+                  <span className="text-rose-600 dark:text-rose-400 font-bold block text-[10px] uppercase">
+                    Registration
+                  </span>
+                  <span className="text-xs font-bold text-rose-800 dark:text-rose-200 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> CLOSED
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsCloseRegModalOpen(true)}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-600 border border-rose-300 dark:border-rose-800 hover:border-transparent text-rose-700 dark:text-rose-300 hover:text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Close Registration</span>
+                </button>
+              )}
 
               {/* Tournament Format Selector (Mid-Tournament Switching Allowed) */}
               <div className="px-3.5 py-1.5 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg">
@@ -513,7 +702,7 @@ export default function UnifiedMatchupBuilder({
                     className="bg-transparent text-xs font-mono font-bold text-[#E56A10] focus:outline-none cursor-pointer"
                   >
                     {CORE_FORMATS.map((f) => (
-                      <option key={f} value={f} className="text-slate-900 dark:text-white">
+                      <option key={f} value={f} className={OPTION_CLASS}>
                         {f}
                       </option>
                     ))}
@@ -521,20 +710,6 @@ export default function UnifiedMatchupBuilder({
                   {isUpdatingFormat && <Loader2 className="w-3 h-3 animate-spin text-[#E56A10]" />}
                 </div>
               </div>
-
-              {/* Seeds Toggle */}
-              <button
-                type="button"
-                onClick={() => setShowSeedsList(!showSeedsList)}
-                className={`px-3 py-2 border rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  showSeedsList
-                    ? "bg-[#E56A10] text-white border-transparent"
-                    : "bg-slate-100 dark:bg-[#1A2234] border-slate-300 dark:border-[#2E384D] text-slate-700 dark:text-slate-300 hover:text-white"
-                }`}
-              >
-                <Hash className="w-3.5 h-3.5" />
-                <span>Seeds</span>
-              </button>
 
               {/* Add Match Button */}
               <button
@@ -549,31 +724,94 @@ export default function UnifiedMatchupBuilder({
           )}
         </div>
 
-        {/* 1 Complete Tournament Livestream Bar */}
+        {/* Livestream and Community Link Controls */}
         {selectedTournamentId && (
-          <div className="pt-3 border-t border-slate-200 dark:border-[#2E384D] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="flex items-center gap-2 text-rose-500 font-mono text-xs font-bold uppercase shrink-0">
-              <Radio className="w-4 h-4 animate-pulse" />
-              <span>Official Livestream Broadcast:</span>
+          <div className="pt-3 border-t border-slate-200 dark:border-[#2E384D] space-y-3">
+            {/* Livestream Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex items-center gap-2 text-rose-500 font-mono text-xs font-bold uppercase shrink-0">
+                <Radio className="w-4 h-4 animate-pulse" />
+                <span>Official Broadcast:</span>
+              </div>
+              <div className="flex-1 relative">
+                <input
+                  type="url"
+                  value={streamUrl}
+                  onChange={(e) => setStreamUrl(e.target.value)}
+                  placeholder="Enter YouTube or Twitch stream URL (e.g. https://www.youtube.com/watch?v=...)"
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveStream}
+                disabled={isSavingStream}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 transition-colors"
+              >
+                {isSavingStream ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tv className="w-3.5 h-3.5" />}
+                <span>Save Broadcast</span>
+              </button>
             </div>
-            <div className="flex-1 relative">
-              <input
-                type="url"
-                value={streamUrl}
-                onChange={(e) => setStreamUrl(e.target.value)}
-                placeholder="Enter YouTube or Twitch stream URL (e.g. https://www.youtube.com/watch?v=...)"
-                className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
-              />
+
+            {/* Exclusive Participant Community Link (Discord OR WhatsApp - never both) */}
+            <div className="pt-3 border-t border-slate-100 dark:border-[#1E2538] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="font-mono text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
+                  Participant Community:
+                </span>
+                <div className="flex items-center gap-3 text-xs font-mono font-bold">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-slate-800 dark:text-slate-200">
+                    <input
+                      type="radio"
+                      name="communityPlatformChoice"
+                      value="DISCORD"
+                      checked={communityPlatform === "DISCORD"}
+                      onChange={() => setCommunityPlatform("DISCORD")}
+                      className="text-[#5865F2] focus:ring-[#5865F2] cursor-pointer"
+                    />
+                    <span className="text-[#5865F2] flex items-center gap-1">
+                      <MessageSquare className="w-3.5 h-3.5" /> Discord
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-slate-800 dark:text-slate-200">
+                    <input
+                      type="radio"
+                      name="communityPlatformChoice"
+                      value="WHATSAPP"
+                      checked={communityPlatform === "WHATSAPP"}
+                      onChange={() => setCommunityPlatform("WHATSAPP")}
+                      className="text-[#25D366] focus:ring-[#25D366] cursor-pointer"
+                    />
+                    <span className="text-[#25D366] flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex-1 relative">
+                <input
+                  type="url"
+                  value={communityLink}
+                  onChange={(e) => setCommunityLink(e.target.value)}
+                  placeholder={communityPlatform === "DISCORD" ? "https://discord.gg/your-invite" : "https://chat.whatsapp.com/your-group"}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#2E384D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveCommunity}
+                disabled={isSavingCommunity}
+                className="px-3.5 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 transition-colors"
+              >
+                {isSavingCommunity ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                <span>Save Community Link</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveStream}
-              disabled={isSavingStream}
-              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 transition-colors"
-            >
-              {isSavingStream ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tv className="w-3.5 h-3.5" />}
-              <span>Save Broadcast URL</span>
-            </button>
+            <p className="text-[10px] font-mono text-slate-400">
+              * Protected link: Visible only to authenticated, confirmed tournament participants on their match/tournament dashboard.
+            </p>
           </div>
         )}
       </div>
@@ -617,7 +855,7 @@ export default function UnifiedMatchupBuilder({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* 2. AUTHORITATIVE REGISTERED TEAMS PANEL (4 cols) */}
+          {/* 2. REGISTERED TEAMS PANEL (4 cols) */}
           <div className="lg:col-span-4 space-y-4">
             <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] rounded-xl overflow-hidden shadow-xs">
               <div className="p-3.5 bg-slate-50 dark:bg-[#161B26] border-b border-slate-200 dark:border-[#242C3D] flex items-center justify-between">
@@ -649,6 +887,7 @@ export default function UnifiedMatchupBuilder({
                   {registeredTeamsList.map((team, idx) => {
                     const tId = team.id || team.team_id;
                     const isPairedInThisRound = pairedTeamIdsInActiveRound.has(tId);
+                    const teamName = team.name || team.team_name || "Team";
 
                     return (
                       <div
@@ -661,13 +900,13 @@ export default function UnifiedMatchupBuilder({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2.5 min-w-0">
-                            {/* Seed Number */}
-                            <span className="w-6 h-6 rounded bg-slate-100 dark:bg-[#1F2637] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#2E384D] text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
-                              #{idx + 1}
-                            </span>
+                            {/* Team Initial Icon Badge (No Seed Number) */}
+                            <div className="w-6 h-6 rounded bg-slate-100 dark:bg-[#1F2637] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-[#2E384D] text-[10px] font-mono font-bold flex items-center justify-center shrink-0 uppercase">
+                              {teamName.substring(0, 1)}
+                            </div>
                             <div className="min-w-0">
                               <div className="text-xs font-bold font-mono text-slate-900 dark:text-white truncate">
-                                {team.name || team.team_name} [{team.tag || team.team_tag || "TEAM"}]
+                                {teamName} [{team.tag || team.team_tag || "TEAM"}]
                               </div>
                               <div className="text-[10px] text-slate-400 font-mono truncate">
                                 Capt: @{team.captain_username || (team.captain as any)?.username || "Player"}
@@ -713,7 +952,7 @@ export default function UnifiedMatchupBuilder({
 
           {/* 3. ROUND-BY-ROUND MATCH ENGINE (8 cols) */}
           <div className="lg:col-span-8 space-y-4">
-            {/* Round Tabs & Round Creator */}
+            {/* Round Tabs & Dynamic Round Creator */}
             <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200 dark:border-[#242C3D]">
               <div className="flex items-center gap-1.5 flex-nowrap">
                 {allRounds.map((rName) => {
@@ -753,7 +992,7 @@ export default function UnifiedMatchupBuilder({
                       type="text"
                       value={newRoundInput}
                       onChange={(e) => setNewRoundInput(e.target.value)}
-                      placeholder="e.g. Round 3"
+                      placeholder="e.g. Round 2"
                       className="px-2 py-1 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#2E384D] rounded text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                     />
                     <button
@@ -840,8 +1079,13 @@ export default function UnifiedMatchupBuilder({
                           )}
                         </div>
 
-                        {/* Status Badge */}
-                        <div>
+                        {/* Status Badge & Join Info Indicator */}
+                        <div className="flex items-center gap-2">
+                          {m.join_info_enabled && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                              <Key className="w-2.5 h-2.5" /> Join Info
+                            </span>
+                          )}
                           {isLive ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-600 text-white flex items-center gap-1 animate-pulse">
                               <Radio className="w-3 h-3" /> LIVE
@@ -961,6 +1205,50 @@ export default function UnifiedMatchupBuilder({
         </div>
       )}
 
+      {/* CONFIRMATION MODAL: CLOSE REGISTRATION */}
+      {isCloseRegModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-md w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-100 dark:bg-rose-950/60 rounded-xl">
+                <AlertCircle className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase">
+                  Close Registration?
+                </h4>
+                <p className="text-xs text-slate-500 font-mono">
+                  {currentTournament?.title}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs font-mono text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to close registration for this tournament? Once closed, no new players or teams can register, and the tournament is permanently locked for match bracket scheduling and execution.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-[#242C3D]">
+              <button
+                type="button"
+                onClick={() => setIsCloseRegModalOpen(false)}
+                className="px-4 py-2 border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1E2538] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseRegistration}
+                disabled={isClosingReg}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {isClosingReg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                <span>Confirm Close Registration</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: ADD MATCH (MANUAL CREATION) */}
       {isAddMatchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
@@ -990,7 +1278,7 @@ export default function UnifiedMatchupBuilder({
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
                 >
                   {allRounds.map((r) => (
-                    <option key={r} value={r}>
+                    <option key={r} value={r} className={OPTION_CLASS}>
                       {r}
                     </option>
                   ))}
@@ -1031,10 +1319,10 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setAddTeamAId(e.target.value)}
                     className="w-full px-3 py-2 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="">-- Choose Registered Team A --</option>
+                    <option value="" className={OPTION_CLASS}>-- Choose Registered Team A --</option>
                     {registeredTeamsList.map((t, i) => (
-                      <option key={t.id || i} value={t.id || t.team_id}>
-                        #{i + 1} {t.name || t.team_name} [{t.tag || "TEAM"}]{" "}
+                      <option key={t.id || i} value={t.id || t.team_id} className={OPTION_CLASS}>
+                        {t.name || t.team_name} [{t.tag || "TEAM"}]{" "}
                         {pairedTeamIdsInActiveRound.has(t.id || t.team_id) ? "(Assigned)" : "(Available)"}
                       </option>
                     ))}
@@ -1085,10 +1373,10 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setAddTeamBId(e.target.value)}
                     className="w-full px-3 py-2 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="">-- Choose Registered Team B --</option>
+                    <option value="" className={OPTION_CLASS}>-- Choose Registered Team B --</option>
                     {registeredTeamsList.map((t, i) => (
-                      <option key={t.id || i} value={t.id || t.team_id}>
-                        #{i + 1} {t.name || t.team_name} [{t.tag || "TEAM"}]{" "}
+                      <option key={t.id || i} value={t.id || t.team_id} className={OPTION_CLASS}>
+                        {t.name || t.team_name} [{t.tag || "TEAM"}]{" "}
                         {pairedTeamIdsInActiveRound.has(t.id || t.team_id) ? "(Assigned)" : "(Available)"}
                       </option>
                     ))}
@@ -1116,8 +1404,8 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setAddSeriesFormat(e.target.value as "BO1" | "BO3")}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="BO1">Best of 1 (First to 1 Win)</option>
-                    <option value="BO3">Best of 3 (First to 2 Wins)</option>
+                    <option value="BO1" className={OPTION_CLASS}>Best of 1 (First to 1 Win)</option>
+                    <option value="BO3" className={OPTION_CLASS}>Best of 3 (First to 2 Wins)</option>
                   </select>
                 </div>
 
@@ -1157,10 +1445,10 @@ export default function UnifiedMatchupBuilder({
         </div>
       )}
 
-      {/* MODAL: EDIT MATCH */}
+      {/* MODAL: EDIT MATCH (INCLUDING JOIN INFO AND REMINDER NOTIFICATIONS) */}
       {editingMatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#111622] border border-slate-200 dark:border-[#242C3D] max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#242C3D] pb-3">
               <h4 className="font-headline font-bold text-base text-slate-900 dark:text-white uppercase flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-[#E56A10]" /> Edit Match #{editingMatch.match_number || 1}
@@ -1185,10 +1473,10 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setEditTeamAId(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="">-- Or use placeholder below --</option>
+                    <option value="" className={OPTION_CLASS}>-- Or use placeholder below --</option>
                     {registeredTeamsList.map((t, i) => (
-                      <option key={t.id || i} value={t.id || t.team_id}>
-                        #{i + 1} {t.name || t.team_name}
+                      <option key={t.id || i} value={t.id || t.team_id} className={OPTION_CLASS}>
+                        {t.name || t.team_name}
                       </option>
                     ))}
                   </select>
@@ -1203,10 +1491,10 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setEditTeamBId(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="">-- Or use placeholder below --</option>
+                    <option value="" className={OPTION_CLASS}>-- Or use placeholder below --</option>
                     {registeredTeamsList.map((t, i) => (
-                      <option key={t.id || i} value={t.id || t.team_id}>
-                        #{i + 1} {t.name || t.team_name}
+                      <option key={t.id || i} value={t.id || t.team_id} className={OPTION_CLASS}>
+                        {t.name || t.team_name}
                       </option>
                     ))}
                   </select>
@@ -1251,8 +1539,8 @@ export default function UnifiedMatchupBuilder({
                     onChange={(e) => setEditSeriesFormat(e.target.value as "BO1" | "BO3")}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white font-bold focus:outline-none focus:border-[#E56A10]"
                   >
-                    <option value="BO1">Best of 1 (First to 1 Win)</option>
-                    <option value="BO3">Best of 3 (First to 2 Wins)</option>
+                    <option value="BO1" className={OPTION_CLASS}>Best of 1 (First to 1 Win)</option>
+                    <option value="BO3" className={OPTION_CLASS}>Best of 3 (First to 2 Wins)</option>
                   </select>
                 </div>
 
@@ -1267,6 +1555,166 @@ export default function UnifiedMatchupBuilder({
                     placeholder="e.g. Tomorrow 6:00 PM IST"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                   />
+                </div>
+              </div>
+
+              {/* Match-Specific Join Information (Credentials) */}
+              <div className="p-3.5 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-[#E56A10]" />
+                    <span className="text-xs font-mono font-bold uppercase text-slate-900 dark:text-white">
+                      Match Join Credentials
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-700 dark:text-slate-300 font-bold">
+                    <input
+                      type="checkbox"
+                      checked={editJoinInfoEnabled}
+                      onChange={(e) => setEditJoinInfoEnabled(e.target.checked)}
+                      className="rounded border-slate-300 text-[#E56A10] focus:ring-[#E56A10] cursor-pointer"
+                    />
+                    <span>Enable for Participants</span>
+                  </label>
+                </div>
+
+                {editJoinInfoEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-[#242C3D]">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                          Join Code / Lobby Code
+                        </label>
+                        <input
+                          type="text"
+                          value={editJoinCode}
+                          onChange={(e) => setEditJoinCode(e.target.value)}
+                          placeholder="e.g. AMT-8821"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                          Password
+                        </label>
+                        <input
+                          type="text"
+                          value={editPassword}
+                          onChange={(e) => setEditPassword(e.target.value)}
+                          placeholder="e.g. scrim99"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                          Party ID
+                        </label>
+                        <input
+                          type="text"
+                          value={editPartyId}
+                          onChange={(e) => setEditPartyId(e.target.value)}
+                          placeholder="e.g. PARTY_41"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                          Room ID
+                        </label>
+                        <input
+                          type="text"
+                          value={editRoomId}
+                          onChange={(e) => setEditRoomId(e.target.value)}
+                          placeholder="e.g. ROOM_77"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                          Lobby ID
+                        </label>
+                        <input
+                          type="text"
+                          value={editLobbyId}
+                          onChange={(e) => setEditLobbyId(e.target.value)}
+                          placeholder="e.g. LOBBY_12"
+                          className="w-full px-2 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                        Direct Join Link (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        value={editJoinLink}
+                        onChange={(e) => setEditJoinLink(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold uppercase text-slate-500 mb-1">
+                        Match Message / Arbiter Instructions
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editMatchMessage}
+                        onChange={(e) => setEditMatchMessage(e.target.value)}
+                        placeholder="Important rules, server region (e.g. Mumbai), spectator policies, or arbiter Discord tags..."
+                        className="w-full px-3 py-1.5 bg-white dark:bg-[#111520] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Countdown Reminders Section */}
+              <div className="p-3.5 bg-slate-50 dark:bg-[#161B26] border border-slate-200 dark:border-[#242C3D] rounded-xl space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-blue-500" />
+                  <span className="text-xs font-mono font-bold uppercase text-slate-900 dark:text-white">
+                    Send Match Reminders
+                  </span>
+                </div>
+                <p className="text-[11px] font-mono text-slate-400">
+                  Trigger notifications directly to confirmed participants of this match.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  {REMINDER_TYPES.map((rt) => {
+                    const isSent = editingMatch.sent_reminders?.includes(rt.id);
+                    const isSending = activeReminderSending === rt.id;
+
+                    return (
+                      <button
+                        key={rt.id}
+                        type="button"
+                        disabled={isSent || Boolean(activeReminderSending)}
+                        onClick={() => handleSendReminder(editingMatch.id, rt.id)}
+                        className={`p-2 rounded-lg text-[10px] font-mono font-bold uppercase flex items-center justify-between border transition-all cursor-pointer ${
+                          isSent
+                            ? "bg-slate-100 dark:bg-[#1A2234] border-slate-300 dark:border-[#2E384D] text-slate-400 dark:text-slate-500 cursor-not-allowed"
+                            : "bg-white dark:bg-[#111520] border-blue-300 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                        }`}
+                      >
+                        <span className="truncate mr-1">{rt.label}</span>
+                        {isSending ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-blue-500 shrink-0" />
+                        ) : isSent ? (
+                          <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                        ) : (
+                          <Send className="w-3 h-3 text-blue-500 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1347,11 +1795,11 @@ export default function UnifiedMatchupBuilder({
                   onChange={(e) => setWinnerTeamId(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-[#161B26] border border-slate-300 dark:border-[#242C3D] rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:border-[#E56A10]"
                 >
-                  <option value="">-- Match Still In Progress (No Winner Yet) --</option>
-                  <option value={scoringMatch.team_a_id || scoringMatch.team_a?.id || scoringMatch.team_a_name || scoringMatch.team_a_placeholder}>
+                  <option value="" className={OPTION_CLASS}>-- Match Still In Progress (No Winner Yet) --</option>
+                  <option value={scoringMatch.team_a_id || scoringMatch.team_a?.id || scoringMatch.team_a_name || scoringMatch.team_a_placeholder} className={OPTION_CLASS}>
                     🏆 {scoringMatch.team_a?.name || scoringMatch.team_a_name || scoringMatch.team_a_placeholder || "Team A"}
                   </option>
-                  <option value={scoringMatch.team_b_id || scoringMatch.team_b?.id || scoringMatch.team_b_name || scoringMatch.team_b_placeholder}>
+                  <option value={scoringMatch.team_b_id || scoringMatch.team_b?.id || scoringMatch.team_b_name || scoringMatch.team_b_placeholder} className={OPTION_CLASS}>
                     🏆 {scoringMatch.team_b?.name || scoringMatch.team_b_name || scoringMatch.team_b_placeholder || "Team B"}
                   </option>
                 </select>

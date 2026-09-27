@@ -3234,11 +3234,11 @@ export default function AdminCockpitPage() {
                             <select
                               value={u.role}
                               onChange={(e) => handleSetUserRole(u.id, e.target.value as any, u.username)}
-                              className="bg-slate-50 border border-slate-200 hover:border-[#E56A10] rounded px-2 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-[#E56A10] cursor-pointer"
+                              className="bg-white dark:bg-[#161B26] border border-slate-300 dark:border-slate-700 hover:border-[#E56A10] rounded px-2 py-1 text-[11px] font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-[#E56A10] cursor-pointer"
                             >
-                              <option value="PLAYER">Player (Standard)</option>
-                              <option value="ORGANIZER">Organizer</option>
-                              <option value="SUPER_ADMIN">Super Admin</option>
+                              <option value="PLAYER" className="bg-white text-slate-900 dark:bg-[#161B26] dark:text-slate-100">Player (Standard)</option>
+                              <option value="ORGANIZER" className="bg-white text-slate-900 dark:bg-[#161B26] dark:text-slate-100">Organizer</option>
+                              <option value="SUPER_ADMIN" className="bg-white text-slate-900 dark:bg-[#161B26] dark:text-slate-100">Super Admin</option>
                             </select>
                           ) : (
                             <span className="text-[10px] text-slate-500 italic">Designated Root</span>

@@ -40,6 +40,13 @@ export interface Tournament {
   has_live_matches?: boolean;
   live_matches_count?: number;
   live_matches?: any[];
+  community_platform?: "DISCORD" | "WHATSAPP" | null;
+  community_link?: string | null;
+  custom_rounds?: string[];
+  registration_status?: string;
+  is_registration_closed?: boolean;
+  stream_url?: string;
+  youtube_live_url?: string;
 }
 
 export interface NormalizedTournament {
@@ -72,6 +79,8 @@ export interface NormalizedTournament {
   hasLiveMatches?: boolean;
   liveMatchesCount?: number;
   liveMatches?: any[];
+  communityPlatform?: "DISCORD" | "WHATSAPP" | null;
+  customRounds?: string[];
   bannerUrl: string;
   badgeColor: string;
   description: string;
@@ -142,14 +151,12 @@ export function normalizeTournament(t: any): NormalizedTournament {
             tag: m.teamA?.tag || m.team_a_tag || "TBD",
             score: m.teamA?.score ?? m.team_a_score ?? "-",
             isWinner: Boolean(m.teamA?.isWinner || m.team_a_winner),
-            seed: m.teamA?.seed ?? m.team_a_seed,
           },
           teamB: {
             name: m.teamB?.name || m.team_b_name || "TBD",
             tag: m.teamB?.tag || m.team_b_tag || "TBD",
             score: m.teamB?.score ?? m.team_b_score ?? "-",
             isWinner: Boolean(m.teamB?.isWinner || m.team_b_winner),
-            seed: m.teamB?.seed ?? m.team_b_seed,
           },
         }))
       : [],
@@ -198,6 +205,8 @@ export function normalizeTournament(t: any): NormalizedTournament {
     seriesFormat: t.series_format || t.seriesFormat || "BO3",
     hasLiveMatches: Boolean(t.has_live_matches ?? t.hasLiveMatches ?? (Array.isArray(t.live_matches) && t.live_matches.length > 0)),
     liveMatchesCount: t.live_matches_count ?? t.liveMatchesCount ?? (Array.isArray(t.live_matches) ? t.live_matches.length : 0),
+    communityPlatform: t.community_platform || t.communityPlatform || null,
+    customRounds: t.custom_rounds || t.customRounds || [],
     liveMatches: t.live_matches || t.liveMatches || [],
   };
 }
@@ -223,11 +232,15 @@ export async function getTournamentMatches(slugOrId: string): Promise<any[]> {
 
 export async function registerForTournament(
   tournamentId: string,
-  teamId?: string
+  teamId?: string,
+  gameId?: string
 ): Promise<{ status: string; message: string; order_id?: string; entry_fee_inr?: number }> {
   return apiClient(`/tournaments/${tournamentId}/register`, {
     method: "POST",
-    body: JSON.stringify(teamId ? { team_id: teamId } : {}),
+    body: JSON.stringify({
+      ...(teamId ? { team_id: teamId } : {}),
+      ...(gameId ? { game_id: gameId, in_game_id: gameId } : {}),
+    }),
   });
 }
 
@@ -276,11 +289,15 @@ export async function getTournamentRegistrationStatus(
 
 export async function registerForTournamentUpi(
   tournamentId: string,
-  teamId?: string
+  teamId?: string,
+  gameId?: string
 ): Promise<TournamentRegisterUpiResponse> {
   return apiClient<TournamentRegisterUpiResponse>(`/tournaments/${tournamentId}/register-upi`, {
     method: "POST",
-    body: JSON.stringify(teamId ? { team_id: teamId } : {}),
+    body: JSON.stringify({
+      ...(teamId ? { team_id: teamId } : {}),
+      ...(gameId ? { game_id: gameId, in_game_id: gameId } : {}),
+    }),
   });
 }
 
@@ -310,6 +327,8 @@ export async function submitTournamentUtr(
     team_id?: string;
     account_code?: string;
     screenshot_url?: string;
+    game_id?: string;
+    in_game_id?: string;
   }
 ): Promise<{ status: string; message: string; payment_id: string; utr: string; payment_status?: string; registration_id?: string }> {
   return apiClient(`/tournaments/${tournamentId}/submit-upi-utr`, {
@@ -384,6 +403,15 @@ export async function getTournamentHistory(tournamentId: string): Promise<Tourna
 
 export async function getTeamJourney(tournamentId: string, teamId: string): Promise<TeamJourneyResponse> {
   return apiClient<TeamJourneyResponse>(`/tournaments/${tournamentId}/teams/${teamId}/journey`);
+}
+
+export interface TournamentCommunityInfo {
+  community_platform: "DISCORD" | "WHATSAPP" | null;
+  community_link: string | null;
+}
+
+export async function getTournamentCommunity(tournamentId: string): Promise<TournamentCommunityInfo> {
+  return apiClient<TournamentCommunityInfo>(`/tournaments/${tournamentId}/community`);
 }
 
 

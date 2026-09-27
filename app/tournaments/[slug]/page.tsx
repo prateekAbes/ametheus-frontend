@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, use, useState } from "react";
-import { getTournamentBySlug, getTournamentMatches, normalizeTournament, NormalizedTournament } from "@/lib/api/tournaments";
+import { getTournamentBySlug, getTournamentMatches, normalizeTournament, NormalizedTournament, getTournamentCommunity, TournamentCommunityInfo } from "@/lib/api/tournaments";
 import Link from "next/link";
 import Image from "next/image";
 import BracketTree from "@/components/tournament/BracketTree";
@@ -31,6 +31,7 @@ export default function TournamentDetailPage({ params }: Props) {
 
   const [tournament, setTournament] = useState<NormalizedTournament | null>(null);
   const [matches, setMatches] = useState<any[]>([]);
+  const [communityInfo, setCommunityInfo] = useState<TournamentCommunityInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasFetched, setHasFetched] = useState(false);
 
@@ -65,6 +66,14 @@ export default function TournamentDetailPage({ params }: Props) {
       })
       .catch((err) => {
         console.warn("[Tournament Matches] Fetch failed gracefully:", err);
+      });
+
+    getTournamentCommunity(resolvedParams.slug)
+      .then((comm) => {
+        if (isMounted) setCommunityInfo(comm);
+      })
+      .catch(() => {
+        if (isMounted) setCommunityInfo(null);
       });
 
     return () => {
@@ -142,6 +151,11 @@ export default function TournamentDetailPage({ params }: Props) {
 
   const isSoloGame = currentTournament.gameSlug === "chess" || currentTournament.maxTeamSize === 1;
   const isComingSoon = currentTournament.status === "COMING_SOON";
+  const isRegistrationClosed =
+    currentTournament.status === "REGISTRATION_CLOSED" ||
+    currentTournament.status === "CLOSED" ||
+    currentTournament.status === "LIVE" ||
+    currentTournament.status === "COMPLETED";
 
   const handleSelectBracketMatch = (bm: any) => {
     if (!bm) return;
@@ -158,8 +172,10 @@ export default function TournamentDetailPage({ params }: Props) {
       scheduledTime: bm.scheduledTime || bm.scheduled_time || "Scheduled Bracket Match",
       status: (bm.status as any) || "CHECK_IN_OPEN",
       serverRegion: bm.serverRegion || bm.server_region || currentTournament.serverRegion,
-      lobbyCode: bm.lobby_code || `AMT-${(bm.id || "00000000").slice(0, 8).toUpperCase()}`,
-      lobbyPassword: bm.lobby_password || "AMT_VANGUARD_99",
+      lobbyCode: bm.lobby_code || bm.lobbyCode || undefined,
+      lobbyPassword: bm.lobby_password || bm.lobbyPassword || undefined,
+      joinInfoEnabled: bm.join_info_enabled || bm.joinInfoEnabled,
+      matchMessage: bm.match_message || bm.matchMessage,
       teamA: {
         id: teamAObj.id || teamAObj.tag || "t-a",
         name: teamAObj.name || "TBD (Slot 1)",
@@ -346,6 +362,39 @@ export default function TournamentDetailPage({ params }: Props) {
             </div>
           )}
 
+          {/* Participant-Only Community Access Banner */}
+          {communityInfo?.community_link && (
+            <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-[#E56A10]/15 via-[#E56A10]/5 to-transparent border border-[#E56A10]/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#E56A10]/20 text-[#E56A10] border border-[#E56A10]/40 flex items-center justify-center font-bold text-lg shrink-0">
+                  {communityInfo.community_platform === "DISCORD" ? "🎮" : "💬"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-headline font-bold text-sm text-slate-900 dark:text-white uppercase">
+                      Official Tournament {communityInfo.community_platform === "DISCORD" ? "Discord Server" : "WhatsApp Group"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      Confirmed Participant Access
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                    Connect directly with tournament arbiters, receive match room codes, and coordinate with competing rosters.
+                  </p>
+                </div>
+              </div>
+              <a
+                href={communityInfo.community_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-[#E56A10] hover:bg-[#D45900] text-white rounded-lg font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-xs"
+              >
+                <span>{communityInfo.community_platform === "DISCORD" ? "[ Join Discord ]" : "[ Join WhatsApp ]"}</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-0.5 opacity-80" />
+              </a>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8 flex flex-col justify-between">
               <div>
@@ -428,9 +477,20 @@ export default function TournamentDetailPage({ params }: Props) {
                   >
                     Registration Opens Soon
                   </button>
+                ) : isRegistrationClosed ? (
+                  <div className="space-y-2">
+                    <div className="w-full py-2.5 bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-bold text-xs uppercase tracking-wider rounded font-mono text-center border border-slate-300 dark:border-slate-700">
+                      Registration Closed
+                    </div>
+                    {isRegistered && (
+                      <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 font-bold text-xs rounded text-center font-mono">
+                        ✓ {isSoloGame ? "YOU ARE REGISTERED AS A CONTENDER" : "YOUR TEAM IS REGISTERED & CONFIRMED"}
+                      </div>
+                    )}
+                  </div>
                 ) : isRegistered ? (
                   <div className="p-3 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 font-bold text-xs rounded text-center font-mono">
-                    ✓ {isSoloGame ? "YOU ARE REGISTERED AS A CONTENDER" : "YOUR TEAM IS REGISTERED & SEEDED"}
+                    ✓ {isSoloGame ? "YOU ARE REGISTERED AS A CONTENDER" : "YOUR TEAM IS REGISTERED & CONFIRMED"}
                   </div>
                 ) : (
                   <button

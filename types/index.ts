@@ -188,8 +188,11 @@ export interface MatchLobbyInfo {
     roster: Array<{ username: string; gameId: string }>;
   };
   serverRegion: string;
-  lobbyCode: string;
-  lobbyPassword: string;
+  lobbyCode?: string;
+  lobbyPassword?: string;
+  joinInfoEnabled?: boolean;
+  joinInfo?: Record<string, string>;
+  matchMessage?: string;
   disputeNotes?: string;
   evidenceUrl?: string;
   scheduledAt?: string;

@@ -17,8 +17,10 @@ export interface Match {
   order?: number;
   status: string;
   server_region: string;
-  lobby_code: string;
-  lobby_password: string;
+  lobby_code?: string;
+  lobby_password?: string;
+  join_info_enabled?: boolean;
+  match_message?: string;
   team_a?: { id?: string; name: string; tag: string; score?: number } | null;
   team_b?: { id?: string; name: string; tag: string; score?: number } | null;
   team_a_id?: string;
@@ -165,4 +167,22 @@ export async function updateMatchScore(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export interface MatchJoinInfo {
+  join_info_enabled: boolean;
+  join_info?: {
+    join_code?: string;
+    party_id?: string;
+    room_id?: string;
+    lobby_id?: string;
+    password?: string;
+    join_link?: string;
+    [key: string]: string | undefined;
+  } | null;
+  match_message?: string | null;
+}
+
+export async function getMatchJoinInfo(matchId: string): Promise<MatchJoinInfo> {
+  return apiClient<MatchJoinInfo>(`/matches/${matchId}/join-info`);
 }

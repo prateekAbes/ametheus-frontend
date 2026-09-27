@@ -344,9 +344,12 @@ export interface AdminMarkMatchLivePayload {
 }
 
 export interface AdminCompleteMatchPayload {
-  team1_score: number;
-  team2_score: number;
-  winner_id: string;
+  team1_score?: number;
+  team2_score?: number;
+  winner_id?: string;
+  score_a?: number;
+  score_b?: number;
+  winner_team_id?: string;
 }
 
 export async function closeTournamentRegistration(
@@ -683,6 +686,51 @@ export async function getWalletAuditLogs(params?: {
   if (params?.skip) query.set("skip", String(params.skip));
   const qs = query.toString();
   return apiClient<WalletAuditSummary>(`/admin/wallet-audit-logs${qs ? `?${qs}` : ""}`);
+}
+
+export async function addTournamentRound(
+  tournamentId: string,
+  roundName: string
+): Promise<{ status: string; message: string; custom_rounds: string[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds`, {
+    method: "POST",
+    body: JSON.stringify({ round_name: roundName }),
+  });
+}
+
+export async function updateTournamentCommunity(
+  tournamentId: string,
+  platform: "DISCORD" | "WHATSAPP" | null,
+  link: string | null
+): Promise<{ status: string; message: string; community_platform: string | null; community_link: string | null }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/community`, {
+    method: "PATCH",
+    body: JSON.stringify({ community_platform: platform, community_link: link }),
+  });
+}
+
+export async function updateMatchJoinInfo(
+  matchId: string,
+  payload: {
+    join_info_enabled: boolean;
+    join_info?: Record<string, string>;
+    match_message?: string;
+  }
+): Promise<{ status: string; message: string; join_info_enabled: boolean; join_info?: Record<string, string>; match_message?: string }> {
+  return apiClient(`/admin/matches/${matchId}/join-info`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function triggerMatchReminder(
+  matchId: string,
+  reminderType: string
+): Promise<{ status: string; message: string; participants_notified: number; skipped?: boolean }> {
+  return apiClient(`/admin/matches/${matchId}/send-reminder`, {
+    method: "POST",
+    body: JSON.stringify({ reminder_type: reminderType }),
+  });
 }
 
 

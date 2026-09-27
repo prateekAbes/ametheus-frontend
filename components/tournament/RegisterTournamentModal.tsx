@@ -175,27 +175,31 @@ export default function RegisterTournamentModal({
   const activeTeams = fetchedTeams.length > 0 ? fetchedTeams : initialTeams;
   const selectedTeam = isSolo ? null : activeTeams.find((t) => t.id === selectedTeamId);
 
-  // Dynamic game identifier labels
-  let gameIdLabel = "In-Game Gamer Tag / Handle";
+  // Dynamic universal game identifier labels
+  let gameIdLabel = "Game ID";
   let gameIdPlaceholder = "e.g. SpeedDemon99";
-  let gameIdHelper = "Your registered player handle will be verified during lobby check-in.";
+  let gameIdHelper = "Please provide your full Game ID to participate.";
 
   if (gameSlug.includes("valorant")) {
-    gameIdLabel = "Riot ID with Tagline (Required for Vanguard Anti-Cheat)";
+    gameIdLabel = "Game ID (Riot ID with Tagline)";
     gameIdPlaceholder = "e.g. TenZ#0001";
-    gameIdHelper = "Must match your active Riot Games account entering the custom room.";
+    gameIdHelper = "Please provide your full Game ID to participate (Must match your active Riot Games account).";
   } else if (gameSlug.includes("counter-strike") || gameSlug.includes("cs2")) {
-    gameIdLabel = "Steam ID64 or Profile URL (Required for VAC Live)";
+    gameIdLabel = "Game ID (Steam ID64 or Profile URL)";
     gameIdPlaceholder = "e.g. 76561198012345678 or steamcommunity.com/id/handle";
-    gameIdHelper = "Steam account will be whitelisted on official 128-tick Mumbai servers.";
+    gameIdHelper = "Please provide your full Game ID to participate (Steam account will be whitelisted on server).";
   } else if (gameSlug.includes("bgmi")) {
-    gameIdLabel = "BGMI Character ID & IGN (Required)";
+    gameIdLabel = "Game ID (BGMI Character ID & IGN)";
     gameIdPlaceholder = "e.g. 5123456789 (Phoenix)";
-    gameIdHelper = "Required for custom room slot assignment.";
+    gameIdHelper = "Please provide your full Game ID to participate (Required for custom room slot).";
+  } else if (gameSlug.includes("free-fire") || gameSlug.includes("freefire")) {
+    gameIdLabel = "Game ID (Free Fire UID)";
+    gameIdPlaceholder = "e.g. 1234567890";
+    gameIdHelper = "Please provide your full Game ID to participate (In-game numeric player UID).";
   } else if (gameSlug.includes("chess")) {
-    gameIdLabel = "Chess.com or Lichess Username (Required)";
+    gameIdLabel = "Game ID (Chess.com or Lichess Username)";
     gameIdPlaceholder = "e.g. GrandmasterBlitz";
-    gameIdHelper = "Used to pair your bracket clock match.";
+    gameIdHelper = "Please provide your full Game ID to participate (Used to pair your bracket clock match).";
   }
 
   const handleProceedToCheckout = () => {
@@ -218,7 +222,7 @@ export default function RegisterTournamentModal({
       }
     }
     if (!inGameId.trim()) {
-      setError(`Please provide your ${gameIdLabel.split("(")[0].trim()} to participate.`);
+      setError("Please provide your full Game ID to participate.");
       return;
     }
     if (!acceptedRules) {
@@ -230,7 +234,7 @@ export default function RegisterTournamentModal({
     if (!tournament.entryFeeNum || tournament.entryFeeNum === 0) {
       // Free tournament
       setIsProcessing(true);
-      registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id)
+      registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id, inGameId.trim())
         .then(() => {
           setStep("SUCCESS");
           onRegistrationSuccess();
@@ -250,7 +254,7 @@ export default function RegisterTournamentModal({
     setError("");
 
     try {
-      await registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id);
+      await registerForTournament(tournament.id, isSolo ? undefined : selectedTeam?.id, inGameId.trim());
       setUpiSubmittedSuccess(false);
       setStep("SUCCESS");
       onRegistrationSuccess();
@@ -298,6 +302,8 @@ export default function RegisterTournamentModal({
         utr: clean,
         team_id: isSolo ? undefined : selectedTeam?.id,
         account_code: upiData.account_code,
+        game_id: inGameId.trim(),
+        in_game_id: inGameId.trim(),
       });
       setUpiSubmittedSuccess(true);
       setStep("SUCCESS");
@@ -836,7 +842,7 @@ export default function RegisterTournamentModal({
                 </>
               ) : (
                 <>
-                  Your team <strong className="text-slate-900 dark:text-white">{selectedTeam?.name}</strong> has been seeded into the tournament with player handle <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.
+                  Your team <strong className="text-slate-900 dark:text-white">{selectedTeam?.name}</strong> has been confirmed for the tournament with Game ID <code className="text-[#E56A10] font-bold">{inGameId}</code>. Match lobby instructions will unlock before launch.
                 </>
               )}
             </p>

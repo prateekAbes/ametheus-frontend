@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MatchLobbyInfo } from "@/types";
-import { X, CheckCircle, Copy, Server, Loader2 } from "lucide-react";
-import { checkInMatch } from "@/lib/api/matches";
+import { X, CheckCircle, Copy, Server, Loader2, ExternalLink, Key, MessageSquare, AlertCircle } from "lucide-react";
+import { checkInMatch, getMatchJoinInfo, MatchJoinInfo } from "@/lib/api/matches";
 
 interface Props {
   match: MatchLobbyInfo | null;
@@ -13,10 +13,20 @@ interface Props {
 }
 
 export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Props) {
-  const [copiedLobby, setCopiedLobby] = useState(false);
-  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [joinInfoData, setJoinInfoData] = useState<MatchJoinInfo | null>(null);
+  const [isLoadingJoinInfo, setIsLoadingJoinInfo] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !match?.id) return;
+    setIsLoadingJoinInfo(true);
+    getMatchJoinInfo(match.id)
+      .then((data) => setJoinInfoData(data))
+      .catch(() => setJoinInfoData(null))
+      .finally(() => setIsLoadingJoinInfo(false));
+  }, [isOpen, match?.id]);
 
   if (!isOpen || !match) return null;
 
@@ -33,15 +43,10 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
     }
   };
 
-  const handleCopy = (text: string, type: "lobby" | "pass") => {
+  const handleCopy = (text: string, keyName: string) => {
     navigator.clipboard.writeText(text);
-    if (type === "lobby") {
-      setCopiedLobby(true);
-      setTimeout(() => setCopiedLobby(false), 2000);
-    } else {
-      setCopiedPassword(true);
-      setTimeout(() => setCopiedPassword(false), 2000);
-    }
+    setCopiedKey(keyName);
+    setTimeout(() => setCopiedKey(null), 2000);
   };
 
   return (
@@ -118,46 +123,109 @@ export default function MatchLobbyModal({ match, isOpen, onClose, onSubmitEviden
             </div>
           </div>
 
-          {/* Dedicated Server Credentials */}
+          {/* Dedicated Server & Match Join Information */}
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-600 font-mono">
               <span className="flex items-center gap-1 text-slate-900 font-bold">
-                <Server className="w-4 h-4 text-[#E56A10]" /> DEDICATED SERVER PROTOCOL
+                <Server className="w-4 h-4 text-[#E56A10]" /> MATCH JOIN INFORMATION
               </span>
               <span>{match.serverRegion}</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-              {/* Lobby Code */}
-              <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY / ROOM ID</div>
-                  <div className="font-mono text-sm font-bold text-slate-900">{match.lobbyCode}</div>
-                </div>
-                <button
-                  onClick={() => handleCopy(match.lobbyCode, "lobby")}
-                  className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copiedLobby ? "Copied" : "Copy"}
-                </button>
+            {isLoadingJoinInfo ? (
+              <div className="py-4 text-center text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-[#E56A10]" /> Loading match credentials...
               </div>
+            ) : joinInfoData?.join_info_enabled && joinInfoData.join_info && Object.keys(joinInfoData.join_info).length > 0 ? (
+              <div className="space-y-3 pt-2 border-t border-slate-200">
+                {joinInfoData.match_message && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-mono text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                    <MessageSquare className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block uppercase text-[10px]">Arbiter Instructions</span>
+                      {joinInfoData.match_message}
+                    </div>
+                  </div>
+                )}
 
-              {/* Lobby Password */}
-              <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY PASSWORD</div>
-                  <div className="font-mono text-sm font-bold text-amber-600">{match.lobbyPassword}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Object.entries(joinInfoData.join_info).map(([key, val]) => {
+                    if (!val) return null;
+                    const label = key.replace(/_/g, " ").toUpperCase();
+                    const isLink = key.includes("link") || key.includes("url") || val.startsWith("http");
+
+                    return (
+                      <div key={key} className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
+                        <div className="min-w-0 flex-1 mr-2">
+                          <div className="text-[10px] text-slate-500 font-mono uppercase">{label}</div>
+                          <div className="font-mono text-sm font-bold text-slate-900 truncate">{val}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isLink && (
+                            <a
+                              href={val}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 bg-[#E56A10]/10 border border-[#E56A10] text-[#E56A10] hover:bg-[#E56A10] hover:text-white rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(val, key)}
+                            className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copiedKey === key ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <button
-                  onClick={() => handleCopy(match.lobbyPassword, "pass")}
-                  className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copiedPassword ? "Copied" : "Copy"}
-                </button>
               </div>
-            </div>
+            ) : match.lobbyCode && match.lobbyCode !== "TBD" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY / ROOM ID</div>
+                    <div className="font-mono text-sm font-bold text-slate-900">{match.lobbyCode}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(match.lobbyCode || "", "lobby")}
+                    className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copiedKey === "lobby" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                {match.lobbyPassword && (
+                  <div className="bg-white border border-slate-200 p-3 rounded-lg flex items-center justify-between shadow-xs">
+                    <div>
+                      <div className="text-[10px] text-slate-500 font-mono uppercase">LOBBY PASSWORD</div>
+                      <div className="font-mono text-sm font-bold text-amber-600">{match.lobbyPassword}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(match.lobbyPassword || "", "pass")}
+                      className="p-1.5 bg-slate-100 border border-slate-200 hover:border-[#E56A10] text-slate-700 hover:text-slate-900 rounded text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      {copiedKey === "pass" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-white border border-dashed border-slate-300 rounded-lg text-center space-y-1">
+                <div className="text-xs font-mono font-bold text-slate-700">Credentials Pending Release</div>
+                <p className="text-[11px] text-slate-500 font-mono">
+                  Dedicated in-game room code and password will appear here once released by match arbiters prior to launch.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Roster & In-Game IDs */}

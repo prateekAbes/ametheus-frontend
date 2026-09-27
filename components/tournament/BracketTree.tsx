@@ -12,7 +12,7 @@ export default function BracketTree({ rounds, onSelectMatch }: Props) {
   if (!rounds || rounds.length === 0) {
     return (
       <div className="p-12 text-center bg-[#F8F9FA] rounded-xl border border-dashed border-[#CBD5E1] text-[#64748B] text-xs">
-        Tournament bracket will be seeded and generated once registration closes.
+        Tournament bracket will be generated once registration closes.
       </div>
     );
   }
@@ -72,11 +72,6 @@ export default function BracketTree({ rounds, onSelectMatch }: Props) {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        {match.teamA?.seed && (
-                          <span className="font-mono text-[10px] text-[#94A3B8]">
-                            #{match.teamA.seed}
-                          </span>
-                        )}
                         <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
                           {match.teamA?.name || "TBD"}
                         </span>
@@ -106,11 +101,6 @@ export default function BracketTree({ rounds, onSelectMatch }: Props) {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        {match.teamB?.seed && (
-                          <span className="font-mono text-[10px] text-[#94A3B8]">
-                            #{match.teamB.seed}
-                          </span>
-                        )}
                         <span className="text-xs text-[#0F172A] truncate max-w-[130px]">
                           {match.teamB?.name || "TBD"}
                         </span>
