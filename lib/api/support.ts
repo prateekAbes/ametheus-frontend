@@ -114,13 +114,6 @@ export async function getSupportSettings(): Promise<{ support_email: string }> {
   return apiClient<{ support_email: string }>("/support/settings");
 }
 
-export async function updateSupportSettings(supportEmail: string): Promise<{ support_email: string }> {
-  return apiClient<{ support_email: string }>("/support/settings", {
-    method: "PUT",
-    body: JSON.stringify({ support_email: supportEmail }),
-  });
-}
-
 export async function retrySupportTicketEmail(
   ticketId: string,
   target: "USER" | "SUPPORT" | "ALL" = "ALL"

@@ -8,10 +8,24 @@ export interface EmailSettings {
   updated_by?: string | null;
 }
 
-export interface EmailSettingsUpdatePayload {
-  official_email: string;
-  support_email: string;
-  automated_email: string;
+export interface EmailServiceStatusItem {
+  service: string;
+  email: string;
+  display_name: string;
+  smtp_host: string;
+  smtp_port: number;
+  use_tls: boolean;
+  configured: boolean;
+  status: string; // "Configured" | "Not Configured"
+}
+
+export interface EmailSystemStatusResponse {
+  email_enabled: boolean;
+  services: {
+    support: EmailServiceStatusItem;
+    noreply: EmailServiceStatusItem;
+    official: EmailServiceStatusItem;
+  };
 }
 
 export interface SmtpStatus {
@@ -19,6 +33,7 @@ export interface SmtpStatus {
   connected: boolean;
   authenticated: boolean;
   sender: string;
+  service?: string;
   host?: string | null;
   port?: number | null;
   secure?: boolean;
@@ -27,11 +42,14 @@ export interface SmtpStatus {
 }
 
 export interface SendTestEmailPayload {
+  service: "support" | "noreply" | "official";
   to_email: string;
 }
 
 export interface SendTestEmailResult {
   success: boolean;
+  service: string;
+  message: string;
   message_id?: string | null;
   error_code?: string | null;
   error_details?: string | null;
@@ -42,21 +60,16 @@ export async function getEmailSettingsPublic(): Promise<EmailSettings> {
   return apiClient<EmailSettings>("/platform/email-settings");
 }
 
+export async function getEmailSystemStatusAdmin(): Promise<EmailSystemStatusResponse> {
+  return apiClient<EmailSystemStatusResponse>("/admin/email/status");
+}
+
 export async function getEmailSettingsAdmin(): Promise<EmailSettings> {
   return apiClient<EmailSettings>("/admin/email/settings");
 }
 
-export async function updateEmailSettingsAdmin(
-  payload: EmailSettingsUpdatePayload
-): Promise<EmailSettings> {
-  return apiClient<EmailSettings>("/admin/email/settings", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getSmtpStatusAdmin(): Promise<SmtpStatus> {
-  return apiClient<SmtpStatus>("/admin/email/smtp-status");
+export async function getSmtpStatusAdmin(service: string = "support"): Promise<SmtpStatus> {
+  return apiClient<SmtpStatus>(`/admin/email/smtp-status?service=${encodeURIComponent(service)}`);
 }
 
 export async function sendTestEmailAdmin(

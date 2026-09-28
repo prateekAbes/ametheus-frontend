@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { getEmailSettingsPublic, EmailSettings } from "@/lib/api/email_settings";
 
 const DEFAULT_SETTINGS: EmailSettings = {
-  official_email: "ametheus@gmail.com",
-  support_email: "ametheus.support@gmail.com",
-  automated_email: "ametheus.noreply@gmail.com",
+  official_email: "official.ametheus@gmail.com",
+  support_email: "support.ametheus@gmail.com",
+  automated_email: "noreply.ametheus@gmail.com",
 };
 
 let cachedSettings: EmailSettings = DEFAULT_SETTINGS;

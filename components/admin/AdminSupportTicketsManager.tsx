@@ -27,7 +27,6 @@ import {
   getSupportTicketDetails,
   updateSupportTicket,
   getSupportSettings,
-  updateSupportSettings,
   retrySupportTicketEmail,
   SupportTicket,
   SupportLog,
@@ -100,10 +99,8 @@ export default function AdminSupportTicketsManager() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Configurable Support Email State
-  const [supportEmailConfig, setSupportEmailConfig] = useState<string>("ametheus.gg@gmail.com");
-  const [isSavingSupportEmail, setIsSavingSupportEmail] = useState(false);
-  const [supportEmailSaveMsg, setSupportEmailSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Support Email Destination (Read-Only from Server Environment)
+  const [supportEmailConfig, setSupportEmailConfig] = useState<string>("support.ametheus@gmail.com");
 
   // Email Retry State
   const [isRetryingEmail, setIsRetryingEmail] = useState<string | null>(null);
@@ -115,23 +112,6 @@ export default function AdminSupportTicketsManager() {
       })
       .catch((err) => console.warn("Could not load support email settings:", err));
   }, []);
-
-  const handleSaveSupportEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supportEmailConfig.trim()) return;
-    setIsSavingSupportEmail(true);
-    setSupportEmailSaveMsg(null);
-    try {
-      const res = await updateSupportSettings(supportEmailConfig.trim());
-      setSupportEmailConfig(res.support_email);
-      setSupportEmailSaveMsg({ type: "success", text: "Support recipient email updated successfully!" });
-      setTimeout(() => setSupportEmailSaveMsg(null), 4000);
-    } catch (err: any) {
-      setSupportEmailSaveMsg({ type: "error", text: err?.message || "Failed to update support email." });
-    } finally {
-      setIsSavingSupportEmail(false);
-    }
-  };
 
   const handleRetryEmail = async (target: "USER" | "SUPPORT" | "ALL") => {
     if (!activeTicket) return;
@@ -279,35 +259,14 @@ export default function AdminSupportTicketsManager() {
           </div>
         </div>
 
-        <form onSubmit={handleSaveSupportEmail} className="flex items-center gap-2 w-full md:w-auto">
-          <input
-            type="email"
-            required
-            value={supportEmailConfig}
-            onChange={(e) => setSupportEmailConfig(e.target.value)}
-            placeholder="support@ametheus.gg"
-            className="px-3 py-1.5 bg-[#0B0E16] border border-[#242C3D] focus:border-[#E56A10] rounded-lg text-xs font-mono text-white outline-none w-full md:w-64"
-          />
-          <button
-            type="submit"
-            disabled={isSavingSupportEmail}
-            className="px-3.5 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-          >
-            {isSavingSupportEmail ? "Saving..." : "Save"}
-          </button>
-        </form>
-      </div>
-      {supportEmailSaveMsg && (
-        <div
-          className={`p-2.5 rounded-lg border text-xs font-mono ${
-            supportEmailSaveMsg.type === "success"
-              ? "bg-emerald-950/60 border-emerald-500 text-emerald-300"
-              : "bg-rose-950/60 border-rose-500 text-rose-300"
-          }`}
-        >
-          {supportEmailSaveMsg.text}
+        <div className="flex items-center gap-2">
+          <div className="px-3.5 py-1.5 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono text-white flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-bold text-slate-200">{supportEmailConfig || "support.ametheus@gmail.com"}</span>
+            <span className="text-[10px] text-slate-500 font-mono">(Server Environment)</span>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-[#121622] border border-[#242C3D] rounded-xl">
