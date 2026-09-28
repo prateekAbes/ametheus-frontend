@@ -10,9 +10,9 @@ export const NOREPLY_EMAIL = "noreply.ametheus@gmail.com";
 export const SUPPORT_PHONE = process.env.NEXT_PUBLIC_SUPPORT_PHONE || "";
 
 export const SOCIAL_LINKS = {
-  instagram: "https://www.instagram.com/ametheus.gg/",
-  youtube: "https://www.youtube.com/@ametheus.goodgame",
-  discord: "https://discord.gg/U59y39QnF",
+  instagram: "https://www.instagram.com/official.ametheus",
+  youtube: "https://www.youtube.com/@official.ametheus.goodgame",
+  discord: "https://discord.gg/VzkfuK7We",
   website: "https://ametheus.gg",
   email: "official.ametheus@gmail.com",
 };

@@ -80,3 +80,55 @@ export async function sendTestEmailAdmin(
     body: JSON.stringify(payload),
   });
 }
+
+export interface OfficialEmailSendPayload {
+  recipient_type: "ALL_USERS" | "SELECTED_USERS" | "SELECTED_TEAMS" | "CUSTOM_EMAILS";
+  user_ids?: string[];
+  team_ids?: string[];
+  custom_emails?: string[];
+  subject: string;
+  message: string;
+}
+
+export interface OfficialEmailSendResult {
+  success: boolean;
+  message: string;
+  recipient_count: number;
+  log_id: string;
+}
+
+export interface OfficialEmailLogItem {
+  id: string;
+  sender: string;
+  recipient_type: string;
+  recipient_count: number;
+  recipients_sample: string[];
+  subject: string;
+  status: string;
+  created_at: string;
+  operator_id?: string | null;
+  error_summary?: string | null;
+}
+
+export interface OfficialEmailHistoryResponse {
+  total: number;
+  items: OfficialEmailLogItem[];
+}
+
+export async function sendOfficialEmailAdmin(
+  payload: OfficialEmailSendPayload
+): Promise<OfficialEmailSendResult> {
+  return apiClient<OfficialEmailSendResult>("/admin/email/official/send", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getOfficialEmailHistoryAdmin(
+  limit: number = 50
+): Promise<OfficialEmailHistoryResponse> {
+  return apiClient<OfficialEmailHistoryResponse>(
+    `/admin/email/official/history?limit=${limit}`
+  );
+}
+

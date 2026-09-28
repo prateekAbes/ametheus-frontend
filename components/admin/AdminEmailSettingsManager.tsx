@@ -23,12 +23,15 @@ import {
   SmtpStatus,
   SendTestEmailResult,
 } from "@/lib/api/email_settings";
+import AdminOfficialMailManager from "./AdminOfficialMailManager";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type IdentityType = "support" | "noreply" | "official";
 
 export default function AdminEmailSettingsManager() {
+  const [activeSubTab, setActiveSubTab] = useState<"architecture" | "official_mail">("architecture");
+
   // System Status State
   const [systemStatus, setSystemStatus] = useState<EmailSystemStatusResponse | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(true);
@@ -148,7 +151,40 @@ export default function AdminEmailSettingsManager() {
         </div>
       )}
 
-      {/* 3 EMAIL SERVICES CARDS (READ-ONLY AS PER SPECIFICATION) */}
+      {/* SUB-NAVIGATION TABS */}
+      <div className="flex items-center gap-2 border-b border-[#242C3D] pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("architecture")}
+          className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === "architecture"
+              ? "bg-[#E56A10] text-white shadow-xs"
+              : "bg-[#111622] border border-[#242C3D] text-slate-400 hover:text-white hover:border-slate-600"
+          }`}
+        >
+          <Server className="w-3.5 h-3.5" />
+          <span>SMTP Architecture &amp; Health</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("official_mail")}
+          className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === "official_mail"
+              ? "bg-[#E56A10] text-white shadow-xs"
+              : "bg-[#111622] border border-[#242C3D] text-slate-400 hover:text-white hover:border-slate-600"
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          <span>Official Mail Dispatch</span>
+        </button>
+      </div>
+
+      {activeSubTab === "official_mail" ? (
+        <AdminOfficialMailManager />
+      ) : (
+        <>
+          {/* 3 EMAIL SERVICES CARDS (READ-ONLY AS PER SPECIFICATION) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* 1. SUPPORT EMAIL */}
         <div className="bg-[#111622] border border-[#242C3D] rounded-xl p-5 relative overflow-hidden shadow-xs">
@@ -468,6 +504,8 @@ export default function AdminEmailSettingsManager() {
           </form>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

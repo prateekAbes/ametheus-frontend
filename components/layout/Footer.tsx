@@ -152,7 +152,7 @@ export default function Footer() {
                   rel="noopener noreferrer"
                   className="hover:text-white transition-colors flex items-center gap-1.5"
                 >
-                  <span className="text-[#E1306C] font-bold">●</span> Instagram (@ametheus.gg)
+                  <span className="text-[#E1306C] font-bold">●</span> Instagram (@official.ametheus)
                 </a>
               </li>
               <li>
