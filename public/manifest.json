@@ -8,14 +8,10 @@
   "theme_color": "#E56A10",
   "icons": [
     {
-      "src": "/brand/ametheus-logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/ametheus-logo.png",
-      "sizes": "512x95",
-      "type": "image/png"
+      "src": "/ametheus-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

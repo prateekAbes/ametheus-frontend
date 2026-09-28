@@ -1,0 +1,17 @@
+{
+  "name": "AMETHEUS — Online Esports Tournament Platform",
+  "short_name": "AMETHEUS",
+  "description": "High-stakes esports tournaments, automated brackets, verified results, and instant team competition.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0E16",
+  "theme_color": "#E56A10",
+  "icons": [
+    {
+      "src": "/ametheus-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
