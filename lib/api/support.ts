@@ -22,8 +22,10 @@ export interface SupportTicket {
   description: string;
   status: "OPEN" | "IN_PROGRESS" | "WAITING_FOR_USER" | "RESOLVED" | "CLOSED";
   internal_notes?: string | null;
-  email_status: "PENDING" | "SENT" | "FAILED";
+  email_status: "PENDING" | "SENT" | "PARTIAL" | "FAILED" | string;
   email_error?: string | null;
+  user_email_status?: string | null;
+  support_email_status?: string | null;
   logs: SupportLog[];
   created_at: string;
   updated_at: string;
@@ -53,6 +55,8 @@ export interface SupportTicketPublicResponse {
   created_at: string;
   email_status?: string;
   email_error?: string | null;
+  user_email?: { sent: boolean; status: string; error?: string | null; recipient?: string };
+  support_email?: { sent: boolean; status: string; error?: string | null; recipient?: string };
   message: string;
 }
 
@@ -105,3 +109,25 @@ export async function updateSupportTicket(
 export async function getMySupportTickets(): Promise<SupportTicket[]> {
   return apiClient<SupportTicket[]>("/support/my-tickets");
 }
+
+export async function getSupportSettings(): Promise<{ support_email: string }> {
+  return apiClient<{ support_email: string }>("/support/settings");
+}
+
+export async function updateSupportSettings(supportEmail: string): Promise<{ support_email: string }> {
+  return apiClient<{ support_email: string }>("/support/settings", {
+    method: "PUT",
+    body: JSON.stringify({ support_email: supportEmail }),
+  });
+}
+
+export async function retrySupportTicketEmail(
+  ticketId: string,
+  target: "USER" | "SUPPORT" | "ALL" = "ALL"
+): Promise<SupportTicket> {
+  return apiClient<SupportTicket>(`/support/tickets/${ticketId}/retry-email`, {
+    method: "POST",
+    body: JSON.stringify({ target }),
+  });
+}
+

@@ -26,6 +26,9 @@ import {
   getAdminSupportTickets,
   getSupportTicketDetails,
   updateSupportTicket,
+  getSupportSettings,
+  updateSupportSettings,
+  retrySupportTicketEmail,
   SupportTicket,
   SupportLog,
 } from "@/lib/api/support";
@@ -96,6 +99,62 @@ export default function AdminSupportTicketsManager() {
   const [internalNotes, setInternalNotes] = useState<string>("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Configurable Support Email State
+  const [supportEmailConfig, setSupportEmailConfig] = useState<string>("ametheus.gg@gmail.com");
+  const [isSavingSupportEmail, setIsSavingSupportEmail] = useState(false);
+  const [supportEmailSaveMsg, setSupportEmailSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Email Retry State
+  const [isRetryingEmail, setIsRetryingEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSupportSettings()
+      .then((res) => {
+        if (res?.support_email) setSupportEmailConfig(res.support_email);
+      })
+      .catch((err) => console.warn("Could not load support email settings:", err));
+  }, []);
+
+  const handleSaveSupportEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportEmailConfig.trim()) return;
+    setIsSavingSupportEmail(true);
+    setSupportEmailSaveMsg(null);
+    try {
+      const res = await updateSupportSettings(supportEmailConfig.trim());
+      setSupportEmailConfig(res.support_email);
+      setSupportEmailSaveMsg({ type: "success", text: "Support recipient email updated successfully!" });
+      setTimeout(() => setSupportEmailSaveMsg(null), 4000);
+    } catch (err: any) {
+      setSupportEmailSaveMsg({ type: "error", text: err?.message || "Failed to update support email." });
+    } finally {
+      setIsSavingSupportEmail(false);
+    }
+  };
+
+  const handleRetryEmail = async (target: "USER" | "SUPPORT" | "ALL") => {
+    if (!activeTicket) return;
+    setIsRetryingEmail(target);
+    setActionMsg(null);
+    try {
+      const updated = await retrySupportTicketEmail(activeTicket.ticket_id, target);
+      setActiveTicket(updated);
+      setTickets((prev) => prev.map((t) => (t.ticket_id === updated.ticket_id ? updated : t)));
+      setActionMsg({
+        type: "success",
+        text: `Email retry dispatched (${target === "USER" ? "User Confirmation" : target === "SUPPORT" ? "Admin Notification" : "Both"}). Current Status: ${updated.email_status}`,
+      });
+    } catch (err: any) {
+      setActionMsg({
+        type: "error",
+        text: err?.message || "Failed to retry email delivery.",
+      });
+    } finally {
+      setIsRetryingEmail(null);
+    }
+  };
+
 
   const fetchTickets = useCallback(async () => {
     setIsLoading(true);
@@ -201,6 +260,55 @@ export default function AdminSupportTicketsManager() {
         </button>
       </div>
 
+      {/* Configurable Support Email Setting */}
+      <div className="bg-[#121622] border border-[#242C3D] rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#E56A10]/15 text-[#E56A10] border border-[#E56A10]/30 flex items-center justify-center shrink-0">
+            <Mail className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-mono font-bold uppercase text-white flex items-center gap-2">
+              Support Notification Email
+              <span className="text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-1.5 py-0.2 rounded">
+                Admin Target
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-[#94A3B8]">
+              Automated admin copies of all user support tickets are dispatched to this address.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveSupportEmail} className="flex items-center gap-2 w-full md:w-auto">
+          <input
+            type="email"
+            required
+            value={supportEmailConfig}
+            onChange={(e) => setSupportEmailConfig(e.target.value)}
+            placeholder="support@ametheus.gg"
+            className="px-3 py-1.5 bg-[#0B0E16] border border-[#242C3D] focus:border-[#E56A10] rounded-lg text-xs font-mono text-white outline-none w-full md:w-64"
+          />
+          <button
+            type="submit"
+            disabled={isSavingSupportEmail}
+            className="px-3.5 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            {isSavingSupportEmail ? "Saving..." : "Save"}
+          </button>
+        </form>
+      </div>
+      {supportEmailSaveMsg && (
+        <div
+          className={`p-2.5 rounded-lg border text-xs font-mono ${
+            supportEmailSaveMsg.type === "success"
+              ? "bg-emerald-950/60 border-emerald-500 text-emerald-300"
+              : "bg-rose-950/60 border-rose-500 text-rose-300"
+          }`}
+        >
+          {supportEmailSaveMsg.text}
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-[#121622] border border-[#242C3D] rounded-xl">
         {/* Status Filters */}
@@ -254,7 +362,7 @@ export default function AdminSupportTicketsManager() {
             Total Tickets: <span className="text-white font-bold">{totalCount}</span>
           </span>
           <span className="text-[11px] font-mono text-[#64748B]">
-            Automated email confirmations enabled via ametheus.gg@gmail.com
+            Automated email confirmations enabled via {supportEmailConfig || "configured support desk"}
           </span>
         </div>
 
@@ -530,6 +638,63 @@ export default function AdminSupportTicketsManager() {
                   onChange={(e) => setInternalNotes(e.target.value)}
                   className="w-full px-4 py-2.5 bg-[#0B0E16] border border-[#242C3D] focus:border-[#E56A10] rounded-xl text-xs font-mono text-white placeholder-[#64748B] outline-none"
                 />
+              </div>
+
+              {/* Email Delivery Status & Retry Controls */}
+              <div className="p-3.5 bg-[#0B0E16] border border-[#242C3D] rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase text-[#CBD5E1] flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-[#E56A10]" />
+                    <span>Email Delivery Status:</span>
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                      activeTicket.email_status === "SENT"
+                        ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800"
+                        : activeTicket.email_status === "PARTIAL"
+                        ? "bg-amber-950/60 text-amber-400 border border-amber-800"
+                        : "bg-rose-950/60 text-rose-400 border border-rose-800"
+                    }`}
+                  >
+                    {activeTicket.email_status}
+                  </span>
+                </div>
+
+                {activeTicket.email_error && (
+                  <p className="text-[11px] font-mono text-rose-400 bg-rose-950/30 border border-rose-900/50 p-2 rounded">
+                    {activeTicket.email_error}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={isRetryingEmail !== null}
+                    onClick={() => handleRetryEmail("USER")}
+                    className="px-3 py-1.5 bg-[#1A2234] hover:bg-[#283248] text-white border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="w-3 h-3 text-[#E56A10]" />
+                    <span>{isRetryingEmail === "USER" ? "Sending..." : "Retry User Email"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRetryingEmail !== null}
+                    onClick={() => handleRetryEmail("SUPPORT")}
+                    className="px-3 py-1.5 bg-[#1A2234] hover:bg-[#283248] text-white border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="w-3 h-3 text-amber-400" />
+                    <span>{isRetryingEmail === "SUPPORT" ? "Sending..." : "Retry Support Notification"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRetryingEmail !== null}
+                    onClick={() => handleRetryEmail("ALL")}
+                    className="px-3 py-1.5 bg-[#1A2234] hover:bg-[#283248] text-white border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3 h-3 text-emerald-400" />
+                    <span>{isRetryingEmail === "ALL" ? "Retrying..." : "Retry Both"}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Event / Audit Timeline */}

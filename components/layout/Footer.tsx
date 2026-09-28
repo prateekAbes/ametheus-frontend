@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SOCIAL_LINKS } from "@/lib/constants/support";
+import { useEmailSettings } from "@/lib/hooks/useEmailSettings";
 import AmetheusLogo from "@/components/ui/AmetheusLogo";
 import { getLeaderboardStats } from "@/lib/api/leaderboard";
 
 export default function Footer() {
+  const { support_email } = useEmailSettings();
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { profile } = useAuthContext();
@@ -108,11 +110,11 @@ export default function Footer() {
               </li>
               <li className="pt-2 text-xs text-[#CBD5E1] font-mono flex flex-col gap-1.5">
                 <a
-                  href={`mailto:${SUPPORT_EMAIL}`}
+                  href={`mailto:${support_email}`}
                   className="hover:text-[#E56A10] transition-colors flex items-center gap-1.5"
                   aria-label="Email Support"
                 >
-                  <span className="text-[#E56A10]">✉</span> {SUPPORT_EMAIL}
+                  <span className="text-[#E56A10]">✉</span> {support_email}
                 </a>
                 {SUPPORT_PHONE ? (
                   <a

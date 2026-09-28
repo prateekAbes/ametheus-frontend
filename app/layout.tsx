@@ -30,8 +30,18 @@ export const metadata: Metadata = {
   description:
     "Enter the competition. High-stakes esports tournaments, automated brackets, verified results, and instant team competition.",
   icons: {
-    icon: "/brand/ametheus-logo.svg",
+    icon: [
+      { url: "/brand/ametheus-logo.svg", type: "image/svg+xml" },
+      { url: "/ametheus-icon.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+    shortcut: "/brand/ametheus-logo.svg",
+    apple: [
+      { url: "/ametheus-icon.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/ametheus-logo.svg", sizes: "any" },
+    ],
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

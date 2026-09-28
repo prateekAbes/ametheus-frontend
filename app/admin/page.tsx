@@ -51,12 +51,14 @@ import {
   Image as ImageIcon,
   QrCode,
   LifeBuoy,
+  Mail,
 } from "lucide-react";
 import { UnifiedMatchupBuilder } from "@/components/admin/UnifiedMatchupBuilder";
 import { AdminNotificationDispatcher } from "@/components/admin/AdminNotificationDispatcher";
 import AdminPageMediaManager from "@/components/admin/AdminPageMediaManager";
 import AdminSupportTicketsManager from "@/components/admin/AdminSupportTicketsManager";
 import AdminRegulationsManager from "@/components/admin/AdminRegulationsManager";
+import AdminEmailSettingsManager from "@/components/admin/AdminEmailSettingsManager";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
   getAuditLogs,
@@ -206,6 +208,7 @@ export default function AdminCockpitPage() {
     | "page_media"
     | "support_tickets"
     | "discipline_regulations"
+    | "email_settings"
   >("overview");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentRole, setCurrentRole] = useState<"SUPER_ADMIN" | "TOURNAMENT_ADMIN">("SUPER_ADMIN");
@@ -1921,15 +1924,17 @@ export default function AdminCockpitPage() {
       prev.map((p) => (p.id === targetId ? { ...p, status: "REJECTED" as any } : p))
     );
     try {
-      await rejectPayment(targetId, paymentRejectReason);
-      setActionMessage("Payment rejected.");
+      const res = await rejectPayment(targetId, paymentRejectReason);
+      setActionMessage(res?.message || "Payment rejected successfully.");
       setRejectingPayment(null);
       setPaymentRejectReason("");
-      const payments = await getAdminPayments();
+      const currentFilter = paymentFilter !== "ALL" ? paymentFilter : undefined;
+      const payments = await getAdminPayments(currentFilter);
       setAdminPayments(payments);
       setTimeout(() => setActionMessage(""), 5000);
     } catch (err: any) {
-      const payments = await getAdminPayments();
+      const currentFilter = paymentFilter !== "ALL" ? paymentFilter : undefined;
+      const payments = await getAdminPayments(currentFilter);
       setAdminPayments(payments);
       setActionMessage(err?.message || "Failed to reject payment.");
       setTimeout(() => setActionMessage(""), 6000);
@@ -2378,6 +2383,16 @@ export default function AdminCockpitPage() {
                 }`}
               >
                 <Scale className="w-3.5 h-3.5" /> Discipline Regulations
+              </button>
+              <button
+                onClick={() => setActiveTab("email_settings")}
+                className={`px-3.5 py-1.5 rounded transition-all font-bold uppercase flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === "email_settings"
+                    ? "bg-[#E56A10] text-white shadow-xs"
+                    : "text-[#94A3B8] hover:text-white hover:bg-[#161A24]"
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" /> Email Settings
               </button>
             </>
           )}
@@ -3487,6 +3502,11 @@ export default function AdminCockpitPage() {
         {/* TAB: GAME DISCIPLINE REGULATIONS & DYNAMIC TABLES */}
         {activeTab === "discipline_regulations" && isSuperAdmin && (
           <AdminRegulationsManager />
+        )}
+
+        {/* TAB: EMAIL & SMTP SETTINGS */}
+        {activeTab === "email_settings" && isSuperAdmin && (
+          <AdminEmailSettingsManager />
         )}
 
         {/* TAB: TOURNAMENTS MANAGEMENT & ABSOLUTE ADMIN CONTROL */}

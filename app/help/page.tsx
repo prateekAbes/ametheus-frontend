@@ -22,6 +22,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/constants/support";
+import { useEmailSettings } from "@/lib/hooks/useEmailSettings";
 
 interface FaqItem {
   id: string;
@@ -240,6 +241,7 @@ const GUIDES: GuideItem[] = [
 ];
 
 function HelpCenterContent() {
+  const { support_email } = useEmailSettings();
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") || "all";
 
@@ -502,8 +504,8 @@ function HelpCenterContent() {
               Submit an official support ticket to our 24/7 arbitration desk for immediate resolution.
             </p>
             <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-700">
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-1.5 hover:text-[#E56A10] transition-colors">
-                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_EMAIL}
+              <a href={`mailto:${support_email}`} className="flex items-center gap-1.5 hover:text-[#E56A10] transition-colors">
+                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {support_email}
               </a>
               {SUPPORT_PHONE ? (
                 <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-1.5 hover:text-[#E56A10] transition-colors">

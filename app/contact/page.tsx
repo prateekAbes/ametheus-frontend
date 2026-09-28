@@ -21,6 +21,7 @@ import {
   LifeBuoy,
 } from "lucide-react";
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/constants/support";
+import { useEmailSettings } from "@/lib/hooks/useEmailSettings";
 import { createSupportTicket, SupportTicketPublicResponse } from "@/lib/api/support";
 
 const CATEGORIES = [
@@ -46,6 +47,7 @@ const PAYMENT_TYPES = [
 ];
 
 export default function ContactPage() {
+  const { support_email } = useEmailSettings();
   const { user, isLoaded } = useUser();
 
   const [name, setName] = useState("");
@@ -179,28 +181,50 @@ export default function ContactPage() {
 
               <div className="text-xs font-mono text-slate-500 space-y-2 bg-[#EFF4FF] p-4 rounded-xl text-left border border-[#D3E4FE]">
                 <div className="flex items-center gap-2 font-bold text-[#0B1C30]">
-                  <Mail className="w-4 h-4 text-[#E56A10]" /> Confirmation &amp; Routing Details
+                  <Mail className="w-4 h-4 text-[#E56A10]" /> Confirmation &amp; Email Delivery Status
                 </div>
-                {createdTicket.email_status === "SENT" ? (
-                  <p className="text-slate-600 leading-relaxed">
-                    • A confirmation email has been dispatched to <strong>{email}</strong> with your Ticket ID and issue summary.
-                    <br />
-                    • A notification copy was transmitted to <strong>ametheus.gg@gmail.com</strong>.
-                    <br />
-                    • Please reference <strong>{createdTicket.ticket_id}</strong> in any future correspondence regarding this request.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 text-slate-600 leading-relaxed">
-                    <p>
-                      • Ticket reference <strong>{createdTicket.ticket_id}</strong> is safely logged in the database and audit trail.
-                    </p>
-                    <p className="text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200">
+
+                {/* User email status */}
+                <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200">
+                  <span>User Confirmation Copy ({email}):</span>
+                  {createdTicket.user_email?.status === "sent" || (createdTicket.email_status === "SENT" && !createdTicket.user_email) ? (
+                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Dispatched
+                    </span>
+                  ) : (
+                    <span className="text-amber-800 font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Delivery Failed / Offline
+                    </span>
+                  )}
+                </div>
+
+                {/* Support notification email status */}
+                <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-200">
+                  <span>Ametheus Support Notification Copy:</span>
+                  {createdTicket.support_email?.status === "sent" || (createdTicket.email_status === "SENT" && !createdTicket.support_email) ? (
+                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Dispatched
+                    </span>
+                  ) : (
+                    <span className="text-amber-800 font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Delivery Failed / Offline
+                    </span>
+                  )}
+                </div>
+
+                {createdTicket.email_status !== "SENT" ? (
+                  <div className="space-y-1 text-slate-600 leading-relaxed pt-1">
+                    <p className="text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200 text-xs">
                       • <strong>Email Delivery Note:</strong> {createdTicket.email_error || "Live SMTP relay not configured in environment"}. Your ticket is fully active in the operations queue and visible to arbiters in the Admin Cockpit.
                     </p>
-                    <p>
+                    <p className="text-xs">
                       • Please save your Ticket ID <strong>{createdTicket.ticket_id}</strong> for future reference.
                     </p>
                   </div>
+                ) : (
+                  <p className="text-slate-600 leading-relaxed pt-1 text-xs">
+                    • Both copies were successfully dispatched. Please quote <strong>{createdTicket.ticket_id}</strong> in any future correspondence regarding this request.
+                  </p>
                 )}
               </div>
 
@@ -397,8 +421,8 @@ export default function ContactPage() {
               Direct communication channels with tournament referees, support desk, and platform community operations.
             </p>
             <div className="mt-auto flex flex-col gap-1.5 text-xs text-slate-700 font-mono pt-3 border-t border-slate-100">
-              <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
-                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_EMAIL}
+              <a href={`mailto:${support_email}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
+                <Mail className="w-3.5 h-3.5 text-[#E56A10]" /> {support_email}
               </a>
               <a href={`tel:${SUPPORT_PHONE.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-[#E56A10] transition-colors">
                 <Phone className="w-3.5 h-3.5 text-[#E56A10]" /> {SUPPORT_PHONE}

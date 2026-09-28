@@ -30,6 +30,7 @@ import {
   Send,
   ExternalLink,
   MessageCircle,
+  RotateCcw,
 } from "lucide-react";
 import {
   getTournamentRegisteredRosters,
@@ -325,6 +326,54 @@ export default function UnifiedMatchupBuilder({
         });
       }
       setLocalBRDistribution(newMatches);
+    }
+  };
+
+  // Admin Manipulation: Add extra match lobby
+  const handleAddBRLobby = () => {
+    setLocalBRDistribution((prev) => {
+      const nextNum = prev.length > 0 ? Math.max(...prev.map((m) => m.match_number)) + 1 : 1;
+      return [
+        ...prev,
+        {
+          match_number: nextNum,
+          match_name: `Match ${nextNum} Lobby`,
+          team_count: 0,
+          teams: [],
+        },
+      ];
+    });
+  };
+
+  // Admin Manipulation: Remove a match lobby (redistributes any teams into lobby 1)
+  const handleRemoveBRLobby = (matchNum: number) => {
+    setLocalBRDistribution((prev) => {
+      if (prev.length <= 1) return prev;
+      const target = prev.find((m) => m.match_number === matchNum);
+      const remaining = prev.filter((m) => m.match_number !== matchNum);
+      if (target && target.teams.length > 0 && remaining.length > 0) {
+        remaining[0].teams.push(...target.teams);
+        remaining[0].team_count = remaining[0].teams.length;
+      }
+      return remaining.map((m, idx) => ({
+        ...m,
+        match_number: idx + 1,
+        match_name: m.match_name.startsWith("Match ") ? `Match ${idx + 1} Lobby` : m.match_name,
+      }));
+    });
+  };
+
+  // Admin Manipulation: Rename match lobby
+  const handleRenameBRLobby = (matchNum: number, newName: string) => {
+    setLocalBRDistribution((prev) =>
+      prev.map((m) => (m.match_number === matchNum ? { ...m, match_name: newName } : m))
+    );
+  };
+
+  // Reset distribution back to backend recommendation
+  const handleResetToRecommended = () => {
+    if (brCalcData?.preview_distribution) {
+      setLocalBRDistribution(brCalcData.preview_distribution);
     }
   };
 
@@ -1204,7 +1253,7 @@ export default function UnifiedMatchupBuilder({
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-3 shrink-0 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
@@ -1214,6 +1263,26 @@ export default function UnifiedMatchupBuilder({
                   />
                   <span>Evenly Rebalance Lobbies</span>
                 </label>
+
+                <button
+                  type="button"
+                  onClick={handleAddBRLobby}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-300 dark:border-[#2E384D]"
+                  title="Add an additional match lobby to manually distribute teams"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#E56A10]" />
+                  <span>Add Lobby</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetToRecommended}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#1F2637] dark:hover:bg-[#283248] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-300 dark:border-[#2E384D]"
+                  title="Reset lobby layout back to authoritative mathematical recommendation"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Reset to Recommended</span>
+                </button>
 
                 <button
                   type="button"
@@ -1273,8 +1342,14 @@ export default function UnifiedMatchupBuilder({
                             #{m.match_number}
                           </div>
                           <div>
-                            <h4 className="font-mono font-bold text-sm text-slate-900 dark:text-white uppercase flex items-center gap-2">
-                              {m.match_name}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={m.match_name}
+                                onChange={(e) => handleRenameBRLobby(m.match_number, e.target.value)}
+                                className="font-mono font-bold text-sm text-slate-900 dark:text-white uppercase bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-[#E56A10] focus:outline-none transition-colors px-1 py-0.5"
+                                title="Click to rename this match lobby"
+                              />
                               {dbMatch?.status === "LIVE" && (
                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase bg-rose-600 text-white animate-pulse">
                                   LIVE
@@ -1285,7 +1360,7 @@ export default function UnifiedMatchupBuilder({
                                   COMPLETED
                                 </span>
                               )}
-                            </h4>
+                            </div>
                             <span className="text-xs font-mono text-slate-500">
                               Assigned: <strong className="text-slate-900 dark:text-white">{m.teams.length}</strong> / {brCalcData?.max_teams_per_match ?? 25} Teams Capacity
                             </span>
@@ -1294,6 +1369,17 @@ export default function UnifiedMatchupBuilder({
 
                         {/* Right Header Actions */}
                         <div className="flex items-center gap-2 flex-wrap">
+                          {localBRDistribution.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBRLobby(m.match_number)}
+                              className="px-2.5 py-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-mono font-bold flex items-center gap-1 transition-colors border border-rose-200 dark:border-rose-900/50 cursor-pointer"
+                              title="Remove this lobby and move its teams into Lobby 1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove Lobby</span>
+                            </button>
+                          )}
                           {dbMatch ? (
                             <>
                               <button
