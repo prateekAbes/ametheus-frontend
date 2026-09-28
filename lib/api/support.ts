@@ -30,6 +30,10 @@ export interface SupportTicket {
   created_at: string;
   updated_at: string;
   resolved_at?: string | null;
+  is_archived?: boolean;
+  archived_at?: string | null;
+  archived_by?: string | null;
+  archive_reason?: string | null;
 }
 
 export interface SupportTicketCreatePayload {
@@ -80,6 +84,7 @@ export async function getAdminSupportTickets(params?: {
   search?: string;
   limit?: number;
   skip?: number;
+  is_archived?: boolean;
 }): Promise<SupportTicketListResponse> {
   const q = new URLSearchParams();
   if (params?.status && params.status !== "ALL") q.set("status", params.status);
@@ -87,9 +92,28 @@ export async function getAdminSupportTickets(params?: {
   if (params?.search) q.set("search", params.search);
   if (params?.limit) q.set("limit", String(params.limit));
   if (params?.skip) q.set("skip", String(params.skip));
+  if (params?.is_archived !== undefined) q.set("is_archived", String(params.is_archived));
 
   const qs = q.toString();
   return apiClient<SupportTicketListResponse>(`/support/tickets${qs ? `?${qs}` : ""}`);
+}
+
+export async function archiveSupportTicket(
+  ticketId: string,
+  reason?: string
+): Promise<{ status: string; ticket_id: string; is_archived: boolean }> {
+  return apiClient(`/support/tickets/${ticketId}/archive`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function unarchiveSupportTicket(
+  ticketId: string
+): Promise<{ status: string; ticket_id: string; is_archived: boolean }> {
+  return apiClient(`/support/tickets/${ticketId}/unarchive`, {
+    method: "POST",
+  });
 }
 
 export async function getSupportTicketDetails(ticketId: string): Promise<SupportTicket> {

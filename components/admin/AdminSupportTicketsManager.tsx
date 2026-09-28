@@ -21,6 +21,8 @@ import {
   Send,
   Save,
   ShieldAlert,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import {
   getAdminSupportTickets,
@@ -31,6 +33,9 @@ import {
   SupportTicket,
   SupportLog,
 } from "@/lib/api/support";
+import { ArchiveViewToggle } from "./ArchiveViewToggle";
+import { AdminArchiveModal } from "./AdminArchiveModal";
+import { archiveSingleRecord, restoreSingleRecord } from "@/lib/api/archive";
 
 const STATUS_CONFIG: Record<
   string,
@@ -91,6 +96,10 @@ export default function AdminSupportTicketsManager() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Archive System State
+  const [ticketView, setTicketView] = useState<"active" | "archived">("active");
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+
   // Detail Modal State
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -135,15 +144,16 @@ export default function AdminSupportTicketsManager() {
     }
   };
 
-
-  const fetchTickets = useCallback(async () => {
+  const fetchTickets = useCallback(async (view?: "active" | "archived") => {
     setIsLoading(true);
     try {
+      const currentView = view !== undefined ? view : ticketView;
       const data = await getAdminSupportTickets({
         status: selectedStatus === "ALL" ? undefined : selectedStatus,
         category: selectedCategory === "ALL" ? undefined : selectedCategory,
         search: searchQuery.trim() || undefined,
         limit: 100,
+        is_archived: currentView === "archived",
       });
       setTickets(data.tickets || []);
       setTotalCount(data.total || 0);
@@ -154,7 +164,35 @@ export default function AdminSupportTicketsManager() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedStatus, selectedCategory, searchQuery]);
+  }, [selectedStatus, selectedCategory, searchQuery, ticketView]);
+
+  const handleArchiveTicket = async (ticketId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await archiveSingleRecord("tickets", ticketId);
+      setActionMsg({ type: "success", text: `Ticket ${ticketId} archived safely.` });
+      fetchTickets();
+      if (activeTicket && activeTicket.ticket_id === ticketId) {
+        setActiveTicket(null);
+      }
+    } catch (err: any) {
+      setActionMsg({ type: "error", text: err?.message || "Failed to archive ticket." });
+    }
+  };
+
+  const handleRestoreTicket = async (ticketId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await restoreSingleRecord("tickets", ticketId);
+      setActionMsg({ type: "success", text: `Ticket ${ticketId} restored to active view.` });
+      fetchTickets();
+      if (activeTicket && activeTicket.ticket_id === ticketId) {
+        setActiveTicket(null);
+      }
+    } catch (err: any) {
+      setActionMsg({ type: "error", text: err?.message || "Failed to restore ticket." });
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -231,7 +269,7 @@ export default function AdminSupportTicketsManager() {
           </p>
         </div>
         <button
-          onClick={fetchTickets}
+          onClick={() => fetchTickets()}
           disabled={isLoading}
           className="px-4 py-2 bg-[#1A2234] hover:bg-[#232D42] border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase text-[#CBD5E1] flex items-center gap-2 transition-all cursor-pointer shrink-0"
         >
@@ -267,6 +305,19 @@ export default function AdminSupportTicketsManager() {
           </div>
         </div>
       </div>
+
+      {/* Archive View Toggle Toolbar */}
+      <ArchiveViewToggle
+        activeView={ticketView}
+        onViewChange={(v) => {
+          setTicketView(v);
+          fetchTickets(v);
+        }}
+        activeCount={ticketView === "active" ? totalCount : undefined}
+        archivedCount={ticketView === "archived" ? totalCount : undefined}
+        sectionName="Support Tickets"
+        onOpenArchiveModal={() => setIsArchiveModalOpen(true)}
+      />
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 bg-[#121622] border border-[#242C3D] rounded-xl">
@@ -424,12 +475,34 @@ export default function AdminSupportTicketsManager() {
 
                       {/* Action */}
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleOpenTicket(t)}
-                          className="px-3 py-1.5 bg-[#1A2234] hover:bg-[#E56A10] hover:text-white border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer text-[#CBD5E1]"
-                        >
-                          Arbitrate →
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenTicket(t)}
+                            className="px-3 py-1.5 bg-[#1A2234] hover:bg-[#E56A10] hover:text-white border border-[#242C3D] rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer text-[#CBD5E1]"
+                          >
+                            Arbitrate →
+                          </button>
+                          {ticketView === "active" ? (
+                            (t.status === "RESOLVED" || t.status === "CLOSED") && (
+                              <button
+                                onClick={(e) => handleArchiveTicket(t.ticket_id, e)}
+                                className="p-1.5 bg-[#1A2234] hover:bg-amber-950/40 text-slate-400 hover:text-amber-400 border border-[#242C3D] rounded-lg transition-colors cursor-pointer"
+                                title="Archive ticket"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                              </button>
+                            )
+                          ) : (
+                            <button
+                              onClick={(e) => handleRestoreTicket(t.ticket_id, e)}
+                              className="px-2.5 py-1.5 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/60 rounded-lg text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Restore ticket to active view"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Restore</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -686,27 +759,63 @@ export default function AdminSupportTicketsManager() {
               )}
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#242C3D]">
-                <button
-                  type="button"
-                  onClick={() => setActiveTicket(null)}
-                  className="px-4 py-2 text-xs font-mono text-[#94A3B8] hover:text-white"
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs font-mono uppercase tracking-wider rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Save className={`w-3.5 h-3.5 ${isUpdating ? "animate-spin" : ""}`} />
-                  <span>{isUpdating ? "Saving..." : "Save Updates & Status"}</span>
-                </button>
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-[#242C3D]">
+                <div>
+                  {activeTicket.is_archived ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreTicket(activeTicket.ticket_id)}
+                      className="px-3 py-1.5 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/60 rounded-xl text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore to Active</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveTicket(activeTicket.ticket_id)}
+                      className="px-3 py-1.5 bg-[#0B0E16] hover:bg-amber-950/40 text-slate-400 hover:text-amber-400 border border-[#242C3D] rounded-xl text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                      <span>Archive Ticket</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTicket(null)}
+                    className="px-4 py-2 text-xs font-mono text-[#94A3B8] hover:text-white"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="px-5 py-2.5 bg-[#E56A10] hover:bg-[#C95B0A] text-white font-bold text-xs font-mono uppercase tracking-wider rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className={`w-3.5 h-3.5 ${isUpdating ? "animate-spin" : ""}`} />
+                    <span>{isUpdating ? "Saving..." : "Save Updates & Status"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Support Tickets Section Archive Modal */}
+      <AdminArchiveModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        section="tickets"
+        sectionTitle="Support Tickets"
+        onArchiveSuccess={(count) => {
+          setActionMsg({ type: "success", text: `Successfully archived ${count} support ticket(s).` });
+          fetchTickets();
+          setTimeout(() => setActionMsg(null), 5000);
+        }}
+      />
     </div>
   );
 }

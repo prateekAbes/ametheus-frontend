@@ -17,12 +17,21 @@ export interface PayoutRecord {
   outgoing_utr?: string;
   rejection_reason?: string;
   created_at: string;
+  is_archived?: boolean;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
 }
 
-export async function getAdminPayments(statusFilter?: string, gameId?: string): Promise<PaymentRecord[]> {
+export async function getAdminPayments(
+  statusFilter?: string,
+  gameId?: string,
+  isArchived: boolean = false
+): Promise<PaymentRecord[]> {
   const params = new URLSearchParams();
   if (statusFilter && statusFilter !== "ALL") params.set("status_filter", statusFilter);
   if (gameId) params.set("game_id", gameId);
+  params.set("is_archived", String(isArchived));
   const q = params.toString();
   return apiClient<PaymentRecord[]>(`/admin/payments${q ? `?${q}` : ""}`);
 }
@@ -40,9 +49,15 @@ export async function rejectPayment(paymentId: string, reason?: string): Promise
   });
 }
 
-export async function getAdminPayouts(statusFilter?: string): Promise<PayoutRecord[]> {
-  const q = statusFilter && statusFilter !== "ALL" ? `?status_filter=${statusFilter}` : "";
-  return apiClient<PayoutRecord[]>(`/admin/payouts${q}`);
+export async function getAdminPayouts(
+  statusFilter?: string,
+  isArchived: boolean = false
+): Promise<PayoutRecord[]> {
+  const params = new URLSearchParams();
+  if (statusFilter && statusFilter !== "ALL") params.set("status_filter", statusFilter);
+  params.set("is_archived", String(isArchived));
+  const q = params.toString();
+  return apiClient<PayoutRecord[]>(`/admin/payouts?${q}`);
 }
 
 export async function createWinningPayout(payload: {

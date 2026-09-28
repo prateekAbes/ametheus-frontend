@@ -21,6 +21,10 @@ export interface PaymentRecord {
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejection_reason?: string;
   created_at: string;
+  is_archived?: boolean;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
 }
 
 export async function submitPaymentUtr(

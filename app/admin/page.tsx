@@ -52,6 +52,9 @@ import {
   QrCode,
   LifeBuoy,
   Mail,
+  Archive,
+  RotateCcw,
+  History,
 } from "lucide-react";
 import { UnifiedMatchupBuilder } from "@/components/admin/UnifiedMatchupBuilder";
 import { AdminNotificationDispatcher } from "@/components/admin/AdminNotificationDispatcher";
@@ -59,6 +62,9 @@ import AdminPageMediaManager from "@/components/admin/AdminPageMediaManager";
 import AdminSupportTicketsManager from "@/components/admin/AdminSupportTicketsManager";
 import AdminRegulationsManager from "@/components/admin/AdminRegulationsManager";
 import AdminEmailSettingsManager from "@/components/admin/AdminEmailSettingsManager";
+import { ArchiveViewToggle } from "@/components/admin/ArchiveViewToggle";
+import { AdminArchiveModal } from "@/components/admin/AdminArchiveModal";
+import { archiveSingleRecord, restoreSingleRecord } from "@/lib/api/archive";
 import { useAuth, useUser, SignInButton } from "@clerk/nextjs";
 import {
   getAuditLogs,
@@ -264,6 +270,8 @@ export default function AdminCockpitPage() {
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditView, setAuditView] = useState<"active" | "archived">("active");
+  const [isAuditArchiveModalOpen, setIsAuditArchiveModalOpen] = useState(false);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -351,6 +359,8 @@ export default function AdminCockpitPage() {
   const [walletAuditLoading, setWalletAuditLoading] = useState(false);
   const [walletAuditSearch, setWalletAuditSearch] = useState("");
   const [walletAuditTypeFilter, setWalletAuditTypeFilter] = useState("ALL");
+  const [walletAuditView, setWalletAuditView] = useState<"active" | "archived">("active");
+  const [isWalletArchiveModalOpen, setIsWalletArchiveModalOpen] = useState(false);
 
   // Dynamic Stages & Rounds Management State
   const [tournamentStages, setTournamentStages] = useState<AdminTournamentStage[]>([]);
@@ -479,6 +489,8 @@ export default function AdminCockpitPage() {
   const [rejectingPayment, setRejectingPayment] = useState<PaymentRecord | null>(null);
   const [paymentRejectReason, setPaymentRejectReason] = useState("UTR reference not found in bank ledger");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentView, setPaymentView] = useState<"active" | "archived">("active");
+  const [isPaymentArchiveModalOpen, setIsPaymentArchiveModalOpen] = useState(false);
 
   // Payouts Ledger State
   const [adminPayouts, setAdminPayouts] = useState<PayoutRecord[]>([]);
@@ -488,6 +500,8 @@ export default function AdminCockpitPage() {
   const [rejectingPayoutRecord, setRejectingPayoutRecord] = useState<PayoutRecord | null>(null);
   const [payoutRejectReason, setPayoutRejectReason] = useState("Beneficiary account / UPI ID declined");
   const [isProcessingPayoutAction, setIsProcessingPayoutAction] = useState(false);
+  const [payoutView, setPayoutView] = useState<"active" | "archived">("active");
+  const [isPayoutArchiveModalOpen, setIsPayoutArchiveModalOpen] = useState(false);
 
   // Manual Winning Payout State
   const [isWinningPayoutModalOpen, setIsWinningPayoutModalOpen] = useState(false);
@@ -1364,12 +1378,14 @@ export default function AdminCockpitPage() {
 
   // ── Wallet Audit Logs Handlers ───────────────────────────────────────────────
   const loadWalletAuditLogs = useCallback(
-    async (search?: string, type?: string) => {
+    async (search?: string, type?: string, view?: "active" | "archived") => {
       setWalletAuditLoading(true);
       try {
+        const currentView = view !== undefined ? view : walletAuditView;
         const data = await getWalletAuditLogs({
           search: search !== undefined ? search : walletAuditSearch,
           txn_type: type !== undefined ? type : walletAuditTypeFilter,
+          is_archived: currentView === "archived",
         });
         setWalletAuditSummary(data);
       } catch (err: any) {
@@ -1378,7 +1394,7 @@ export default function AdminCockpitPage() {
         setWalletAuditLoading(false);
       }
     },
-    [walletAuditSearch, walletAuditTypeFilter]
+    [walletAuditSearch, walletAuditTypeFilter, walletAuditView]
   );
 
   // ── Dynamic Tournament Stages & Rounds Handlers ──────────────────────────────
@@ -2007,6 +2023,144 @@ export default function AdminCockpitPage() {
       setTimeout(() => setActionMessage(""), 6000);
     } finally {
       setIsSubmittingWinningPayout(false);
+    }
+  };
+
+  // ── Unified Section Archive & Restore Handlers ──────────────────────────────
+  const loadAdminPayments = useCallback(
+    async (filter?: string, view?: "active" | "archived") => {
+      try {
+        const currentFilter = filter !== undefined ? filter : (paymentFilter !== "ALL" ? paymentFilter : undefined);
+        const currentView = view !== undefined ? view : paymentView;
+        const payments = await getAdminPayments(currentFilter, undefined, currentView === "archived");
+        setAdminPayments(payments);
+      } catch (err: any) {
+        console.error("Failed to load admin payments:", err);
+      }
+    },
+    [paymentFilter, paymentView]
+  );
+
+  const handleArchivePayment = async (paymentId: string) => {
+    try {
+      await archiveSingleRecord("payments", paymentId);
+      setActionMessage("Payment archived safely.");
+      await loadAdminPayments();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to archive payment.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleRestorePayment = async (paymentId: string) => {
+    try {
+      await restoreSingleRecord("payments", paymentId);
+      setActionMessage("Payment restored to active view.");
+      await loadAdminPayments();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to restore payment.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const loadAdminPayouts = useCallback(
+    async (filter?: string, view?: "active" | "archived") => {
+      try {
+        const currentFilter = filter !== undefined ? filter : (payoutFilter !== "ALL" ? payoutFilter : undefined);
+        const currentView = view !== undefined ? view : payoutView;
+        const payouts = await getAdminPayouts(currentFilter, currentView === "archived");
+        setAdminPayouts(payouts);
+      } catch (err: any) {
+        console.error("Failed to load admin payouts:", err);
+      }
+    },
+    [payoutFilter, payoutView]
+  );
+
+  const handleArchivePayout = async (payoutId: string) => {
+    try {
+      await archiveSingleRecord("payouts", payoutId);
+      setActionMessage("Payout record archived safely.");
+      await loadAdminPayouts();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to archive payout.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleRestorePayout = async (payoutId: string) => {
+    try {
+      await restoreSingleRecord("payouts", payoutId);
+      setActionMessage("Payout record restored to active view.");
+      await loadAdminPayouts();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to restore payout.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const loadAuditLogs = useCallback(
+    async (view?: "active" | "archived") => {
+      try {
+        const currentView = view !== undefined ? view : auditView;
+        const logs = await getAuditLogs({ is_archived: currentView === "archived" });
+        setAuditLogs(logs);
+      } catch (err: any) {
+        console.error("Failed to load audit logs:", err);
+      }
+    },
+    [auditView]
+  );
+
+  const handleArchiveAuditLog = async (logId: string) => {
+    try {
+      await archiveSingleRecord("audit", logId);
+      setActionMessage("Audit log entry archived.");
+      await loadAuditLogs();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to archive audit log.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleRestoreAuditLog = async (logId: string) => {
+    try {
+      await restoreSingleRecord("audit", logId);
+      setActionMessage("Audit log entry restored to active view.");
+      await loadAuditLogs();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to restore audit log.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleArchiveWalletLog = async (txnId: string) => {
+    try {
+      await archiveSingleRecord("wallet", txnId);
+      setActionMessage("Wallet ledger entry archived.");
+      await loadWalletAuditLogs();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to archive wallet ledger entry.");
+      setTimeout(() => setActionMessage(""), 5000);
+    }
+  };
+
+  const handleRestoreWalletLog = async (txnId: string) => {
+    try {
+      await restoreSingleRecord("wallet", txnId);
+      setActionMessage("Wallet ledger entry restored.");
+      await loadWalletAuditLogs();
+      setTimeout(() => setActionMessage(""), 4000);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to restore wallet ledger entry.");
+      setTimeout(() => setActionMessage(""), 5000);
     }
   };
 
@@ -3120,7 +3274,10 @@ export default function AdminCockpitPage() {
                   return (
                     <button
                       key={f}
-                      onClick={() => setPaymentFilter(f)}
+                      onClick={() => {
+                        setPaymentFilter(f);
+                        loadAdminPayments(f !== "ALL" ? f : undefined, paymentView);
+                      }}
                       className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${paymentFilter === f ? "bg-[#E56A10] text-white border-[#E56A10]" : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"}`}
                     >
                       {f.replace(/_/g, " ")}
@@ -3130,6 +3287,19 @@ export default function AdminCockpitPage() {
                 })}
               </div>
             </div>
+
+            {/* Archive View Toggle Toolbar */}
+            <ArchiveViewToggle
+              activeView={paymentView}
+              onViewChange={(v) => {
+                setPaymentView(v);
+                loadAdminPayments(paymentFilter !== "ALL" ? paymentFilter : undefined, v);
+              }}
+              activeCount={paymentView === "active" ? adminPayments.length : undefined}
+              archivedCount={paymentView === "archived" ? adminPayments.length : undefined}
+              sectionName="Payments"
+              onOpenArchiveModal={() => setIsPaymentArchiveModalOpen(true)}
+            />
 
             {(() => {
               const term = paymentSearchTerm.trim().toLowerCase();
@@ -3154,8 +3324,14 @@ export default function AdminCockpitPage() {
                 return (
                   <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">
                     <CheckCircle className="w-12 h-12 text-emerald-300 mx-auto" />
-                    <p className="font-headline font-bold text-slate-900 text-base">No Payments Found</p>
-                    <p className="text-xs text-slate-500 font-mono">No payment records match the selected filter.</p>
+                    <p className="font-headline font-bold text-slate-900 text-base">
+                      {paymentView === "archived" ? "No Archived Payments Found" : "No Active Payments Found"}
+                    </p>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {paymentView === "archived"
+                        ? "No payment records have been archived matching this filter."
+                        : "No active payment records match the selected filter."}
+                    </p>
                   </div>
                 );
               }
@@ -3192,23 +3368,43 @@ export default function AdminCockpitPage() {
                             </td>
                             <td className="px-4 py-3 text-slate-500">{pmt.created_at ? new Date(pmt.created_at).toLocaleDateString("en-IN") : "—"}</td>
                             <td className="px-4 py-3">
-                              {pmt.status === "PENDING" && (
-                                <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
+                                {pmt.status === "PENDING" && paymentView === "active" && (
+                                  <>
+                                    <button
+                                      onClick={() => handleApprovePayment(pmt.id)}
+                                      disabled={isProcessingPayment}
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      <Check className="w-3 h-3" /> Approve
+                                    </button>
+                                    <button
+                                      onClick={() => { setRejectingPayment(pmt); setPaymentRejectReason(""); }}
+                                      className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <X className="w-3 h-3" /> Reject
+                                    </button>
+                                  </>
+                                )}
+                                {paymentView === "active" && (pmt.status === "APPROVED" || pmt.status === "REJECTED") && (
                                   <button
-                                    onClick={() => handleApprovePayment(pmt.id)}
-                                    disabled={isProcessingPayment}
-                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                                    onClick={() => handleArchivePayment(pmt.id)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700 rounded border border-slate-200 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Archive payment safely"
                                   >
-                                    <Check className="w-3 h-3" /> Approve
+                                    <Archive className="w-3 h-3" /> Archive
                                   </button>
+                                )}
+                                {paymentView === "archived" && (
                                   <button
-                                    onClick={() => { setRejectingPayment(pmt); setPaymentRejectReason(""); }}
-                                    className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                    onClick={() => handleRestorePayment(pmt.id)}
+                                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded border border-amber-300 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Restore payment to active view"
                                   >
-                                    <X className="w-3 h-3" /> Reject
+                                    <RotateCcw className="w-3 h-3" /> Restore
                                   </button>
-                                </div>
-                              )}
+                                )}
+                              </div>
                               {pmt.screenshot_url && (
                                 <a href={pmt.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 underline ml-auto block text-right mt-1">
                                   View Screenshot
@@ -3223,6 +3419,19 @@ export default function AdminCockpitPage() {
                 </div>
               );
             })()}
+
+            {/* Payment Section Archive Modal */}
+            <AdminArchiveModal
+              isOpen={isPaymentArchiveModalOpen}
+              onClose={() => setIsPaymentArchiveModalOpen(false)}
+              section="payments"
+              sectionTitle="Payments"
+              onArchiveSuccess={(count) => {
+                setActionMessage(`Successfully archived ${count} payment record(s).`);
+                loadAdminPayments();
+                setTimeout(() => setActionMessage(""), 5000);
+              }}
+            />
           </div>
         )}
 
@@ -3250,7 +3459,10 @@ export default function AdminCockpitPage() {
                   return (
                     <button
                       key={f}
-                      onClick={() => setPayoutFilter(f)}
+                      onClick={() => {
+                        setPayoutFilter(f);
+                        loadAdminPayouts(f !== "ALL" ? f : undefined, payoutView);
+                      }}
                       className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all cursor-pointer flex items-center gap-1.5 ${payoutFilter === f ? "bg-[#E56A10] text-white border-[#E56A10]" : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"}`}
                     >
                       {f}
@@ -3261,14 +3473,33 @@ export default function AdminCockpitPage() {
               </div>
             </div>
 
+            {/* Payouts Archive View Toggle */}
+            <ArchiveViewToggle
+              activeView={payoutView}
+              onViewChange={(v) => {
+                setPayoutView(v);
+                loadAdminPayouts(payoutFilter !== "ALL" ? payoutFilter : undefined, v);
+              }}
+              activeCount={payoutView === "active" ? adminPayouts.length : undefined}
+              archivedCount={payoutView === "archived" ? adminPayouts.length : undefined}
+              sectionName="Payouts"
+              onOpenArchiveModal={() => setIsPayoutArchiveModalOpen(true)}
+            />
+
             {(() => {
               const filtered = payoutFilter === "ALL" ? adminPayouts : adminPayouts.filter((p) => p.status === payoutFilter);
               if (filtered.length === 0) {
                 return (
                   <div className="bg-white border border-slate-200 p-12 rounded-xl text-center space-y-3">
                     <ArrowUpRight className="w-12 h-12 text-slate-300 mx-auto" />
-                    <p className="font-headline font-bold text-slate-900 text-base">No Payouts Found</p>
-                    <p className="text-xs text-slate-500 font-mono">No payout records match the selected filter.</p>
+                    <p className="font-headline font-bold text-slate-900 text-base">
+                      {payoutView === "archived" ? "No Archived Payouts Found" : "No Payouts Found"}
+                    </p>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {payoutView === "archived"
+                        ? "No payout records have been archived matching this filter."
+                        : "No payout records match the selected filter."}
+                    </p>
                   </div>
                 );
               }
@@ -3307,22 +3538,42 @@ export default function AdminCockpitPage() {
                               }`}>{po.status}</span>
                             </td>
                             <td className="px-4 py-3">
-                              {po.status === "PENDING" && (
-                                <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
+                                {po.status === "PENDING" && payoutView === "active" && (
+                                  <>
+                                    <button
+                                      onClick={() => { setCompletingPayout(po); setOutgoingUtrInput(""); }}
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Check className="w-3 h-3" /> Mark Paid
+                                    </button>
+                                    <button
+                                      onClick={() => { setRejectingPayoutRecord(po); setPayoutRejectReason(""); }}
+                                      className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <X className="w-3 h-3" /> Reject
+                                    </button>
+                                  </>
+                                )}
+                                {payoutView === "active" && (po.status === "PAID" || po.status === "REJECTED") && (
                                   <button
-                                    onClick={() => { setCompletingPayout(po); setOutgoingUtrInput(""); }}
-                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase rounded transition-colors cursor-pointer flex items-center gap-1"
+                                    onClick={() => handleArchivePayout(po.id)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700 rounded border border-slate-200 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Archive payout record"
                                   >
-                                    <Check className="w-3 h-3" /> Mark Paid
+                                    <Archive className="w-3 h-3" /> Archive
                                   </button>
+                                )}
+                                {payoutView === "archived" && (
                                   <button
-                                    onClick={() => { setRejectingPayoutRecord(po); setPayoutRejectReason(""); }}
-                                    className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-bold uppercase rounded border border-rose-200 transition-colors cursor-pointer flex items-center gap-1"
+                                    onClick={() => handleRestorePayout(po.id)}
+                                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded border border-amber-300 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Restore payout to active view"
                                   >
-                                    <X className="w-3 h-3" /> Reject
+                                    <RotateCcw className="w-3 h-3" /> Restore
                                   </button>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -3332,6 +3583,19 @@ export default function AdminCockpitPage() {
                 </div>
               );
             })()}
+
+            {/* Payouts Section Archive Modal */}
+            <AdminArchiveModal
+              isOpen={isPayoutArchiveModalOpen}
+              onClose={() => setIsPayoutArchiveModalOpen(false)}
+              section="payouts"
+              sectionTitle="Payouts"
+              onArchiveSuccess={(count) => {
+                setActionMessage(`Successfully archived ${count} payout record(s).`);
+                loadAdminPayouts();
+                setTimeout(() => setActionMessage(""), 5000);
+              }}
+            />
           </div>
         )}
 
@@ -3457,6 +3721,20 @@ export default function AdminCockpitPage() {
                 <CheckCircle className="w-3.5 h-3.5" /> SHA-256 HASH VERIFIED
               </span>
             </div>
+
+            {/* Audit Trail Archive View Toggle */}
+            <ArchiveViewToggle
+              activeView={auditView}
+              onViewChange={(v) => {
+                setAuditView(v);
+                loadAuditLogs(v);
+              }}
+              activeCount={auditView === "active" ? auditLogs.length : undefined}
+              archivedCount={auditView === "archived" ? auditLogs.length : undefined}
+              sectionName="Audit Trail"
+              onOpenArchiveModal={() => setIsAuditArchiveModalOpen(true)}
+            />
+
             <div className="space-y-2 text-xs font-mono max-h-96 overflow-y-auto">
               {auditLogs.length > 0 ? (
                 auditLogs.map((log) => (
@@ -3477,15 +3755,45 @@ export default function AdminCockpitPage() {
                         </span>
                       )}
                       <span className="text-slate-500 text-[11px]">IP: {log.ip_address}</span>
+                      {auditView === "active" ? (
+                        <button
+                          onClick={() => handleArchiveAuditLog(log.id)}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-amber-600 transition-colors cursor-pointer"
+                          title="Archive this log entry"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleRestoreAuditLog(log.id)}
+                          className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded border border-amber-200 text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Restore log entry to active view"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Restore
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="bg-slate-50 p-6 text-center text-slate-500 rounded border border-slate-200">
-                  No audit logs recorded yet.
+                  {auditView === "archived" ? "No archived audit logs recorded." : "No active audit logs recorded yet."}
                 </div>
               )}
             </div>
+
+            {/* Audit Logs Section Archive Modal */}
+            <AdminArchiveModal
+              isOpen={isAuditArchiveModalOpen}
+              onClose={() => setIsAuditArchiveModalOpen(false)}
+              section="audit"
+              sectionTitle="Audit Trail"
+              onArchiveSuccess={(count) => {
+                setActionMessage(`Successfully archived ${count} audit log entry/entries.`);
+                loadAuditLogs();
+                setTimeout(() => setActionMessage(""), 5000);
+              }}
+            />
           </div>
         )}
 
@@ -3940,6 +4248,19 @@ export default function AdminCockpitPage() {
               </button>
             </div>
 
+            {/* Wallet Audit Archive View Toggle */}
+            <ArchiveViewToggle
+              activeView={walletAuditView}
+              onViewChange={(v) => {
+                setWalletAuditView(v);
+                loadWalletAuditLogs(walletAuditSearch, walletAuditTypeFilter, v);
+              }}
+              activeCount={walletAuditView === "active" ? walletAuditSummary?.transactions?.length : undefined}
+              archivedCount={walletAuditView === "archived" ? walletAuditSummary?.transactions?.length : undefined}
+              sectionName="Wallet Logs"
+              onOpenArchiveModal={() => setIsWalletArchiveModalOpen(true)}
+            />
+
             {/* Audit Logs Table */}
             <div className="bg-white dark:bg-[#121622] border border-slate-200 dark:border-[#242C3D] rounded-xl overflow-hidden shadow-xs">
               {walletAuditLoading ? (
@@ -3951,10 +4272,12 @@ export default function AdminCockpitPage() {
                 <div className="p-12 text-center space-y-3">
                   <Scale className="w-10 h-10 text-slate-400 mx-auto" />
                   <h4 className="font-headline font-bold text-slate-900 dark:text-white text-base">
-                    No Ledger Transactions Found
+                    {walletAuditView === "archived" ? "No Archived Ledger Transactions Found" : "No Ledger Transactions Found"}
                   </h4>
                   <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
-                    No transactions match the current search or filter criteria. Ledger entries are automatically written upon deposits, entry fee payments, and payouts.
+                    {walletAuditView === "archived"
+                      ? "No ledger transaction records have been archived matching this criteria."
+                      : "No transactions match the current search or filter criteria. Ledger entries are automatically written upon deposits, entry fee payments, and payouts."}
                   </p>
                 </div>
               ) : (
@@ -3968,6 +4291,7 @@ export default function AdminCockpitPage() {
                         <th className="p-3.5">Amount (INR)</th>
                         <th className="p-3.5">Balance Transition</th>
                         <th className="p-3.5">Description / Ref</th>
+                        <th className="p-3.5 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-[#242C3D] text-slate-800 dark:text-slate-200">
@@ -4024,6 +4348,27 @@ export default function AdminCockpitPage() {
                               </span>
                             )}
                           </td>
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            {walletAuditView === "active" ? (
+                              <button
+                                onClick={() => handleArchiveWalletLog(txn.id)}
+                                className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-slate-500 hover:text-amber-600 rounded text-[10px] font-mono transition-colors cursor-pointer"
+                                title="Archive this transaction log"
+                              >
+                                <Archive className="w-3 h-3 inline mr-1" />
+                                Archive
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRestoreWalletLog(txn.id)}
+                                className="px-2 py-1 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded border border-amber-200 dark:border-amber-800 text-[10px] font-mono transition-colors cursor-pointer"
+                                title="Restore transaction log to active view"
+                              >
+                                <RotateCcw className="w-3 h-3 inline mr-1" />
+                                Restore
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -4031,6 +4376,19 @@ export default function AdminCockpitPage() {
                 </div>
               )}
             </div>
+
+            {/* Wallet Audit Section Archive Modal */}
+            <AdminArchiveModal
+              isOpen={isWalletArchiveModalOpen}
+              onClose={() => setIsWalletArchiveModalOpen(false)}
+              section="wallet"
+              sectionTitle="Wallet Ledger Logs"
+              onArchiveSuccess={(count) => {
+                setActionMessage(`Successfully archived ${count} wallet ledger record(s).`);
+                loadWalletAuditLogs();
+                setTimeout(() => setActionMessage(""), 5000);
+              }}
+            />
           </div>
         )}
 

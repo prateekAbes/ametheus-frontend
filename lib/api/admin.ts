@@ -10,10 +10,29 @@ export interface AuditLog {
   ip_address: string;
   prev_hash?: string;
   record_hash?: string;
+  is_archived?: boolean;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
 }
 
-export async function getAuditLogs(): Promise<AuditLog[]> {
-  return apiClient<AuditLog[]>("/admin/audit-logs");
+export async function getAuditLogs(params?: {
+  is_archived?: boolean;
+  search?: string;
+  action?: string;
+  operator?: string;
+  limit?: number;
+  skip?: number;
+}): Promise<AuditLog[]> {
+  const query = new URLSearchParams();
+  if (params?.is_archived !== undefined) query.set("is_archived", String(params.is_archived));
+  if (params?.search) query.set("search", params.search);
+  if (params?.action && params.action !== "ALL") query.set("action", params.action);
+  if (params?.operator) query.set("operator", params.operator);
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.skip) query.set("skip", String(params.skip));
+  const qs = query.toString();
+  return apiClient<AuditLog[]>(`/admin/audit-logs${qs ? `?${qs}` : ""}`);
 }
 
 export async function assignTournamentAdmin(
@@ -742,14 +761,51 @@ export async function getWalletAuditLogs(params?: {
   txn_type?: string;
   limit?: number;
   skip?: number;
+  is_archived?: boolean;
 }): Promise<WalletAuditSummary> {
   const query = new URLSearchParams();
   if (params?.search) query.set("search", params.search);
   if (params?.txn_type && params.txn_type !== "ALL") query.set("txn_type", params.txn_type);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.skip) query.set("skip", String(params.skip));
+  if (params?.is_archived !== undefined) query.set("is_archived", String(params.is_archived));
   const qs = query.toString();
   return apiClient<WalletAuditSummary>(`/admin/wallet-audit-logs${qs ? `?${qs}` : ""}`);
+}
+
+export interface AdminNotification {
+  id: string;
+  user_id: string;
+  user_name?: string;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+  is_read: boolean;
+  created_at: string;
+  is_archived: boolean;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
+}
+
+export async function getAdminNotifications(params?: {
+  search?: string;
+  type?: string;
+  is_read?: boolean;
+  is_archived?: boolean;
+  limit?: number;
+  skip?: number;
+}): Promise<{ items: AdminNotification[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.type && params.type !== "ALL") query.set("type", params.type);
+  if (params?.is_read !== undefined) query.set("is_read", String(params.is_read));
+  if (params?.is_archived !== undefined) query.set("is_archived", String(params.is_archived));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.skip) query.set("skip", String(params.skip));
+  const qs = query.toString();
+  return apiClient<{ items: AdminNotification[]; total: number }>(`/admin/notifications${qs ? `?${qs}` : ""}`);
 }
 
 export async function addTournamentRound(

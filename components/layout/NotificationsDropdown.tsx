@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   CheckCheck,
@@ -12,6 +12,7 @@ import {
   Info,
   ExternalLink,
   X,
+  Archive,
 } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -20,12 +21,18 @@ import {
   markAllNotificationsAsRead,
   NotificationItem,
 } from "@/lib/api/index";
+import {
+  archiveUserNotification,
+  archiveAllReadUserNotifications,
+} from "@/lib/api/archive";
 
 export default function NotificationsDropdown() {
+  const router = useRouter();
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isArchiving, setIsArchiving] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeNotifications = isSignedIn ? notifications : [];
@@ -77,6 +84,8 @@ export default function NotificationsDropdown() {
     };
   }, []);
 
+  const hasReadNotifications = activeNotifications.some((n) => n.is_read);
+
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsAsRead();
@@ -84,6 +93,33 @@ export default function NotificationsDropdown() {
       setUnreadCount(0);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleArchiveAllRead = async () => {
+    if (isArchiving) return;
+    setIsArchiving(true);
+    try {
+      await archiveAllReadUserNotifications();
+      setNotifications((prev) => prev.filter((n) => !n.is_read));
+    } catch (e) {
+      console.error("Failed to archive read notifications:", e);
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleArchiveSingle = async (e: React.MouseEvent, notifId: string, isUnread: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await archiveUserNotification(notifId);
+      setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      if (isUnread) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (e) {
+      console.error("Failed to archive notification:", e);
     }
   };
 
@@ -100,6 +136,9 @@ export default function NotificationsDropdown() {
       }
     }
     setIsOpen(false);
+    if (notif.link) {
+      router.push(notif.link);
+    }
   };
 
   const renderIcon = (type: string) => {
@@ -173,7 +212,20 @@ export default function NotificationsDropdown() {
                     className="text-[11px] text-[#94A3B8] hover:text-[#E56A10] transition-colors flex items-center gap-1 font-medium cursor-pointer"
                   >
                     <CheckCheck className="w-3.5 h-3.5" />
-                    <span>Mark all read</span>
+                    <span className="hidden xs:inline">Mark all read</span>
+                  </button>
+                )}
+
+                {hasReadNotifications && (
+                  <button
+                    type="button"
+                    disabled={isArchiving}
+                    onClick={handleArchiveAllRead}
+                    className="text-[11px] text-[#94A3B8] hover:text-[#CBD5E1] transition-colors flex items-center gap-1 font-medium cursor-pointer disabled:opacity-50"
+                    title="Clear all read notifications"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span className="hidden xs:inline">Clear read</span>
                   </button>
                 )}
 
@@ -201,48 +253,47 @@ export default function NotificationsDropdown() {
                   You&apos;re all caught up! No active notifications.
                 </div>
               ) : (
-                activeNotifications.map((n) => {
-                  const content = (
-                    <div
-                      key={n.id}
-                      onClick={() => handleItemClick(n)}
-                      className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-[#161A24] ${
-                        !n.is_read ? "bg-[#141822]" : ""
-                      }`}
-                    >
-                      <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5 shrink-0">
-                        {renderIcon(n.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className={`text-xs font-semibold truncate ${!n.is_read ? "text-white" : "text-[#CBD5E1]"}`}>
-                            {n.title}
-                          </span>
+                activeNotifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleItemClick(n)}
+                    className={`group p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-[#161A24] ${
+                      !n.is_read ? "bg-[#141822]" : ""
+                    }`}
+                  >
+                    <div className="p-1.5 bg-[#0B0E16] border border-[#242C3D] rounded mt-0.5 shrink-0">
+                      {renderIcon(n.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className={`text-xs font-semibold truncate ${!n.is_read ? "text-white" : "text-[#CBD5E1]"}`}>
+                          {n.title}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {!n.is_read && (
                             <span className="w-1.5 h-1.5 rounded-full bg-[#E56A10] shrink-0" />
                           )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleArchiveSingle(e, n.id, !n.is_read)}
+                            title="Archive notification"
+                            className="opacity-40 group-hover:opacity-100 p-1 text-[#64748B] hover:text-white hover:bg-[#242C3D] rounded transition-all cursor-pointer"
+                          >
+                            <Archive className="w-3 h-3" />
+                          </button>
                         </div>
-                        <p className="text-[11px] text-[#94A3B8] leading-relaxed break-words line-clamp-3">
-                          {n.message}
-                        </p>
-                        {n.link && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-[#E56A10] font-mono mt-1 hover:underline">
-                            View details <ExternalLink className="w-2.5 h-2.5" />
-                          </span>
-                        )}
                       </div>
+                      <p className="text-[11px] text-[#94A3B8] leading-relaxed break-words line-clamp-3">
+                        {n.message}
+                      </p>
+                      {n.link && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-[#E56A10] font-mono mt-1 hover:underline">
+                          View details <ExternalLink className="w-2.5 h-2.5" />
+                        </span>
+                      )}
                     </div>
-                  );
-
-                  if (n.link) {
-                    return (
-                      <Link key={n.id} href={n.link} onClick={() => handleItemClick(n)}>
-                        {content}
-                      </Link>
-                    );
-                  }
-                  return content;
-                })
+                  </div>
+                ))
               )}
             </div>
           </div>
