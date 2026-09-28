@@ -104,10 +104,10 @@ function MatchCard({
   const statusLabel = (match.status as string);
 
   return (
-    <div className="bg-white dark:bg-[#121622] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] shadow-sm p-6 hover:border-[#CBD5E1] dark:hover:border-[#E56A10] transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+    <div className="bg-white dark:bg-[#121622] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] shadow-sm p-4 sm:p-6 hover:border-[#CBD5E1] dark:hover:border-[#E56A10] transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6">
 
       {/* Left Details */}
-      <div className="flex flex-col gap-2 min-w-[280px]">
+      <div className="flex flex-col gap-2 min-w-0 sm:min-w-[280px]">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status badge: LIVE NOW pulsing OR normal status */}
           {live ? (
@@ -138,45 +138,45 @@ function MatchCard({
             {match.gameName}
           </span>
         </div>
-        <h3 className="font-headline font-bold text-lg text-[#0B1C30] dark:text-white">{match.stage}</h3>
-        <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono">{match.tournamentTitle}</div>
+        <h3 className="font-headline font-bold text-lg text-[#0B1C30] dark:text-white truncate">{match.stage}</h3>
+        <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono truncate">{match.tournamentTitle}</div>
         <div className="text-xs text-[#565E74] dark:text-slate-400 font-mono">{match.format}</div>
         <div className="flex items-center gap-1.5 text-xs text-[#565E74] dark:text-slate-400 font-mono mt-1">
-          <Server className="w-3.5 h-3.5 text-[#E56A10]" />
-          <span>{match.serverRegion}</span>
+          <Server className="w-3.5 h-3.5 text-[#E56A10] shrink-0" />
+          <span className="truncate">{match.serverRegion}</span>
         </div>
       </div>
 
       {/* Match Teams VS Section */}
-      <div className="flex items-center justify-center gap-6 sm:gap-10 py-4 px-6 bg-[#EFF4FF] dark:bg-[#161A24] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] flex-1 max-w-xl">
+      <div className="flex items-center justify-center gap-3 sm:gap-10 py-3 sm:py-4 px-3 sm:px-6 bg-[#EFF4FF] dark:bg-[#161A24] rounded-xl border border-[#D3E4FE] dark:border-[#242C3D] flex-1 max-w-xl w-full">
         {/* Team A */}
-        <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
+        <div className="flex flex-col items-center text-center min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-xs sm:text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
             {match.teamA.tag}
           </div>
-          <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamA.name}</span>
-          <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamA.tag}]</span>
+          <span className="font-bold text-xs sm:text-sm text-[#0B1C30] dark:text-white mt-1.5 truncate max-w-[80px] sm:max-w-none">{match.teamA.name}</span>
+          <span className="text-[10px] sm:text-[11px] text-[#565E74] dark:text-slate-400 font-mono truncate max-w-[80px] sm:max-w-none">[{match.teamA.tag}]</span>
         </div>
 
         {/* Center Score / Versus */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center shrink-0">
           {match.teamA.score !== undefined && match.teamB.score !== undefined ? (
-            <div className="text-2xl font-mono font-bold text-[#0B1C30] dark:text-white">
+            <div className="text-xl sm:text-2xl font-mono font-bold text-[#0B1C30] dark:text-white">
               {match.teamA.score} : {match.teamB.score}
             </div>
           ) : (
-            <div className="text-base font-headline font-bold text-[#565E74] dark:text-slate-400">VS</div>
+            <div className="text-sm sm:text-base font-headline font-bold text-[#565E74] dark:text-slate-400">VS</div>
           )}
           <span className="text-[10px] text-[#565E74] dark:text-slate-400 font-mono mt-1">{match.scheduledTime}</span>
         </div>
 
         {/* Team B */}
-        <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
+        <div className="flex flex-col items-center text-center min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-white dark:bg-[#1A2234] border border-[#CBD5E1] dark:border-[#242C3D] flex items-center justify-center font-bold text-xs sm:text-sm text-[#0B1C30] dark:text-white shadow-sm font-headline">
             {match.teamB.tag}
           </div>
-          <span className="font-bold text-sm text-[#0B1C30] dark:text-white mt-1.5">{match.teamB.name}</span>
-          <span className="text-[11px] text-[#565E74] dark:text-slate-400 font-mono">[{match.teamB.tag}]</span>
+          <span className="font-bold text-xs sm:text-sm text-[#0B1C30] dark:text-white mt-1.5 truncate max-w-[80px] sm:max-w-none">{match.teamB.name}</span>
+          <span className="text-[10px] sm:text-[11px] text-[#565E74] dark:text-slate-400 font-mono truncate max-w-[80px] sm:max-w-none">[{match.teamB.tag}]</span>
         </div>
       </div>
 

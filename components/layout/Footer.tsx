@@ -177,7 +177,7 @@ export default function Footer() {
         </div>
 
         <div className="pt-8 border-t border-[#242C3D] flex flex-col sm:flex-row items-center justify-between text-xs text-[#64748B] gap-4">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start text-center sm:text-left gap-3">
             <p>© 2026 AMETHEUS Esports Platform. All rights reserved.</p>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#121622] border border-[#242C3D] rounded font-mono text-[11px] text-[#94A3B8]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
@@ -185,14 +185,14 @@ export default function Footer() {
               <span className="font-bold text-white tabular-nums">{activeContenders}</span>
             </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/help" className="hover:text-[#94A3B8]">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-6 gap-y-2">
+            <Link href="/help" className="hover:text-[#94A3B8] whitespace-nowrap">
               Terms of Competition
             </Link>
-            <Link href="/help" className="hover:text-[#94A3B8]">
+            <Link href="/help" className="hover:text-[#94A3B8] whitespace-nowrap">
               Privacy Policy
             </Link>
-            <Link href="/help" className="hover:text-[#94A3B8]">
+            <Link href="/help" className="hover:text-[#94A3B8] whitespace-nowrap">
               Security &amp; Integrity
             </Link>
           </div>

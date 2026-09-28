@@ -160,7 +160,7 @@ export default function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B0E16]/95 backdrop-blur-md text-[#F8FAFC] border-b border-[#242C3D]">
-        <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2 lg:gap-3">
+        <div className="h-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-4 xl:px-8 flex items-center justify-between gap-2 lg:gap-3">
           {/* Brand Logo */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Link
@@ -170,7 +170,7 @@ export default function Header() {
             >
               <AmetheusLogo className="h-7 sm:h-8 md:h-9 w-auto object-contain transition-transform group-hover:scale-[1.02]" />
             </Link>
-            <span className="hidden sm:inline-flex px-1.5 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase whitespace-nowrap">
+            <span className="hidden xl:inline-flex px-1.5 py-0.5 bg-[#161A24] border border-[#242C3D] text-[#94A3B8] text-[10px] font-bold tracking-wider rounded font-mono uppercase whitespace-nowrap">
               PRO ARENA
             </span>
           </div>
@@ -184,7 +184,7 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   onClick={closeAllDropdowns}
-                  className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
+                  className={`px-1.5 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                     active
                       ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
                       : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
@@ -201,7 +201,7 @@ export default function Header() {
               <Link
                 href="/dashboard"
                 onClick={closeAllDropdowns}
-                className={`px-2 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
+                className={`px-1.5 xl:px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                   isActive("/dashboard")
                     ? "text-white bg-[#161A24] border-[#242C3D] shadow-xs"
                     : "text-[#CBD5E1] border-transparent hover:text-white hover:bg-[#161A24]/60"
@@ -218,7 +218,7 @@ export default function Header() {
                 <Link
                   href="/organizer"
                   onClick={closeAllDropdowns}
-                  className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
+                  className={`px-1.5 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                     isActive("/organizer")
                       ? "bg-[#E56A10]/20 text-[#E56A10] border-[#E56A10]/40 font-bold"
                       : "text-[#E56A10] border-transparent hover:bg-[#161A24]"
@@ -232,7 +232,7 @@ export default function Header() {
                   <Link
                     href="/admin"
                     onClick={closeAllDropdowns}
-                    className={`px-2 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-bold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
+                    className={`px-1.5 xl:px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1.5 border font-bold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#E56A10] ${
                       isActive("/admin")
                         ? "bg-[#E56A10] text-white border-transparent shadow-xs"
                         : "bg-[#E56A10]/15 text-[#FFB68F] border-[#E56A10]/40 hover:bg-[#E56A10]/25"
@@ -248,11 +248,11 @@ export default function Header() {
           </nav>
 
           {/* Right Action Bar (Search, Notifications, Theme Toggle, Auth, Mobile Toggle) */}
-          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 mr-1 sm:mr-2">
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 mr-0 xl:mr-2">
             {/* Quick Search Bar with Live Autocomplete */}
-            <div className="relative hidden md:block" ref={searchDropdownRef}>
+            <div className="relative hidden xl:block" ref={searchDropdownRef}>
               <form onSubmit={handleSearchSubmit} className="flex items-center relative">
-                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] w-36 lg:w-44 xl:w-52 focus-within:border-[#E56A10]/60">
+                <div className="flex items-center bg-[#161A24] border border-[#242C3D] hover:border-[#333C4D] transition-colors px-2 py-1.5 rounded text-xs text-[#94A3B8] xl:w-52 focus-within:border-[#E56A10]/60">
                   <Search className="w-3.5 h-3.5 mr-1.5 text-[#94A3B8] shrink-0" />
                   <input
                     ref={searchInputRef}
@@ -339,7 +339,7 @@ export default function Header() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="h-8 w-8 rounded-lg border border-[#242C3D] bg-[#161A24]/70 hover:bg-[#161A24] text-[#CBD5E1] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="hidden sm:flex h-8 w-8 rounded-lg border border-[#242C3D] bg-[#161A24]/70 hover:bg-[#161A24] text-[#CBD5E1] hover:text-white items-center justify-center transition-colors cursor-pointer shrink-0"
               title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle Color Theme"
             >
@@ -352,14 +352,14 @@ export default function Header() {
 
             {/* Clerk Auth Section */}
             <Show when="signed-out">
-              <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-[#242C3D] shrink-0">
+              <div className="hidden sm:flex items-center gap-1 xl:gap-2 pl-1.5 xl:pl-2 border-l border-[#242C3D] shrink-0">
                 <SignInButton mode="modal">
-                  <button className="px-2 sm:px-2.5 py-1.5 text-xs font-mono font-bold text-[#CBD5E1] hover:text-white transition-colors cursor-pointer">
+                  <button className="px-1.5 xl:px-2.5 py-1.5 text-xs font-mono font-bold text-[#CBD5E1] hover:text-white transition-colors cursor-pointer">
                     SIGN IN
                   </button>
                 </SignInButton>
                 <SignUpButton mode="modal">
-                  <button className="px-2.5 sm:px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shadow-xs cursor-pointer flex items-center gap-1">
+                  <button className="px-2 xl:px-3 py-1.5 bg-[#E56A10] hover:bg-[#D45900] text-white text-xs font-mono font-bold uppercase rounded transition-colors shadow-xs cursor-pointer flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
                     JOIN LEAGUE
                   </button>

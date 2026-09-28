@@ -150,32 +150,32 @@ export default function HomePage() {
 
           {/* Live Telemetry Bar */}
           <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-3xl pt-8 border-t border-[#242C3D]/80 bg-[#0B0E16]/60 backdrop-blur-xs rounded-xl p-4">
-            <div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold font-headline text-white tabular-nums truncate">
                 {prizePoolDisplay}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
                 Active Prize Pool
               </div>
             </div>
-            <div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-[#E56A10] tabular-nums">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold font-headline text-[#E56A10] tabular-nums truncate">
                 {games.length}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
                 Esports Disciplines
               </div>
             </div>
-            <div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-white tabular-nums">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold font-headline text-white tabular-nums truncate">
                 {upcomingTournamentsCount}
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
                 Upcoming Tournaments
               </div>
             </div>
-            <div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-[#10B981] tabular-nums">
+            <div className="min-w-0">
+              <div className="text-xl sm:text-3xl font-bold font-headline text-[#10B981] tabular-nums truncate">
                 100%
               </div>
               <div className="text-xs text-[#94A3B8] font-mono uppercase mt-1">
@@ -189,8 +189,8 @@ export default function HomePage() {
       {/* 2. THE COMPETITIVE PIPELINE (Position 2 - Prominently Styled) */}
       <section id="pipeline" className="relative overflow-hidden py-20 px-4 md:px-8 max-w-[1440px] mx-auto w-full border-b border-slate-200 dark:border-[#242C3D]">
         {/* Ambient background typography */}
-        <div aria-hidden="true" className="absolute top-8 left-1/2 -translate-x-1/2 pointer-events-none select-none z-0 overflow-hidden">
-          <span className="font-headline font-black text-[14vw] sm:text-[11vw] tracking-tighter text-slate-900/[0.02] dark:text-white/[0.02] uppercase whitespace-nowrap leading-none">
+        <div aria-hidden="true" className="absolute top-8 left-1/2 -translate-x-1/2 pointer-events-none select-none z-0 overflow-hidden w-full max-w-full text-center">
+          <span className="font-headline font-black text-[14vw] sm:text-[11vw] tracking-tighter text-slate-900/[0.02] dark:text-white/[0.02] uppercase whitespace-nowrap leading-none inline-block">
             PIPELINE
           </span>
         </div>
