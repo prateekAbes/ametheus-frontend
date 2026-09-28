@@ -100,7 +100,7 @@ export default function AdminSupportTicketsManager() {
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Support Email Destination (Read-Only from Server Environment)
-  const [supportEmailConfig, setSupportEmailConfig] = useState<string>("support.ametheus@gmail.com");
+  const [supportEmailConfig, setSupportEmailConfig] = useState<string>("support@ametheus.games");
 
   // Email Retry State
   const [isRetryingEmail, setIsRetryingEmail] = useState<string | null>(null);
@@ -262,7 +262,7 @@ export default function AdminSupportTicketsManager() {
         <div className="flex items-center gap-2">
           <div className="px-3.5 py-1.5 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono text-white flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-bold text-slate-200">{supportEmailConfig || "support.ametheus@gmail.com"}</span>
+            <span className="font-bold text-slate-200">{supportEmailConfig || "support@ametheus.games"}</span>
             <span className="text-[10px] text-slate-500 font-mono">(Server Environment)</span>
           </div>
         </div>

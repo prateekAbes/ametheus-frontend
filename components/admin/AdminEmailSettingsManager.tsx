@@ -77,7 +77,7 @@ export default function AdminEmailSettingsManager() {
         configured: false,
         connected: false,
         authenticated: false,
-        sender: `${service}.ametheus@gmail.com`,
+        sender: `${service}@ametheus.games`,
         status_code: "CONNECTION_FAILED",
         message: "Failed to communicate with backend diagnostic service.",
       });
@@ -132,7 +132,7 @@ export default function AdminEmailSettingsManager() {
               <span>Email &amp; SMTP Architecture</span>
             </h2>
             <p className="text-xs font-mono text-[#94A3B8] max-w-2xl">
-              Ametheus maintains three isolated Gmail SMTP service configurations for Support, Automated notifications, and Official communications.
+              Ametheus routes outgoing mail through Brevo SMTP relay for Support, Automated notifications, and Official communications.
               Identities and credentials are fixed via the server environment and cannot be mutated from the dashboard.
             </p>
           </div>
@@ -209,7 +209,7 @@ export default function AdminEmailSettingsManager() {
           <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg mb-3">
             <div className="text-[10px] font-mono text-slate-500 uppercase">Sender Address</div>
             <div className="text-xs font-mono font-bold text-[#E56A10] truncate mt-0.5">
-              {systemStatus?.services?.support?.email || "support.ametheus@gmail.com"}
+              {systemStatus?.services?.support?.email || "support@ametheus.games"}
             </div>
           </div>
 
@@ -218,7 +218,7 @@ export default function AdminEmailSettingsManager() {
           </p>
 
           <div className="text-[10px] font-mono text-slate-500 border-t border-[#242C3D] pt-2.5 flex items-center justify-between">
-            <span>Relay: smtp.gmail.com:587</span>
+            <span>Relay: smtp-relay.brevo.com:587</span>
             <span>TLS: Enabled</span>
           </div>
         </div>
@@ -246,7 +246,7 @@ export default function AdminEmailSettingsManager() {
           <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg mb-3">
             <div className="text-[10px] font-mono text-slate-500 uppercase">Sender Address</div>
             <div className="text-xs font-mono font-bold text-[#E56A10] truncate mt-0.5">
-              {systemStatus?.services?.noreply?.email || "noreply.ametheus@gmail.com"}
+              {systemStatus?.services?.noreply?.email || "noreply@ametheus.games"}
             </div>
           </div>
 
@@ -255,7 +255,7 @@ export default function AdminEmailSettingsManager() {
           </p>
 
           <div className="text-[10px] font-mono text-slate-500 border-t border-[#242C3D] pt-2.5 flex items-center justify-between">
-            <span>Relay: smtp.gmail.com:587</span>
+            <span>Relay: smtp-relay.brevo.com:587</span>
             <span>Reply-To: Support</span>
           </div>
         </div>
@@ -283,7 +283,7 @@ export default function AdminEmailSettingsManager() {
           <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg mb-3">
             <div className="text-[10px] font-mono text-slate-500 uppercase">Sender Address</div>
             <div className="text-xs font-mono font-bold text-[#E56A10] truncate mt-0.5">
-              {systemStatus?.services?.official?.email || "official.ametheus@gmail.com"}
+              {systemStatus?.services?.official?.email || "official@ametheus.games"}
             </div>
           </div>
 
@@ -292,7 +292,7 @@ export default function AdminEmailSettingsManager() {
           </p>
 
           <div className="text-[10px] font-mono text-slate-500 border-t border-[#242C3D] pt-2.5 flex items-center justify-between">
-            <span>Relay: smtp.gmail.com:587</span>
+            <span>Relay: smtp-relay.brevo.com:587</span>
             <span>TLS: Enabled</span>
           </div>
         </div>
@@ -388,14 +388,14 @@ export default function AdminEmailSettingsManager() {
               <div className="p-2.5 bg-[#0B0E16] border border-[#242C3D] rounded-lg">
                 <div className="text-slate-500 uppercase text-[9px]">Tested Identity</div>
                 <div className="text-white font-bold truncate mt-0.5">
-                  {smtpStatus?.sender || `${diagService}.ametheus@gmail.com`}
+                  {smtpStatus?.sender || `${diagService}@ametheus.games`}
                 </div>
               </div>
 
               <div className="p-2.5 bg-[#0B0E16] border border-[#242C3D] rounded-lg">
                 <div className="text-slate-500 uppercase text-[9px]">Relay Port / Protocol</div>
                 <div className="text-white font-bold truncate mt-0.5">
-                  smtp.gmail.com:587 (TLS)
+                  smtp-relay.brevo.com:587 (TLS)
                 </div>
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function AdminEmailSettingsManager() {
             <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1.5 pt-1">
               <Lock className="w-3.5 h-3.5 text-[#E56A10] shrink-0" />
               <span>
-                Gmail App Passwords reside securely in server environment variables and are never transmitted to the browser.
+                Brevo SMTP credentials reside securely in server environment variables and are never transmitted to the browser.
               </span>
             </div>
           </div>
@@ -439,9 +439,9 @@ export default function AdminEmailSettingsManager() {
                 disabled={isSendingTest}
                 className="w-full px-3 py-2 bg-[#0B0E16] border border-[#242C3D] focus:border-[#E56A10] rounded-xl text-xs font-mono text-white outline-none cursor-pointer"
               >
-                <option value="support">Support — support.ametheus@gmail.com</option>
-                <option value="noreply">No-Reply — noreply.ametheus@gmail.com</option>
-                <option value="official">Official — official.ametheus@gmail.com</option>
+                <option value="support">Support — support@ametheus.games</option>
+                <option value="noreply">No-Reply — noreply@ametheus.games</option>
+                <option value="official">Official — official@ametheus.games</option>
               </select>
             </div>
 

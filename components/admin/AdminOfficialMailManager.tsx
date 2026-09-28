@@ -214,13 +214,13 @@ export default function AdminOfficialMailManager() {
             <p className="text-xs font-mono text-[#94A3B8] max-w-2xl">
               Dispatch high-priority official communications representing Ametheus Operations.
               All messages are fixed to originate exclusively from{" "}
-              <strong className="text-white">official.ametheus@gmail.com</strong>.
+              <strong className="text-white">official@ametheus.games</strong>.
             </p>
           </div>
 
           <div className="flex items-center gap-2 px-3 py-1.5 bg-[#161B26] border border-[#242C3D] rounded-lg text-xs font-mono text-slate-300">
             <Lock className="w-3.5 h-3.5 text-[#E56A10]" />
-            <span>Sender: official.ametheus@gmail.com</span>
+            <span>Sender: official@ametheus.games</span>
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@ export default function AdminOfficialMailManager() {
               <div className="flex items-center gap-2 px-3 py-2 bg-[#0B0E16] border border-[#242C3D] rounded-lg text-xs font-mono text-slate-300 select-none">
                 <ShieldAlert className="w-4 h-4 text-[#E56A10]" />
                 <span className="font-bold text-white">Ametheus Official</span>
-                <span className="text-slate-500">&lt;official.ametheus@gmail.com&gt;</span>
+                <span className="text-slate-500">&lt;official@ametheus.games&gt;</span>
                 <span className="ml-auto text-[10px] text-[#E56A10] bg-[#E56A10]/10 px-2 py-0.5 rounded border border-[#E56A10]/30 uppercase">
                   Fixed Identity
                 </span>
@@ -591,7 +591,7 @@ export default function AdminOfficialMailManager() {
               <div className="p-3 bg-[#0B0E16] border border-[#242C3D] rounded-lg space-y-1">
                 <div>
                   <span className="text-slate-500">Sender: </span>
-                  <span className="text-white font-bold">official.ametheus@gmail.com</span>
+                  <span className="text-white font-bold">official@ametheus.games</span>
                 </div>
                 <div>
                   <span className="text-slate-500">Subject: </span>
