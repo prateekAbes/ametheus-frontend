@@ -210,33 +210,6 @@ export default function TournamentDetailPage({ params }: Props) {
 
   return (
     <div className="flex flex-col w-full bg-[#F8F9FF] dark:bg-[#0B0E16] text-[#0F172A] dark:text-[#F8FAFC] transition-colors">
-      {/* Tournament Banner Hero Header */}
-      <div className="relative w-full h-52 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200 dark:border-[#242C3D]">
-        <Image
-          src={
-            currentTournament.bannerUrl &&
-            !currentTournament.bannerUrl.includes("aida") &&
-            !currentTournament.bannerUrl.includes("googleusercontent.com")
-              ? currentTournament.bannerUrl
-              : "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"
-          }
-          alt={currentTournament.title}
-          fill
-          unoptimized
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-        <div className="absolute bottom-4 left-4 md:left-8 flex flex-wrap items-center gap-2">
-          <span className="px-3 py-1 bg-black/80 backdrop-blur-md text-white border border-white/20 font-mono text-xs rounded font-bold uppercase">
-            {currentTournament.gameName}
-          </span>
-          <span className="px-3 py-1 bg-[#E56A10] text-white font-mono text-xs rounded font-bold uppercase shadow-sm">
-            {currentTournament.prizePool} PRIZE POOL
-          </span>
-        </div>
-      </div>
-
       {/* 1. Hero Summary */}
       <section className="relative w-full overflow-hidden bg-white dark:bg-[#0B0E16] border-b border-[#E2E8F0] dark:border-[#242C3D] py-8 transition-colors">
         <PageMediaVisual
@@ -249,6 +222,12 @@ export default function TournamentDetailPage({ params }: Props) {
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#E56A10] text-white text-xs font-mono font-bold rounded uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               {currentTournament.statusLabel}
+            </span>
+            <span className="px-2.5 py-1 bg-black/80 dark:bg-slate-900/80 text-white border border-slate-700/50 font-mono text-xs rounded font-bold uppercase backdrop-blur-xs">
+              {currentTournament.gameName}
+            </span>
+            <span className="px-2.5 py-1 bg-[#E56A10] text-white font-mono text-xs rounded font-bold uppercase shadow-sm">
+              {currentTournament.prizePool} PRIZE POOL
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F1F3F5] dark:bg-[#161A24] text-[#0F172A] dark:text-slate-200 border dark:border-[#242C3D] text-xs font-mono rounded">
               <Shield className="w-3.5 h-3.5 text-[#E56A10]" />

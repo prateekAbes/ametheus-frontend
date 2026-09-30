@@ -282,38 +282,51 @@ function TournamentsContent() {
                       src={tournament.bannerUrl}
                       alt={tournament.title}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 bg-black/75 text-white border border-white/20 font-mono text-[10px] rounded font-bold uppercase backdrop-blur-xs">
-                        {tournament.gameName}
-                      </span>
-                      <span className="px-2 py-0.5 bg-black/75 border border-white/20 text-white font-mono text-[10px] rounded font-bold backdrop-blur-xs">
-                        {tournament.format}
-                      </span>
-                    </div>
-                    <div className="absolute top-3 right-3">
-                      {tournament.hasLiveMatches ? (
-                        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white border border-rose-400 backdrop-blur-xs animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          🔴 LIVE MATCHES NOW
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
+                    
+                    {/* Responsive Overlay Container */}
+                    <div className="absolute inset-0 p-3 flex flex-col justify-between pointer-events-none">
+                      {/* Top Header Row with flex-wrap */}
+                      <div className="flex flex-wrap items-start justify-between gap-1.5 w-full">
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0 max-w-[70%] sm:max-w-none">
+                          <span className="px-2 py-0.5 bg-black/80 text-white border border-white/20 font-mono text-[10px] rounded font-bold uppercase backdrop-blur-xs truncate max-w-[160px] sm:max-w-none">
+                            {tournament.gameName}
+                          </span>
+                          <span className="px-2 py-0.5 bg-black/80 border border-white/20 text-white font-mono text-[10px] rounded font-bold backdrop-blur-xs shrink-0">
+                            {tournament.format}
+                          </span>
+                        </div>
+                        <div className="shrink-0 ml-auto">
+                          {tournament.hasLiveMatches ? (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white border border-rose-400 backdrop-blur-xs animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                              <span>LIVE NOW</span>
+                            </span>
+                          ) : (
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border backdrop-blur-xs ${
+                                tournament.status === "REGISTRATION_OPEN"
+                                  ? "bg-emerald-600/90 text-white border-emerald-400"
+                                  : tournament.status === "REGISTRATION_CLOSED"
+                                  ? "bg-blue-600/90 text-white border-blue-400"
+                                  : "bg-black/80 text-orange-300 border-orange-400/50"
+                              }`}
+                            >
+                              {tournament.statusLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bottom Footer Row with flex-wrap safety */}
+                      <div className="flex items-end justify-between gap-2 text-white text-xs font-mono w-full">
+                        <span className="text-slate-200 text-[11px] font-bold bg-black/60 px-2 py-0.5 rounded backdrop-blur-xs shrink-0">
+                          {tournament.registeredTeams} / {tournament.maxTeams} TEAMS
                         </span>
-                      ) : (
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border backdrop-blur-xs ${
-                            tournament.status === "REGISTRATION_OPEN"
-                              ? "bg-emerald-600/90 text-white border-emerald-400"
-                              : tournament.status === "REGISTRATION_CLOSED"
-                              ? "bg-blue-600/90 text-white border-blue-400"
-                              : "bg-black/75 text-orange-300 border-orange-400/50"
-                          }`}
-                        >
-                          {tournament.statusLabel}
+                        <span className="text-[#E56A10] font-bold text-xs sm:text-sm bg-black/80 px-2 py-0.5 rounded border border-[#E56A10]/40 backdrop-blur-xs shrink-0 tabular-nums">
+                          {tournament.prizePool}
                         </span>
-                      )}
-                    </div>
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
-                      <span className="text-slate-300">{tournament.registeredTeams} / {tournament.maxTeams} TEAMS</span>
-                      <span className="text-[#E56A10] font-bold text-sm bg-black/60 px-2 py-0.5 rounded border border-[#E56A10]/40">{tournament.prizePool}</span>
+                      </div>
                     </div>
                   </div>
 

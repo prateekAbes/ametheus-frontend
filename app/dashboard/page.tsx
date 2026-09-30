@@ -142,6 +142,23 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDisbandTeam = async (teamId: string, teamName: string) => {
+    if (!confirm(`Are you sure you want to disband team "${teamName}"? All active registrations will be cancelled and eligible fees refunded to player wallets. This cannot be undone.`)) return;
+    try {
+      await disbandTeam(teamId);
+      showToast(`Team "${teamName}" disbanded and registrations cancelled.`);
+      const [updatedTeams, updatedRegs] = await Promise.all([
+        getMyTeams(),
+        getMyTournamentRegistrations(),
+      ]);
+      setTeams(updatedTeams);
+      setMyRegistrations(updatedRegs);
+      refreshProfile();
+    } catch (err: any) {
+      showToast(err?.message || "Failed to disband team");
+    }
+  };
+
   // Load dashboard data & initialize first launch persona deterministically
   useEffect(() => {
     let isMounted = true;
@@ -1117,17 +1134,28 @@ export default function DashboardPage() {
                             </span>
                           </div>
 
-                          <div className="flex items-center bg-white dark:bg-[#202636] border border-slate-300 dark:border-[#242C3D] px-2 py-0.5 rounded gap-1">
-                            <span className="font-mono text-xs font-bold text-slate-900 dark:text-white tracking-wider">
-                              {inviteCode}
-                            </span>
-                            <button
-                              onClick={() => copyToClipboard(inviteCode, `Team Code "${inviteCode}" copied!`)}
-                              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-                              title="Copy permanent team code"
-                            >
-                              <Copy className="w-3 h-3" />
-                            </button>
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex items-center bg-white dark:bg-[#202636] border border-slate-300 dark:border-[#242C3D] px-2 py-0.5 rounded gap-1">
+                              <span className="font-mono text-xs font-bold text-slate-900 dark:text-white tracking-wider">
+                                {inviteCode}
+                              </span>
+                              <button
+                                onClick={() => copyToClipboard(inviteCode, `Team Code "${inviteCode}" copied!`)}
+                                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                                title="Copy permanent team code"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                            {isCaptain && (
+                              <button
+                                onClick={() => handleDisbandTeam(team.id, team.name)}
+                                className="px-2 py-0.5 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 rounded text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer"
+                                title="Disband team and cancel registrations"
+                              >
+                                Disband
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

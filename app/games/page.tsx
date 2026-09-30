@@ -223,30 +223,50 @@ export default function GamesDirectoryPage() {
                 <div>
                   {/* Thumbnail Header */}
                   <div className="relative w-full h-44 overflow-hidden bg-[#0B0E16]">
-                    <Image
-                      src={game.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"}
-                      alt={game.name}
-                      fill
-                      unoptimized
-                      className="object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
-                    />
+                    {game.heroMediaUrl && game.heroMediaEnabled ? (
+                      <img
+                        src={game.heroMediaUrl}
+                        alt={game.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = game.bannerUrl;
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src={game.bannerUrl || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop"}
+                        alt={game.name}
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform duration-500 opacity-80"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                      <span className="px-2 py-0.5 bg-white/90 dark:bg-slate-900/90 text-[#0F172A] dark:text-white font-mono text-[10px] rounded font-bold">
-                        {game.platform}
-                      </span>
-                      <span className="px-2 py-0.5 bg-[#E56A10] text-white font-mono text-[10px] rounded font-bold">
-                        {game.tag}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-mono">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        {game.teamsCount || 0} TEAMS
-                      </span>
-                      <span className="bg-black/60 px-2 py-0.5 rounded text-[11px] text-[#CBD5E1]">
-                        {game.antiCheat}
-                      </span>
+                    <div className="absolute inset-0 p-3 flex flex-col justify-between pointer-events-none">
+                      <div className="flex flex-wrap items-start justify-between gap-1.5 w-full">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="px-2 py-0.5 bg-white/90 dark:bg-slate-900/90 text-[#0F172A] dark:text-white font-mono text-[10px] rounded font-bold">
+                            {game.platform}
+                          </span>
+                          <span className="px-2 py-0.5 bg-[#E56A10] text-white font-mono text-[10px] rounded font-bold">
+                            {game.tag}
+                          </span>
+                        </div>
+                        {game.status === "COMING_SOON" && (
+                          <span className="px-2 py-0.5 bg-amber-500 text-black font-mono text-[10px] rounded font-bold uppercase shadow-xs">
+                            COMING SOON
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end justify-between gap-2 text-white text-xs font-mono w-full">
+                        <span className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded text-[11px] backdrop-blur-xs">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          {game.teamsCount || 0} TEAMS
+                        </span>
+                        <span className="bg-black/60 px-2 py-0.5 rounded text-[11px] text-[#CBD5E1] backdrop-blur-xs">
+                          {game.antiCheat}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -289,13 +309,23 @@ export default function GamesDirectoryPage() {
 
                 {/* Action Button */}
                 <div className="p-5 pt-0">
-                  <Link
-                    href={`/games/${game.slug}`}
-                    className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#D45900] text-white text-xs font-bold uppercase tracking-wider rounded flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <span>Enter Dedicated Hub</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  {game.status === "COMING_SOON" ? (
+                    <Link
+                      href={`/games/${game.slug}`}
+                      className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider rounded flex items-center justify-center gap-2 transition-colors cursor-pointer font-mono"
+                    >
+                      <span>Arena Preview (Coming Soon)</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/games/${game.slug}`}
+                      className="w-full py-2.5 bg-[#0F172A] dark:bg-[#E56A10] hover:bg-[#1E293B] dark:hover:bg-[#D45900] text-white text-xs font-bold uppercase tracking-wider rounded flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <span>Enter Dedicated Hub</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
                 </div>
               </article>
             ))}

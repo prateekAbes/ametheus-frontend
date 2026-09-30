@@ -26,6 +26,7 @@ import {
   UserMinus,
   Loader2,
   Trophy,
+  Clock,
 } from "lucide-react";
 
 interface Props {
@@ -531,8 +532,57 @@ export default function DedicatedGameHubPage({ params }: Props) {
                     </Link>
                   </div>
                 </div>
+              ) : game.status === "COMING_SOON" ? (
+                /* Coming Soon Teaser State */
+                <div className="py-8 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto border border-amber-500/30">
+                    <Clock className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold font-headline text-slate-900 dark:text-white uppercase">
+                      {game.name} is Coming Soon
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono max-w-md mx-auto">
+                      Official arena launches soon. Team formation, athlete rosters, and tournament registrations are currently locked.
+                      {game.expectedReleaseDate && (
+                        <span className="block mt-1 font-bold text-amber-600 dark:text-amber-400">
+                          Target Launch: {game.expectedReleaseDate}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      disabled
+                      className="px-6 py-3 bg-slate-100 dark:bg-[#161A24] border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-mono font-bold text-xs uppercase rounded-xl flex items-center gap-2 cursor-not-allowed opacity-60"
+                      title="Team formation locked until title launch"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>{isSoloGame ? "Register Solo Profile (Locked)" : "Create Team (Locked)"}</span>
+                    </button>
+
+                    {!isSoloGame && (
+                      <button
+                        disabled
+                        className="px-6 py-3 bg-slate-100 dark:bg-[#161A24] border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-mono font-bold text-xs uppercase rounded-xl flex items-center gap-2 cursor-not-allowed opacity-60"
+                        title="Joining locked until title launch"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>Join Team (Locked)</span>
+                      </button>
+                    )}
+
+                    <Link
+                      href="/games"
+                      className="px-6 py-3 bg-slate-100 dark:bg-[#161A24] hover:bg-slate-200 dark:hover:bg-[#202534] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#242C3D] font-mono font-bold text-xs uppercase rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Explore Other Disciplines</span>
+                    </Link>
+                  </div>
+                </div>
               ) : (
-                /* No Team Created Yet */
+                /* No Team Created Yet (Active Game) */
                 <div className="py-8 text-center space-y-4">
                   <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center mx-auto">
                     <Users className="w-8 h-8" />
