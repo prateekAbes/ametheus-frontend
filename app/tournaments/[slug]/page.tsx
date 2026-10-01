@@ -882,6 +882,10 @@ export default function TournamentDetailPage({ params }: Props) {
         tournament={currentTournament as any}
         onRegistrationSuccess={() => {
           setIsRegistered(true);
+          // Refetch tournament so registeredTeams count reflects the new registration
+          getTournamentBySlug(resolvedParams.slug)
+            .then((data) => { if (data) setTournament(normalizeTournament(data)); })
+            .catch(() => {});
         }}
       />
 
