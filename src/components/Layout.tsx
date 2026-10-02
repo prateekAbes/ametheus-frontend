@@ -215,6 +215,14 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-void text-ink">
       <ScrollRestoration />
+      {/* Directional neon line-transfer beam triggered on route transitions */}
+      <div
+        key={`beam-${pathname}`}
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[2px] overflow-hidden"
+      >
+        <div className="line-transfer-beam h-full w-full bg-gradient-to-r from-transparent via-cyan to-transparent shadow-[0_0_12px_#3ef2ff]" />
+      </div>
       <Nav />
       {/* Incoming page fades in over the static void base. No exit phase, no overlay, no filters:
           if the animation never runs, content is still fully visible (CSS `both` ends at opacity 1). */}

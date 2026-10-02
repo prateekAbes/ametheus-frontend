@@ -9,6 +9,28 @@ const rawBase =
 
 export const API_BASE_URL = rawBase.replace(/\/+$/, '')
 
+/**
+ * Resolves a media URL against the API_BASE_URL if it is a relative path.
+ * Retains absolute URLs (http, https, data:, blob:).
+ */
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url || typeof url !== 'string') return ''
+  const trimmed = url.trim()
+  if (!trimmed) return ''
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed
+  }
+  if (trimmed.startsWith('/')) {
+    return `${API_BASE_URL}${trimmed}`
+  }
+  return `${API_BASE_URL}/${trimmed}`
+}
+
 export interface ApiErrorResponse {
   detail?: string | { msg: string; type: string }[]
   message?: string
@@ -56,8 +78,7 @@ export async function apiClient<T>(
   const isProtected =
     cleanEndpoint.startsWith('/admin') ||
     cleanEndpoint.startsWith('/organizer') ||
-    cleanEndpoint === '/auth/me' ||
-    cleanEndpoint === '/auth/profile' ||
+    cleanEndpoint.startsWith('/auth/') ||
     cleanEndpoint.startsWith('/wallet') ||
     cleanEndpoint.startsWith('/teams') ||
     cleanEndpoint === '/tournaments/my-registrations' ||

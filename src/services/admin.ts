@@ -128,9 +128,9 @@ export async function getAdminUsers(limit: number = 100): Promise<AdminUser[]> {
 }
 
 export async function setUserRole(userId: string, role: string): Promise<any> {
-  return apiClient('/admin/roles', {
+  return apiClient(`/admin/users/${userId}/set-role`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId, role }),
+    body: JSON.stringify({ role }),
   })
 }
 
@@ -151,7 +151,12 @@ export async function getAuditLogs(limit: number = 100): Promise<AuditLog[]> {
 
 // Payments & UTR Verifications
 export async function getPendingPayments(): Promise<PendingPayment[]> {
-  return apiClient<PendingPayment[]>('/admin/payments/pending')
+  return apiClient<PendingPayment[]>('/admin/payments?status_filter=PENDING')
+}
+
+export async function getAdminPayments(statusFilter?: string): Promise<PendingPayment[]> {
+  const q = statusFilter && statusFilter !== 'ALL' ? `?status_filter=${statusFilter}` : ''
+  return apiClient<PendingPayment[]>(`/admin/payments${q}`)
 }
 
 export async function approvePayment(paymentId: string): Promise<any> {
@@ -254,6 +259,18 @@ export async function updateGame(gameId: string, payload: any): Promise<any> {
   return apiClient(`/games/${gameId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteGame(gameId: string): Promise<any> {
+  return apiClient(`/games/${gameId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function publishGame(gameId: string): Promise<any> {
+  return apiClient(`/games/${gameId}/publish`, {
+    method: 'POST',
   })
 }
 
@@ -363,4 +380,31 @@ export async function sendAdminNotification(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+// Media Upload
+export async function uploadMediaFile(file: File): Promise<{
+  status: string
+  id: string
+  url: string
+  data_url: string
+  filename: string
+}> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient<{
+    status: string
+    id: string
+    url: string
+    data_url: string
+    filename: string
+  }>('/media/upload', {
+    method: 'POST',
+    body: formData,
+  })
+}
+
+// Tournament Registered Rosters
+export async function getTournamentRegisteredRosters(tournamentId: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/registered-rosters`)
 }

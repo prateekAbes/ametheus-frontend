@@ -3,6 +3,9 @@ import { useUser, useClerk } from '@clerk/clerk-react'
 import { Container, Cta, Field, Hud, Panel, Toggle, Badge } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
 import { updateUserProfile } from '../services/auth'
+import { resolveMediaUrl } from '../services/apiClient'
+import { uploadMediaFile } from '../services/admin'
+import { AVATARS, img } from '../lib/data'
 
 const SECTIONS = ['Account', 'Preferences', 'Privacy', 'Security'] as const
 const sel =
@@ -190,6 +193,9 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [riotId, setRiotId] = useState(profile?.riot_id || '')
   const [steamId, setSteamId] = useState(profile?.steam_id || '')
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [avatarUploadError, setAvatarUploadError] = useState('')
 
   useEffect(() => {
     if (profile) {
@@ -197,8 +203,27 @@ export default function Settings() {
       setDisplayName(profile.display_name || '')
       setRiotId(profile.riot_id || '')
       setSteamId(profile.steam_id || '')
+      setAvatarUrl(profile.avatar_url || '')
     }
   }, [profile])
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingAvatar(true)
+    setAvatarUploadError('')
+    try {
+      const res = await uploadMediaFile(file)
+      if (res && res.url) {
+        setAvatarUrl(res.url)
+        touch()
+      }
+    } catch (err: any) {
+      setAvatarUploadError(err.message || 'Failed to upload image.')
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   const [notif, setNotif] = useState<Record<string, boolean>>({
     'Tournament updates': true,
@@ -240,8 +265,10 @@ export default function Settings() {
         display_name: displayName.trim() || undefined,
         riot_id: riotId.trim() || undefined,
         steam_id: steamId.trim() || undefined,
+        avatar_url: avatarUrl ? avatarUrl.trim() : undefined,
       })
       await refreshProfile()
+      window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaved(true)
       setDirty(false)
       setSaveMessage('Profile changes successfully updated in backend.')
@@ -319,6 +346,61 @@ export default function Settings() {
                   value={profile?.role || 'PLAYER'}
                 />
               </div>
+
+              <Panel className="p-6">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center">
+                  <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-cyan/40 bg-surface">
+                    <img
+                      src={resolveMediaUrl(avatarUrl) || img(AVATARS[0])}
+                      alt="Avatar Preview"
+                      className="size-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <Hud className="text-cyan">Profile Avatar & Player Crest</Hud>
+                    <p className="text-xs text-dim">
+                      Upload your official competitive esports avatar or select from sanctioned operator crests.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="cursor-pointer border border-cyan bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan/20 transition-colors">
+                        {isUploadingAvatar ? 'Uploading...' : 'Upload Image'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={isUploadingAvatar}
+                          onChange={handleAvatarFile}
+                        />
+                      </label>
+                      <span className="font-mono text-xs text-dim">or select crest:</span>
+                      <div className="flex items-center gap-2">
+                        {AVATARS.map((av) => {
+                          const avUrl = img(av)
+                          const isSelected = avatarUrl === av || avatarUrl === avUrl
+                          return (
+                            <button
+                              key={av}
+                              type="button"
+                              onClick={() => {
+                                setAvatarUrl(avUrl)
+                                touch()
+                              }}
+                              className={`relative size-8 overflow-hidden rounded-full border transition-transform hover:scale-110 ${
+                                isSelected ? 'border-cyan shadow-[0_0_8px_rgba(62,242,255,0.8)]' : 'border-white/20'
+                              }`}
+                            >
+                              <img src={avUrl} alt="Preset avatar" className="size-full object-cover" />
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {avatarUploadError && (
+                      <p className="font-mono text-xs text-live">{avatarUploadError}</p>
+                    )}
+                  </div>
+                </div>
+              </Panel>
 
               <Panel className="p-6">
                 <Hud>Game Identifiers</Hud>

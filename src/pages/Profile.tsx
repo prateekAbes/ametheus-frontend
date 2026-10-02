@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, Cta } from '../components/ui'
 import { GAMES, gameBy, inr, AVATARS } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
+import { resolveMediaUrl } from '../services/apiClient'
 import { getMyTeams, type Team } from '../services/teams'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
@@ -17,7 +18,7 @@ const RANKS: Record<string, [string, number]> = {
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
 export default function Profile() {
-  const { profile, role, isSignedIn } = useAuthContext()
+  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, isSignedIn } = useAuthContext()
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
   const [matches, setMatches] = useState<any[]>([])
@@ -62,10 +63,10 @@ export default function Profile() {
     })
   }, [isSignedIn, profile?.username])
 
-  const username = profile?.display_name || profile?.username || 'Player'
+  const username = authDisplayName || profile?.display_name || profile?.username || 'Player'
   const email = profile?.email || 'player@ametheus.gg'
   const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
-  const avatarUrl = profile?.avatar_url || AVATARS[0]
+  const avatarUrl = authAvatarUrl || resolveMediaUrl(profile?.avatar_url) || AVATARS[0]
 
   // Filter registrations by participation lifecycle
   const filteredFeed = useMemo(() => {
@@ -118,7 +119,7 @@ export default function Profile() {
           <div className="relative border border-white/15 bg-surface p-3">
             <Brackets color="border-cyan/70" />
             <img
-              src={avatarUrl.startsWith('http') ? avatarUrl : `https://images.unsplash.com/photo-${avatarUrl}?w=900&q=80&fit=crop`}
+              src={resolveMediaUrl(avatarUrl) || AVATARS[0]}
               alt={username}
               className="aspect-[4/5] w-full object-cover"
             />

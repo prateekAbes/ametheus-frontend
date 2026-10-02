@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth, useUser } from '@clerk/clerk-react'
-import { setAuthTokenGetter } from '../services/apiClient'
+import { setAuthTokenGetter, resolveMediaUrl } from '../services/apiClient'
 import { syncUser, getCurrentUserProfile, UserProfile } from '../services/auth'
 
 export type CanonicalRole = 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN'
@@ -35,6 +35,8 @@ export function normalizeRole(rawRole: any, email?: string): CanonicalRole {
 interface AuthContextValue {
   profile: UserProfile | null
   role: CanonicalRole
+  displayName: string
+  avatarUrl: string
   isLoading: boolean
   isSignedIn: boolean
   isPlayer: boolean
@@ -46,6 +48,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   profile: null,
   role: 'PLAYER',
+  displayName: 'Contender',
+  avatarUrl: '',
   isLoading: true,
   isSignedIn: false,
   isPlayer: false,
@@ -134,6 +138,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignore cache read failures
     }
 
+    // Helper to prioritize elevated roles
+    const pickHigherRole = (r1: CanonicalRole, r2: CanonicalRole): CanonicalRole => {
+      if (r1 === 'SUPER_ADMIN' || r2 === 'SUPER_ADMIN') return 'SUPER_ADMIN'
+      if (r1 === 'ORGANIZER' || r2 === 'ORGANIZER') return 'ORGANIZER'
+      return 'PLAYER'
+    }
+
     // 3. Authoritative sync with backend MongoDB
     try {
       const token = await getToken()
@@ -147,9 +158,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         if (synced && synced.id) {
-          const canonical = normalizeRole(synced.role || metadataRole, userEmail)
+          const metaCanonical = normalizeRole(metadataRole, userEmail)
+          const backendCanonical = normalizeRole(synced.role, userEmail)
+          const canonical = pickHigherRole(metaCanonical, backendCanonical)
           const finalProfile: UserProfile = {
             ...synced,
+            avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : avatarUrl,
             role: canonical as any,
           }
           setProfile(finalProfile)
@@ -165,9 +179,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const me = await getCurrentUserProfile()
         if (me && me.id) {
-          const canonical = normalizeRole(me.role || metadataRole, userEmail)
+          const metaCanonical = normalizeRole(metadataRole, userEmail)
+          const backendCanonical = normalizeRole(me.role, userEmail)
+          const canonical = pickHigherRole(metaCanonical, backendCanonical)
           const finalProfile: UserProfile = {
             ...me,
+            avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : avatarUrl,
             role: canonical as any,
           }
           setProfile(finalProfile)
@@ -207,6 +224,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadProfile()
   }, [loadProfile])
 
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      loadProfile()
+    }
+    window.addEventListener('ametheus:profile_updated', handleProfileUpdate)
+    return () => {
+      window.removeEventListener('ametheus:profile_updated', handleProfileUpdate)
+    }
+  }, [loadProfile])
+
   const refreshProfile = useCallback(async () => {
     await loadProfile()
   }, [loadProfile])
@@ -215,6 +242,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!profile) return 'PLAYER'
     return normalizeRole(profile.role, profile.email)
   }, [profile])
+
+  const effectiveDisplayName = useMemo(() => {
+    return (
+      profile?.display_name ||
+      user?.fullName ||
+      profile?.username ||
+      user?.username ||
+      'Contender'
+    )
+  }, [profile?.display_name, profile?.username, user?.fullName, user?.username])
+
+  const effectiveAvatarUrl = useMemo(() => {
+    return resolveMediaUrl(profile?.avatar_url || user?.imageUrl)
+  }, [profile?.avatar_url, user?.imageUrl])
 
   const isSignedIn = !!clerkSignedIn || !!profile
   const isPlayer = isSignedIn
@@ -226,6 +267,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         profile,
         role: effectiveRole,
+        displayName: effectiveDisplayName,
+        avatarUrl: effectiveAvatarUrl,
         isLoading,
         isSignedIn,
         isPlayer,

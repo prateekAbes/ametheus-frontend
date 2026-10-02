@@ -78,7 +78,7 @@ export default function AccountMenu() {
   const { pathname } = useLocation()
   const acc = useAccent(pathname)
 
-  const { profile, role, isSignedIn, isOrganizer, isSuperAdmin } = useAuthContext()
+  const { profile, role, displayName, avatarUrl, isSignedIn, isOrganizer, isSuperAdmin } = useAuthContext()
   const clerk = useClerk()
 
   useEffect(() => setOpen(false), [pathname])
@@ -113,7 +113,11 @@ export default function AccountMenu() {
   })()
 
   const [avatarErr, setAvatarErr] = useState(false)
-  const userAvatar = (!avatarErr && profile?.avatar_url) ? profile.avatar_url : DEFAULT_AVATAR
+  useEffect(() => {
+    setAvatarErr(false)
+  }, [avatarUrl])
+
+  const userAvatar = (!avatarErr && avatarUrl) ? avatarUrl : DEFAULT_AVATAR
 
   const rows: Row[] = useMemo(() => {
     if (isSignedIn) {
@@ -121,21 +125,8 @@ export default function AccountMenu() {
         {
           key: 'user',
           to: '/profile',
-          label: profile?.display_name || profile?.username || 'Profile',
-          hint: profile?.email || 'Your player profile',
-          trail: (
-            <span
-              className={`font-mono text-[9px] uppercase tracking-[0.16em] px-1.5 py-0.5 border ${
-                role === 'SUPER_ADMIN'
-                  ? 'border-magenta/40 bg-magenta/10 text-magenta'
-                  : role === 'ORGANIZER'
-                  ? 'border-cyan/40 bg-cyan/10 text-cyan'
-                  : 'border-white/20 bg-white/5 text-dim'
-              }`}
-            >
-              {role === 'SUPER_ADMIN' ? 'ROOT' : role}
-            </span>
-          ),
+          label: 'My Profile',
+          hint: 'Player card & match stats',
           group: 0,
         },
         {
@@ -425,6 +416,47 @@ export default function AccountMenu() {
 
         <div className="relative max-h-[inherit] overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),10px)] md:pb-1.5">
           <div className="mx-auto mb-1 mt-2.5 h-1 w-10 rounded-full bg-white/15 md:hidden" />
+
+          {/* Top User Identity Header Card */}
+          {isSignedIn && (
+            <div className="border-b border-white/[0.08] p-3 mx-1">
+              <div className="flex items-center gap-3">
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-white/20 bg-surface">
+                  <img
+                    src={userAvatar}
+                    alt={displayName}
+                    onError={() => setAvatarErr(true)}
+                    className="size-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate text-sm font-bold text-ink">
+                      {displayName}
+                    </span>
+                    <span
+                      className={`font-mono text-[9px] uppercase tracking-[0.16em] px-1.5 py-0.5 border shrink-0 ${
+                        role === 'SUPER_ADMIN'
+                          ? 'border-magenta/40 bg-magenta/10 text-magenta'
+                          : role === 'ORGANIZER'
+                          ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                          : 'border-white/20 bg-white/5 text-dim'
+                      }`}
+                    >
+                      {role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : role}
+                    </span>
+                  </div>
+                  <div className="truncate font-mono text-[11px] text-dim">
+                    {profile?.username ? `@${profile.username}` : profile?.email}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span className="font-mono text-[10px] uppercase text-dim">Vault</span>
+                    <span className="font-mono font-bold text-cyan">{balanceDisplay}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 
             DROPDOWN CONTENT-AWARE HIGHLIGHT:
