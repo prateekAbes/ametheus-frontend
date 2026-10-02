@@ -29,11 +29,11 @@ function Crystal({ accent }: { accent: string }) {
   useFrame((s, dt) => {
     if (!g.current) return
     const scroll = scrollP
-    g.current.rotation.y += dt * (0.18 + scroll * 0.8)
+    g.current.rotation.y += dt * (0.22 + scroll * 0.8)
     g.current.rotation.x = THREE.MathUtils.lerp(g.current.rotation.x, pointer.y * 0.5, 0.05)
     g.current.position.x = THREE.MathUtils.lerp(g.current.position.x, pointer.x * 0.6, 0.04)
     g.current.scale.setScalar(1 + scroll * 0.35)
-    if (shell.current) shell.current.rotation.z = s.clock.elapsedTime * -0.12
+    if (shell.current) shell.current.rotation.z = s.clock.elapsedTime * -0.14
   })
   return (
     <Float speed={1.4} floatIntensity={0.8} rotationIntensity={0.3}>
@@ -127,7 +127,7 @@ export default function Scene3D({ crystal = true, accent = '#8b5cff', particles 
   return (
     <div ref={box} className={`pointer-events-none absolute inset-0 ${className}`} aria-hidden style={{ background: `radial-gradient(50% 50% at 50% 50%, ${accent}22, transparent 70%)` }}>
       {!reduce && (
-        <Canvas frameloop={on ? 'always' : 'never'} dpr={[1, mobile ? 1 : 1.5]} camera={{ position: [0, 0, 7], fov: 50 }} gl={{ antialias: !mobile, alpha: true, powerPreference: 'high-performance' }}>
+        <Canvas frameloop={on ? 'always' : 'never'} dpr={[1, mobile ? 1 : 1.5]} camera={{ position: [0, 0, mobile ? 8 : 7], fov: mobile ? 52 : 50 }} gl={{ antialias: !mobile, alpha: true, powerPreference: 'high-performance' }}>
           <ambientLight intensity={0.3} />
           <pointLight position={[4, 3, 4]} intensity={60} color="#3ef2ff" />
           <pointLight position={[-4, -2, 3]} intensity={50} color="#ff3dbb" />

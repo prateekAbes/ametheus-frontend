@@ -10,7 +10,7 @@ import {
 } from '../services/tournaments'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
-import { getPageMedia, PageMediaConfig } from '../services/admin'
+import { getPageMedia, PageMediaConfig, getHeroPresentationSettings, HeroPresentationSettings } from '../services/admin'
 import { resolveMediaUrl } from '../services/apiClient'
 import {
   GAMES,
@@ -42,6 +42,7 @@ export default function Home() {
   const [featuredTour, setFeaturedTour] = useState<NormalizedTournament | null>(null)
   const [games, setGames] = useState<ApiGame[]>([])
   const [homeMedia, setHomeMedia] = useState<PageMediaConfig | null>(null)
+  const [heroSettings, setHeroSettings] = useState<HeroPresentationSettings | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export default function Home() {
       getGames().catch(() => []),
       getFeaturedTournament().catch(() => null),
       getPageMedia('home').catch(() => null),
-    ]).then(([tList, gList, fTour, hMedia]) => {
+      getHeroPresentationSettings().catch(() => null),
+    ]).then(([tList, gList, fTour, hMedia, hSettings]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
@@ -60,6 +62,9 @@ export default function Home() {
       }
       if (hMedia) {
         setHomeMedia(hMedia)
+      }
+      if (hSettings) {
+        setHeroSettings(hSettings)
       }
       setLoading(false)
     })
@@ -124,6 +129,7 @@ export default function Home() {
         gameCount={gameCount}
         eligibleTournaments={eligibleTournaments}
         homeMedia={homeMedia}
+        heroSettings={heroSettings}
       />
       <Featured
         tournaments={tournaments}
@@ -142,17 +148,19 @@ function Hero({
   gameCount,
   eligibleTournaments,
   homeMedia,
+  heroSettings,
 }: {
   activeCount: number
   gameCount: number
   eligibleTournaments: NormalizedTournament[]
   homeMedia?: PageMediaConfig | null
+  heroSettings?: HeroPresentationSettings | null
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
   const coord = useRef<HTMLSpanElement>(null)
   const shards = CATALOG.filter((g) => g.status === 'active' && g.photo).slice(0, SLOTS.length)
-  const scene = !isMobile() && !reducedMotion()
+  const scene = !reducedMotion()
 
   const [tourIndex, setTourIndex] = useState(0)
 
@@ -236,7 +244,7 @@ function Hero({
       <div className="pointer-events-none absolute inset-0 hidden md:block [background:radial-gradient(520px_circle_at_var(--lx,50%)_var(--ly,40%),rgb(62_242_255/.09),transparent_60%)]" />
       {scene && (
         <Suspense fallback={null}>
-          <Scene3D particles={1200} />
+          <Scene3D particles={isMobile() ? 500 : 1200} />
         </Suspense>
       )}
 
@@ -244,13 +252,25 @@ function Hero({
         <div
           data-h="media-foreground"
           className="pointer-events-none absolute inset-0 z-[5] overflow-hidden"
-          style={{ opacity: homeMedia.opacity ?? 0.35 }}
+          style={{
+            opacity: heroSettings?.opacity ?? homeMedia.opacity ?? 0.35,
+            filter: `brightness(${heroSettings?.brightness ?? 1}) contrast(${heroSettings?.contrast ?? 1}) saturate(${heroSettings?.saturation ?? 1})`,
+          }}
         >
           <img
             src={resolveMediaUrl(homeMedia.media_url)}
             alt=""
             className="h-full w-full object-cover mix-blend-screen"
+            style={{
+              animationDuration: heroSettings?.animation_speed && heroSettings.animation_speed !== 1 ? `${1 / heroSettings.animation_speed}s` : undefined,
+            }}
           />
+          {heroSettings?.overlay_opacity ? (
+            <div
+              className="pointer-events-none absolute inset-0 bg-void"
+              style={{ opacity: heroSettings.overlay_opacity }}
+            />
+          ) : null}
         </div>
       )}
 

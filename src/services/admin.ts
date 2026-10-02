@@ -116,6 +116,31 @@ export interface PageMediaConfig {
   fallback_url?: string
   is_active: boolean
   opacity?: number
+  is_locked?: boolean
+}
+
+export interface HeroPresentationSettings {
+  animation_speed: number
+  brightness: number
+  opacity: number
+  contrast: number
+  saturation: number
+  overlay_opacity: number
+  asset_url: string
+  is_locked: boolean
+  updated_at?: string
+  updated_by?: string
+}
+
+export const DEFAULT_HERO_SETTINGS: HeroPresentationSettings = {
+  animation_speed: 1.0,
+  brightness: 1.0,
+  opacity: 0.40,
+  contrast: 1.0,
+  saturation: 1.0,
+  overlay_opacity: 0.35,
+  asset_url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z0ZWFmNnN2cWJxeHoxbjlyM3cydXBnNDB1NnY2d2hkYWFxdG00MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3oKIPnAiaMCws8nOsE/giphy.gif',
+  is_locked: true,
 }
 
 // Stats & Users
@@ -435,4 +460,26 @@ export async function uploadMediaFile(file: File): Promise<{
 // Tournament Registered Rosters
 export async function getTournamentRegisteredRosters(tournamentId: string): Promise<any> {
   return apiClient(`/admin/tournaments/${tournamentId}/registered-rosters`)
+}
+
+// Hero Presentation Settings (Protected Hero Asset)
+export async function getHeroPresentationSettings(): Promise<HeroPresentationSettings> {
+  try {
+    return await apiClient<HeroPresentationSettings>('/admin/hero/settings')
+  } catch {
+    try {
+      return await apiClient<HeroPresentationSettings>('/media/hero/settings')
+    } catch {
+      return DEFAULT_HERO_SETTINGS
+    }
+  }
+}
+
+export async function updateHeroPresentationSettings(
+  payload: Partial<Omit<HeroPresentationSettings, 'asset_url' | 'is_locked'>>
+): Promise<HeroPresentationSettings> {
+  return apiClient<HeroPresentationSettings>('/admin/hero/settings', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
 }

@@ -54,9 +54,14 @@ export class ApiError extends Error {
 }
 
 let authTokenGetter: ((options?: { skipCache?: boolean }) => Promise<string | null>) | null = null
+let authUserEmailGetter: (() => string | null) | null = null
 
 export function setAuthTokenGetter(getter: (options?: { skipCache?: boolean }) => Promise<string | null>) {
   authTokenGetter = getter
+}
+
+export function setAuthUserEmailGetter(getter: (() => string | null) | null) {
+  authUserEmailGetter = getter
 }
 
 export async function apiClient<T>(
@@ -98,6 +103,18 @@ export async function apiClient<T>(
       }
     } catch {
       // Guest fallback
+    }
+  }
+
+  // Inject user email header if available to assist authoritative server linking
+  if (!headers['X-User-Email'] && authUserEmailGetter) {
+    try {
+      const email = authUserEmailGetter()
+      if (email && email.trim()) {
+        headers['X-User-Email'] = email.trim()
+      }
+    } catch {
+      // Ignore
     }
   }
 

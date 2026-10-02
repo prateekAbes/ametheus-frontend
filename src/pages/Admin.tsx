@@ -49,6 +49,10 @@ import {
   EmailSystemStatus,
   PageMediaConfig,
   AuditLog,
+  HeroPresentationSettings,
+  getHeroPresentationSettings,
+  updateHeroPresentationSettings,
+  DEFAULT_HERO_SETTINGS,
 } from '../services/admin'
 import { getGames, Game } from '../services/games'
 import {
@@ -342,13 +346,15 @@ export default function Admin() {
   const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false)
 
   // HERO & PAGE MEDIA Interactive States
+  const [heroSettings, setHeroSettings] = useState<HeroPresentationSettings>(DEFAULT_HERO_SETTINGS)
+  const [isSavingHeroSettings, setIsSavingHeroSettings] = useState(false)
   const [editingMedia, setEditingMedia] = useState<PageMediaConfig | null>(null)
   const [isUploadingMediaFile, setIsUploadingMediaFile] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList] = await Promise.all([
+      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, hSettings] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
         getPendingPayments().catch(() => []),
@@ -363,6 +369,7 @@ export default function Admin() {
         getEmailSystemStatusAdmin().catch(() => null),
         getAllPageMedia().catch(() => []),
         getDisputes().catch(() => []),
+        getHeroPresentationSettings().catch(() => null),
       ])
 
       if (s) setStats(s)
@@ -379,6 +386,7 @@ export default function Admin() {
       setEmailStatus(eStat)
       setMediaConfigs(mList)
       setDisputes(dispList)
+      if (hSettings) setHeroSettings(hSettings)
 
       if (fTour) {
         setSelectedFeaturedId(fTour.id || fTour.slug)
@@ -1169,59 +1177,318 @@ export default function Admin() {
 
         {/* TAB: HERO & PAGE MEDIA */}
         {tab === 'HERO & PAGE MEDIA' && (
-          <div className="mt-8 space-y-6">
+          <div className="mt-8 space-y-8">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <h2 className="font-display text-3xl font-black uppercase">Hero Backgrounds & Page Media</h2>
-                <p className="text-xs text-dim">Manage cinematic video backgrounds, GIFs, and imagery across platform pages with live backend sync.</p>
+                <p className="text-xs text-dim">Fine-tune protected hero presentation settings with live preview, and configure imagery across platform pages.</p>
               </div>
               <Hud className="text-cyan">{mediaConfigs.length} ACTIVE PAGES</Hud>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              {mediaConfigs.map((m) => (
-                <Panel key={m.page_id} className="p-6 space-y-4">
-                  <div className="relative aspect-video w-full overflow-hidden border border-white/10 bg-void">
-                    {m.media_url ? (
-                      <img
-                        src={resolveMediaUrl(m.media_url)}
-                        alt={m.title || m.page_id}
-                        className="size-full object-cover"
-                        style={{ opacity: m.opacity ?? 0.35 }}
-                      />
-                    ) : (
-                      <div className="grid size-full place-items-center font-mono text-xs text-dim">
-                        NO ACTIVE MEDIA CONFIGURED
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2 border border-white/20 bg-void/80 px-2 py-0.5 font-mono text-[9px] uppercase backdrop-blur-sm">
-                      {m.media_type || 'IMAGE'}
-                    </div>
+            {/* PROTECTED HOMEPAGE HERO PRESENTATION PANEL */}
+            <Panel className="p-6 border border-cyan/30 bg-graphite space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-2xl font-black uppercase text-cyan">
+                      Homepage Hero Presentation & Animation
+                    </span>
+                    <span className="border border-cyan/40 bg-cyan/15 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan font-bold">
+                      🔒 Official Asset Protected
+                    </span>
                   </div>
+                  <p className="font-mono text-xs text-dim">
+                    The Figma-approved Ametheus Hero GIF asset is locked and immutable. Adjust visual presentation, CSS filters, and playback speed below with real-time preview.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      setHeroSettings(DEFAULT_HERO_SETTINGS)
+                      showToast('Hero settings reset to official defaults')
+                    }}
+                    className="border border-white/20 bg-surface px-3 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink transition-colors"
+                  >
+                    Reset Defaults
+                  </button>
+                  <button
+                    disabled={isSavingHeroSettings}
+                    onClick={async () => {
+                      setIsSavingHeroSettings(true)
+                      try {
+                        const updated = await updateHeroPresentationSettings({
+                          animation_speed: heroSettings.animation_speed,
+                          brightness: heroSettings.brightness,
+                          opacity: heroSettings.opacity,
+                          contrast: heroSettings.contrast,
+                          saturation: heroSettings.saturation,
+                          overlay_opacity: heroSettings.overlay_opacity,
+                        })
+                        setHeroSettings(updated)
+                        showToast('Hero presentation settings updated and synchronized!')
+                      } catch (err: any) {
+                        alert(err.message || 'Failed to update hero settings')
+                      } finally {
+                        setIsSavingHeroSettings(false)
+                      }
+                    }}
+                    className="border border-cyan bg-cyan px-5 py-1.5 font-mono text-xs uppercase font-bold text-void hover:bg-cyan/90 transition-colors disabled:opacity-50"
+                  >
+                    {isSavingHeroSettings ? 'Saving...' : 'Save Hero Settings'}
+                  </button>
+                </div>
+              </div>
 
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="font-mono text-xs text-cyan font-bold">{m.page_id.toUpperCase()}</span>
-                    <span className={`border px-2 py-0.5 font-mono text-[9px] uppercase ${m.is_active ? 'border-ok/40 bg-ok/10 text-ok' : 'border-white/20 text-dim'}`}>
-                      {m.is_active ? 'ACTIVE' : 'INACTIVE'}
+              {/* TWO COLUMN: LIVE PREVIEW & SLIDERS */}
+              <div className="grid gap-6 lg:grid-cols-12 items-start">
+                {/* LIVE PREVIEW COLUMN */}
+                <div className="lg:col-span-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs text-dim uppercase">Live Hero Preview</span>
+                    <span className="font-mono text-[10px] text-cyan">
+                      SPEED: {heroSettings.animation_speed.toFixed(1)}x · OPACITY: {Math.round(heroSettings.opacity * 100)}%
                     </span>
                   </div>
 
-                  <div>
-                    <h3 className="font-display text-2xl font-black uppercase">{m.title || m.page_id}</h3>
-                    <p className="text-xs text-dim font-mono truncate mt-1">URL: {m.media_url || 'None'}</p>
-                    <p className="text-xs text-dim font-mono">Opacity: {Math.round((m.opacity ?? 0.35) * 100)}%</p>
+                  <div className="relative aspect-video w-full overflow-hidden border border-white/20 bg-void rounded-sm shadow-inner">
+                    {/* Simulated Hero background */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_115%,#8b5cff4d,transparent_55%),radial-gradient(ellipse_at_80%_-5%,#3ef2ff1a,transparent_45%)]" />
+
+                    {/* Official Figma Protected Hero GIF with live filters applied */}
+                    <img
+                      src={resolveMediaUrl(heroSettings.asset_url || DEFAULT_HERO_SETTINGS.asset_url)}
+                      alt="Official Protected Ametheus Hero GIF"
+                      className="size-full object-cover mix-blend-screen"
+                      style={{
+                        opacity: heroSettings.opacity,
+                        filter: `brightness(${heroSettings.brightness}) contrast(${heroSettings.contrast}) saturate(${heroSettings.saturation})`,
+                      }}
+                    />
+
+                    {/* Live overlay mask */}
+                    {heroSettings.overlay_opacity > 0 && (
+                      <div
+                        className="pointer-events-none absolute inset-0 bg-void"
+                        style={{ opacity: heroSettings.overlay_opacity }}
+                      />
+                    )}
+
+                    {/* Status Badge */}
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5 border border-cyan/40 bg-void/90 px-2.5 py-1 font-mono text-[10px] text-cyan backdrop-blur-md">
+                      <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
+                      <span>🔒 OFFICIAL FIGMA HERO ASSET (LOCKED)</span>
+                    </div>
+
+                    <div className="absolute bottom-3 left-3 font-mono text-[10px] text-dim bg-void/80 px-2 py-0.5 backdrop-blur-sm">
+                      FPS: 60 · SPEED {heroSettings.animation_speed}x
+                    </div>
+                  </div>
+                  <p className="font-mono text-[11px] text-dim">
+                    * The official hero asset URL is strictly enforced. Media changes are rejected by backend authority.
+                  </p>
+                </div>
+
+                {/* INTERACTIVE CONTROLS COLUMN */}
+                <div className="lg:col-span-6 space-y-4 font-mono text-xs">
+                  {/* ANIMATION SPEED */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Playback Animation Speed</label>
+                      <span className="text-cyan font-bold tabular-nums">{heroSettings.animation_speed.toFixed(1)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.1"
+                      value={heroSettings.animation_speed}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, animation_speed: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>0.5x (Slow)</span>
+                      <span>1.0x (Normal)</span>
+                      <span>2.0x (Fast)</span>
+                    </div>
                   </div>
 
-                  <div className="flex justify-end pt-2">
-                    <button
-                      onClick={() => setEditingMedia(m)}
-                      className="border border-cyan bg-cyan/15 px-4 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors"
-                    >
-                      Configure / Upload Media
-                    </button>
+                  {/* BRIGHTNESS */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Brightness</label>
+                      <span className="text-cyan font-bold tabular-nums">{Math.round(heroSettings.brightness * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="1.5"
+                      step="0.05"
+                      value={heroSettings.brightness}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, brightness: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>50%</span>
+                      <span>100% (Default)</span>
+                      <span>150%</span>
+                    </div>
                   </div>
-                </Panel>
-              ))}
+
+                  {/* OPACITY */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Hero Media Opacity</label>
+                      <span className="text-cyan font-bold tabular-nums">{Math.round(heroSettings.opacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={heroSettings.opacity}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, opacity: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>10%</span>
+                      <span>40% (Default)</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  {/* CONTRAST */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Contrast</label>
+                      <span className="text-cyan font-bold tabular-nums">{Math.round(heroSettings.contrast * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="1.5"
+                      step="0.05"
+                      value={heroSettings.contrast}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, contrast: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>50%</span>
+                      <span>100%</span>
+                      <span>150%</span>
+                    </div>
+                  </div>
+
+                  {/* SATURATION */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Color Saturation</label>
+                      <span className="text-cyan font-bold tabular-nums">{Math.round(heroSettings.saturation * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.0"
+                      max="2.0"
+                      step="0.05"
+                      value={heroSettings.saturation}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, saturation: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>0% (Monochrome)</span>
+                      <span>100%</span>
+                      <span>200%</span>
+                    </div>
+                  </div>
+
+                  {/* OVERLAY OPACITY */}
+                  <div className="border border-white/10 bg-surface/50 p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-ink font-bold">Dark Void Overlay Intensity</label>
+                      <span className="text-cyan font-bold tabular-nums">{Math.round(heroSettings.overlay_opacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.0"
+                      max="0.8"
+                      step="0.05"
+                      value={heroSettings.overlay_opacity}
+                      onChange={(e) => setHeroSettings({ ...heroSettings, overlay_opacity: parseFloat(e.target.value) })}
+                      className="w-full accent-cyan cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-dim">
+                      <span>0% (None)</span>
+                      <span>35% (Balanced)</span>
+                      <span>80% (Dark)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Panel>
+
+            <div className="border-t border-white/10 pt-4">
+              <h3 className="font-display 2xl font-black uppercase text-ink">Other Platform Page Media</h3>
+              <p className="text-xs text-dim font-mono mt-1">Configure secondary media for hub pages (Tournaments, Matches, Teams, Games, Leaderboard).</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {mediaConfigs.map((m) => {
+                const isHome = m.page_id === 'home'
+                return (
+                  <Panel key={m.page_id} className={`p-6 space-y-4 ${isHome ? 'border-cyan/40 bg-surface/80' : ''}`}>
+                    <div className="relative aspect-video w-full overflow-hidden border border-white/10 bg-void">
+                      {m.media_url ? (
+                        <img
+                          src={resolveMediaUrl(m.media_url)}
+                          alt={m.title || m.page_id}
+                          className="size-full object-cover"
+                          style={{ opacity: m.opacity ?? 0.35 }}
+                        />
+                      ) : (
+                        <div className="grid size-full place-items-center font-mono text-xs text-dim">
+                          NO ACTIVE MEDIA CONFIGURED
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 border border-white/20 bg-void/80 px-2 py-0.5 font-mono text-[9px] uppercase backdrop-blur-sm">
+                        {isHome ? 'PROTECTED GIF' : (m.media_type || 'IMAGE')}
+                      </div>
+                      {isHome && (
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 border border-cyan/40 bg-void/90 px-2 py-0.5 font-mono text-[9px] text-cyan backdrop-blur-sm">
+                          <span>🔒 PROTECTED HERO</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-mono text-xs text-cyan font-bold">{m.page_id.toUpperCase()}</span>
+                      <span className={`border px-2 py-0.5 font-mono text-[9px] uppercase ${m.is_active ? 'border-ok/40 bg-ok/10 text-ok' : 'border-white/20 text-dim'}`}>
+                        {m.is_active ? 'ACTIVE' : 'INACTIVE'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-display text-2xl font-black uppercase">{m.title || m.page_id}</h3>
+                      <p className="text-xs text-dim font-mono truncate mt-1">
+                        {isHome ? 'Asset: Official Figma Approved Hero GIF (Locked)' : `URL: ${m.media_url || 'None'}`}
+                      </p>
+                      <p className="text-xs text-dim font-mono">Opacity: {Math.round((m.opacity ?? 0.35) * 100)}%</p>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={() => setEditingMedia(m)}
+                        className={`border px-4 py-1.5 font-mono text-xs uppercase transition-colors ${
+                          isHome
+                            ? 'border-white/20 bg-surface text-ink hover:border-cyan hover:text-cyan'
+                            : 'border-cyan bg-cyan/15 text-cyan hover:bg-cyan/30'
+                        }`}
+                      >
+                        {isHome ? 'View Protection Status' : 'Configure / Upload Media'}
+                      </button>
+                    </div>
+                  </Panel>
+                )
+              })}
             </div>
           </div>
         )}
@@ -2262,34 +2529,45 @@ export default function Admin() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="text-dim">Media Asset URL (Image / GIF / Web)</label>
-                <div className="flex gap-2 mt-1">
-                  <input required placeholder="https://..." value={editingMedia.media_url} onChange={(e) => setEditingMedia({ ...editingMedia, media_url: e.target.value })} className="flex-1 border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                  <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3 py-2 uppercase text-cyan hover:bg-cyan/20 shrink-0">
-                    {isUploadingMediaFile ? '...' : 'Upload File'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isUploadingMediaFile}
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        setIsUploadingMediaFile(true)
-                        try {
-                          const res = await uploadMediaFile(f)
-                          if (res?.url) setEditingMedia((prev) => prev ? { ...prev, media_url: res.url } : null)
-                        } catch (err: any) {
-                          alert(err.message || 'Media upload failed')
-                        } finally {
-                          setIsUploadingMediaFile(false)
-                        }
-                      }}
-                    />
-                  </label>
+              {editingMedia.page_id === 'home' ? (
+                <div className="border border-cyan/40 bg-cyan/10 p-3 space-y-1.5 font-mono text-xs">
+                  <div className="flex items-center gap-1.5 text-cyan font-bold">
+                    <span>🔒 OFFICIAL FIGMA HERO ASSET (PROTECTED & IMMUTABLE)</span>
+                  </div>
+                  <p className="text-[11px] text-dim">
+                    The homepage hero GIF asset is locked to the approved Figma design. Media file replacement, URL modification, and deletion are permanently disabled. Please tune visual appearance via the Hero Settings panel above.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="text-dim">Media Asset URL (Image / GIF / Web)</label>
+                  <div className="flex gap-2 mt-1">
+                    <input required placeholder="https://..." value={editingMedia.media_url} onChange={(e) => setEditingMedia({ ...editingMedia, media_url: e.target.value })} className="flex-1 border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                    <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3 py-2 uppercase text-cyan hover:bg-cyan/20 shrink-0">
+                      {isUploadingMediaFile ? '...' : 'Upload File'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingMediaFile}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          setIsUploadingMediaFile(true)
+                          try {
+                            const res = await uploadMediaFile(f)
+                            if (res?.url) setEditingMedia((prev) => prev ? { ...prev, media_url: res.url } : null)
+                          } catch (err: any) {
+                            alert(err.message || 'Media upload failed')
+                          } finally {
+                            setIsUploadingMediaFile(false)
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-dim">Fallback Image URL</label>
                 <input placeholder="https://..." value={editingMedia.fallback_url || ''} onChange={(e) => setEditingMedia({ ...editingMedia, fallback_url: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />

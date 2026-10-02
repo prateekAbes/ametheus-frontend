@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth, useUser } from '@clerk/clerk-react'
-import { setAuthTokenGetter, resolveMediaUrl } from '../services/apiClient'
+import { setAuthTokenGetter, setAuthUserEmailGetter, resolveMediaUrl } from '../services/apiClient'
 import { syncUser, getCurrentUserProfile, UserProfile } from '../services/auth'
 
 export type CanonicalRole = 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN'
@@ -79,6 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
   }, [clerkSignedIn, getToken])
+
+  // Centralized user email getter for API requests
+  useEffect(() => {
+    if (user?.primaryEmailAddress?.emailAddress) {
+      setAuthUserEmailGetter(() => user.primaryEmailAddress?.emailAddress || null)
+    } else {
+      setAuthUserEmailGetter(null)
+    }
+  }, [user?.primaryEmailAddress?.emailAddress])
 
   const loadProfile = useCallback(async () => {
     // Wait until Clerk auth state is fully resolved
@@ -161,8 +170,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const metaCanonical = normalizeRole(metadataRole, userEmail)
           const backendCanonical = normalizeRole(synced.role, userEmail)
           const canonical = pickHigherRole(metaCanonical, backendCanonical)
+          const cleanEmail =
+            (user.primaryEmailAddress?.emailAddress) ||
+            (synced.email && !synced.email.endsWith('@ametheus.gg') ? synced.email : userEmail)
           const finalProfile: UserProfile = {
             ...synced,
+            email: cleanEmail,
             avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : avatarUrl,
             role: canonical as any,
           }
@@ -182,8 +195,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const metaCanonical = normalizeRole(metadataRole, userEmail)
           const backendCanonical = normalizeRole(me.role, userEmail)
           const canonical = pickHigherRole(metaCanonical, backendCanonical)
+          const cleanEmail =
+            (user.primaryEmailAddress?.emailAddress) ||
+            (me.email && !me.email.endsWith('@ametheus.gg') ? me.email : userEmail)
           const finalProfile: UserProfile = {
             ...me,
+            email: cleanEmail,
             avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : avatarUrl,
             role: canonical as any,
           }
