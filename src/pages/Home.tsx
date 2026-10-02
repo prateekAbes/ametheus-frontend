@@ -71,13 +71,21 @@ export default function Home() {
   }, [])
 
   // Derived lists
-  const activeTournaments = tournaments.filter(
-    (t) => t.status !== 'CANCELLED' && t.status !== 'COMPLETED'
-  )
-  const eligibleTournaments = tournaments.filter(
-    (t) => t.status === 'REGISTRATION_OPEN' || t.status === 'UPCOMING' || t.status === 'LIVE'
-  )
-  const liveCount = tournaments.filter((t) => t.status.toLowerCase() === 'live').length
+  const activeTournaments = useMemo(() => {
+    return tournaments.filter(
+      (t) => !['CANCELLED', 'COMPLETED'].includes((t.status || '').toUpperCase())
+    )
+  }, [tournaments])
+
+  const eligibleTournaments = useMemo(() => {
+    const matched = tournaments.filter((t) => {
+      const s = (t.status || '').toUpperCase()
+      return ['REGISTRATION_OPEN', 'OPEN', 'UPCOMING', 'LIVE', 'ACTIVE'].includes(s)
+    })
+    return matched.length > 0 ? matched : activeTournaments.length > 0 ? activeTournaments : tournaments
+  }, [tournaments, activeTournaments])
+
+  const liveCount = tournaments.filter((t) => (t.status || '').toLowerCase() === 'live').length
   const gameCount = games.length > 0 ? games.length : CATALOG.length
 
   // Lead featured tournament calculation (to exclude from upcoming list)

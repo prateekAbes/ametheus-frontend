@@ -190,3 +190,24 @@ export async function submitMatchDispute(
   })
 }
 
+export async function updateMatch(
+  matchId: string,
+  payload: {
+    lobby_code?: string
+    lobby_password?: string
+    youtube_live_url?: string
+    live_link?: string
+    server_region?: string
+    status?: string
+    score_a?: number
+    score_b?: number
+    winner_team_id?: string
+  }
+): Promise<any> {
+  return apiClient(`/matches/${matchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+

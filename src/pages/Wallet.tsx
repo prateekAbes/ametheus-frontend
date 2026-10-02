@@ -265,20 +265,34 @@ export default function Wallet() {
                     minute: '2-digit',
                   })}
                 </span>
-                <div>
-                  <span className="font-display text-sm font-black uppercase text-ink block">
-                    {t.entry_type} · {t.source_type}
-                  </span>
-                  {t.description && <span className="text-xs text-dim">{t.description}</span>}
-                </div>
-                <span
-                  className={`font-display text-lg font-black tabular-nums ${
-                    t.entry_type === 'CREDIT' ? 'text-ok' : 'text-live'
-                  }`}
-                >
-                  {t.entry_type === 'CREDIT' ? '+' : '−'}
-                  {inr(t.amount_inr)}
-                </span>
+                {(() => {
+                  const isCredit =
+                    t.entry_type === 'CREDIT' ||
+                    t.source_type === 'WALLET_TOPUP' ||
+                    (t.source_type && (t.source_type.includes('TOPUP') || t.source_type.includes('DEPOSIT') || t.source_type.includes('WINNING'))) ||
+                    t.amount_inr > 0
+                  const displayType = (t.source_type || (isCredit ? 'DEPOSIT' : 'WITHDRAWAL')).replace(/_/g, ' ')
+                  const absAmount = Math.abs(t.amount_inr ?? 0)
+
+                  return (
+                    <>
+                      <div>
+                        <span className="font-display text-sm font-black uppercase text-ink block">
+                          {displayType}
+                        </span>
+                        {t.description && <span className="text-xs text-dim">{t.description}</span>}
+                      </div>
+                      <span
+                        className={`font-display text-lg font-black tabular-nums ${
+                          isCredit ? 'text-ok' : 'text-live'
+                        }`}
+                      >
+                        {isCredit ? '+' : '−'}
+                        {inr(absAmount)}
+                      </span>
+                    </>
+                  )
+                })()}
                 <span className="text-xs text-dim font-mono text-right md:text-left">
                   {inr(t.balance_after_inr)}
                 </span>

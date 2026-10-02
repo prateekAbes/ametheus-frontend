@@ -120,6 +120,19 @@ export interface PageMediaConfig {
 }
 
 // Stats & Users
+export interface PublicPlatformStats {
+  total_users: number
+  total_tournaments: number
+  total_games: number
+  total_matches: number
+  total_teams: number
+  total_payout_inr: number
+}
+
+export async function getPublicPlatformStats(): Promise<PublicPlatformStats> {
+  return apiClient<PublicPlatformStats>('/platform/stats')
+}
+
 export async function getAdminStats(): Promise<AdminStats> {
   return apiClient<AdminStats>('/admin/stats')
 }

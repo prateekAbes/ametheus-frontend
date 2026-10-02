@@ -17,7 +17,7 @@ import {
   normalizeTournament,
   getTournamentRegistrations,
 } from '../services/tournaments'
-import { getMatches, submitMatchResult, ApiMatch } from '../services/matches'
+import { getMatches, submitMatchResult, updateMatch, ApiMatch } from '../services/matches'
 import { inr } from '../lib/data'
 
 export default function Organizer() {
@@ -73,6 +73,7 @@ export default function Organizer() {
   const [lobbyCode, setLobbyCode] = useState('')
   const [lobbyPassword, setLobbyPassword] = useState('')
   const [streamUrl, setStreamUrl] = useState('')
+  const [isSavingLobby, setIsSavingLobby] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -237,6 +238,34 @@ export default function Organizer() {
       alert(err.message || 'Failed to submit match score')
     } finally {
       setIsSubmittingScore(false)
+    }
+  }
+
+  const openLobbyModal = (m: ApiMatch) => {
+    setSelectedLobbyMatch(m)
+    setLobbyCode(m.lobby_code || '')
+    setLobbyPassword(m.lobby_password || '')
+    setStreamUrl(m.youtube_live_url || m.live_link || '')
+  }
+
+  const handleSaveLobbyCredentials = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedLobbyMatch) return
+    setIsSavingLobby(true)
+    try {
+      await updateMatch(selectedLobbyMatch.id, {
+        lobby_code: lobbyCode.trim(),
+        lobby_password: lobbyPassword.trim(),
+        youtube_live_url: streamUrl.trim(),
+      })
+      setActionMsg('Lobby room credentials & stream URL updated successfully.')
+      setTimeout(() => setActionMsg(null), 4000)
+      setSelectedLobbyMatch(null)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update lobby credentials')
+    } finally {
+      setIsSavingLobby(false)
     }
   }
 
@@ -460,6 +489,12 @@ export default function Organizer() {
                         className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors"
                       >
                         Submit Score
+                      </button>
+                      <button
+                        onClick={() => openLobbyModal(m)}
+                        className="border border-white/20 bg-surface px-3 py-1 font-mono text-xs text-ink hover:border-cyan hover:text-cyan transition-colors"
+                      >
+                        Room & Stream
                       </button>
                     </div>
                   </div>
@@ -821,6 +856,82 @@ export default function Organizer() {
                   className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
                 >
                   {isSubmittingScore ? 'Submitting...' : 'Certify Result'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Room & Stream Modal */}
+      {selectedLobbyMatch && (
+        <div
+          role="dialog"
+          aria-modal
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedLobbyMatch(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8"
+          >
+            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="font-display text-2xl font-black uppercase text-ink">Room & Stream Settings</h3>
+                <p className="text-xs text-dim">Set custom room code, password, and live stream URL.</p>
+              </div>
+              <button onClick={() => setSelectedLobbyMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveLobbyCredentials} className="space-y-4">
+              <div>
+                <Hud>Lobby / Room Code</Hud>
+                <input
+                  type="text"
+                  value={lobbyCode}
+                  onChange={(e) => setLobbyCode(e.target.value)}
+                  placeholder="e.g. AMT-ROOM-01"
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                />
+              </div>
+
+              <div>
+                <Hud>Lobby Password</Hud>
+                <input
+                  type="text"
+                  value={lobbyPassword}
+                  onChange={(e) => setLobbyPassword(e.target.value)}
+                  placeholder="e.g. PASS123"
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                />
+              </div>
+
+              <div>
+                <Hud>Live Stream URL (YouTube Embed / Watch Link)</Hud>
+                <input
+                  type="url"
+                  value={streamUrl}
+                  onChange={(e) => setStreamUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                />
+                <span className="mt-1 block text-[10px] text-dim">Stream will appear on the match details page and broadcast hubs.</span>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLobbyMatch(null)}
+                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingLobby}
+                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                >
+                  {isSavingLobby ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
             </form>

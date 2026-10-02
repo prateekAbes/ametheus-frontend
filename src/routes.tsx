@@ -121,6 +121,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'support', Component: Support },
+      { path: 'help', Component: Support },
       { path: 'rules', Component: Rules },
       {
         path: 'admin',

@@ -83,25 +83,39 @@ export default function Transactions() {
                       })}
                     </Hud>
                   </div>
-                  <div>
-                    <p className="font-display text-lg font-black uppercase text-ink">
-                      {t.source_type}
-                    </p>
-                    <p className="font-mono text-xs text-dim">
-                      {t.description || `Ledger Ref: ${t.reference_id || t.id.slice(0, 8)}`}
-                    </p>
-                  </div>
-                  <div>
-                    <span
-                      className={`font-display text-2xl font-black tabular-nums ${
-                        t.entry_type === 'CREDIT' ? 'text-ok' : 'text-live'
-                      }`}
-                    >
-                      {t.entry_type === 'CREDIT' ? '+' : '−'}
-                      {inr(t.amount_inr)}
-                    </span>
-                    <Hud className="block text-[10px]">{t.entry_type}</Hud>
-                  </div>
+                  {(() => {
+                    const isCredit =
+                      t.entry_type === 'CREDIT' ||
+                      t.source_type === 'WALLET_TOPUP' ||
+                      (t.source_type && (t.source_type.includes('TOPUP') || t.source_type.includes('DEPOSIT') || t.source_type.includes('WINNING'))) ||
+                      t.amount_inr > 0
+                    const displayType = (t.source_type || (isCredit ? 'DEPOSIT' : 'WITHDRAWAL')).replace(/_/g, ' ')
+                    const absAmount = Math.abs(t.amount_inr ?? 0)
+
+                    return (
+                      <>
+                        <div>
+                          <p className="font-display text-lg font-black uppercase text-ink">
+                            {displayType}
+                          </p>
+                          <p className="font-mono text-xs text-dim">
+                            {t.description || `Ledger Ref: ${t.reference_id || t.id.slice(0, 8)}`}
+                          </p>
+                        </div>
+                        <div>
+                          <span
+                            className={`font-display text-2xl font-black tabular-nums ${
+                              isCredit ? 'text-ok' : 'text-live'
+                            }`}
+                          >
+                            {isCredit ? '+' : '−'}
+                            {inr(absAmount)}
+                          </span>
+                          <Hud className="block text-[10px]">{isCredit ? 'CREDIT' : 'DEBIT'}</Hud>
+                        </div>
+                      </>
+                    )
+                  })()}
                   <div className="text-right md:text-left">
                     <p className="font-mono text-xs text-dim">Balance</p>
                     <p className="font-mono text-sm font-bold text-ink">

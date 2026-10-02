@@ -84,9 +84,17 @@ function LiveFeature({ m }: { m: Match & { tourName?: string; liveLink?: string 
           <Hud>
             {m.date} · {m.time}
           </Hud>
-          <span className="inline-flex items-center gap-2 font-display text-sm md:text-base font-extrabold uppercase tracking-[0.08em] text-live transition-all group-hover:gap-4">
-            ▶ Watch Broadcast
-          </span>
+          <div className="flex items-center gap-3">
+            {m.liveLink && (
+              <span className="flex items-center gap-1.5 rounded bg-live/20 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-live border border-live/40">
+                <span className="size-1.5 rounded-full bg-live animate-ping" />
+                Stream Active
+              </span>
+            )}
+            <span className="inline-flex items-center gap-2 font-display text-sm md:text-base font-extrabold uppercase tracking-[0.08em] text-live transition-all group-hover:gap-4">
+              ▶ Watch Broadcast
+            </span>
+          </div>
         </div>
       </div>
     </Link>

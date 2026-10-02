@@ -11,6 +11,26 @@ const NAMES = [
 ]
 const ROLES = ['Captain · IGL', 'Entry', 'Support', 'Sniper', 'Flex']
 
+function getYoutubeEmbedUrl(url?: string): string | null {
+  if (!url) return null
+  try {
+    const trimmed = url.trim()
+    if (trimmed.includes('/embed/')) return trimmed
+    const watchMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{11})/)
+    if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}?autoplay=1`
+    const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/)
+    if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}?autoplay=1`
+    const liveMatch = trimmed.match(/youtube\.com\/live\/([a-zA-Z0-9_-]{11})/)
+    if (liveMatch) return `https://www.youtube.com/embed/${liveMatch[1]}?autoplay=1`
+    if (trimmed.includes('youtube.com')) {
+      return trimmed.replace('watch?v=', 'embed/')
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 function Countdown({ targetIso }: { targetIso?: string }) {
   const [s, setS] = useState(2 * 86400 + 5 * 3600 + 42 * 60 + 17)
 
@@ -378,9 +398,9 @@ export default function MatchDetail() {
         {live ? (
           <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <div className="group relative aspect-video overflow-hidden border border-live/40 bg-black">
-              {m.liveLink && m.liveLink.includes('youtube.com') ? (
+              {getYoutubeEmbedUrl(m.liveLink) ? (
                 <iframe
-                  src={m.liveLink.replace('watch?v=', 'embed/')}
+                  src={getYoutubeEmbedUrl(m.liveLink)!}
                   title="Live Stream"
                   className="h-full w-full border-0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

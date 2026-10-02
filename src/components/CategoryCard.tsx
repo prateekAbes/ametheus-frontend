@@ -27,7 +27,7 @@ export default function CategoryCard({
   return (
     <Link
       to={`/games/category/${category.slug}`}
-      className="group relative flex aspect-[16/9] w-full flex-col justify-between overflow-hidden border border-white/10 bg-surface p-5 transition-all duration-500 hover:border-cyan/50 hover:shadow-[0_0_30px_rgba(62,242,255,0.15)] md:p-6"
+      className="group relative flex min-h-[260px] sm:min-h-0 sm:aspect-[16/9] w-full flex-col justify-between overflow-hidden border border-white/10 bg-surface p-5 transition-all duration-500 hover:border-cyan/50 hover:shadow-[0_0_30px_rgba(62,242,255,0.15)] md:p-6"
     >
       {/* Rotating Background Image with smooth transition */}
       <div className="absolute inset-0 overflow-hidden bg-void">
@@ -38,7 +38,7 @@ export default function CategoryCard({
             alt={`${category.name} preview`}
             loading={index < 2 ? 'eager' : 'lazy'}
             decoding="async"
-            className={`absolute inset-0 size-full object-cover transition-all duration-1000 ease-in-out group-hover:scale-105 ${
+            className={`absolute inset-0 size-full object-cover object-center transition-all duration-1000 ease-in-out group-hover:scale-105 ${
               idx === activeImageIndex
                 ? 'opacity-60 brightness-90'
                 : 'opacity-0 pointer-events-none'
