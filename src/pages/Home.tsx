@@ -10,8 +10,6 @@ import {
 } from '../services/tournaments'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
-import { getPageMedia, PageMediaConfig, getHeroPresentationSettings, HeroPresentationSettings } from '../services/admin'
-import { resolveMediaUrl } from '../services/apiClient'
 import {
   GAMES,
   CATALOG,
@@ -41,8 +39,6 @@ export default function Home() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([])
   const [featuredTour, setFeaturedTour] = useState<NormalizedTournament | null>(null)
   const [games, setGames] = useState<ApiGame[]>([])
-  const [homeMedia, setHomeMedia] = useState<PageMediaConfig | null>(null)
-  const [heroSettings, setHeroSettings] = useState<HeroPresentationSettings | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,20 +47,12 @@ export default function Home() {
       getTournaments().catch(() => []),
       getGames().catch(() => []),
       getFeaturedTournament().catch(() => null),
-      getPageMedia('home').catch(() => null),
-      getHeroPresentationSettings().catch(() => null),
-    ]).then(([tList, gList, fTour, hMedia, hSettings]) => {
+    ]).then(([tList, gList, fTour]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
       if (fTour) {
         setFeaturedTour(normalizeTournament(fTour))
-      }
-      if (hMedia) {
-        setHomeMedia(hMedia)
-      }
-      if (hSettings) {
-        setHeroSettings(hSettings)
       }
       setLoading(false)
     })
@@ -128,8 +116,6 @@ export default function Home() {
         activeCount={activeTournaments.length}
         gameCount={gameCount}
         eligibleTournaments={eligibleTournaments}
-        homeMedia={homeMedia}
-        heroSettings={heroSettings}
       />
       <Featured
         tournaments={tournaments}
@@ -147,14 +133,10 @@ function Hero({
   activeCount,
   gameCount,
   eligibleTournaments,
-  homeMedia,
-  heroSettings,
 }: {
   activeCount: number
   gameCount: number
   eligibleTournaments: NormalizedTournament[]
-  homeMedia?: PageMediaConfig | null
-  heroSettings?: HeroPresentationSettings | null
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
@@ -246,32 +228,6 @@ function Hero({
         <Suspense fallback={null}>
           <Scene3D particles={isMobile() ? 500 : 1200} />
         </Suspense>
-      )}
-
-      {homeMedia?.is_active && homeMedia.media_url && (
-        <div
-          data-h="media-foreground"
-          className="pointer-events-none absolute inset-0 z-[5] overflow-hidden"
-          style={{
-            opacity: heroSettings?.opacity ?? homeMedia.opacity ?? 0.35,
-            filter: `brightness(${heroSettings?.brightness ?? 1}) contrast(${heroSettings?.contrast ?? 1}) saturate(${heroSettings?.saturation ?? 1})`,
-          }}
-        >
-          <img
-            src={resolveMediaUrl(homeMedia.media_url)}
-            alt=""
-            className="h-full w-full object-cover mix-blend-screen"
-            style={{
-              animationDuration: heroSettings?.animation_speed && heroSettings.animation_speed !== 1 ? `${1 / heroSettings.animation_speed}s` : undefined,
-            }}
-          />
-          {heroSettings?.overlay_opacity ? (
-            <div
-              className="pointer-events-none absolute inset-0 bg-void"
-              style={{ opacity: heroSettings.overlay_opacity }}
-            />
-          ) : null}
-        </div>
       )}
 
       {shards.map((g, k) => (
