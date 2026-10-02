@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import Games from './pages/Games'
 import GameDetail from './pages/GameDetail'
+import CategoryDetail from './pages/CategoryDetail'
 import Tournaments from './pages/Tournaments'
 import TournamentDetail from './pages/TournamentDetail'
 import Matches from './pages/Matches'
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Home },
       { path: 'games', Component: Games },
+      { path: 'games/category/:slug', Component: CategoryDetail },
       { path: 'games/:slug', Component: GameDetail },
       { path: 'tournaments', Component: Tournaments },
       { path: 'tournaments/:id', Component: TournamentDetail },

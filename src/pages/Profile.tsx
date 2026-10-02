@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, Cta } from '../components/ui'
-import { GAMES, gameBy, inr, AVATARS } from '../lib/data'
+import { GAMES, gameBy, inr, AVATARS, img } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
 import { getMyTeams, type Team } from '../services/teams'
@@ -66,7 +66,8 @@ export default function Profile() {
   const username = authDisplayName || profile?.display_name || profile?.username || 'Player'
   const email = profile?.email || 'player@ametheus.gg'
   const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
-  const avatarUrl = authAvatarUrl || resolveMediaUrl(profile?.avatar_url) || AVATARS[0]
+  const rawAvatar = authAvatarUrl || profile?.avatar_url
+  const avatarDisplay = rawAvatar ? resolveMediaUrl(rawAvatar) : img(AVATARS[0], 800)
 
   // Filter registrations by participation lifecycle
   const filteredFeed = useMemo(() => {
@@ -119,7 +120,7 @@ export default function Profile() {
           <div className="relative border border-white/15 bg-surface p-3">
             <Brackets color="border-cyan/70" />
             <img
-              src={resolveMediaUrl(avatarUrl) || AVATARS[0]}
+              src={avatarDisplay}
               alt={username}
               className="aspect-[4/5] w-full object-cover"
             />

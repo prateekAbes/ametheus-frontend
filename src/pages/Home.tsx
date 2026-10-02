@@ -1,5 +1,7 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { useAuthContext } from '../context/AuthContext'
+import { slugifyCategory } from '../lib/categories'
 import {
   getTournaments,
   getFeaturedTournament,
@@ -66,6 +68,15 @@ export default function Home() {
     }
   }, [])
 
+  // 60-second dynamic shuffle interval for homepage sections
+  const [shuffleTick, setShuffleTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setShuffleTick((prev) => prev + 1)
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [])
+
   // Derived lists
   const activeTournaments = tournaments.filter(
     (t) => t.status !== 'CANCELLED' && t.status !== 'COMPLETED'
@@ -75,6 +86,36 @@ export default function Home() {
   )
   const liveCount = tournaments.filter((t) => t.status.toLowerCase() === 'live').length
   const gameCount = games.length > 0 ? games.length : CATALOG.length
+
+  // Lead featured tournament calculation (to exclude from upcoming list)
+  const leadTour = featuredTour || tournaments.find((t) => t.isFeatured) || tournaments[0]
+
+  // Upcoming tournaments: strictly exclude lead tournament and limit to max 4
+  const eligibleUpcoming = useMemo(() => {
+    return activeTournaments.filter(
+      (t) => !leadTour || (t.id !== leadTour.id && t.slug !== leadTour.slug)
+    )
+  }, [activeTournaments, leadTour])
+
+  // Visible max 4 tournaments, dynamically shuffled/rotated every 60s
+  const visibleTournaments = useMemo(() => {
+    if (eligibleUpcoming.length <= 4) return eligibleUpcoming
+    const offset = (shuffleTick * 4) % eligibleUpcoming.length
+    const rotated = [...eligibleUpcoming.slice(offset), ...eligibleUpcoming.slice(0, offset)]
+    return rotated.slice(0, 4)
+  }, [eligibleUpcoming, shuffleTick])
+
+  // Visible max 4 games, dynamically shuffled/rotated every 60s
+  const activeGamesPool = useMemo(() => {
+    return games.length > 0 ? games : (CATALOG.filter((g) => g.status === 'active') as any[])
+  }, [games])
+
+  const visibleGames = useMemo(() => {
+    if (activeGamesPool.length <= 4) return activeGamesPool
+    const offset = (shuffleTick * 4) % activeGamesPool.length
+    const rotated = [...activeGamesPool.slice(offset), ...activeGamesPool.slice(0, offset)]
+    return rotated.slice(0, 4)
+  }, [activeGamesPool, shuffleTick])
 
   return (
     <>
@@ -88,8 +129,8 @@ export default function Home() {
         tournaments={tournaments}
         featuredTournament={featuredTour}
       />
-      <ExploreGames games={games} />
-      <Upcoming tournaments={activeTournaments} />
+      <ExploreGames games={visibleGames} totalCount={activeGamesPool.length} />
+      <Upcoming tournaments={visibleTournaments} />
       <Why />
       <FinalCta liveCount={liveCount} />
     </>
@@ -107,6 +148,7 @@ function Hero({
   eligibleTournaments: NormalizedTournament[]
   homeMedia?: PageMediaConfig | null
 }) {
+  const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
   const coord = useRef<HTMLSpanElement>(null)
   const shards = CATALOG.filter((g) => g.status === 'active' && g.photo).slice(0, SLOTS.length)
@@ -242,7 +284,7 @@ function Hero({
         </Link>
       ))}
 
-      <div data-h="stage" className="relative z-10 flex h-full flex-col items-center justify-center px-4 text-center">
+      <div data-h="stage" className="relative z-10 flex h-full w-full max-w-full flex-col items-center justify-center px-4 text-center overflow-x-hidden">
         <div data-h="kicker" className="mb-6">
           <Hud className="text-cyan">
             <Dot pulse /> &nbsp;System Online · Welcome to Ametheus
@@ -250,7 +292,7 @@ function Hero({
         </div>
         <h1
           data-h="title"
-          className="relative max-w-[92vw] select-none text-balance font-display font-black uppercase leading-[0.8] tracking-[-0.01em] text-[clamp(4.5rem,21vw,22rem)]"
+          className="relative w-full max-w-[96vw] select-none text-balance font-display font-black uppercase leading-[0.85] sm:leading-[0.8] tracking-[-0.01em] text-[clamp(2.5rem,15vw,22rem)] sm:text-[clamp(3.5rem,18vw,22rem)]"
           style={{ translate: 'calc(var(--px) * -8px) calc(var(--py) * -6px)', transition: 'translate .8s cubic-bezier(.2,.7,.1,1)' }}
         >
           <span className="absolute inset-0 text-magenta/35 mix-blend-screen" style={{ translate: 'calc(3px + var(--px) * 3px) 0' }} aria-hidden>
@@ -263,16 +305,29 @@ function Hero({
             AMETHEUS
           </span>
         </h1>
-        <p data-h="tag" className="mt-4 font-display text-xl font-bold uppercase tracking-[0.35em] md:text-4xl md:tracking-[0.45em]">
+        <p data-h="tag" className="mt-4 font-display text-base font-bold uppercase tracking-[0.2em] sm:text-xl sm:tracking-[0.35em] md:text-4xl md:tracking-[0.45em]">
           India's Gaming Battleground
         </p>
-        <p data-h="copy" className="mt-5 max-w-md text-balance text-dim">
+        <p data-h="copy" className="mt-5 max-w-md text-balance text-sm sm:text-base text-dim px-2">
           A premium esports platform where players discover games, build teams, enter tournaments, and compete.
         </p>
         <div data-h="cta" className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Cta to="/tournaments">Explore Tournaments</Cta>
           <Cta ghost to="/games">Explore Games</Cta>
         </div>
+
+        {!isSignedIn && (
+          <div data-h="cta" className="mt-6">
+            <Link
+              to="/login"
+              className="group inline-flex items-center gap-2.5 rounded-full border border-cyan/40 bg-void/80 px-4 py-2 font-mono text-xs uppercase tracking-[0.18em] text-cyan backdrop-blur-md transition-all duration-300 hover:border-cyan hover:bg-cyan/15 hover:shadow-[0_0_24px_rgba(62,242,255,0.3)]"
+            >
+              <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
+              Sign in to join tournaments
+              <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="absolute left-5 top-28 z-10 hidden flex-col gap-4 sm:flex md:left-10">
@@ -524,8 +579,8 @@ function Featured({
   )
 }
 
-function ExploreGames({ games }: { games: ApiGame[] }) {
-  const activeGames = games.length > 0 ? games : CATALOG.filter((g) => g.status === 'active')
+function ExploreGames({ games, totalCount }: { games: ApiGame[]; totalCount?: number }) {
+  const displayGames = games.slice(0, 4)
   return (
     <section className="relative py-24 md:py-36 overflow-hidden">
       {/* High-Resolution Cinematic Gaming / Esports Arena Backdrop with dark overlay, gradient, vignette */}
@@ -561,11 +616,11 @@ function ExploreGames({ games }: { games: ApiGame[] }) {
           idx="02"
           kicker="Battlegrounds"
           title={<>Explore<br />Games</>}
-          sub={`${activeGames.length} live competitive titles. Each with dedicated ladders, formats, and squad sizes.`}
+          sub={`${totalCount || displayGames.length} live competitive titles. Each with dedicated ladders, formats, and squad sizes.`}
           right={<Cta ghost small to="/games">All games</Cta>}
         />
         <div className="mt-14 grid gap-4 md:grid-cols-12">
-          {activeGames.slice(0, 4).map((rawG, k) => {
+          {displayGames.map((rawG, k) => {
             const g = normalizeGame(rawG as any)
             return (
               <Link
@@ -586,7 +641,9 @@ function ExploreGames({ games }: { games: ApiGame[] }) {
                   </div>
                   <div>
                     <h3 className="font-display text-5xl font-black uppercase text-ink">{g.name}</h3>
-                    <Hud className="mt-2 block">{g.category} · {g.platform}</Hud>
+                    <Hud className="mt-2 block">
+                      <span className="text-cyan">{g.category}</span> · {g.platform}
+                    </Hud>
                   </div>
                 </div>
               </Link>
@@ -600,7 +657,7 @@ function ExploreGames({ games }: { games: ApiGame[] }) {
 
 function Upcoming({ tournaments }: { tournaments: NormalizedTournament[] }) {
   if (!tournaments.length) return null
-  const list = tournaments.map((t): Partial<DesignTournament> & Pick<DesignTournament, 'id' | 'name'> => ({
+  const list = tournaments.slice(0, 4).map((t): Partial<DesignTournament> & Pick<DesignTournament, 'id' | 'name'> => ({
     id: t.slug || t.id,
     name: t.title,
     game: t.gameId,

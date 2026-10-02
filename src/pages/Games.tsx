@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getTournaments, normalizeTournament } from '../services/tournaments'
 import { GAMES, CATALOG, gameBy, img } from '../lib/data'
+import { groupGamesByCategory } from '../lib/categories'
 import { AdaptiveGrid, GameCard } from '../components/kit'
 import { Hud, Badge, PageHero, Container, SectionHead } from '../components/ui'
+import CategoryCard from '../components/CategoryCard'
 
 export default function Games() {
   const [open, setOpen] = useState(0)
@@ -47,6 +49,8 @@ export default function Games() {
       live: 1,
     }
   })
+
+  const categories = useMemo(() => groupGamesByCategory(apiGames), [apiGames])
 
   return (
     <>
@@ -145,6 +149,25 @@ export default function Games() {
           )}
         </Container>
       </section>
+
+      {/* Competitive Categories with 5s rotating image cards */}
+      {categories.length > 0 && (
+        <section className="border-t border-white/10 bg-graphite/30 py-16 md:py-24">
+          <Container>
+            <SectionHead
+              idx="02"
+              kicker="Game Categories"
+              title={<>Browse by <span className="outline-text">Genre</span></>}
+              sub="Explore specialized formats, from tactical shooters to battle royale survival arenas."
+            />
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.map((cat, idx) => (
+                <CategoryCard key={cat.slug} category={cat} index={idx} />
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
 
       <section className="in-view pb-32 pt-10 md:pb-40">
         <Container>

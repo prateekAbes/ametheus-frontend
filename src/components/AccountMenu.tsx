@@ -65,9 +65,6 @@ type Row = {
   group: number
 }
 
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1610041321420-a596dd14ebc9?w=120&q=80&fit=crop&auto=format'
-
 export default function AccountMenu() {
   const [open, setOpen] = useState(false)
   const [hover, setHover] = useState<string | null>(null)
@@ -117,7 +114,7 @@ export default function AccountMenu() {
     setAvatarErr(false)
   }, [avatarUrl])
 
-  const userAvatar = (!avatarErr && avatarUrl) ? avatarUrl : DEFAULT_AVATAR
+  const userAvatar = (!avatarErr && avatarUrl) ? avatarUrl : null
 
   const rows: Row[] = useMemo(() => {
     if (isSignedIn) {
@@ -340,28 +337,46 @@ export default function AccountMenu() {
         Circular, object-fit: cover, correctly aligned, subtle on hover.
         When opened, it remains circular.
       */}
-      <button
-        onClick={toggle}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="Account menu"
-        className="group relative grid size-11 place-items-center rounded-full md:size-12"
-      >
-        <span
-          className={`block size-9 overflow-hidden rounded-full bg-surface transition-[transform,box-shadow,filter] duration-200 ease-out ${
-            open
-              ? 'brightness-110 shadow-[0_0_0_1.5px_var(--acc)]'
-              : 'group-hover:scale-105 group-hover:brightness-110 shadow-[0_0_0_1px_rgb(255_255_255_/_0.15)]'
-          }`}
+      {!isSignedIn ? (
+        <Link
+          to="/login"
+          aria-label="Sign in"
+          className="group relative flex items-center gap-2 rounded-full border border-cyan/40 bg-void/80 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-cyan backdrop-blur-md transition-all duration-200 hover:border-cyan hover:bg-cyan/15 hover:shadow-[0_0_12px_rgba(62,242,255,0.25)]"
         >
-          <img
-            src={userAvatar}
-            alt="Account profile"
-            onError={() => setAvatarErr(true)}
-            className="size-full rounded-full object-cover"
-          />
-        </span>
-      </button>
+          <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
+          <span className="hidden sm:inline">Sign In</span>
+          <span className="sm:hidden">Login</span>
+        </Link>
+      ) : (
+        <button
+          onClick={toggle}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Account menu"
+          className="group relative grid size-11 place-items-center rounded-full md:size-12"
+        >
+          <span
+            className={`block size-9 overflow-hidden rounded-full bg-surface transition-[transform,box-shadow,filter] duration-200 ease-out ${
+              open
+                ? 'brightness-110 shadow-[0_0_0_1.5px_var(--acc)]'
+                : 'group-hover:scale-105 group-hover:brightness-110 shadow-[0_0_0_1px_rgb(255_255_255_/_0.15)]'
+            }`}
+          >
+            {userAvatar ? (
+              <img
+                src={userAvatar}
+                alt={displayName || 'Account profile'}
+                onError={() => setAvatarErr(true)}
+                className="size-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-cyan/15 font-display text-sm font-bold text-cyan">
+                {(displayName || profile?.username || 'P').charAt(0).toUpperCase()}
+              </div>
+            )}
+          </span>
+        </button>
+      )}
 
       {/* Mobile scrim */}
       <div
@@ -418,16 +433,23 @@ export default function AccountMenu() {
           <div className="mx-auto mb-1 mt-2.5 h-1 w-10 rounded-full bg-white/15 md:hidden" />
 
           {/* Top User Identity Header Card */}
-          {isSignedIn && (
+          {/* Top User Identity Header Card */}
+          {isSignedIn ? (
             <div className="border-b border-white/[0.08] p-3 mx-1">
               <div className="flex items-center gap-3">
                 <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-white/20 bg-surface">
-                  <img
-                    src={userAvatar}
-                    alt={displayName}
-                    onError={() => setAvatarErr(true)}
-                    className="size-full object-cover"
-                  />
+                  {userAvatar ? (
+                    <img
+                      src={userAvatar}
+                      alt={displayName}
+                      onError={() => setAvatarErr(true)}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-full items-center justify-center bg-cyan/15 font-display text-base font-bold text-cyan">
+                      {(displayName || profile?.username || 'P').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
@@ -454,6 +476,29 @@ export default function AccountMenu() {
                     <span className="font-mono font-bold text-cyan">{balanceDisplay}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border-b border-white/[0.08] p-4 mx-1 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan block mb-1">
+                Ametheus Gaming
+              </span>
+              <p className="font-display text-base font-bold uppercase text-ink">
+                Sign in to join tournaments
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Link
+                  to="/login"
+                  className="flex-1 border border-cyan bg-cyan/10 py-1.5 font-mono text-xs uppercase tracking-wider text-cyan transition-colors hover:bg-cyan/20"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/signup"
+                  className="flex-1 border border-white/20 bg-white/5 py-1.5 font-mono text-xs uppercase tracking-wider text-white transition-colors hover:bg-white/10"
+                >
+                  Sign Up
+                </Link>
               </div>
             </div>
           )}

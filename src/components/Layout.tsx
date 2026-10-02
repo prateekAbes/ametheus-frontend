@@ -131,8 +131,19 @@ function Nav() {
             ))}
           </ul>
           <div className="mt-10 grid grid-cols-2 gap-px border border-white/10 bg-white/10">
-            {PROFILE.map(([l, to]) => <Link key={l} to={to} className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">{l}</Link>)}
-            <Link to="/login" className="bg-void px-4 py-3 text-sm text-live">Logout</Link>
+            {isSignedIn ? (
+              <>
+                {PROFILE.map(([l, to]) => <Link key={l} to={to} className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">{l}</Link>)}
+                <Link to="/login" className="bg-void px-4 py-3 text-sm text-live">Logout</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider">Log In</Link>
+                <Link to="/signup" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider">Sign Up</Link>
+                <Link to="/support" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">Support</Link>
+                <Link to="/about" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">About</Link>
+              </>
+            )}
           </div>
         </div>
       </div>

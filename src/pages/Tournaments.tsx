@@ -142,22 +142,26 @@ export default function Tournaments() {
       />
 
       {/* Filter Bar */}
-      <div className="sticky top-20 z-20 border-y border-white/10 bg-void/85 backdrop-blur-md">
-        <Container className="py-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Chips items={STATUS_CHIPS} value={selectedStatus} onChange={setSelectedStatus} />
+      <div className="sticky top-16 z-30 border-y border-white/10 bg-void/90 backdrop-blur-md md:top-[72px]">
+        <Container className="py-3 space-y-2.5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="overflow-x-auto no-scrollbar">
+              <Chips items={STATUS_CHIPS} value={selectedStatus} onChange={setSelectedStatus} />
+            </div>
             <div className="flex items-center gap-3">
               <input
                 type="text"
                 placeholder="Search tournaments..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-white/10 bg-surface px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim outline-none focus:border-cyan"
+                className="w-full sm:w-auto border border-white/10 bg-surface px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim outline-none focus:border-cyan"
               />
-              <Hud>{list.length} Events</Hud>
+              <Hud className="shrink-0">{list.length} Events</Hud>
             </div>
           </div>
-          <Chips items={GAME_CHIPS} value={selectedGame} onChange={setSelectedGame} />
+          <div className="overflow-x-auto no-scrollbar">
+            <Chips items={GAME_CHIPS} value={selectedGame} onChange={setSelectedGame} />
+          </div>
         </Container>
       </div>
 
