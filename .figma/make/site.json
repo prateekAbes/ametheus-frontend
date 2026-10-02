@@ -1,0 +1,10 @@
+{
+  "description": "An immersive esports platform offering cinematic game worlds, live tournaments, leaderboards, and community hubs for competitive gamers to connect and compete.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

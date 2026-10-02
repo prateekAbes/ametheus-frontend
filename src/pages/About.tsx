@@ -1,0 +1,91 @@
+import { lazy, Suspense } from 'react'
+import { Container, Cta, Hud, SectionHead, Particles } from '../components/ui'
+import { AVATARS, GAMES, COMING, img } from '../lib/data'
+const Scene3D = lazy(() => import('../components/Scene3D'))
+
+const ARENA = '1770067665792-9975acdec4fb', EVENT = '1767455471543-055dbc6c6700', CITY = '1535391879778-3bae11d29a24'
+
+function Chapter({ idx, kicker, title, body, photo, flip }: { idx: string; kicker: string; title: string; body: string; photo: string; flip?: boolean }) {
+  return (
+    <section className="py-20 md:py-32">
+      <Container className={`grid items-center gap-10 md:grid-cols-12 ${flip ? 'md:[&>*:first-child]:order-2' : ''}`}>
+        <div className="relative md:col-span-7">
+          <img src={img(photo, 1400)} alt="" className="aspect-[4/3] w-full object-cover opacity-80" />
+          <span className="outline-text absolute -bottom-10 left-4 font-display text-[8rem] font-black leading-none md:text-[12rem]">{idx}</span>
+        </div>
+        <div className="md:col-span-5">
+          <Hud className="text-cyan">{idx} — {kicker}</Hud>
+          <h2 className="mt-4 font-display text-[clamp(2.75rem,6vw,6rem)] font-black uppercase leading-[0.85]">{title}</h2>
+          <p className="mt-6 text-lg text-ink/75">{body}</p>
+        </div>
+      </Container>
+    </section>
+  )
+}
+
+export default function About() {
+  return (
+    <div className="bg-void">
+      <section className="relative flex min-h-[100svh] items-end overflow-hidden">
+        <img src={img(ARENA, 2200)} alt="" className="kenburns absolute inset-0 h-full w-full object-cover opacity-45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-void/20" />
+        <Suspense fallback={null}><Scene3D accent="#8b5cff" /></Suspense>
+        <Container className="relative pb-16 pt-40">
+          <Hud className="text-ink">Est. 2026 · Bengaluru, India</Hud>
+          <h1 className="reveal mt-6 font-display text-[clamp(4.5rem,19vw,20rem)] font-black uppercase leading-[0.78]">Ametheus</h1>
+          <p className="mt-4 font-display text-[clamp(1.5rem,4vw,4rem)] font-black uppercase tracking-[0.05em] text-cyan">The Gaming Battleground</p>
+        </Container>
+      </section>
+
+      <div className="overflow-hidden border-y border-white/10 py-6">
+        <div className="marquee flex w-max gap-12 whitespace-nowrap font-display text-5xl font-black uppercase md:text-7xl">
+          {[0, 1].map((k) => <span key={k} className="flex gap-12">{[...GAMES.map((g) => g.name), ...COMING].map((n, i) => <span key={n} className={i % 2 ? 'outline-text' : ''}>{n} ✦</span>)}</span>)}
+        </div>
+      </div>
+
+      <Chapter idx="01" kicker="Our Story" title="Built in a hostel room." photo={CITY} body="It started with six friends, a borrowed router and a WhatsApp bracket that broke every weekend. We wanted tournaments that felt like finals, not spreadsheets. So we built the arena we wished existed." />
+      <Chapter flip idx="02" kicker="Our Mission" title="Every player deserves a stage." photo={EVENT} body="From a phone in Patna to a rig in Pune, talent is everywhere. Fair brackets, instant payouts and real broadcasts — so the only thing that decides a match is how you play." />
+
+      <section className="py-20">
+        <Container>
+          <SectionHead idx="03" kicker="The Gaming Ecosystem" title={<>Four games.<br /><span className="text-cyan">One arena.</span></>} />
+          <div className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {GAMES.map((g, i) => (
+              <div key={g.slug} className={`group relative h-[420px] overflow-hidden border border-white/10 ${i % 2 ? 'lg:mt-16' : ''}`}>
+                <img src={img(g.photo, 900)} alt={g.name} className="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110" />
+                <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a, transparent 60%), linear-gradient(140deg, ${g.accent}40, transparent 50%)` }} />
+                <div className="absolute inset-x-5 bottom-5"><Hud>{g.genre}</Hud><p className="font-display text-4xl font-black uppercase" style={{ color: g.accent }}>{g.short}</p><p className="mt-1 text-sm text-ink/70">{g.line}</p></div>
+              </div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      <section className="relative overflow-hidden py-24 md:py-36">
+        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-2/3 opacity-60" />
+        <Container className="relative">
+          <SectionHead idx="04" kicker="Tournament Ecosystem" title="By the numbers" />
+          <div className="mt-16 grid grid-cols-2 gap-y-14 md:grid-cols-4">
+            {[['₹1.2Cr', 'Prize pool paid'], ['340+', 'Tournaments run'], ['48K', 'Registered players'], ['92s', 'Avg payout time']].map(([v, k]) => (
+              <div key={k} className="border-l border-cyan/40 pl-5"><p className="font-display text-[clamp(3.5rem,8vw,8rem)] font-black leading-none">{v}</p><Hud className="mt-3 block">{k}</Hud></div>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      <section className="py-24">
+        <Container className="grid items-end gap-12 md:grid-cols-2">
+          <div>
+            <Hud className="text-cyan">05 — Community</Hud>
+            <h2 className="mt-4 font-display text-[clamp(3rem,9vw,9rem)] font-black uppercase leading-[0.82]">Squads<br />become<br /><span className="text-cyan">family.</span></h2>
+            <p className="mt-6 max-w-md text-lg text-ink/75">Scrims at 2am, Discord voice channels that never sleep, rivals who become teammates. The scoreboard resets. The bonds don't.</p>
+            <div className="mt-10 flex flex-wrap gap-4"><Cta to="/signup">Join the battleground</Cta><Cta ghost to="/tournaments">See tournaments</Cta></div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[...AVATARS, AVATARS[1]].map((a, i) => <img key={i} src={img(a, 500)} alt="" className={`aspect-[3/4] w-full object-cover grayscale transition hover:grayscale-0 ${i % 3 === 1 ? 'translate-y-8' : ''}`} />)}
+          </div>
+        </Container>
+      </section>
+    </div>
+  )
+}
