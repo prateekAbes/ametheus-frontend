@@ -182,6 +182,7 @@ export async function createUpiAccount(payload: {
   upi_id: string
   payee_name: string
   display_name?: string
+  qr_url?: string
 }): Promise<UpiAccount> {
   return apiClient<UpiAccount>('/admin/upi-accounts', {
     method: 'POST',
@@ -192,6 +193,25 @@ export async function createUpiAccount(payload: {
 export async function toggleUpiAccountStatus(id: string): Promise<any> {
   return apiClient(`/admin/upi-accounts/${id}/toggle-status`, {
     method: 'POST',
+  })
+}
+
+export async function uploadUpiAccountQr(accountId: string, file: File): Promise<{
+  status: string
+  qr_url: string
+  media_id?: string
+  account?: UpiAccount
+}> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient<{
+    status: string
+    qr_url: string
+    media_id?: string
+    account?: UpiAccount
+  }>(`/admin/upi-accounts/${accountId}/qr`, {
+    method: 'POST',
+    body: formData,
   })
 }
 
@@ -359,6 +379,14 @@ export async function getAllPageMedia(): Promise<PageMediaConfig[]> {
     return await apiClient<PageMediaConfig[]>('/media/pages')
   } catch {
     return []
+  }
+}
+
+export async function getPageMedia(pageId: string): Promise<PageMediaConfig | null> {
+  try {
+    return await apiClient<PageMediaConfig>(`/media/pages/${pageId}`)
+  } catch {
+    return null
   }
 }
 

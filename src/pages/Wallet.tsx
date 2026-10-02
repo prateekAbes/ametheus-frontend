@@ -13,6 +13,7 @@ import {
   type WalletLedgerItem,
 } from '../services/wallet'
 import { useAuthContext } from '../context/AuthContext'
+import { resolveMediaUrl } from '../services/apiClient'
 
 function Modal({
   title,
@@ -63,6 +64,7 @@ export default function Wallet() {
     upi_id: string
     payee_name: string
     upi_uri: string
+    qr_url?: string
   } | null>(null)
   const [utr, setUtr] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -148,9 +150,38 @@ export default function Wallet() {
     }
   }
 
-  const available = wallet ? wallet.available_balance_inr : 0
-  const reserved = wallet ? wallet.inr_reserved_paise / 100 : 0
-  const total = wallet ? wallet.inr_balance_paise / 100 : 0
+  const parseNum = (v: any) => {
+    if (v === null || v === undefined) return 0
+    const n = Number(v)
+    return isNaN(n) ? 0 : n
+  }
+
+  const available = wallet
+    ? parseNum(
+        wallet.available_inr ??
+        wallet.available_balance_inr ??
+        (wallet.available_paise !== undefined ? wallet.available_paise / 100 : undefined) ??
+        (wallet.inr_balance_paise !== undefined ? wallet.inr_balance_paise / 100 : undefined) ??
+        wallet.inr_balance
+      )
+    : 0
+
+  const reserved = wallet
+    ? parseNum(
+        wallet.reserved_inr ??
+        (wallet.reserved_paise !== undefined ? wallet.reserved_paise / 100 : undefined) ??
+        (wallet.inr_reserved_paise !== undefined ? wallet.inr_reserved_paise / 100 : undefined)
+      )
+    : 0
+
+  const total = wallet
+    ? parseNum(
+        wallet.total_inr ??
+        (wallet.total_paise !== undefined ? wallet.total_paise / 100 : undefined) ??
+        (wallet.inr_balance_paise !== undefined ? wallet.inr_balance_paise / 100 : undefined) ??
+        (available + reserved)
+      )
+    : 0
 
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32">
@@ -319,7 +350,15 @@ export default function Wallet() {
             <form onSubmit={handleSubmitTopupUtr} className="space-y-4 text-center">
               <Hud className="text-cyan">Scan to Pay via Any UPI App</Hud>
               <div className="mx-auto my-3 flex justify-center bg-white p-3 rounded-lg w-fit">
-                <QRCodeSVG value={topupDetails.upi_uri} size={180} />
+                {topupDetails.qr_url ? (
+                  <img
+                    src={resolveMediaUrl(topupDetails.qr_url)}
+                    alt="UPI QR Code"
+                    className="size-44 object-contain"
+                  />
+                ) : (
+                  <QRCodeSVG value={topupDetails.upi_uri} size={180} />
+                )}
               </div>
               <div className="bg-void p-3 font-mono text-xs text-dim rounded space-y-1">
                 <p>

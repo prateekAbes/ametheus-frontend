@@ -14,6 +14,7 @@ import {
   getAdminUpiAccounts,
   createUpiAccount,
   toggleUpiAccountStatus,
+  uploadUpiAccountQr,
   getAdminPayouts,
   createWinningPayout,
   completePayout,
@@ -116,9 +117,11 @@ export default function Admin() {
   const [rejectPaymentId, setRejectPaymentId] = useState<string | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
 
-  // UPI Modal
+  // UPI Modal & QR States
   const [isNewUpiOpen, setIsNewUpiOpen] = useState(false)
-  const [newUpi, setNewUpi] = useState({ code: '', upi_id: '', payee_name: '', display_name: '' })
+  const [newUpi, setNewUpi] = useState({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '' })
+  const [uploadingQrAccId, setUploadingQrAccId] = useState<string | null>(null)
+  const [isUploadingNewUpiQr, setIsUploadingNewUpiQr] = useState(false)
 
   // Payout Modals
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false)
@@ -297,7 +300,7 @@ export default function Admin() {
       await createUpiAccount(newUpi)
       showToast(`UPI Account ${newUpi.code} registered!`)
       setIsNewUpiOpen(false)
-      setNewUpi({ code: '', upi_id: '', payee_name: '', display_name: '' })
+      setNewUpi({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '' })
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to create UPI account')
@@ -1218,16 +1221,59 @@ export default function Admin() {
 
             <div className="grid gap-4 md:grid-cols-2">
               {upiAccounts.map((a) => (
-                <Panel key={a.id} className="p-6 space-y-3 font-mono text-xs">
+                <Panel key={a.id} className="p-6 space-y-4 font-mono text-xs">
                   <div className="flex justify-between items-center border-b border-white/10 pb-2">
                     <span className="font-bold text-ink">{a.code}</span>
                     <span className={`px-2 py-0.5 border ${a.status === 'ACTIVE' ? 'border-ok text-ok' : 'border-dim text-dim'}`}>
                       {a.status}
                     </span>
                   </div>
-                  <div>UPI VPA: <span className="text-cyan font-bold">{a.upi_id}</span></div>
-                  <div>Payee Name: <span className="text-dim">{a.payee_name}</span></div>
-                  <div className="pt-2 flex justify-end">
+
+                  <div className="flex gap-4 items-start">
+                    <div className="size-24 shrink-0 border border-white/15 bg-white p-1 rounded flex items-center justify-center overflow-hidden">
+                      {a.qr_url ? (
+                        <img
+                          src={resolveMediaUrl(a.qr_url)}
+                          alt={`QR for ${a.code}`}
+                          className="size-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-gray-500 font-sans text-center">No QR Uploaded</span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div>UPI VPA: <span className="text-cyan font-bold break-all">{a.upi_id}</span></div>
+                      <div>Payee Name: <span className="text-dim">{a.payee_name}</span></div>
+                      <div>Usage Count: <span className="text-dim">{a.payment_count || 0} checkouts</span></div>
+                      <div className="pt-2">
+                        <label className="inline-block cursor-pointer border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] uppercase text-cyan hover:bg-cyan/20">
+                          {uploadingQrAccId === a.id ? 'Uploading QR...' : a.qr_url ? 'Replace QR Image' : 'Upload QR Image'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingQrAccId === a.id}
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0]
+                              if (!f) return
+                              setUploadingQrAccId(a.id)
+                              try {
+                                await uploadUpiAccountQr(a.id, f)
+                                showToast(`QR uploaded for ${a.code}`)
+                                loadData()
+                              } catch (err: any) {
+                                alert(err.message || 'QR upload failed')
+                              } finally {
+                                setUploadingQrAccId(null)
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10 flex justify-end">
                     <button
                       onClick={() => handleToggleUpi(a.id)}
                       className="border border-white/20 px-3 py-1 text-dim hover:text-ink hover:border-cyan"
@@ -1559,6 +1605,45 @@ export default function Admin() {
               <input required placeholder="Account Code (e.g. UPI_PRIMARY)" value={newUpi.code} onChange={(e) => setNewUpi({ ...newUpi, code: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
               <input required placeholder="UPI VPA (e.g. company@kotak)" value={newUpi.upi_id} onChange={(e) => setNewUpi({ ...newUpi, upi_id: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
               <input required placeholder="Payee Name (e.g. AMETHEUS ESPORTS PRIVATE LIMITED)" value={newUpi.payee_name} onChange={(e) => setNewUpi({ ...newUpi, payee_name: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+              <div>
+                <label className="text-dim">QR Image (Optional)</label>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    placeholder="QR image URL (or upload)"
+                    value={newUpi.qr_url || ''}
+                    onChange={(e) => setNewUpi({ ...newUpi, qr_url: e.target.value })}
+                    className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none"
+                  />
+                  <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3 py-2 uppercase text-cyan hover:bg-cyan/20 shrink-0">
+                    {isUploadingNewUpiQr ? '...' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isUploadingNewUpiQr}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0]
+                        if (!f) return
+                        setIsUploadingNewUpiQr(true)
+                        try {
+                          const res = await uploadMediaFile(f)
+                          if (res?.url) setNewUpi((prev) => ({ ...prev, qr_url: res.url }))
+                        } catch (err: any) {
+                          alert(err.message || 'QR upload failed')
+                        } finally {
+                          setIsUploadingNewUpiQr(false)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {newUpi.qr_url && (
+                  <div className="mt-2 flex items-center gap-3 bg-void p-2 border border-white/10">
+                    <img src={resolveMediaUrl(newUpi.qr_url)} alt="QR Preview" className="size-12 object-contain bg-white p-0.5 rounded" />
+                    <span className="text-[10px] text-ok truncate">QR Code attached</span>
+                  </div>
+                )}
+              </div>
               <div className="pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsNewUpiOpen(false)} className="border border-white/20 px-3 py-1.5 uppercase text-dim">Cancel</button>
                 <button type="submit" className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold">Register Account</button>

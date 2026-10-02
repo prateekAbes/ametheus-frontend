@@ -1,10 +1,16 @@
 import { apiClient } from './apiClient'
 
 export interface WalletSummary {
-  inr_balance: string
-  inr_balance_paise: number
-  inr_reserved_paise: number
-  available_balance_inr: number
+  inr_balance?: string | number
+  inr_balance_paise?: number
+  inr_reserved_paise?: number
+  available_balance_inr?: number
+  available_inr?: number
+  available_paise?: number
+  reserved_inr?: number
+  reserved_paise?: number
+  total_inr?: number
+  total_paise?: number
 }
 
 export interface WalletLedgerItem {
