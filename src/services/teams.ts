@@ -35,22 +35,40 @@ export async function getTeamById(id: string): Promise<Team> {
 export async function createTeam(payload: {
   name: string
   tag: string
-  game_id: string
+  game_id?: string
+  game_slug?: string
+  captain_handle?: string
   game_handle?: string
 }): Promise<Team> {
+  const slug = (payload.game_slug || payload.game_id || '').trim()
+  const handle = (payload.captain_handle || payload.game_handle || 'Contender').trim()
   return apiClient<Team>('/teams', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      tag: payload.tag.trim().toUpperCase(),
+      game_slug: slug,
+      game_id: slug,
+      captain_handle: handle,
+      game_handle: handle,
+    }),
   })
 }
 
 export async function joinTeamByCode(payload: {
   invite_code: string
+  player_handle?: string
   game_handle?: string
 }): Promise<Team> {
+  const code = payload.invite_code.trim().toUpperCase()
+  const handle = (payload.player_handle || payload.game_handle || 'Contender').trim()
   return apiClient<Team>('/teams/join', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      invite_code: code,
+      player_handle: handle,
+      game_handle: handle,
+    }),
   })
 }
 

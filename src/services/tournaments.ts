@@ -46,6 +46,9 @@ export interface Tournament {
   matches_summary?: TournamentMatchSummary[]
   is_registered?: boolean
   is_featured?: boolean
+  live_stream_url?: string
+  stream_url?: string
+  registration_status?: string
 }
 
 export interface NormalizedTournament {

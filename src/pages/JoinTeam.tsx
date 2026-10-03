@@ -22,9 +22,11 @@ export default function JoinTeam() {
     setIsLoading(true)
     setErrorMessage('')
     try {
+      const handle = gameHandle.trim() || profile?.username || 'Contender'
       const res = await joinTeamByCode({
         invite_code: code.trim().toUpperCase(),
-        game_handle: gameHandle.trim() || profile?.username || undefined,
+        player_handle: handle,
+        game_handle: handle,
       })
       setJoinedTeam(res)
     } catch (err: any) {

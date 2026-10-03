@@ -29,11 +29,14 @@ export default function CreateTeam() {
     setIsSubmitting(true)
     setErrorMessage('')
     try {
+      const handle = gameHandle.trim() || profile?.username || 'Contender'
       const res = await createTeam({
         name: name.trim(),
         tag: displayTag,
+        game_slug: game,
         game_id: game,
-        game_handle: gameHandle.trim() || profile?.username || undefined,
+        captain_handle: handle,
+        game_handle: handle,
       })
       if (res && res.invite_code) {
         setCreatedCode(res.invite_code)

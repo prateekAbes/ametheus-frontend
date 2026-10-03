@@ -190,6 +190,108 @@ export async function submitMatchDispute(
   })
 }
 
+export interface RegisteredRosterMember {
+  user_id: string
+  username: string
+  game_id?: string
+  role?: string
+}
+
+export interface RegisteredRosterTeam {
+  team_id: string
+  team_name: string
+  team_tag: string
+  captain?: {
+    user_id: string
+    username: string
+    game_id?: string
+  }
+  captain_username?: string
+  members?: RegisteredRosterMember[]
+  is_paired?: boolean
+  is_solo?: boolean
+}
+
+export interface TournamentRegisteredRostersResponse {
+  tournament_id: string
+  tournament_title: string
+  game_name: string
+  game_slug: string
+  match_format: string
+  series_format: string
+  status?: string
+  total_registered?: number
+  teams: RegisteredRosterTeam[]
+}
+
+export interface LiveDashboardData {
+  ready_for_match_creation: any[]
+  scheduled: ApiMatch[]
+  live_now: ApiMatch[]
+  completed: ApiMatch[]
+}
+
+export interface AdminMatchCreatePayload {
+  tournament_id: string
+  team_a_id?: string
+  team_b_id?: string
+  team_a_name?: string
+  team_b_name?: string
+  team_a_placeholder?: string
+  team_b_placeholder?: string
+  round_name?: string
+  round_number?: number
+  match_number?: number
+  match_type?: string
+  stage?: string
+  series_format?: string
+  match_format?: string
+  scheduled_at?: string
+  scheduled_date?: string
+  scheduled_time?: string
+  youtube_live_url?: string
+  status?: string
+}
+
+export interface AdminMatchUpdatePayload {
+  team_a_id?: string
+  team_b_id?: string
+  team_a_name?: string
+  team_b_name?: string
+  team_a_placeholder?: string
+  team_b_placeholder?: string
+  round_name?: string
+  round_number?: number
+  match_number?: number
+  match_type?: string
+  stage?: string
+  series_format?: string
+  scheduled_at?: string
+  scheduled_time?: string
+  youtube_live_url?: string
+  status?: string
+  score_a?: number
+  score_b?: number
+  winner_team_id?: string
+  lobby_code?: string
+  lobby_password?: string
+  server_region?: string
+}
+
+export interface MatchJoinInfo {
+  join_info_enabled: boolean
+  join_info?: {
+    join_code?: string
+    party_id?: string
+    room_id?: string
+    lobby_id?: string
+    password?: string
+    join_link?: string
+    [key: string]: string | undefined
+  } | null
+  match_message?: string | null
+}
+
 export async function updateMatch(
   matchId: string,
   payload: {
@@ -205,6 +307,124 @@ export async function updateMatch(
   }
 ): Promise<any> {
   return apiClient(`/matches/${matchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getLiveMatchesDashboard(): Promise<LiveDashboardData> {
+  return apiClient<LiveDashboardData>('/admin/matches/live-dashboard')
+}
+
+export async function getTournamentRegisteredRosters(
+  tournamentId: string
+): Promise<TournamentRegisteredRostersResponse> {
+  return apiClient<TournamentRegisteredRostersResponse>(
+    `/admin/tournaments/${tournamentId}/registered-rosters`
+  )
+}
+
+export async function closeTournamentRegistration(tournamentId: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/close-registration`, {
+    method: 'POST',
+  })
+}
+
+export async function updateTournamentStream(
+  tournamentId: string,
+  streamUrl: string
+): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/stream`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stream_url: streamUrl }),
+  })
+}
+
+export async function createMatchAdmin(
+  payload: AdminMatchCreatePayload
+): Promise<{ status: string; message: string; match_id: string }> {
+  return apiClient('/admin/matches', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateMatchDetailsAdmin(
+  matchId: string,
+  payload: AdminMatchUpdatePayload
+): Promise<{ status: string; message: string; match_id: string }> {
+  return apiClient(`/admin/matches/${matchId}/update`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteMatchAdmin(
+  matchId: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function markMatchLiveAdmin(
+  matchId: string,
+  youtube_live_url: string
+): Promise<{ status: string; message: string; match_id: string; youtube_live_url: string }> {
+  return apiClient(`/admin/matches/${matchId}/mark-live`, {
+    method: 'POST',
+    body: JSON.stringify({ youtube_live_url }),
+  })
+}
+
+export async function completeMatchAdmin(
+  matchId: string,
+  payload: { score_a: number; score_b: number; winner_team_id?: string }
+): Promise<{ status: string; message: string; match_id: string; winner_id: string }> {
+  return apiClient(`/admin/matches/${matchId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function swapTeamsAdmin(
+  matchId: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/swap`, {
+    method: 'POST',
+  })
+}
+
+export async function updateMatchStatus(
+  matchId: string,
+  status: string,
+  stream_url?: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, stream_url }),
+  })
+}
+
+export async function updateMatchScore(
+  matchId: string,
+  payload: { team1_score: number; team2_score: number; winner_team_id?: string }
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/score`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getMatchJoinInfo(matchId: string): Promise<MatchJoinInfo> {
+  return apiClient<MatchJoinInfo>(`/matches/${matchId}/join-info`)
+}
+
+export async function updateMatchJoinInfo(
+  matchId: string,
+  payload: any
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/matches/${matchId}/join-info`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   })
