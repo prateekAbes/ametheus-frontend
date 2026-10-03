@@ -29,15 +29,15 @@ const PROFILE = [
 
 export function Logo() {
   return (
-    <Link to="/" className="group flex items-center gap-2.5 outline-none">
-      <span className="relative inline-flex size-7 shrink-0 items-center justify-center overflow-hidden rounded p-0.5">
+    <Link to="/" className="group flex items-center gap-2.5 outline-none select-none">
+      <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-surface/60 p-1 transition-colors duration-300 group-hover:border-cyan/50">
         <svg
-          width="26"
-          height="24"
+          width="20"
+          height="18"
           viewBox="0 0 30 28"
           fill="none"
           aria-hidden
-          className="shrink-0 transition-transform duration-300 group-hover:scale-105"
+          className="shrink-0 transition-transform duration-300 origin-center group-hover:scale-105"
         >
           <polygon points="3,7 25,7 27,2 5,2" fill="#3ef2ff" />
           <polygon points="7,15 21,15 23,10 9,10" fill="#3ef2ff" />

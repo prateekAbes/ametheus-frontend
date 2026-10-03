@@ -10,13 +10,36 @@ export interface GameCategory {
   description?: string
 }
 
+export const CANONICAL_CATEGORIES = [
+  { slug: 'battle-royale', name: 'Battle Royale' },
+  { slug: 'tactical-fps', name: 'Tactical FPS' },
+  { slug: 'fps', name: 'First-Person Shooter' },
+  { slug: 'moba', name: 'MOBA' },
+  { slug: 'fighting', name: 'Fighting' },
+  { slug: 'sports', name: 'Sports & Racing' },
+  { slug: 'strategy', name: 'Strategy & Card' },
+  { slug: 'vehicle-sports', name: 'Vehicle Sports' },
+  { slug: 'arena-brawler', name: 'Arena Brawler' },
+  { slug: '2d-shooter', name: '2D Shooter' },
+  { slug: 'kart-battle', name: 'Kart Battle' },
+] as const
+
+const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+  br: 'battle-royale',
+  'first-person-shooter': 'fps',
+  'sports-racing': 'sports',
+  racing: 'sports',
+  'strategy-card': 'strategy',
+  card: 'strategy',
+}
+
 const CATEGORY_NAMES: Record<string, string> = {
   'battle-royale': 'Battle Royale',
   'tactical-fps': 'Tactical FPS',
   fps: 'First-Person Shooter',
   'first-person-shooter': 'First-Person Shooter',
   moba: 'MOBA',
-  strategy: 'Strategy',
+  strategy: 'Strategy & Card',
   'strategy-card': 'Strategy & Card',
   fighting: 'Fighting',
   sports: 'Sports & Racing',
@@ -47,7 +70,8 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 export function slugifyCategory(category?: string): string {
   if (!category) return 'esports'
   const clean = category.toLowerCase().trim()
-  return clean.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'esports'
+  const rawSlug = clean.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'esports'
+  return CATEGORY_SLUG_ALIASES[rawSlug] || rawSlug
 }
 
 export function formatCategoryName(category?: string): string {

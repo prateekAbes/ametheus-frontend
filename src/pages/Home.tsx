@@ -77,14 +77,6 @@ export default function Home() {
     )
   }, [tournaments])
 
-  const eligibleTournaments = useMemo(() => {
-    const matched = tournaments.filter((t) => {
-      const s = (t.status || '').toUpperCase()
-      return ['REGISTRATION_OPEN', 'OPEN', 'UPCOMING', 'LIVE', 'ACTIVE'].includes(s)
-    })
-    return matched.length > 0 ? matched : activeTournaments.length > 0 ? activeTournaments : tournaments
-  }, [tournaments, activeTournaments])
-
   const liveCount = tournaments.filter((t) => (t.status || '').toLowerCase() === 'live').length
   const gameCount = games.length > 0 ? games.length : CATALOG.length
 
@@ -123,7 +115,6 @@ export default function Home() {
       <Hero
         activeCount={activeTournaments.length}
         gameCount={gameCount}
-        eligibleTournaments={eligibleTournaments}
       />
       <Featured
         tournaments={tournaments}
@@ -140,30 +131,15 @@ export default function Home() {
 function Hero({
   activeCount,
   gameCount,
-  eligibleTournaments,
 }: {
   activeCount: number
   gameCount: number
-  eligibleTournaments: NormalizedTournament[]
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
   const coord = useRef<HTMLSpanElement>(null)
   const shards = CATALOG.filter((g) => g.status === 'active' && g.photo).slice(0, SLOTS.length)
   const scene = !reducedMotion()
-
-  const [tourIndex, setTourIndex] = useState(0)
-
-  useEffect(() => {
-    if (eligibleTournaments.length <= 1) return
-    const id = setInterval(() => {
-      setTourIndex((prev) => (prev + 1) % eligibleTournaments.length)
-    }, 5000)
-    return () => clearInterval(id)
-  }, [eligibleTournaments.length])
-
-  const activeTour =
-    eligibleTournaments.length > 0 ? eligibleTournaments[tourIndex % eligibleTournaments.length] : null
 
   useEffect(() => {
     const el = ref.current
@@ -333,93 +309,6 @@ function Hero({
         <Hud><span ref={coord}>X 50.0 / Y 40.0</span></Hud>
         <Hud className="text-cyan">INDIA SERVER · 14MS</Hud>
       </div>
-
-      {activeTour ? (
-        <div
-          data-h="hud"
-          className="group absolute bottom-8 right-6 z-20 hidden w-80 flex-col gap-2 border border-white/10 bg-void/85 p-3.5 backdrop-blur-md transition-colors hover:border-white/30 lg:flex md:right-10"
-        >
-          <Link
-            to={`/tournaments/${activeTour.slug || activeTour.id}`}
-            className="flex items-center gap-3.5"
-          >
-            <div className="relative size-14 shrink-0 overflow-hidden bg-surface border border-white/10">
-              <Media
-                id={gameBy(activeTour.gameId).photo}
-                w={160}
-                sizes="56px"
-                className="h-full w-full object-cover opacity-85"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <Hud className="flex items-center gap-1.5 text-[10px]">
-                <Dot
-                  c={activeTour.status === 'LIVE' ? 'bg-live' : 'bg-ok'}
-                  pulse={activeTour.status === 'LIVE'}
-                />
-                {activeTour.status === 'LIVE'
-                  ? 'Live Match'
-                  : activeTour.status === 'REGISTRATION_OPEN'
-                  ? 'Registration Open'
-                  : 'Upcoming Tournament'}
-              </Hud>
-              <p className="truncate font-display text-lg font-black uppercase leading-tight text-ink mt-0.5">
-                {activeTour.title}
-              </p>
-              <Hud className="block text-[10px] text-cyan">
-                {inr(activeTour.prizePoolInr)} · {activeTour.registeredTeams} Teams Registered
-              </Hud>
-            </div>
-            <span className="text-dim transition-transform group-hover:translate-x-1 group-hover:text-cyan">
-              →
-            </span>
-          </Link>
-
-          {eligibleTournaments.length > 1 && (
-            <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-2">
-              <div className="flex gap-1.5">
-                {eligibleTournaments.map((t, idx) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTourIndex(idx)}
-                    aria-label={`Select tournament ${idx + 1}`}
-                    className={`h-1 transition-all ${
-                      idx === tourIndex % eligibleTournaments.length
-                        ? 'w-6 bg-cyan'
-                        : 'w-2 bg-white/20 hover:bg-white/40'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-dim">
-                {(tourIndex % eligibleTournaments.length) + 1} / {eligibleTournaments.length}
-              </span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <Link
-          data-h="hud"
-          to="/tournaments"
-          className="group absolute bottom-8 right-6 z-20 hidden w-72 items-center gap-4 border border-white/10 bg-void/75 p-3 transition-colors hover:border-white/30 lg:flex md:right-10"
-        >
-          <div className="size-12 shrink-0 bg-surface/50 border border-white/10 flex items-center justify-center font-display text-lg text-dim">
-            ◈
-          </div>
-          <div className="min-w-0 flex-1">
-            <Hud className="flex items-center gap-1.5 text-dim">
-              <Dot c="bg-dim" /> Upcoming Season
-            </Hud>
-            <p className="truncate font-display text-sm font-bold uppercase leading-tight text-ink mt-0.5">
-              Next Tournaments Soon
-            </p>
-            <Hud className="block text-[10px] text-cyan">Explore All Brackets</Hud>
-          </div>
-          <span className="text-dim transition-transform group-hover:translate-x-1 group-hover:text-cyan">
-            →
-          </span>
-        </Link>
-      )}
 
       <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2">
         <Hud>DESCEND</Hud>

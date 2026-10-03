@@ -278,7 +278,7 @@ export default function Support() {
                   : 'border-white/10 bg-surface hover:border-white/30'
               }`}
             >
-              <span className="font-display text-4xl text-cyan transition-transform group-hover:scale-110">
+              <span className="inline-block font-display text-4xl text-cyan origin-left transition-transform duration-300 group-hover:scale-110">
                 {c.g}
               </span>
               <span className="pointer-events-none absolute -right-4 -top-6 font-display text-[8rem] leading-none text-white/[0.03]">

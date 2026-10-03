@@ -67,6 +67,8 @@ import {
   generateBracketOrganizer,
   cancelTournamentOrganizer,
 } from '../services/organizer'
+import { getMatches, updateMatch, ApiMatch } from '../services/matches'
+import { CANONICAL_CATEGORIES } from '../lib/categories'
 import { resolveMediaUrl } from '../services/apiClient'
 import { inr } from '../lib/data'
 
@@ -94,29 +96,62 @@ function BannerImageUploader({
     setWarning(null)
     setInfo(null)
 
-    const objectUrl = URL.createObjectURL(file)
-    const imgObj = new Image()
+    if (file.size > 20 * 1024 * 1024) {
+      setWarning('⚠️ File size exceeds maximum limit of 20MB.')
+      return
+    }
 
+    const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
+    const objectUrl = URL.createObjectURL(file)
+
+    if (isSvg) {
+      setInfo('✓ Vector SVG graphic loaded (infinitely sharp at all resolutions)')
+      setPreviewSrc(objectUrl)
+      setIsUploading(true)
+      try {
+        const res = await uploadMediaFile(file)
+        if (res?.url) {
+          onChange(res.url)
+        }
+      } catch (err: any) {
+        alert(err.message || 'SVG upload failed')
+      } finally {
+        setIsUploading(false)
+      }
+      return
+    }
+
+    const imgObj = new Image()
     imgObj.onload = async () => {
       const width = imgObj.naturalWidth
       const height = imgObj.naturalHeight
       const ratio = width / (height || 1)
-      const targetRatio = 16 / 9
+      const targetRatio = recommendedRatio === '1:1' ? 1.0 : 16 / 9
 
-      if (Math.abs(ratio - targetRatio) > 0.18) {
-        setWarning(
-          `⚠️ Non-standard aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 16:9 (~1.78:1, e.g. ${recommendedRes}). Image will be fitted/cropped to 16:9.`
-        )
+      if (recommendedRatio === '1:1') {
+        if (Math.abs(ratio - 1.0) > 0.25) {
+          setWarning(
+            `⚠️ Non-square aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 1:1 square (e.g. ${recommendedRes}).`
+          )
+        } else {
+          setInfo(`✓ Verified: 1:1 square aspect ratio (${width}x${height}px)`)
+        }
       } else {
-        setInfo(`✓ Verified: 16:9 aspect ratio (${width}x${height}px)`)
-      }
+        if (Math.abs(ratio - targetRatio) > 0.18) {
+          setWarning(
+            `⚠️ Non-standard aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 16:9 (~1.78:1, e.g. ${recommendedRes}). Image will be fitted/cropped to 16:9.`
+          )
+        } else {
+          setInfo(`✓ Verified: 16:9 aspect ratio (${width}x${height}px)`)
+        }
 
-      if (width < 1280 || height < 720) {
-        setWarning((prev) =>
-          prev
-            ? `${prev} | Note: Low resolution (${width}x${height}px). Recommended is ${recommendedRes} for high-DPI displays.`
-            : `ℹ️ Note: Resolution is ${width}x${height}px. Recommended is ${recommendedRes} for optimal visual quality.`
-        )
+        if (width < 1280 || height < 720) {
+          setWarning((prev) =>
+            prev
+              ? `${prev} | Note: Low resolution (${width}x${height}px). Recommended is ${recommendedRes} for high-DPI displays.`
+              : `ℹ️ Note: Resolution is ${width}x${height}px. Recommended is ${recommendedRes} for optimal visual quality.`
+          )
+        }
       }
 
       setPreviewSrc(objectUrl)
@@ -134,7 +169,7 @@ function BannerImageUploader({
     }
 
     imgObj.onerror = () => {
-      setWarning('Unable to decode image file. Please choose a valid PNG, JPG, or WEBP image.')
+      setWarning('Unable to decode image file. Please choose a valid PNG, JPG, WEBP, or SVG image.')
     }
 
     imgObj.src = objectUrl
@@ -163,10 +198,10 @@ function BannerImageUploader({
           className="flex-1 border border-white/15 bg-surface p-2.5 font-mono text-xs text-ink outline-none focus:border-cyan"
         />
         <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3.5 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan/20 shrink-0 flex items-center justify-center">
-          {isUploading ? 'Inspecting...' : 'Upload Image'}
+          {isUploading ? 'Uploading...' : 'Upload File'}
           <input
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
             className="hidden"
             disabled={isUploading}
             onChange={handleFileChange}
@@ -185,16 +220,16 @@ function BannerImageUploader({
         </div>
       )}
 
-      {/* 16:9 Card Aspect Ratio Preview */}
+      {/* Card Aspect Ratio Preview */}
       {currentDisplay ? (
-        <div className="relative aspect-[16/9] w-full max-w-sm overflow-hidden border border-white/20 bg-surface/50 mt-1">
+        <div className={`relative ${recommendedRatio === '1:1' ? 'aspect-square max-w-[120px]' : 'aspect-[16/9] max-w-sm'} w-full overflow-hidden border border-white/20 bg-surface/50 mt-1`}>
           <img
             src={currentDisplay}
-            alt="16:9 Card Preview"
+            alt="Preview"
             className="size-full object-cover"
           />
           <div className="absolute bottom-1 right-1 bg-void/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-cyan border border-white/10 backdrop-blur-sm">
-            16:9 Card Preview
+            {recommendedRatio} Preview
           </div>
           <button
             type="button"
@@ -210,8 +245,8 @@ function BannerImageUploader({
           </button>
         </div>
       ) : (
-        <div className="flex aspect-[16/9] w-full max-w-sm items-center justify-center border border-dashed border-white/15 bg-surface/20 text-dim font-mono text-[10px] mt-1">
-          No Image Set (Will Use Default 16:9 Game Art)
+        <div className={`flex ${recommendedRatio === '1:1' ? 'aspect-square max-w-[120px]' : 'aspect-[16/9] max-w-sm'} w-full items-center justify-center border border-dashed border-white/15 bg-surface/20 text-dim font-mono text-[10px] mt-1 text-center p-2`}>
+          No {recommendedRatio === '1:1' ? 'Logo' : 'Banner'} Set
         </div>
       )}
     </div>
@@ -221,6 +256,7 @@ function BannerImageUploader({
 const TABS = [
   'OVERVIEW',
   'TOURNAMENTS',
+  'LIVE MATCHES',
   'FEATURED TOURNAMENT',
   'GAMES CATALOG',
   'PAGE MEDIA',
@@ -345,10 +381,90 @@ export default function Admin() {
   const [editingMedia, setEditingMedia] = useState<PageMediaConfig | null>(null)
   const [isUploadingMediaFile, setIsUploadingMediaFile] = useState(false)
 
+  // LIVE MATCHES Interactive States
+  const [adminMatches, setAdminMatches] = useState<ApiMatch[]>([])
+  const [matchesLoading, setMatchesLoading] = useState(false)
+  const [matchStatusFilter, setMatchStatusFilter] = useState('ALL')
+  const [matchTourFilter, setMatchTourFilter] = useState('ALL')
+  const [editingMatch, setEditingMatch] = useState<ApiMatch | null>(null)
+  const [editMatchForm, setEditMatchForm] = useState({
+    status: 'SCHEDULED',
+    youtube_live_url: '',
+    live_link: '',
+    lobby_code: '',
+    lobby_password: '',
+    server_region: 'AWS Mumbai (ap-south-1)',
+    score_a: 0,
+    score_b: 0,
+    winner_team_id: '',
+  })
+
+  const fetchAdminMatches = async () => {
+    setMatchesLoading(true)
+    try {
+      const data = await getMatches()
+      if (Array.isArray(data)) setAdminMatches(data)
+    } catch (err) {
+      console.warn('Failed to load matches:', err)
+    } finally {
+      setMatchesLoading(false)
+    }
+  }
+
+  const handleQuickMatchStatus = async (matchId: string, newStatus: string) => {
+    try {
+      await updateMatch(matchId, { status: newStatus })
+      setActionMsg(`Match status updated to ${newStatus}`)
+      setTimeout(() => setActionMsg(null), 3000)
+      fetchAdminMatches()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update match status')
+    }
+  }
+
+  const handleOpenEditMatch = (m: ApiMatch) => {
+    setEditingMatch(m)
+    setEditMatchForm({
+      status: m.status || 'SCHEDULED',
+      youtube_live_url: m.youtube_live_url || '',
+      live_link: m.live_link || '',
+      lobby_code: m.lobby_code || '',
+      lobby_password: m.lobby_password || '',
+      server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
+      score_a: m.team_a?.score ?? 0,
+      score_b: m.team_b?.score ?? 0,
+      winner_team_id: m.winner_team_id || '',
+    })
+  }
+
+  const handleSaveMatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingMatch) return
+    try {
+      await updateMatch(editingMatch.id, {
+        status: editMatchForm.status,
+        youtube_live_url: editMatchForm.youtube_live_url,
+        live_link: editMatchForm.live_link,
+        lobby_code: editMatchForm.lobby_code,
+        lobby_password: editMatchForm.lobby_password,
+        server_region: editMatchForm.server_region,
+        score_a: Number(editMatchForm.score_a),
+        score_b: Number(editMatchForm.score_b),
+        winner_team_id: editMatchForm.winner_team_id || undefined,
+      })
+      setActionMsg('Match credentials, stream & score updated successfully')
+      setTimeout(() => setActionMsg(null), 3500)
+      setEditingMatch(null)
+      fetchAdminMatches()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update match')
+    }
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList] = await Promise.all([
+      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
         getPendingPayments().catch(() => []),
@@ -363,6 +479,7 @@ export default function Admin() {
         getEmailSystemStatusAdmin().catch(() => null),
         getAllPageMedia().catch(() => []),
         getDisputes().catch(() => []),
+        getMatches().catch(() => []),
       ])
 
       if (s) setStats(s)
@@ -379,6 +496,7 @@ export default function Admin() {
       setEmailStatus(eStat)
       setMediaConfigs(mList)
       setDisputes(dispList)
+      if (Array.isArray(mAll)) setAdminMatches(mAll)
 
       if (fTour) {
         setSelectedFeaturedId(fTour.id || fTour.slug)
@@ -1027,6 +1145,222 @@ export default function Admin() {
                     </Panel>
                   )
                 })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: LIVE MATCHES */}
+        {tab === 'LIVE MATCHES' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Live Matches & Broadcast Operations</h2>
+                <p className="text-xs text-dim">Authoritative control: real-time match status, server lobby credentials, live YouTube broadcasts, and scores.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={fetchAdminMatches}
+                  disabled={matchesLoading}
+                  className="border border-white/20 px-3 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink hover:border-white/40"
+                >
+                  {matchesLoading ? 'Refreshing...' : '↻ Refresh Matches'}
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border border-white/10 bg-graphite p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs text-dim uppercase">Status:</span>
+                {['ALL', 'LIVE', 'CHECK_IN_OPEN', 'SCHEDULED', 'COMPLETED'].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setMatchStatusFilter(s)}
+                    className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors ${
+                      matchStatusFilter === s
+                        ? 'border border-cyan bg-cyan text-void font-bold'
+                        : 'border border-white/10 bg-surface text-dim hover:text-ink'
+                    }`}
+                  >
+                    {s === 'LIVE' ? '🔴 LIVE' : s}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs text-dim uppercase">Tournament:</span>
+                <select
+                  value={matchTourFilter}
+                  onChange={(e) => setMatchTourFilter(e.target.value)}
+                  className="border border-white/15 bg-surface px-2.5 py-1 font-mono text-xs text-ink outline-none"
+                >
+                  <option value="ALL">All Tournaments</option>
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+                <Hud className="text-cyan">
+                  {adminMatches.filter((m) => {
+                    const statusMatch =
+                      matchStatusFilter === 'ALL' || (m.status || '').toUpperCase() === matchStatusFilter
+                    const tourMatch =
+                      matchTourFilter === 'ALL' || m.tournament_id === matchTourFilter
+                    return statusMatch && tourMatch
+                  }).length}{' '}
+                  Matches Found
+                </Hud>
+              </div>
+            </div>
+
+            {/* Matches List */}
+            <div className="space-y-3 font-mono text-xs">
+              {adminMatches
+                .filter((m) => {
+                  const statusMatch =
+                    matchStatusFilter === 'ALL' || (m.status || '').toUpperCase() === matchStatusFilter
+                  const tourMatch =
+                    matchTourFilter === 'ALL' || m.tournament_id === matchTourFilter
+                  return statusMatch && tourMatch
+                })
+                .map((m) => {
+                  const isLive = (m.status || '').toUpperCase() === 'LIVE'
+                  const isCheckIn = (m.status || '').toUpperCase() === 'CHECK_IN_OPEN'
+                  const isDone = (m.status || '').toUpperCase() === 'COMPLETED'
+                  const teamAName = m.team_a?.name || 'TBD (Team A)'
+                  const teamBName = m.team_b?.name || 'TBD (Team B)'
+                  const scoreA = m.team_a?.score ?? 0
+                  const scoreB = m.team_b?.score ?? 0
+                  const streamUrl = m.youtube_live_url || m.live_link
+
+                  return (
+                    <Panel
+                      key={m.id}
+                      className={`p-4 md:p-5 transition-colors ${
+                        isLive
+                          ? 'border-live/60 bg-live/[0.04]'
+                          : isCheckIn
+                          ? 'border-warn/40 bg-warn/[0.02]'
+                          : 'border-white/10 bg-surface/50'
+                      }`}
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-[10px] text-cyan uppercase tracking-wider font-bold">
+                              {m.tournament_title || 'Tournament'} · {m.stage || m.match_type || 'Match Round'}
+                            </span>
+                            <span className="text-white/20">|</span>
+                            <Badge
+                              s={
+                                isLive
+                                  ? 'live'
+                                  : isDone
+                                  ? 'completed'
+                                  : isCheckIn
+                                  ? 'warn'
+                                  : 'upcoming'
+                              }
+                              label={m.status || 'SCHEDULED'}
+                            />
+                            {streamUrl && (
+                              <a
+                                href={streamUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded bg-live/20 px-2 py-0.5 font-mono text-[10px] font-bold text-live border border-live/30 hover:bg-live/30"
+                              >
+                                🔴 YouTube Stream Active ↗
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-4 py-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-display text-lg font-black uppercase text-ink">
+                                {teamAName}
+                              </span>
+                              <span className="font-display text-lg font-black text-cyan px-1.5 py-0.5 bg-void border border-white/10 tabular-nums">
+                                {scoreA}
+                              </span>
+                            </div>
+                            <span className="text-dim font-bold">VS</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-display text-lg font-black text-cyan px-1.5 py-0.5 bg-void border border-white/10 tabular-nums">
+                                {scoreB}
+                              </span>
+                              <span className="font-display text-lg font-black uppercase text-ink">
+                                {teamBName}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-dim">
+                            <span>Format: {m.format || m.series_format || 'BO1'}</span>
+                            <span>Region: {m.server_region || 'AWS Mumbai'}</span>
+                            {m.lobby_code && (
+                              <span className="text-ink">
+                                Lobby Code: <strong className="text-cyan font-mono">{m.lobby_code}</strong>
+                              </span>
+                            )}
+                            {m.lobby_password && (
+                              <span className="text-ink">
+                                Pass: <strong className="text-cyan font-mono">{m.lobby_password}</strong>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quick Controls */}
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          {!isLive && !isDone && (
+                            <button
+                              onClick={() => handleQuickMatchStatus(m.id, 'LIVE')}
+                              className="border border-live bg-live/20 px-3 py-1.5 uppercase font-mono text-xs font-bold text-live hover:bg-live hover:text-white transition-all"
+                            >
+                              🔴 Go Live
+                            </button>
+                          )}
+                          {!isCheckIn && !isLive && !isDone && (
+                            <button
+                              onClick={() => handleQuickMatchStatus(m.id, 'CHECK_IN_OPEN')}
+                              className="border border-warn/40 bg-warn/10 px-3 py-1.5 uppercase font-mono text-xs text-warn hover:bg-warn/20 transition-all"
+                            >
+                              Open Check-in
+                            </button>
+                          )}
+                          {isLive && (
+                            <button
+                              onClick={() => handleQuickMatchStatus(m.id, 'COMPLETED')}
+                              className="border border-white/20 bg-surface px-3 py-1.5 uppercase font-mono text-xs text-dim hover:text-ink hover:border-white/40 transition-all"
+                            >
+                              End Match
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleOpenEditMatch(m)}
+                            className="border border-cyan bg-cyan/15 px-3.5 py-1.5 uppercase font-mono text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all"
+                          >
+                            Edit Stream & Lobby
+                          </button>
+                        </div>
+                      </div>
+                    </Panel>
+                  )
+                })}
+
+              {adminMatches.filter((m) => {
+                const statusMatch =
+                  matchStatusFilter === 'ALL' || (m.status || '').toUpperCase() === matchStatusFilter
+                const tourMatch =
+                  matchTourFilter === 'ALL' || m.tournament_id === matchTourFilter
+                return statusMatch && tourMatch
+              }).length === 0 && (
+                <div className="border border-white/10 p-8 text-center text-dim bg-surface/30">
+                  No matches found for the selected filter criteria. Create or import tournament brackets to generate matches.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2121,7 +2455,17 @@ export default function Admin() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-dim">Category</label>
-                  <input required placeholder="e.g. Battle Royale" value={newGame.category} onChange={(e) => setNewGame({ ...newGame, category: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <select
+                    value={newGame.category}
+                    onChange={(e) => setNewGame({ ...newGame, category: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                  >
+                    {CANONICAL_CATEGORIES.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-dim">Platform</label>
@@ -2164,6 +2508,13 @@ export default function Admin() {
                 value={newGame.banner_url}
                 onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
               />
+              <BannerImageUploader
+                label="Game Logo / Icon (1:1 SVG or PNG)"
+                recommendedRatio="1:1"
+                recommendedRes="512x512"
+                value={newGame.logo_url}
+                onChange={(val) => setNewGame({ ...newGame, logo_url: val })}
+              />
               <div>
                 <label className="text-dim">Description</label>
                 <textarea rows={3} value={newGame.description} onChange={(e) => setNewGame({ ...newGame, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -2200,7 +2551,20 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="text-dim">Category</label>
-                  <input required value={editingGame.category} onChange={(e) => setEditingGame({ ...editingGame, category: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <select
+                    value={editingGame.category}
+                    onChange={(e) => setEditingGame({ ...editingGame, category: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                  >
+                    {CANONICAL_CATEGORIES.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.name}
+                      </option>
+                    ))}
+                    {!CANONICAL_CATEGORIES.some((c) => c.slug === editingGame.category) && (
+                      <option value={editingGame.category}>{editingGame.category}</option>
+                    )}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -2225,6 +2589,13 @@ export default function Admin() {
                 label="Game Banner Image (16:9)"
                 value={editingGame.banner_url || ''}
                 onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
+              />
+              <BannerImageUploader
+                label="Game Logo / Icon (1:1 SVG or PNG)"
+                recommendedRatio="1:1"
+                recommendedRes="512x512"
+                value={editingGame.logo_url || ''}
+                onChange={(val) => setEditingGame((prev) => prev ? { ...prev, logo_url: val } : null)}
               />
               <div>
                 <label className="text-dim">Description</label>
@@ -2316,6 +2687,144 @@ export default function Admin() {
               <div className="pt-3 flex justify-end gap-2">
                 <button type="button" onClick={() => setEditingMedia(null)} className="border border-white/20 px-3 py-1.5 uppercase text-dim">Cancel</button>
                 <button type="submit" className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold">Save Media Config</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MATCH & STREAM MODAL */}
+      {editingMatch && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8">
+            <h3 className="font-display text-2xl font-black uppercase text-cyan">
+              Edit Match & Stream Broadcast
+            </h3>
+            <p className="text-xs text-dim mt-1 font-mono">
+              {editingMatch.tournament_title || 'Tournament'} · {editingMatch.stage || 'Round'}
+            </p>
+            <form onSubmit={handleSaveMatchSubmit} className="mt-4 space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-dim">Match Status</label>
+                <select
+                  value={editMatchForm.status}
+                  onChange={(e) => setEditMatchForm({ ...editMatchForm, status: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                >
+                  <option value="SCHEDULED">SCHEDULED (Upcoming)</option>
+                  <option value="CHECK_IN_OPEN">CHECK_IN_OPEN (15m Roster Check-in)</option>
+                  <option value="READY">READY (Both Checked-in)</option>
+                  <option value="LIVE">LIVE (Broadcasting Now)</option>
+                  <option value="COMPLETED">COMPLETED (Score Finalized)</option>
+                  <option value="DISPUTED">DISPUTED (Under Review)</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-dim">YouTube Live Stream Broadcast URL</label>
+                <input
+                  type="url"
+                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                  value={editMatchForm.youtube_live_url}
+                  onChange={(e) => setEditMatchForm({ ...editMatchForm, youtube_live_url: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+                <p className="text-[10px] text-dim mt-0.5">Stream embeds or links directly on Match Lobby and Public Matches page.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-dim">Custom Room / Lobby Code</label>
+                  <input
+                    placeholder="e.g. AMT-9021"
+                    value={editMatchForm.lobby_code}
+                    onChange={(e) => setEditMatchForm({ ...editMatchForm, lobby_code: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="text-dim">Room Password</label>
+                  <input
+                    placeholder="e.g. AMT@2026"
+                    value={editMatchForm.lobby_password}
+                    onChange={(e) => setEditMatchForm({ ...editMatchForm, lobby_password: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-dim">Server Region</label>
+                <input
+                  value={editMatchForm.server_region}
+                  onChange={(e) => setEditMatchForm({ ...editMatchForm, server_region: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-3">
+                <div>
+                  <label className="text-dim">
+                    {editingMatch.team_a?.name || 'Team A'} Score
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editMatchForm.score_a}
+                    onChange={(e) => setEditMatchForm({ ...editMatchForm, score_a: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-dim">
+                    {editingMatch.team_b?.name || 'Team B'} Score
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editMatchForm.score_b}
+                    onChange={(e) => setEditMatchForm({ ...editMatchForm, score_b: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-dim">Declared Winner (Optional)</label>
+                <select
+                  value={editMatchForm.winner_team_id}
+                  onChange={(e) => setEditMatchForm({ ...editMatchForm, winner_team_id: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                >
+                  <option value="">No Winner Declared Yet</option>
+                  {editingMatch.team_a?.id && (
+                    <option value={editingMatch.team_a.id}>
+                      {editingMatch.team_a.name || 'Team A'}
+                    </option>
+                  )}
+                  {editingMatch.team_b?.id && (
+                    <option value={editingMatch.team_b.id}>
+                      {editingMatch.team_b.name || 'Team B'}
+                    </option>
+                  )}
+                </select>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingMatch(null)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold"
+                >
+                  Save Match & Stream
+                </button>
               </div>
             </form>
           </div>
