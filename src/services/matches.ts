@@ -99,7 +99,32 @@ export interface ApiMatch {
   scheduled_at?: string
   live_link?: string
   youtube_live_url?: string
+  round_number?: number
+  round_name?: string
+  match_number?: number
+  scheduled_date?: string
+  roster_status?: string
+  team_a_id?: string
+  team_b_id?: string
+  team_a_name?: string
+  team_b_name?: string
+  team_a_placeholder?: string
+  team_b_placeholder?: string
+  next_match_id?: string
+  next_match_slot?: string
+  advancement_label?: string
+  teams?: any[]
+  tournament?: any
+  team_a_details?: any
+  team_b_details?: any
+  teams_details?: any[]
+  previous_matches?: any[]
+  next_match?: any
+  tournament_progression?: any[]
   order?: number
+  score_a?: number
+  score_b?: number
+  captain_notes?: string
   status: string
   server_region?: string
   lobby_code?: string
@@ -251,6 +276,10 @@ export interface AdminMatchCreatePayload {
   scheduled_time?: string
   youtube_live_url?: string
   status?: string
+  roster_status?: string
+  next_match_id?: string
+  next_match_slot?: string
+  advancement_label?: string
 }
 
 export interface AdminMatchUpdatePayload {
@@ -266,10 +295,16 @@ export interface AdminMatchUpdatePayload {
   match_type?: string
   stage?: string
   series_format?: string
+  match_format?: string
   scheduled_at?: string
+  scheduled_date?: string
   scheduled_time?: string
   youtube_live_url?: string
   status?: string
+  roster_status?: string
+  next_match_id?: string
+  next_match_slot?: string
+  advancement_label?: string
   score_a?: number
   score_b?: number
   winner_team_id?: string
@@ -429,5 +464,71 @@ export async function updateMatchJoinInfo(
     body: JSON.stringify(payload),
   })
 }
+
+export interface TournamentRoundsRostersResponse {
+  status: string
+  tournament: {
+    id: string
+    title: string
+    slug?: string
+    format: string
+    status: string
+    registration_status?: string
+    live_stream_url?: string
+    community_platform?: string
+    community_link?: string
+    server_region?: string
+    custom_rounds?: string[]
+  }
+  registered_teams: Array<{
+    id: string
+    name: string
+    tag: string
+    captain_name: string
+    captain_handle: string
+    member_count: number
+    logo_url?: string
+  }>
+  unpaired_teams: Array<{
+    id: string
+    name: string
+    tag: string
+    captain_name: string
+    captain_handle: string
+    member_count: number
+    logo_url?: string
+  }>
+  rounds: Array<{
+    round_number: number
+    round_name: string
+    matches: ApiMatch[]
+  }>
+  total_matches: number
+}
+
+export async function getTournamentRoundsRosters(tournamentId: string): Promise<TournamentRoundsRostersResponse> {
+  return apiClient<TournamentRoundsRostersResponse>(`/admin/tournaments/${tournamentId}/rounds-rosters`)
+}
+
+export async function publishRosterAdmin(
+  matchId: string,
+  payload?: { notify_leaders?: boolean; match_notes?: string }
+): Promise<{ status: string; message: string; match_id: string; roster_status: string; notified_count: number }> {
+  return apiClient(`/admin/matches/${matchId}/publish-roster`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  })
+}
+
+export async function publishAllRostersAdmin(
+  tournamentId: string,
+  roundName?: string
+): Promise<{ status: string; message: string; published_matches: number; notified_leaders: number }> {
+  const query = roundName && roundName !== 'ALL' ? `?round_name=${encodeURIComponent(roundName)}` : ''
+  return apiClient(`/admin/tournaments/${tournamentId}/publish-all-rosters${query}`, {
+    method: 'POST',
+  })
+}
+
 
 

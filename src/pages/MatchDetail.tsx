@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { Container, Hud, Badge, Crest, Avatar, Panel, Brackets, SectionHead, Cta } from '../components/ui'
-import { matchBy, gameBy, tourBy, img, AVATARS, MATCHES, type Match as StaticMatch } from '../lib/data'
-import { getMatchById, captainCheckIn, submitMatchResult, submitMatchDispute, mapApiMatchToUiMatch } from '../services/matches'
+import { Container, Hud, Badge, Crest, Avatar, Panel, Brackets, SectionHead } from '../components/ui'
+import { gameBy, img } from '../lib/data'
+import {
+  getMatchById,
+  captainCheckIn,
+  submitMatchResult,
+  submitMatchDispute,
+  type ApiMatch,
+} from '../services/matches'
 import { useAuthContext } from '../context/AuthContext'
-
-const NAMES = [
-  ['VYRUS', 'KAALI.X', 'ZER0DAY', 'NEONRANI', 'BHAIJAAN'],
-  ['OMEN.IN', 'RAZORX', 'SPECTRE', 'MAVI', 'TORQUE'],
-]
-const ROLES = ['Captain · IGL', 'Entry', 'Support', 'Sniper', 'Flex']
 
 function getYoutubeEmbedUrl(url?: string): string | null {
   if (!url) return null
@@ -76,7 +76,7 @@ export default function MatchDetail() {
   const { profile } = useAuthContext()
 
   const [loading, setLoading] = useState(true)
-  const [matchData, setMatchData] = useState<any>(null)
+  const [match, setMatch] = useState<ApiMatch | null>(null)
   const [checkInLoading, setCheckInLoading] = useState(false)
   const [checkInMessage, setCheckInMessage] = useState('')
   const [copiedCode, setCopiedCode] = useState(false)
@@ -94,82 +94,103 @@ export default function MatchDetail() {
   const [disputeEvidence, setDisputeEvidence] = useState('')
   const [submittingDispute, setSubmittingDispute] = useState(false)
 
-  useEffect(() => {
-    let mounted = true
+  const loadData = () => {
     setLoading(true)
-
     getMatchById(id)
-      .then((data) => {
-        if (!mounted) return
-        if (data && data.id) {
-          setMatchData(mapApiMatchToUiMatch(data))
-        } else {
-          setMatchData(matchBy(id))
+      .then((data: any) => {
+        if (data && (data.id || data._id)) {
+          setMatch(data)
+          if (data.score_a !== undefined) setScoreA(data.score_a)
+          if (data.score_b !== undefined) setScoreB(data.score_b)
         }
       })
-      .catch(() => {
-        if (mounted) {
-          setMatchData(matchBy(id))
-        }
+      .catch((err) => {
+        console.error('Failed to load match detail:', err)
       })
       .finally(() => {
-        if (mounted) setLoading(false)
+        setLoading(false)
       })
+  }
 
-    return () => {
-      mounted = false
-    }
+  useEffect(() => {
+    loadData()
   }, [id])
 
-  const m: StaticMatch & {
-    tourName?: string
-    liveLink?: string
-    lobbyCode?: string
-    lobbyPassword?: string
-    serverRegion?: string
-    checkInStatus?: { team_a?: boolean; team_b?: boolean }
-  } = matchData || matchBy(id)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-void pt-32 pb-24 text-center font-mono text-dim">
+        <Container>
+          <div className="inline-block size-8 animate-spin border-2 border-cyan border-t-transparent mb-4" />
+          <p className="uppercase tracking-widest text-xs">Loading Match Cockpit &amp; Roster Formation...</p>
+        </Container>
+      </div>
+    )
+  }
 
-  const g = gameBy(m.game)
-  const t = tourBy(m.tour)
-  const live = m.status === 'live'
-  const done = m.status === 'completed'
-  const [sa, sb] = m.score ?? [0, 0]
+  if (!match) {
+    return (
+      <div className="min-h-screen bg-void pt-32 pb-24 text-center font-mono">
+        <Container>
+          <h2 className="font-display text-4xl font-black uppercase text-warn">Match Not Found</h2>
+          <p className="mt-3 text-xs text-dim">The specified match record does not exist or has been archived.</p>
+          <div className="mt-8">
+            <Link to="/matches" className="border border-white/20 bg-surface px-6 py-2.5 uppercase text-xs font-bold text-ink hover:border-cyan hover:text-cyan">
+              ← Back to Live Matches
+            </Link>
+          </div>
+        </Container>
+      </div>
+    )
+  }
 
-  const maps =
-    g.genre === 'Battle Royale'
-      ? ['Bermuda', 'Purgatory', 'Kalahari']
-      : g.slug === 'valorant'
-      ? ['Ascent', 'Bind', 'Haven']
-      : ['Firing Range', 'Standoff', 'Raid']
+  // Normalizations
+  const rawStatus = (match.status || 'SCHEDULED').toUpperCase()
+  const isLive = rawStatus === 'LIVE' || rawStatus === 'IN_PROGRESS'
+  const isDone = rawStatus === 'COMPLETED'
+  const isUpcoming = rawStatus === 'SCHEDULED' || rawStatus === 'CHECK_IN_OPEN'
 
-  const breakdown = maps.map((map, i) => {
-    const played = done ? i < sa + sb : live ? i <= sa + sb : false
-    const cur = live && i === sa + sb
-    const aw = i < sa
-    return {
-      map,
-      played,
-      cur,
-      a: !played ? '—' : cur ? 9 : aw ? 13 : 8 + i,
-      b: !played ? '—' : cur ? 7 : aw ? 9 + i : 13,
-    }
-  })
+  const t = match.tournament || {}
+  const g = gameBy(t.game_slug || match.game_slug || 'valorant')
+  const streamUrl = match.youtube_live_url || match.live_link || t.live_stream_url
 
-  const h2h = MATCHES.filter((x) => x.id !== m.id && x.status === 'completed').slice(0, 3)
-  const winner = done ? (sa > sb ? m.a : m.b) : null
+  const teamA = match.team_a_details || {
+    id: match.team_a_id,
+    name: match.team_a_name || match.team_a_placeholder || 'Team A',
+    tag: 'TEAM',
+    captain: { name: 'Captain', handle: match.team_a_name || 'Captain' },
+    members: [],
+  }
+
+  const teamB = match.team_b_details || {
+    id: match.team_b_id,
+    name: match.team_b_name || match.team_b_placeholder || 'Team B',
+    tag: 'TEAM',
+    captain: { name: 'Captain', handle: match.team_b_name || 'Captain' },
+    members: [],
+  }
+
+  const multiTeams = match.teams_details || []
+  const isBattleRoyale = (t.format || '').toLowerCase().includes('battle royale') || multiTeams.length > 2
+
+  const winnerId = match.winner_team_id
+  const winnerName = isDone
+    ? (winnerId === match.team_a_id ? teamA.name : winnerId === match.team_b_id ? teamB.name : null) ||
+      (match.score_a !== undefined && match.score_b !== undefined && match.score_a > match.score_b ? teamA.name : teamB.name)
+    : null
+
+  const progressionRounds = match.tournament_progression || []
+  const prevMatches = match.previous_matches || []
+  const nextMatch = match.next_match
 
   const handleCheckIn = async () => {
     setCheckInLoading(true)
     setCheckInMessage('')
     try {
       const res = await captainCheckIn(id)
-      setCheckInMessage(res.message || 'Check-in confirmed!')
-      // Refresh match state
-      const updated = await getMatchById(id)
-      if (updated) setMatchData(mapApiMatchToUiMatch(updated))
+      setCheckInMessage(res.message || 'Check-in verified successfully!')
+      loadData()
     } catch (err: any) {
-      setCheckInMessage(err.message || 'Check-in failed. Are you a registered team member?')
+      setCheckInMessage(err.message || 'Check-in failed. Are you a registered team captain?')
     } finally {
       setCheckInLoading(false)
     }
@@ -185,8 +206,7 @@ export default function MatchDetail() {
         evidence_url: evidenceUrl || undefined,
       })
       setShowResultModal(false)
-      const updated = await getMatchById(id)
-      if (updated) setMatchData(mapApiMatchToUiMatch(updated))
+      loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to submit score.')
     } finally {
@@ -203,7 +223,8 @@ export default function MatchDetail() {
         evidence_url: disputeEvidence || undefined,
       })
       setShowDisputeModal(false)
-      alert('Dispute submitted. A tournament arbiter has been assigned to review.')
+      alert('Dispute submitted for tournament arbiter review.')
+      loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to submit dispute.')
     } finally {
@@ -213,114 +234,389 @@ export default function MatchDetail() {
 
   return (
     <>
-      {/* BROADCAST HEADER */}
+      {/* 1. BROADCAST HERO / TOURNAMENT INFO (Section 30) */}
       <section className="relative overflow-hidden bg-void pt-28">
-        <img
-          src={img(g.photo, 2000)}
-          alt=""
-          className="kenburns absolute inset-0 h-full w-full object-cover opacity-30"
-        />
+        {t.banner_url ? (
+          <img
+            src={t.banner_url}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-20 filter blur-xs"
+          />
+        ) : (
+          <img
+            src={img(g.photo, 2000)}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-25"
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{
-            background: `radial-gradient(ellipse at 50% 110%, ${g.accent}55, transparent 60%), linear-gradient(to bottom, #05060acc, #05060a)`,
+            background: `radial-gradient(ellipse at 50% 110%, ${g.accent}44, transparent 65%), linear-gradient(to bottom, #05060acc, #05060a)`,
           }}
         />
-        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-50" />
-        <Container className="relative pb-14">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-40" />
+
+        <Container className="relative pb-12">
+          {/* Tournament Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className="font-display text-sm font-black tracking-[0.2em]"
+                className="font-display text-sm font-black tracking-[0.2em] uppercase"
                 style={{ color: g.accent }}
               >
-                {g.short}
+                {t.game_name || g.name}
               </span>
+              <span className="text-dim">•</span>
               <Link
-                to={`/tournaments/${t.id}`}
-                className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink hover:text-cyan"
+                to={`/tournaments/${t.id || match.tournament_id}`}
+                className="font-mono text-xs uppercase tracking-[0.18em] text-ink hover:text-cyan font-bold transition-colors"
               >
-                {m.tourName || t.name}
+                {t.title || 'Tournament Championship'}
               </Link>
-              <Hud>
-                · {m.round} · Match {String(m.no).padStart(2, '0')}
+              <span className="text-dim">•</span>
+              <Hud className="text-dim">
+                {match.round_name || match.stage || `Round ${match.round_number || 1}`} · Match {String(match.match_number || 1).padStart(2, '0')}
               </Hud>
-            </div>
-            <Badge s={m.status} label={live ? 'Live · On Air' : undefined} />
-          </div>
-
-          <div className="mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:gap-12">
-            <div
-              className={`flex flex-col items-center gap-4 text-center md:flex-row-reverse md:text-right ${
-                winner && winner !== m.a ? 'opacity-50' : ''
-              }`}
-            >
-              <Crest name={m.a} size={110} color={g.accent} />
-              <h1 className="reveal font-display text-[clamp(2rem,7vw,7rem)] font-black uppercase leading-[0.8]">
-                {m.a}
-              </h1>
-            </div>
-            <div className="text-center">
-              {m.score ? (
-                <p className="font-display text-[clamp(4rem,12vw,11rem)] font-black leading-none tabular-nums">
-                  {sa}
-                  <span className={live ? 'text-live' : 'text-dim'}>:</span>
-                  {sb}
-                </p>
-              ) : (
-                <p className="outline-text font-display text-[clamp(4rem,12vw,11rem)] font-black leading-none">
-                  VS
-                </p>
+              {match.format && (
+                <span className="border border-white/10 bg-surface/60 px-2 py-0.5 font-mono text-[10px] text-cyan uppercase font-bold">
+                  {match.series_format || match.format}
+                </span>
               )}
-              <Hud className="block">{m.format}</Hud>
             </div>
-            <div
-              className={`flex flex-col items-center gap-4 text-center md:flex-row md:text-left ${
-                winner && winner !== m.b ? 'opacity-50' : ''
-              }`}
-            >
-              <Crest name={m.b} size={110} color={g.accent} />
-              <h1 className="reveal font-display text-[clamp(2rem,7vw,7rem)] font-black uppercase leading-[0.8]">
-                {m.b}
-              </h1>
+
+            <div className="flex items-center gap-3">
+              {t.community_link && (
+                <a
+                  href={t.community_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded bg-emerald-500/20 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition-all shadow-xs"
+                >
+                  <span>💬</span>
+                  <span>Join {t.community_platform || 'WhatsApp'}</span>
+                </a>
+              )}
+              <Badge
+                s={isLive ? 'live' : isDone ? 'completed' : 'upcoming'}
+                label={isLive ? 'Live · On Air' : isDone ? 'Final Result' : 'Scheduled'}
+              />
             </div>
           </div>
 
-          <div className="mt-12 grid grid-cols-2 gap-px border border-white/10 bg-white/10 md:grid-cols-4">
-            {[
-              ['Date', m.date],
-              ['Time', m.time],
-              ['Format', m.format],
-              ['Status', m.status],
-            ].map(([k, v]) => (
-              <div key={k} className="bg-void/80 p-4">
-                <Hud>{k}</Hud>
-                <p className="mt-1 font-display text-xl font-extrabold uppercase">{v}</p>
+          {/* 2. MATCH FORMATION HEADLINE (1v1 or Battle Royale Grid) */}
+          {!isBattleRoyale ? (
+            <div className="mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-12">
+              {/* Team A */}
+              <div
+                className={`flex flex-col items-center gap-4 text-center md:flex-row-reverse md:text-right ${
+                  winnerName && winnerName !== teamA.name ? 'opacity-40' : ''
+                }`}
+              >
+                {teamA.logo_url ? (
+                  <img src={teamA.logo_url} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
+                ) : (
+                  <Crest name={teamA.name} size={90} color={g.accent} />
+                )}
+                <div>
+                  <h1 className="font-display text-[clamp(1.75rem,5.5vw,5rem)] font-black uppercase leading-[0.85] text-ink">
+                    {teamA.name}
+                  </h1>
+                  <p className="mt-1 font-mono text-xs text-dim uppercase">
+                    TAG: [{teamA.tag || 'TEAM'}] • CAPTAIN: @{teamA.captain?.handle || teamA.captain?.name || 'TBD'}
+                  </p>
+                </div>
               </div>
-            ))}
+
+              {/* Score / VS Center */}
+              <div className="text-center px-4">
+                {match.score_a !== undefined && match.score_b !== undefined ? (
+                  <p className="font-display text-[clamp(3.5rem,10vw,8.5rem)] font-black leading-none tabular-nums text-ink">
+                    {match.score_a}
+                    <span className={isLive ? 'text-live animate-pulse' : 'text-dim'}>:</span>
+                    {match.score_b}
+                  </p>
+                ) : (
+                  <p className="font-display text-[clamp(3.5rem,10vw,8.5rem)] font-black leading-none text-dim/50">
+                    VS
+                  </p>
+                )}
+                <div className="mt-2 inline-flex items-center gap-2 border border-white/10 bg-void/80 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-cyan">
+                  <span>{match.round_name || `Round ${match.round_number || 1}`}</span>
+                  <span>•</span>
+                  <span>{match.series_format || match.format || 'BO1'}</span>
+                </div>
+              </div>
+
+              {/* Team B */}
+              <div
+                className={`flex flex-col items-center gap-4 text-center md:flex-row md:text-left ${
+                  winnerName && winnerName !== teamB.name ? 'opacity-40' : ''
+                }`}
+              >
+                {teamB.logo_url ? (
+                  <img src={teamB.logo_url} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
+                ) : (
+                  <Crest name={teamB.name} size={90} color={g.accent} />
+                )}
+                <div>
+                  <h1 className="font-display text-[clamp(1.75rem,5.5vw,5rem)] font-black uppercase leading-[0.85] text-ink">
+                    {teamB.name}
+                  </h1>
+                  <p className="mt-1 font-mono text-xs text-dim uppercase">
+                    TAG: [{teamB.tag || 'TEAM'}] • CAPTAIN: @{teamB.captain?.handle || teamB.captain?.name || 'TBD'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-10">
+              <div className="text-center mb-6">
+                <span className="font-mono text-xs uppercase tracking-widest text-cyan">
+                  [ MULTI-TEAM BATTLE ROYALE LOBBY ]
+                </span>
+                <h1 className="font-display text-4xl font-black uppercase text-ink mt-1">
+                  {multiTeams.length} Competing Squads
+                </h1>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {multiTeams.map((sq, i) => (
+                  <Panel key={sq.id || i} className="p-3 text-center border-white/10">
+                    <p className="font-display text-sm font-black uppercase truncate text-ink">{sq.name}</p>
+                    <p className="font-mono text-[10px] text-cyan uppercase">TAG: [{sq.tag}]</p>
+                    <p className="font-mono text-[10px] text-dim truncate">@{sq.captain?.handle || 'Captain'}</p>
+                  </Panel>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Match Specs Bar */}
+          <div className="mt-10 grid grid-cols-2 gap-px border border-white/10 bg-white/10 md:grid-cols-4 font-mono text-xs">
+            <div className="bg-void/90 p-4">
+              <Hud>SCHEDULED DATE</Hud>
+              <p className="mt-1 font-display text-lg font-extrabold uppercase text-ink">
+                {match.scheduled_date || (match.scheduled_at ? new Date(match.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD')}
+              </p>
+            </div>
+            <div className="bg-void/90 p-4">
+              <Hud>SCHEDULED TIME</Hud>
+              <p className="mt-1 font-display text-lg font-extrabold uppercase text-ink">
+                {match.scheduled_time || 'TBD'}
+              </p>
+            </div>
+            <div className="bg-void/90 p-4">
+              <Hud>COMPETITION FORMAT</Hud>
+              <p className="mt-1 font-display text-lg font-extrabold uppercase text-cyan">
+                {t.format || match.format || 'Single Elimination'}
+              </p>
+            </div>
+            <div className="bg-void/90 p-4">
+              <Hud>MATCH TELEMETRY</Hud>
+              <p className="mt-1 font-display text-lg font-extrabold uppercase text-live">
+                {isLive ? '🔴 BROADCAST ON AIR' : isDone ? '🏆 RESULT CONFIRMED' : '⏳ UPCOMING'}
+              </p>
+            </div>
           </div>
         </Container>
       </section>
 
-      {/* LOBBY & ACTIONS SECTION */}
-      <Container className="pt-8 pb-10">
+      {/* 3. MATCH JOURNEY / BRACKET VISUALIZATION (Section 31) */}
+      <Container className="py-8">
+        <Panel className="p-6 border-white/10 bg-surface/60">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div>
+              <Hud className="text-cyan">Tournament Progression &amp; Match Journey</Hud>
+              <p className="text-xs text-dim mt-1 font-mono">
+                Visual advancement pathway from qualification to championship final.
+              </p>
+            </div>
+            {match.advancement_label && (
+              <div className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-[11px] text-cyan font-bold uppercase">
+                Advancement: {match.advancement_label}
+              </div>
+            )}
+          </div>
+
+          {/* Timeline of Rounds */}
+          {progressionRounds.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:gap-6 font-mono text-xs">
+              {progressionRounds.map((rnd: any, idx: number) => (
+                <div key={rnd.round_name || idx} className="flex items-center gap-3">
+                  <div
+                    className={`px-4 py-2 border rounded transition-all ${
+                      rnd.is_current
+                        ? 'border-cyan bg-cyan/20 text-cyan font-bold shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                        : 'border-white/10 bg-void/60 text-dim'
+                    }`}
+                  >
+                    <span className="text-[10px] uppercase block tracking-wider">Round {rnd.round_number}</span>
+                    <span className="font-display text-sm font-black uppercase text-ink">{rnd.round_name}</span>
+                  </div>
+                  {idx < progressionRounds.length - 1 && (
+                    <span className="text-dim/60 font-bold">──►</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upstream & Downstream Match Nodes */}
+          <div className="mt-8 grid gap-4 md:grid-cols-3 font-mono text-xs">
+            {/* Feeder / Previous Match */}
+            <div className="border border-white/10 bg-void/80 p-4">
+              <Hud className="text-dim">← PREVIOUS ROUND FEEDER</Hud>
+              {prevMatches.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {prevMatches.map((pm: any) => (
+                    <div key={pm.id} className="text-[11px] border-b border-white/5 pb-1">
+                      <span className="text-dim">{pm.round_name} M{pm.match_number}: </span>
+                      <span className="text-ink font-bold">{pm.team_a_name} vs {pm.team_b_name}</span>
+                      {pm.winner_team_id && <span className="text-ok ml-1">(Winner Advanced)</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-dim text-[11px]">Opening stage fixture (Direct Seeding).</p>
+              )}
+            </div>
+
+            {/* Current Match */}
+            <div className="border border-cyan/60 bg-cyan/10 p-4 shadow-sm">
+              <Hud className="text-cyan">★ CURRENT FIXTURE ★</Hud>
+              <p className="mt-2 font-display text-sm font-black text-ink uppercase">
+                {teamA.name} <span className="text-dim">VS</span> {teamB.name}
+              </p>
+              <p className="text-[10px] text-cyan mt-1">
+                STATUS: {match.status} • {match.scheduled_time || 'TBD'}
+              </p>
+            </div>
+
+            {/* Downstream / Next Match */}
+            <div className="border border-white/10 bg-void/80 p-4">
+              <Hud className="text-dim">NEXT ROUND DESTINATION →</Hud>
+              {nextMatch ? (
+                <div className="mt-2 text-[11px]">
+                  <p className="font-bold text-ink">{nextMatch.round_name} · Match {nextMatch.match_number}</p>
+                  <p className="text-dim mt-0.5">Slot: {nextMatch.team_a_name} vs {nextMatch.team_b_name}</p>
+                </div>
+              ) : (
+                <p className="mt-2 text-dim text-[11px]">
+                  {match.advancement_label || 'Winner advances to subsequent tournament bracket tier.'}
+                </p>
+              )}
+            </div>
+          </div>
+        </Panel>
+      </Container>
+
+      {/* 4. BROADCAST STREAM OR COUNTDOWN (Section 33) */}
+      <Container className="pb-10">
+        {isLive ? (
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div className="group relative aspect-video overflow-hidden border border-live/60 bg-black shadow-[0_0_30px_rgba(239,68,68,0.2)]">
+              {getYoutubeEmbedUrl(streamUrl) ? (
+                <iframe
+                  src={getYoutubeEmbedUrl(streamUrl)!}
+                  title="Official Broadcast Stream"
+                  className="h-full w-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <div className="relative h-full w-full flex flex-col items-center justify-center bg-black/90 p-8 text-center font-mono">
+                  <div className="size-16 rounded-full bg-live/20 border border-live/50 flex items-center justify-center text-live text-2xl animate-pulse mb-4">
+                    🔴
+                  </div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">Official Broadcast Live</h3>
+                  <p className="mt-2 text-xs text-dim max-w-md">
+                    Stream link is configured for external broadcast portal.
+                  </p>
+                  {streamUrl && (
+                    <a
+                      href={streamUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-5 border border-live bg-live/20 px-6 py-2.5 uppercase font-bold text-xs text-live hover:bg-live hover:text-white transition-all"
+                    >
+                      📺 Watch on Streaming Portal →
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Live Telemetry Panel */}
+            <Panel className="p-5 font-mono text-xs">
+              <Hud className="text-live">◉ Telemetry Feed</Hud>
+              <div className="mt-4 space-y-3">
+                <div className="border-b border-white/5 pb-2">
+                  <span className="text-dim">Match Status:</span>
+                  <p className="font-bold text-live">🔴 LIVE ON AIR</p>
+                </div>
+                <div className="border-b border-white/5 pb-2">
+                  <span className="text-dim">Score:</span>
+                  <p className="font-display text-lg font-black text-ink">{match.score_a ?? 0} : {match.score_b ?? 0}</p>
+                </div>
+                <div className="border-b border-white/5 pb-2">
+                  <span className="text-dim">Server Region:</span>
+                  <p className="text-ink">{match.server_region || 'AWS Mumbai (ap-south-1)'}</p>
+                </div>
+                <div>
+                  <span className="text-dim">Format:</span>
+                  <p className="text-cyan font-bold">{match.series_format || match.format || 'BO1'}</p>
+                </div>
+              </div>
+            </Panel>
+          </div>
+        ) : isDone ? (
+          <Panel className="overflow-hidden p-8 text-center md:p-14 border-ok/40 bg-ok/5">
+            <Brackets color="border-ok/40" />
+            <Hud className="text-ok">Official Match Result Verified</Hud>
+            <div className="mt-4">
+              <h2 className="font-display text-5xl font-black uppercase md:text-7xl text-ink">
+                {winnerName || 'Winner Decided'}
+              </h2>
+              <p className="mt-2 font-display text-2xl font-black text-dim">
+                Final Score: {match.score_a ?? 0} — {match.score_b ?? 0}
+              </p>
+            </div>
+            {match.captain_notes && (
+              <p className="mt-4 font-mono text-xs text-dim italic">
+                Arbiter Notes: "{match.captain_notes}"
+              </p>
+            )}
+          </Panel>
+        ) : (
+          <Panel className="p-8 text-center md:p-14 border-white/10">
+            <Brackets color="border-cyan/50" />
+            <Hud className="text-cyan">Match Countdown Timer</Hud>
+            <div className="mt-6">
+              <Countdown targetIso={match.scheduled_at} />
+            </div>
+          </Panel>
+        )}
+      </Container>
+
+      {/* 5. PARTICIPANT LOBBY & ACTIONS SECTION */}
+      <Container className="pb-12">
         <div className="grid gap-6 md:grid-cols-3">
           {/* Lobby Info Card */}
           <Panel className="p-6">
             <Brackets color="border-cyan/40" />
-            <Hud className="text-cyan">Match Room Lobbies</Hud>
+            <Hud className="text-cyan">Match Room Credentials</Hud>
             <div className="mt-4 space-y-3 font-mono text-xs">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <span className="text-dim">Room ID:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-ink">{m.lobbyCode || 'AMT-ROOM-01'}</span>
+                  <span className="font-bold text-ink">{match.lobby_code || 'AMT-ROOM-01'}</span>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(m.lobbyCode || 'AMT-ROOM-01')
+                      navigator.clipboard.writeText(match.lobby_code || 'AMT-ROOM-01')
                       setCopiedCode(true)
                       setTimeout(() => setCopiedCode(false), 1500)
                     }}
-                    className="text-[10px] uppercase text-cyan hover:underline"
+                    className="text-[10px] uppercase text-cyan hover:underline cursor-pointer"
                   >
                     {copiedCode ? '✓' : 'Copy'}
                   </button>
@@ -329,14 +625,14 @@ export default function MatchDetail() {
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <span className="text-dim">Password:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-ink">{m.lobbyPassword || 'PASS-99'}</span>
+                  <span className="font-bold text-ink">{match.lobby_password || 'PASS-99'}</span>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(m.lobbyPassword || 'PASS-99')
+                      navigator.clipboard.writeText(match.lobby_password || 'PASS-99')
                       setCopiedPass(true)
                       setTimeout(() => setCopiedPass(false), 1500)
                     }}
-                    className="text-[10px] uppercase text-cyan hover:underline"
+                    className="text-[10px] uppercase text-cyan hover:underline cursor-pointer"
                   >
                     {copiedPass ? '✓' : 'Copy'}
                   </button>
@@ -344,7 +640,7 @@ export default function MatchDetail() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-dim">Server Region:</span>
-                <span className="text-ink">{m.serverRegion || 'AWS Mumbai (ap-south-1)'}</span>
+                <span className="text-ink">{match.server_region || 'AWS Mumbai (ap-south-1)'}</span>
               </div>
             </div>
           </Panel>
@@ -353,15 +649,15 @@ export default function MatchDetail() {
           <Panel className="p-6">
             <Hud className="text-ink">Captain Check-in</Hud>
             <p className="mt-2 text-xs text-dim">
-              Both team captains must check in prior to match start to signal lobby readiness.
+              Both team captains must signal lobby presence prior to scheduled match commencement.
             </p>
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4">
               <button
-                disabled={checkInLoading || done}
+                disabled={checkInLoading || isDone}
                 onClick={handleCheckIn}
-                className="w-full border border-cyan bg-cyan/10 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors disabled:opacity-40"
+                className="w-full border border-cyan bg-cyan/15 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors disabled:opacity-40 cursor-pointer"
               >
-                {checkInLoading ? 'Checking in...' : '✓ Confirm Check-in'}
+                {checkInLoading ? 'Verifying check-in...' : '✓ Confirm Captain Check-in'}
               </button>
             </div>
             {checkInMessage && (
@@ -371,272 +667,187 @@ export default function MatchDetail() {
 
           {/* Results & Disputes */}
           <Panel className="p-6">
-            <Hud className="text-ink">Match Actions</Hud>
+            <Hud className="text-ink">Roster Match Operations</Hud>
             <p className="mt-2 text-xs text-dim">
-              Report verified scores with screenshot proof, or initiate an arbiter dispute.
+              Submit verified scoreboard screenshots, or flag competitive rule disputes.
             </p>
-            <div className="mt-4 flex flex-col gap-2">
+            <div className="mt-4 flex flex-col gap-2 font-mono text-xs">
               <button
                 onClick={() => setShowResultModal(true)}
-                className="border border-white/20 bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider hover:border-cyan hover:text-cyan transition-colors"
+                className="border border-white/20 bg-surface px-4 py-2.5 font-bold uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
               >
-                Submit Match Score
+                Submit Scorecard Proof
               </button>
               <button
                 onClick={() => setShowDisputeModal(true)}
-                className="border border-live/30 bg-live/5 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors"
+                className="border border-live/40 bg-live/10 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-live hover:bg-live/20 transition-colors cursor-pointer"
               >
-                File Dispute / Arbiter Review
+                Open Arbiter Dispute
               </button>
             </div>
           </Panel>
         </div>
       </Container>
 
-      {/* STAGE & VIDEO STREAM */}
-      <Container className="py-10">
-        {live ? (
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-            <div className="group relative aspect-video overflow-hidden border border-live/40 bg-black">
-              {getYoutubeEmbedUrl(m.liveLink) ? (
-                <iframe
-                  src={getYoutubeEmbedUrl(m.liveLink)!}
-                  title="Live Stream"
-                  className="h-full w-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <>
-                  <img
-                    src={img(g.photo, 1600)}
-                    alt=""
-                    className="h-full w-full object-cover opacity-70"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
-                  <div className="absolute left-4 right-4 top-4 flex items-center justify-between">
-                    <Badge s="live" label="Live · Broadcast" />
-                    <div className="flex items-center gap-2 bg-black/60 px-3 py-1.5 font-display text-lg font-black">
-                      <span>{m.a.split(' ')[1] ?? m.a}</span>
-                      <span style={{ color: g.accent }}>
-                        {sa} : {sb}
-                      </span>
-                      <span>{m.b.split(' ')[1] ?? m.b}</span>
-                    </div>
-                  </div>
-                  <button
-                    aria-label="Play"
-                    className="absolute left-1/2 top-1/2 grid size-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/30 bg-black/40 text-3xl transition-transform group-hover:scale-110"
-                  >
-                    ▶
-                  </button>
-                  <div className="absolute inset-x-0 bottom-0 p-4">
-                    <div className="h-1 bg-white/20">
-                      <div className="h-full w-[64%] bg-live" />
-                    </div>
-                    <div className="mt-3 flex justify-between font-mono text-xs text-ink/80">
-                      <span>❚❚ &nbsp; 🔊 &nbsp; LIVE</span>
-                      <span>1080p60 · ⚙ · ⛶</span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            <Panel className="p-5">
-              <Hud className="text-live">◉ Live feed</Hud>
-              <ul className="mt-4 space-y-3 font-mono text-xs">
-                {[
-                  `${NAMES[0][1]} eliminated ${NAMES[1][2]}`,
-                  `${m.a} secured first blood`,
-                  `${NAMES[1][0]} clutched a 1v2`,
-                  `${NAMES[0][3]} sniper tag · 240m`,
-                  'Round point awarded to ' + m.a,
-                ].map((x, i) => (
-                  <li key={i} className="flex gap-3 border-b border-white/5 pb-3">
-                    <span className="text-dim">{`0${i + 1}:4${i}`}</span>
-                    <span>{x}</span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          </div>
-        ) : done ? (
-          <Panel className="overflow-hidden p-10 text-center md:p-16">
-            <Brackets color="border-white/30" />
-            <Hud className="text-ok">Final · Verified Result</Hud>
-            <div className="mt-6 flex justify-center">
-              <Crest name={winner!} size={96} color={g.accent} />
-            </div>
-            <p className="mt-6 font-display text-6xl font-black uppercase md:text-8xl">{winner}</p>
-            <p className="mt-2 font-display text-2xl font-black text-dim">
-              wins {Math.max(sa, sb)}–{Math.min(sa, sb)}
-            </p>
-          </Panel>
-        ) : (
-          <Panel className="p-10 text-center md:p-16">
-            <Brackets color="border-cyan/50" />
-            <Hud className="text-cyan">Lobby opens in</Hud>
-            <div className="mt-8">
-              <Countdown />
-            </div>
-            <div className="mt-10">
-              <Cta small to={`/tournaments/${t.id}`}>
-                Tournament Hub
-              </Cta>
-            </div>
-          </Panel>
-        )}
-      </Container>
-
-      {/* ROSTERS */}
-      <Container className="pb-16">
-        <SectionHead kicker="Line-ups" title="Rosters" size="md" className="mb-10" />
+      {/* 6. VERIFIED TEAM ROSTER DETAILS (Section 32) */}
+      <Container className="pb-24">
+        <SectionHead kicker="Verified Squads" title="Team Rosters" size="md" className="mb-8" />
+        
         <div className="grid gap-6 md:grid-cols-2">
-          {[m.a, m.b].map((team, ti) => (
-            <Panel key={team} className="p-6">
-              <div className="mb-5 flex items-center gap-4 border-b border-white/10 pb-5">
-                <Crest name={team} size={48} color={g.accent} />
-                <p className="font-display text-3xl font-black uppercase">{team}</p>
-              </div>
-              <ul className="space-y-3">
-                {NAMES[ti].map((p, i) => (
-                  <li key={p} className="flex items-center gap-4">
-                    <Avatar id={AVATARS[(i + ti * 2) % 5]} size={44} />
-                    <div className="flex-1">
-                      <p className="font-display text-xl font-black">{p}</p>
-                      <Hud>{ROLES[i]}</Hud>
-                    </div>
-                    <span className="font-mono text-xs text-dim">
-                      K/D {(1.8 - i * 0.2 + ti * 0.1).toFixed(2)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ))}
-        </div>
-      </Container>
-
-      {/* BREAKDOWN + INFO */}
-      <Container className="grid gap-10 pb-24 lg:grid-cols-[1.4fr_1fr]">
-        <div>
-          <SectionHead kicker="Map by map" title="Breakdown" size="md" className="mb-8" />
-          <div className="divide-y divide-white/10 border-y border-white/10">
-            {breakdown.map((r, i) => (
-              <div
-                key={r.map}
-                className={`grid grid-cols-[auto_1fr_auto] items-center gap-5 py-5 ${
-                  r.played ? '' : 'opacity-40'
-                }`}
-              >
-                <Hud className="w-16">Map {i + 1}</Hud>
-                <div className="flex items-center gap-3">
-                  <span className="font-display text-2xl font-black uppercase">{r.map}</span>
-                  {r.cur && <Badge s="live" />}
+          {/* Team A Roster Card */}
+          <Panel className="p-6 border-white/10">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                {teamA.logo_url ? (
+                  <img src={teamA.logo_url} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+                ) : (
+                  <Crest name={teamA.name} size={48} color={g.accent} />
+                )}
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamA.name}</h3>
+                  <span className="font-mono text-xs text-cyan uppercase font-bold">TAG: [{teamA.tag || 'TEAM'}]</span>
                 </div>
-                <span className="font-display text-3xl font-black tabular-nums">
-                  {r.a}
-                  <span className="mx-2 text-dim">:</span>
-                  {r.b}
-                </span>
               </div>
-            ))}
-          </div>
-          <SectionHead kicker="Head to head" title="History" size="md" className="mb-8 mt-16" />
-          <div className="space-y-2">
-            {h2h.map((x) => (
-              <Link
-                key={x.id}
-                to={`/matches/${x.id}`}
-                className="flex items-center justify-between border border-white/10 p-4 hover:border-white/30"
-              >
-                <span className="font-display text-lg font-black uppercase">
-                  {x.a} <span className="text-dim">vs</span> {x.b}
-                </span>
-                <span className="font-mono text-sm tabular-nums">
-                  {x.score?.join(' : ')} · {x.date}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
+              <span className="font-mono text-xs text-dim">
+                {teamA.members?.length || 1} Registered Contenders
+              </span>
+            </div>
 
-        <Panel className="h-fit p-6">
-          <Hud className="text-ink">Match Information</Hud>
-          <dl className="mt-5 space-y-4">
-            {[
-              ['Tournament', m.tourName || t.name],
-              ['Game', g.name],
-              ['Round', m.round],
-              ['Match No.', String(m.no)],
-              ['Format', m.format],
-              ['Region', m.serverRegion || t.region],
-              ['Server', 'Mumbai · 18ms'],
-              ['Result', done ? `${winner} won` : live ? 'In progress' : 'Pending'],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4 border-b border-white/5 pb-3">
-                <dt className="text-dim">{k}</dt>
-                <dd className="text-right font-medium">{v}</dd>
+            {/* Captain Bar */}
+            <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
+              <span className="text-[10px] uppercase text-cyan block font-bold">TEAM LEADER / CAPTAIN:</span>
+              <p className="font-display text-base font-black text-ink uppercase mt-0.5">
+                {teamA.captain?.name || teamA.captain?.handle || 'Captain'}
+              </p>
+              <p className="text-[11px] text-dim">
+                Handle: @{teamA.captain?.handle || teamA.captain?.name || 'TBD'}
+              </p>
+            </div>
+
+            {/* Player List */}
+            <div className="space-y-2">
+              {(teamA.members && teamA.members.length > 0 ? teamA.members : [teamA.captain]).map((mem: any, i: number) => (
+                <div key={mem.id || i} className="flex items-center justify-between border-b border-white/5 py-2 font-mono text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan/60" />
+                    <span className="font-bold text-ink">{mem.name || mem.handle || `Player ${i + 1}`}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-dim">@{mem.handle || mem.name}</span>
+                    <span className="border border-white/10 bg-surface px-2 py-0.5 text-[10px] text-dim uppercase">
+                      {mem.role || (i === 0 ? 'CAPTAIN' : 'PLAYER')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          {/* Team B Roster Card */}
+          <Panel className="p-6 border-white/10">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                {teamB.logo_url ? (
+                  <img src={teamB.logo_url} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+                ) : (
+                  <Crest name={teamB.name} size={48} color={g.accent} />
+                )}
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamB.name}</h3>
+                  <span className="font-mono text-xs text-cyan uppercase font-bold">TAG: [{teamB.tag || 'TEAM'}]</span>
+                </div>
               </div>
-            ))}
-          </dl>
-        </Panel>
+              <span className="font-mono text-xs text-dim">
+                {teamB.members?.length || 1} Registered Contenders
+              </span>
+            </div>
+
+            {/* Captain Bar */}
+            <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
+              <span className="text-[10px] uppercase text-cyan block font-bold">TEAM LEADER / CAPTAIN:</span>
+              <p className="font-display text-base font-black text-ink uppercase mt-0.5">
+                {teamB.captain?.name || teamB.captain?.handle || 'Captain'}
+              </p>
+              <p className="text-[11px] text-dim">
+                Handle: @{teamB.captain?.handle || teamB.captain?.name || 'TBD'}
+              </p>
+            </div>
+
+            {/* Player List */}
+            <div className="space-y-2">
+              {(teamB.members && teamB.members.length > 0 ? teamB.members : [teamB.captain]).map((mem: any, i: number) => (
+                <div key={mem.id || i} className="flex items-center justify-between border-b border-white/5 py-2 font-mono text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan/60" />
+                    <span className="font-bold text-ink">{mem.name || mem.handle || `Player ${i + 1}`}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-dim">@{mem.handle || mem.name}</span>
+                    <span className="border border-white/10 bg-surface px-2 py-0.5 text-[10px] text-dim uppercase">
+                      {mem.role || (i === 0 ? 'CAPTAIN' : 'PLAYER')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
       </Container>
 
       {/* RESULT MODAL */}
       {showResultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4">
-          <Panel className="relative w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4 font-mono">
+          <Panel className="relative w-full max-w-md p-6 border-cyan/40">
             <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-2xl font-black uppercase">Submit Match Result</h3>
-            <p className="mt-1 text-xs text-dim">Enter the final score verified by both teams.</p>
-            <form onSubmit={handleResultSubmit} className="mt-4 space-y-4">
+            <h3 className="font-display text-2xl font-black uppercase text-ink">Submit Match Score</h3>
+            <p className="mt-1 text-xs text-dim">Report verified match scorecard for administrative audit.</p>
+            <form onSubmit={handleResultSubmit} className="mt-4 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-dim">{m.a} Score</label>
+                  <label className="text-dim uppercase">{teamA.name} Score</label>
                   <input
                     type="number"
                     min="0"
                     value={scoreA}
-                    onChange={(e) => setScoreA(Number(e.target.value))}
-                    className="mt-1 w-full border border-white/20 bg-void p-2 font-mono font-bold"
+                    onChange={(e) => setScoreA(parseInt(e.target.value) || 0)}
+                    className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-dim">{m.b} Score</label>
+                  <label className="text-dim uppercase">{teamB.name} Score</label>
                   <input
                     type="number"
                     min="0"
                     value={scoreB}
-                    onChange={(e) => setScoreB(Number(e.target.value))}
-                    className="mt-1 w-full border border-white/20 bg-void p-2 font-mono font-bold"
+                    onChange={(e) => setScoreB(parseInt(e.target.value) || 0)}
+                    className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-dim">Screenshot Proof URL</label>
+                <label className="text-dim uppercase">Proof Screenshot / Evidence URL</label>
                 <input
                   type="url"
-                  placeholder="https://imgur.com/... or cloud image"
+                  placeholder="https://..."
                   value={evidenceUrl}
                   onChange={(e) => setEvidenceUrl(e.target.value)}
-                  className="mt-1 w-full border border-white/20 bg-void p-2 text-xs"
+                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowResultModal(false)}
-                  className="border border-white/10 px-4 py-2 text-xs uppercase"
+                  className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingResult}
-                  className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs font-bold uppercase text-void"
+                  className="border border-cyan bg-cyan/20 px-6 py-2 uppercase font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
                 >
-                  {submittingResult ? 'Submitting...' : 'Submit Score'}
+                  {submittingResult ? 'Submitting...' : 'Submit Result'}
                 </button>
               </div>
             </form>
@@ -646,49 +857,47 @@ export default function MatchDetail() {
 
       {/* DISPUTE MODAL */}
       {showDisputeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4">
-          <Panel className="relative w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4 font-mono">
+          <Panel className="relative w-full max-w-md p-6 border-live/40">
             <Brackets color="border-live/50" />
             <h3 className="font-display text-2xl font-black uppercase text-live">File Match Dispute</h3>
-            <p className="mt-1 text-xs text-dim">
-              Explain the violation or scoring error. An arbiter will review the match logs.
-            </p>
-            <form onSubmit={handleDisputeSubmit} className="mt-4 space-y-4">
+            <p className="mt-1 text-xs text-dim">Freeze match outcome for official arbiter investigation.</p>
+            <form onSubmit={handleDisputeSubmit} className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="text-xs text-dim">Reason / Description</label>
+                <label className="text-dim uppercase">Dispute Description / Grounds</label>
                 <textarea
+                  rows={4}
                   required
-                  rows={3}
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Describe what occurred (e.g., unauthorized player, cheating, disconnect)..."
-                  className="mt-1 w-full border border-white/20 bg-void p-2 text-xs"
+                  placeholder="Detail rule infractions, no-shows, or server anomalies..."
+                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
                 />
               </div>
               <div>
-                <label className="text-xs text-dim">Evidence URL (Optional)</label>
+                <label className="text-dim uppercase">Evidence Link (optional)</label>
                 <input
                   type="url"
                   value={disputeEvidence}
                   onChange={(e) => setDisputeEvidence(e.target.value)}
                   placeholder="https://..."
-                  className="mt-1 w-full border border-white/20 bg-void p-2 text-xs"
+                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowDisputeModal(false)}
-                  className="border border-white/10 px-4 py-2 text-xs uppercase"
+                  className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingDispute}
-                  className="border border-live bg-live px-4 py-2 font-mono text-xs font-bold uppercase text-white"
+                  className="border border-live bg-live/20 px-6 py-2 uppercase font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
                 >
-                  {submittingDispute ? 'Submitting...' : 'Confirm Dispute'}
+                  {submittingDispute ? 'Filing...' : 'Submit Dispute'}
                 </button>
               </div>
             </form>
