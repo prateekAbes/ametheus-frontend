@@ -18,6 +18,7 @@ import MyRegistrations from './pages/MyRegistrations'
 import MyMatches from './pages/MyMatches'
 import Notifications from './pages/Notifications'
 import Support from './pages/Support'
+import Reviews from './pages/Reviews'
 import About from './pages/About'
 import Settings from './pages/Settings'
 import Rules from './pages/Rules'
@@ -122,6 +123,7 @@ export const router = createBrowserRouter([
       },
       { path: 'support', Component: Support },
       { path: 'help', Component: Support },
+      { path: 'reviews', Component: Reviews },
       { path: 'rules', Component: Rules },
       {
         path: 'admin',

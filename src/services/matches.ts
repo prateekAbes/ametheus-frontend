@@ -365,6 +365,12 @@ export async function closeTournamentRegistration(tournamentId: string): Promise
   })
 }
 
+export async function reopenTournamentRegistration(tournamentId: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/reopen-registration`, {
+    method: 'POST',
+  })
+}
+
 export async function updateTournamentStream(
   tournamentId: string,
   streamUrl: string

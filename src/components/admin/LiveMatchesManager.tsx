@@ -11,6 +11,7 @@ import {
   updateMatchStatus,
   getTournamentRegisteredRosters,
   closeTournamentRegistration,
+  reopenTournamentRegistration,
   updateTournamentStream,
   getTournamentRoundsRosters,
   publishRosterAdmin,
@@ -38,6 +39,15 @@ const DEFAULT_STAGES = [
   'Third Place Match',
 ]
 
+export const COMPETITION_FORMATS = [
+  'Single Elimination',
+  'Knockout',
+  'Double Elimination',
+  'Round Robin',
+  'Battle Royale',
+  'Drop-in',
+] as const
+
 export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
   const [matches, setMatches] = useState<ApiMatch[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,7 +62,14 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
   const [tournStreamUrl, setTournStreamUrl] = useState('')
   const [savingStream, setSavingStream] = useState(false)
   const [closingReg, setClosingReg] = useState(false)
+  const [reopeningReg, setReopeningReg] = useState(false)
   const [showRostersDrawer, setShowRostersDrawer] = useState(false)
+  const [squadSearch, setSquadSearch] = useState('')
+
+  // Multi-Round & Mixed Formats state
+  const [customRounds, setCustomRounds] = useState<string[]>([])
+  const [newRoundName, setNewRoundName] = useState('')
+  const [roundFormatMap, setRoundFormatMap] = useState<Record<string, string>>({})
 
   // Round Builder Data
   const [roundsRostersData, setRoundsRostersData] = useState<TournamentRoundsRostersResponse | null>(null)
@@ -216,13 +233,16 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
       if (rName) roundsSet.add(rName)
     })
 
+    // Add any admin created custom rounds
+    customRounds.forEach((cr) => roundsSet.add(cr))
+
     // If empty and a tournament is selected, provide sensible defaults
     if (roundsSet.size === 0 && selectedTournId !== 'ALL') {
       DEFAULT_STAGES.slice(0, 4).forEach((s) => roundsSet.add(s))
     }
 
     return Array.from(roundsSet)
-  }, [roundsRostersData, matches, selectedTournId, currentTournament])
+  }, [roundsRostersData, matches, selectedTournId, currentTournament, customRounds])
 
   // Handle Save Tournament Stream
   const handleSaveTournStream = async () => {
@@ -251,11 +271,56 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         currentTournament.registration_status = 'CLOSED'
       }
       fetchRoundsData(selectedTournId)
+      onMatchesUpdated?.()
     } catch (err: any) {
       showBanner(err?.message || 'Failed to close registration', 'err')
     } finally {
       setClosingReg(false)
     }
+  }
+
+  // Handle Reopen Tournament Registration
+  const handleReopenRegistration = async () => {
+    if (!selectedTournId || selectedTournId === 'ALL') return
+    if (!confirm('Reopen registrations for this tournament? New teams will be able to register.')) return
+    setReopeningReg(true)
+    try {
+      await reopenTournamentRegistration(selectedTournId)
+      showBanner('Tournament registrations reopened! Contenders may now register again.')
+      if (currentTournament) {
+        currentTournament.status = 'REGISTRATION_OPEN'
+        currentTournament.registration_status = 'OPEN'
+      }
+      fetchRoundsData(selectedTournId)
+      onMatchesUpdated?.()
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to reopen registration', 'err')
+    } finally {
+      setReopeningReg(false)
+    }
+  }
+
+  // Handle Add New Custom Round
+  const handleAddNewRound = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const trimmed = newRoundName.trim()
+    if (!trimmed) return
+    if (availableRoundTabs.includes(trimmed)) {
+      setSelectedRoundTab(trimmed)
+      setNewRoundName('')
+      return
+    }
+    setCustomRounds((prev) => [...prev, trimmed])
+    setSelectedRoundTab(trimmed)
+    setNewRoundName('')
+    showBanner(`Round "${trimmed}" added to workspace!`)
+  }
+
+  // Handle Set Format for Current Round
+  const handleSetRoundFormat = (fmt: string) => {
+    if (selectedRoundTab === 'ALL') return
+    setRoundFormatMap((prev) => ({ ...prev, [selectedRoundTab]: fmt }))
+    showBanner(`Format for "${selectedRoundTab}" set to ${fmt}`)
   }
 
   // Handle Quick Status
@@ -530,6 +595,16 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     currentTournament?.status === 'IN_PROGRESS' ||
     currentTournament?.status === 'COMPLETED'
 
+  const closedTournaments = useMemo(() => {
+    return tournaments.filter(
+      (t) =>
+        t.registration_status === 'CLOSED' ||
+        t.status === 'REGISTRATION_CLOSED' ||
+        t.status === 'IN_PROGRESS' ||
+        t.status === 'COMPLETED'
+    )
+  }, [tournaments])
+
   return (
     <div className="space-y-6 font-mono text-xs">
       {/* Header Bar */}
@@ -550,12 +625,23 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => {
+              if (closedTournaments.length === 0) {
+                showBanner(
+                  'Cannot create matches: Tournament registration must be CLOSED before match rosters can be formed. Please close registration on a tournament first.',
+                  'err'
+                )
+                return
+              }
               const defaultRound =
                 selectedRoundTab !== 'ALL'
                   ? selectedRoundTab
                   : availableRoundTabs[0] || 'Round 1'
+              const initialTournId =
+                selectedTournId !== 'ALL' && closedTournaments.some((t) => (t.id || t.slug) === selectedTournId)
+                  ? selectedTournId
+                  : closedTournaments[0]?.id || closedTournaments[0]?.slug || ''
               setAddMatchData({
-                tournament_id: selectedTournId !== 'ALL' ? selectedTournId : tournaments[0]?.id || '',
+                tournament_id: initialTournId,
                 stage: defaultRound,
                 round_name: defaultRound,
                 round_number: 1,
@@ -662,9 +748,18 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   {closingReg ? 'Closing...' : '🔒 Close Reg & Finalize Rosters'}
                 </button>
               ) : (
-                <span className="border border-dim bg-dim/10 px-2.5 py-1 text-[10px] text-dim font-bold uppercase">
-                  ✓ Registrations Closed
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="border border-dim bg-dim/10 px-2.5 py-1 text-[10px] text-dim font-bold uppercase">
+                    ✓ Registrations Closed
+                  </span>
+                  <button
+                    onClick={handleReopenRegistration}
+                    disabled={reopeningReg}
+                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                  >
+                    {reopeningReg ? 'Reopening...' : '🔓 Reopen Registration'}
+                  </button>
+                </div>
               )}
               <button
                 onClick={() => setShowRostersDrawer(!showRostersDrawer)}
@@ -675,6 +770,28 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
             </div>
           )}
         </div>
+
+        {/* Warning if selected tournament registration is OPEN */}
+        {selectedTournId !== 'ALL' && currentTournament && !isRegistrationClosed && (
+          <div className="p-3 border border-warn/40 bg-warn/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-warn">
+              <span className="text-base">⚠️</span>
+              <div>
+                <strong>Registration is OPEN for {currentTournament.title}.</strong>
+                <p className="text-[11px] text-dim">
+                  Match rosters can only be formed once registration is closed and contenders are locked.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleCloseRegistration}
+              disabled={closingReg}
+              className="border border-warn bg-warn px-3 py-1.5 text-xs font-bold text-void uppercase tracking-wider hover:bg-warn/90 transition-colors shrink-0 cursor-pointer"
+            >
+              {closingReg ? 'Closing...' : '🔒 Close Registration & Lock Rosters'}
+            </button>
+          </div>
+        )}
 
         {/* Tournament Broadcast Stream Bar */}
         {selectedTournId !== 'ALL' && currentTournament && (
@@ -764,67 +881,188 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         )}
       </Panel>
 
-      {/* ROUND SELECTION TABS & ROSTER BATCH PUBLISH BAR */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-graphite p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-dim uppercase font-bold mr-1">Rounds:</span>
-            <button
-              onClick={() => setSelectedRoundTab('ALL')}
-              className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                selectedRoundTab === 'ALL'
-                  ? 'border border-cyan bg-cyan text-void font-bold'
-                  : 'border border-white/10 bg-surface text-dim hover:text-ink'
-              }`}
-            >
-              All Rounds ({filteredMatches.length})
-            </button>
-            {availableRoundTabs.map((r) => {
-              const rMatches = matches.filter((m) => {
-                const tourMatch =
-                  selectedTournId === 'ALL' ||
-                  m.tournament_id === selectedTournId ||
-                  (currentTournament?.slug && m.tournament_id === currentTournament.slug)
-                const isRound =
-                  m.round_name === r ||
-                  m.stage === r ||
-                  (m.round_number && `Round ${m.round_number}` === r)
-                return tourMatch && isRound
-              })
-              const rDrafts = rMatches.filter(
-                (m) => (m.roster_status || '').toUpperCase() === 'DRAFT'
-              ).length
+      {/* MULTI-ROUND WORKSPACE */}
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+        {/* LEFT COLUMN: COMPACT SQUADS / CONTENDERS RAIL (<300px) */}
+        <div className="w-full lg:w-72 max-w-full lg:max-w-[280px] shrink-0 space-y-3">
+          <Panel className="p-3 border-white/15 bg-surface/50 space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <Hud className="text-cyan">Squad Contenders</Hud>
+              <span className="border border-white/20 bg-void px-1.5 py-0.5 text-[10px] text-ink font-bold">
+                {tournRosters.length} Teams
+              </span>
+            </div>
 
-              return (
+            <div className="flex items-center justify-between text-[10px] text-dim px-0.5">
+              <span>Paired: <strong className="text-ok">{tournRosters.filter(t => t.is_paired).length}</strong></span>
+              <span>Unpaired: <strong className="text-warn">{tournRosters.filter(t => !t.is_paired).length}</strong></span>
+            </div>
+
+            {/* Squad Search Input */}
+            <input
+              type="text"
+              placeholder="Filter squads..."
+              value={squadSearch}
+              onChange={(e) => setSquadSearch(e.target.value)}
+              className="w-full border border-white/15 bg-void px-2 py-1 text-[11px] text-ink placeholder:text-dim/50 outline-none focus:border-cyan"
+            />
+
+            {/* Roster List */}
+            {tournRosters.length === 0 ? (
+              <div className="p-4 border border-dashed border-white/10 text-center text-dim text-[11px]">
+                {selectedTournId === 'ALL'
+                  ? 'Select a tournament above to view contenders.'
+                  : 'No teams registered yet.'}
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                {tournRosters
+                  .filter(
+                    (t) =>
+                      !squadSearch.trim() ||
+                      t.team_name.toLowerCase().includes(squadSearch.toLowerCase()) ||
+                      t.team_tag.toLowerCase().includes(squadSearch.toLowerCase()) ||
+                      (t.captain?.username || '').toLowerCase().includes(squadSearch.toLowerCase())
+                  )
+                  .map((team, idx) => (
+                    <div
+                      key={team.team_id}
+                      className="border border-white/10 bg-void/80 p-2 space-y-1 hover:border-cyan/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-display font-black uppercase text-ink truncate text-[11px]" title={team.team_name}>
+                          <span className="text-cyan mr-1 font-mono">#{idx + 1}</span>
+                          {team.team_name} [{team.team_tag}]
+                        </span>
+                        <span
+                          className={`text-[8px] px-1 py-0.2 border uppercase shrink-0 font-bold ${
+                            team.is_paired
+                              ? 'border-ok/40 text-ok bg-ok/10'
+                              : 'border-warn/40 text-warn bg-warn/10'
+                          }`}
+                        >
+                          {team.is_paired ? 'Paired' : 'Unpaired'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-dim flex items-center justify-between">
+                        <span className="truncate max-w-[150px]">
+                          Capt: @{team.captain?.username || team.captain_username || 'TBD'}
+                        </span>
+                        {team.members && team.members.length > 0 && (
+                          <span className="text-dim/70 shrink-0 font-mono">({team.members.length}p)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        {/* RIGHT / MAIN COLUMN: MULTI-ROUND SYSTEM & MATCH FORMATIONS */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* ROUND SELECTION TABS & ROSTER BATCH PUBLISH BAR */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-graphite p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-dim uppercase font-bold mr-1">Rounds:</span>
                 <button
-                  key={r}
-                  onClick={() => setSelectedRoundTab(r)}
-                  className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
-                    selectedRoundTab === r
+                  onClick={() => setSelectedRoundTab('ALL')}
+                  className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                    selectedRoundTab === 'ALL'
                       ? 'border border-cyan bg-cyan text-void font-bold'
                       : 'border border-white/10 bg-surface text-dim hover:text-ink'
                   }`}
                 >
-                  <span>{r}</span>
-                  <span className="text-[10px] opacity-75">({rMatches.length})</span>
-                  {rDrafts > 0 && (
-                    <span className="size-2 rounded-full bg-warn inline-block" title={`${rDrafts} draft rosters`} />
-                  )}
+                  All Rounds ({filteredMatches.length})
                 </button>
-              )
-            })}
-          </div>
+                {availableRoundTabs.map((r) => {
+                  const rMatches = matches.filter((m) => {
+                    const tourMatch =
+                      selectedTournId === 'ALL' ||
+                      m.tournament_id === selectedTournId ||
+                      (currentTournament?.slug && m.tournament_id === currentTournament.slug)
+                    const isRound =
+                      m.round_name === r ||
+                      m.stage === r ||
+                      (m.round_number && `Round ${m.round_number}` === r)
+                    return tourMatch && isRound
+                  })
+                  const rDrafts = rMatches.filter(
+                    (m) => (m.roster_status || '').toUpperCase() === 'DRAFT'
+                  ).length
 
-          {/* Batch Publish Button if there are draft rosters in scope */}
-          {draftMatchesInScope.length > 0 && selectedTournId !== 'ALL' && (
-            <button
-              onClick={() => setIsBatchPublishOpen(true)}
-              className="border border-warn bg-warn/15 px-3 py-1 font-mono text-xs font-bold uppercase text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <span>📢 Publish All Drafts in {selectedRoundTab === 'ALL' ? 'Tournament' : selectedRoundTab} ({draftMatchesInScope.length})</span>
-            </button>
-          )}
-        </div>
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => setSelectedRoundTab(r)}
+                      className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        selectedRoundTab === r
+                          ? 'border border-cyan bg-cyan text-void font-bold'
+                          : 'border border-white/10 bg-surface text-dim hover:text-ink'
+                      }`}
+                    >
+                      <span>{r}</span>
+                      <span className="text-[10px] opacity-75">({rMatches.length})</span>
+                      {rDrafts > 0 && (
+                        <span className="size-2 rounded-full bg-warn inline-block" title={`${rDrafts} draft rosters`} />
+                      )}
+                    </button>
+                  )
+                })}
+
+                {/* Inline Add Round Form */}
+                <form onSubmit={handleAddNewRound} className="flex items-center gap-1 ml-1">
+                  <input
+                    type="text"
+                    placeholder="+ Add round..."
+                    value={newRoundName}
+                    onChange={(e) => setNewRoundName(e.target.value)}
+                    className="border border-white/20 bg-void px-2 py-0.5 text-[11px] text-ink outline-none focus:border-cyan w-28"
+                  />
+                  <button
+                    type="submit"
+                    className="border border-cyan/50 bg-cyan/15 px-2 py-0.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </form>
+              </div>
+
+              {/* Batch Publish Button if there are draft rosters in scope */}
+              {draftMatchesInScope.length > 0 && selectedTournId !== 'ALL' && (
+                <button
+                  onClick={() => setIsBatchPublishOpen(true)}
+                  className="border border-warn bg-warn/15 px-3 py-1 font-mono text-xs font-bold uppercase text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>📢 Publish All Drafts in {selectedRoundTab === 'ALL' ? 'Tournament' : selectedRoundTab} ({draftMatchesInScope.length})</span>
+                </button>
+              )}
+            </div>
+
+            {/* Round Competition Format Selector Bar */}
+            {selectedRoundTab !== 'ALL' && (
+              <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 border border-white/10 bg-void/70 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-dim uppercase font-bold text-[11px]">Round Competition Format:</span>
+                  <select
+                    value={roundFormatMap[selectedRoundTab] || currentTournament?.format || 'Knockout'}
+                    onChange={(e) => handleSetRoundFormat(e.target.value)}
+                    className="border border-white/20 bg-surface px-2.5 py-1 text-xs text-ink outline-none focus:border-cyan"
+                  >
+                    {COMPETITION_FORMATS.map((fmt) => (
+                      <option key={fmt} value={fmt}>
+                        {fmt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="text-dim text-[11px]">
+                  Configuring pairings &amp; advancement for: <strong className="text-cyan">{selectedRoundTab}</strong>
+                </div>
+              </div>
+            )}
+          </div>
 
         {/* Secondary Filter: Match Lifecycle Status */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-2">
@@ -846,10 +1084,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
           </div>
           <Hud className="text-cyan">{filteredMatches.length} Match Formations Listed</Hud>
         </div>
-      </div>
 
-      {/* MATCH FORMATIONS LIST: WHO IS PLAYING WHOM */}
-      <div className="space-y-4">
+        {/* MATCH FORMATIONS LIST: WHO IS PLAYING WHOM */}
+        <div className="space-y-4">
         {filteredMatches.map((m) => {
           const isLive = (m.status || '').toUpperCase() === 'LIVE'
           const isCheckIn = (m.status || '').toUpperCase() === 'CHECK_IN_OPEN'
@@ -1150,6 +1387,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
             No matches found for the selected round and criteria. Use &quot;+ Form Match Roster&quot; above to configure round formations.
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* MODAL 1: ADD / FORM MATCH ROSTER */}
@@ -1170,22 +1409,32 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
 
             <form onSubmit={handleAddMatchSubmit} className="mt-5 space-y-4 font-mono text-xs">
               {/* Target Tournament */}
+              {/* Target Tournament (Closed Only) */}
               <div>
-                <label className="block text-dim uppercase mb-1">Target Tournament</label>
-                <select
-                  value={addMatchData.tournament_id}
-                  onChange={(e) =>
-                    setAddMatchData({ ...addMatchData, tournament_id: e.target.value })
-                  }
-                  required
-                  className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
-                >
-                  {tournaments.map((t) => (
-                    <option key={t.id || t.slug} value={t.id || t.slug}>
-                      {t.title}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-dim uppercase">Target Tournament (Closed Only)</label>
+                  <span className="text-[10px] text-ok font-bold uppercase">✓ Registration Closed</span>
+                </div>
+                {closedTournaments.length === 0 ? (
+                  <div className="p-3 border border-warn/40 bg-warn/10 text-warn text-xs space-y-2">
+                    <p>⚠️ No tournaments currently have closed registrations. Tournament registration must be closed before match rosters can be formed.</p>
+                  </div>
+                ) : (
+                  <select
+                    value={addMatchData.tournament_id}
+                    onChange={(e) =>
+                      setAddMatchData({ ...addMatchData, tournament_id: e.target.value })
+                    }
+                    required
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
+                  >
+                    {closedTournaments.map((t) => (
+                      <option key={t.id || t.slug} value={t.id || t.slug}>
+                        {t.title} ({t.status || 'CLOSED'})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Roster Publication Initial State */}

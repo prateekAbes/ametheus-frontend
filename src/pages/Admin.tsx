@@ -60,6 +60,20 @@ import {
   Tournament,
 } from '../services/tournaments'
 import {
+  getGenres,
+  createGenre,
+  updateGenre,
+  deleteGenre,
+  Genre,
+  GenreCreatePayload,
+} from '../services/genres'
+import {
+  getAdminReviews,
+  moderateReview,
+  deleteReview,
+  ReviewItem,
+} from '../services/reviews'
+import {
   createTournamentOrganizer,
   updateTournamentOrganizer,
   deleteTournamentOrganizer,
@@ -260,7 +274,9 @@ const TABS = [
   'LIVE MATCHES',
   'FEATURED TOURNAMENT',
   'GAMES CATALOG',
+  'GENRES & CATEGORIES',
   'PAGE MEDIA',
+  'REVIEWS MODERATION',
   'USERS & ROLES',
   'PENDING PAYMENTS',
   'UPI & QR ACCOUNTS',
@@ -344,6 +360,7 @@ export default function Admin() {
     max_team_size: 5,
     start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
     banner_url: '',
+    whatsapp_group_url: '',
     description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
   })
   const [editingTour, setEditingTour] = useState<Tournament | null>(null)
@@ -378,9 +395,32 @@ export default function Admin() {
   const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false)
 
+  // GENRES & CATEGORIES Interactive States
+  const [genres, setGenres] = useState<Genre[]>([])
+  const [isCreateGenreOpen, setIsCreateGenreOpen] = useState(false)
+  const [newGenre, setNewGenre] = useState<GenreCreatePayload>({
+    name: '',
+    slug: '',
+    description: '',
+    banner_url: '',
+    icon_url: '',
+    rotation_interval_seconds: 4,
+    display_order: 0,
+    is_active: true,
+  })
+  const [editingGenre, setEditingGenre] = useState<Genre | null>(null)
+
   // PAGE MEDIA Interactive States
   const [editingMedia, setEditingMedia] = useState<PageMediaConfig | null>(null)
   const [isUploadingMediaFile, setIsUploadingMediaFile] = useState(false)
+
+  // REVIEWS MODERATION Interactive States
+  const [adminReviews, setAdminReviews] = useState<ReviewItem[]>([])
+  const [reviewStatusFilter, setReviewStatusFilter] = useState('ALL')
+  const [reviewSearch, setReviewSearch] = useState('')
+  const [selectedReviewForMod, setSelectedReviewForMod] = useState<ReviewItem | null>(null)
+  const [modStatus, setModStatus] = useState<'APPROVED' | 'FEATURED' | 'PENDING' | 'HIDDEN'>('APPROVED')
+  const [modNotes, setModNotes] = useState('')
 
   // LIVE MATCHES Interactive States
   const [adminMatches, setAdminMatches] = useState<ApiMatch[]>([])
@@ -465,7 +505,7 @@ export default function Admin() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll] = await Promise.all([
+      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll, genreList, revList] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
         getPendingPayments().catch(() => []),
@@ -481,6 +521,8 @@ export default function Admin() {
         getAllPageMedia().catch(() => []),
         getDisputes().catch(() => []),
         getMatches().catch(() => []),
+        getGenres(true).catch(() => []),
+        getAdminReviews().catch(() => []),
       ])
 
       if (s) setStats(s)
@@ -498,6 +540,8 @@ export default function Admin() {
       setMediaConfigs(mList)
       setDisputes(dispList)
       if (Array.isArray(mAll)) setAdminMatches(mAll)
+      setGenres(genreList)
+      setAdminReviews(revList)
 
       if (fTour) {
         setSelectedFeaturedId(fTour.id || fTour.slug)
@@ -763,6 +807,7 @@ export default function Admin() {
         max_teams: Number(editingTour.max_teams),
         start_date: editingTour.start_date,
         banner_url: editingTour.banner_url,
+        whatsapp_group_url: editingTour.whatsapp_group_url,
         description: editingTour.description,
       })
       showToast('Tournament updated successfully!')
@@ -840,6 +885,105 @@ export default function Admin() {
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to publish game')
+    }
+  }
+
+  // Genres Action Handlers
+  const handleCreateGenreSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await createGenre({
+        ...newGenre,
+        rotation_interval_seconds: Number(newGenre.rotation_interval_seconds || 4),
+        display_order: Number(newGenre.display_order || 0),
+      })
+      showToast(`Genre category "${newGenre.name}" created!`)
+      setIsCreateGenreOpen(false)
+      setNewGenre({
+        name: '',
+        slug: '',
+        description: '',
+        banner_url: '',
+        icon_url: '',
+        rotation_interval_seconds: 4,
+        display_order: 0,
+        is_active: true,
+      })
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to create genre')
+    }
+  }
+
+  const handleUpdateGenreSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingGenre) return
+    try {
+      await updateGenre(editingGenre.id || (editingGenre as any)._id, {
+        name: editingGenre.name,
+        slug: editingGenre.slug,
+        description: editingGenre.description,
+        banner_url: editingGenre.banner_url,
+        icon_url: editingGenre.icon_url,
+        rotation_interval_seconds: Number(editingGenre.rotation_interval_seconds || 4),
+        display_order: Number(editingGenre.display_order || 0),
+        is_active: editingGenre.is_active,
+      })
+      showToast(`Genre category "${editingGenre.name}" updated!`)
+      setEditingGenre(null)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update genre')
+    }
+  }
+
+  const handleDeleteGenreAction = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the genre "${name}"?`)) return
+    try {
+      await deleteGenre(id)
+      showToast(`Genre "${name}" removed.`)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete genre')
+    }
+  }
+
+  const handleToggleGenreActive = async (g: Genre) => {
+    try {
+      await updateGenre(g.id || (g as any)._id, {
+        is_active: !g.is_active,
+      })
+      showToast(`Genre "${g.name}" ${!g.is_active ? 'activated' : 'deactivated'}.`)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to toggle genre status')
+    }
+  }
+
+  // Reviews Action Handlers
+  const handleModerateReviewAction = async (
+    id: string,
+    status: 'APPROVED' | 'FEATURED' | 'PENDING' | 'HIDDEN',
+    notes?: string
+  ) => {
+    try {
+      await moderateReview(id, { status, admin_notes: notes })
+      showToast(`Review updated to ${status}!`)
+      setSelectedReviewForMod(null)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update review status')
+    }
+  }
+
+  const handleDeleteReviewAction = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this contender review?')) return
+    try {
+      await deleteReview(id)
+      showToast('Review permanently deleted.')
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete review')
     }
   }
 
@@ -1293,6 +1437,183 @@ export default function Admin() {
           </div>
         )}
 
+        {/* TAB: GENRES & CATEGORIES */}
+        {tab === 'GENRES & CATEGORIES' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Dynamic Genres & Categories Hub</h2>
+                <p className="text-xs text-dim">
+                  Centralized genres aggregate multiple game titles. Public genre cards cycle member game logos automatically.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Hud className="text-cyan">{genres.length} REGISTERED GENRES</Hud>
+                <button
+                  onClick={() => setIsCreateGenreOpen(true)}
+                  className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 transition-all shrink-0"
+                >
+                  + Add Genre Category
+                </button>
+              </div>
+            </div>
+
+            {/* Image Presets & Guidelines Panel */}
+            <Panel className="p-5 border-cyan/30 bg-cyan/[0.03]">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="size-2 bg-cyan rounded-full animate-pulse" />
+                <span className="font-mono text-xs uppercase font-bold text-cyan tracking-wider">
+                  Standardized Media Presets & Aspect Ratios
+                </span>
+              </div>
+              <p className="text-xs text-dim mb-4">
+                Genre artwork and rotating title assets dynamically adapt across responsive viewports. Use the official presets below for pristine sharpness and zero distortion:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 font-mono text-xs">
+                <div className="border border-white/10 bg-surface/70 p-3">
+                  <div className="text-cyan font-bold text-sm">16:9 DESKTOP</div>
+                  <div className="text-ink font-semibold mt-0.5">1920 × 1080 px</div>
+                  <div className="text-dim text-[10px] mt-1">Hero banners & widescreen cards</div>
+                </div>
+                <div className="border border-white/10 bg-surface/70 p-3">
+                  <div className="text-cyan font-bold text-sm">4:3 TABLET</div>
+                  <div className="text-ink font-semibold mt-0.5">1200 × 900 px</div>
+                  <div className="text-dim text-[10px] mt-1">Medium grid tiles & catalog cards</div>
+                </div>
+                <div className="border border-white/10 bg-surface/70 p-3">
+                  <div className="text-cyan font-bold text-sm">9:16 MOBILE</div>
+                  <div className="text-ink font-semibold mt-0.5">1080 × 1920 px</div>
+                  <div className="text-dim text-[10px] mt-1">Vertical feed cards & mobile stories</div>
+                </div>
+                <div className="border border-white/10 bg-surface/70 p-3">
+                  <div className="text-cyan font-bold text-sm">1:1 SQUARE</div>
+                  <div className="text-ink font-semibold mt-0.5">800 × 800 px</div>
+                  <div className="text-dim text-[10px] mt-1">Genre badge icons & avatar marks</div>
+                </div>
+                <div className="border border-white/10 bg-surface/70 p-3">
+                  <div className="text-cyan font-bold text-sm">VECTOR SVG</div>
+                  <div className="text-ink font-semibold mt-0.5">Scale-Free</div>
+                  <div className="text-dim text-[10px] mt-1">Infinitely sharp vector emblems</div>
+                </div>
+              </div>
+            </Panel>
+
+            {/* Genres Grid */}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {genres.map((g) => {
+                const genreId = g.id || (g as any)._id
+                const connectedGames = g.games || []
+                return (
+                  <Panel key={genreId || g.slug} className="p-5 flex flex-col justify-between space-y-4">
+                    <div>
+                      {/* Banner / Media Preview */}
+                      <div className="relative aspect-video w-full overflow-hidden border border-white/10 bg-surface mb-3">
+                        {g.banner_url ? (
+                          <img
+                            src={resolveMediaUrl(g.banner_url)}
+                            alt={g.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid size-full place-items-center font-mono text-xs text-dim">
+                            NO BANNER ARTWORK
+                          </div>
+                        )}
+                        {g.icon_url && (
+                          <div className="absolute bottom-2 left-2 size-10 overflow-hidden border border-white/20 bg-void/85 p-1 backdrop-blur-sm">
+                            <img
+                              src={resolveMediaUrl(g.icon_url)}
+                              alt={`${g.name} icon`}
+                              className="size-full object-contain"
+                            />
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2 border border-white/20 bg-void/85 px-2 py-0.5 font-mono text-[9px] uppercase backdrop-blur-sm text-cyan">
+                          {g.rotation_interval_seconds}s CYCLE
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="font-mono text-xs text-cyan font-bold uppercase">{g.slug}</span>
+                        <span
+                          className={`border px-2 py-0.5 font-mono text-[9px] uppercase ${
+                            g.is_active ? 'border-ok/40 bg-ok/10 text-ok' : 'border-white/20 text-dim'
+                          }`}
+                        >
+                          {g.is_active ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-2 font-display text-2xl font-black uppercase text-ink">{g.name}</h3>
+                      {g.description && (
+                        <p className="mt-1 font-mono text-xs text-dim line-clamp-2">{g.description}</p>
+                      )}
+
+                      {/* Member games connected */}
+                      <div className="mt-4 border-t border-white/5 pt-3">
+                        <div className="flex items-center justify-between font-mono text-[11px] mb-2">
+                          <span className="text-dim">Connected Games:</span>
+                          <span className="text-cyan font-bold">
+                            {g.game_count ?? connectedGames.length} Titles
+                          </span>
+                        </div>
+                        {connectedGames.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {connectedGames.map((gm) => (
+                              <span
+                                key={gm.id || gm.slug}
+                                className="inline-flex items-center gap-1 border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-ink"
+                              >
+                                {gm.logo_url && (
+                                  <img
+                                    src={resolveMediaUrl(gm.logo_url)}
+                                    alt=""
+                                    className="size-3 object-contain"
+                                  />
+                                )}
+                                {gm.title}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="font-mono text-[10px] text-dim/60 italic">
+                            No games currently assigned to this category
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-3">
+                      <button
+                        onClick={() => setEditingGenre(g)}
+                        className="border border-white/20 bg-surface px-3 py-1 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleToggleGenreActive(g)}
+                        className={`border px-2.5 py-1 font-mono text-xs uppercase ${
+                          g.is_active
+                            ? 'border-warn/40 bg-warn/10 text-warn hover:bg-warn/20'
+                            : 'border-ok/40 bg-ok/10 text-ok hover:bg-ok/20'
+                        }`}
+                      >
+                        {g.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteGenreAction(genreId, g.name)}
+                        className="border border-live/40 bg-live/10 px-3 py-1 font-mono text-xs uppercase text-live hover:bg-live/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </Panel>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* TAB: PAGE MEDIA */}
         {tab === 'PAGE MEDIA' && (
           <div className="mt-8 space-y-8">
@@ -1353,6 +1674,183 @@ export default function Admin() {
                   </Panel>
                 ))}
             </div>
+          </div>
+        )}
+
+        {/* TAB: REVIEWS MODERATION */}
+        {tab === 'REVIEWS MODERATION' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Contender Reviews Moderation</h2>
+                <p className="text-xs text-dim">
+                  Audit, verify, feature, or remove community reviews submitted by registered platform players.
+                </p>
+              </div>
+              <Hud className="text-cyan">{adminReviews.length} TOTAL REVIEWS</Hud>
+            </div>
+
+            {/* Metrics Overview */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Panel className="p-4">
+                <Hud className="text-dim">TOTAL REVIEWS</Hud>
+                <p className="mt-2 font-display text-3xl font-black">{adminReviews.length}</p>
+              </Panel>
+              <Panel className="p-4">
+                <Hud className="text-ok">AVERAGE RATING</Hud>
+                <p className="mt-2 font-display text-3xl font-black text-ok">
+                  {adminReviews.length > 0
+                    ? (adminReviews.reduce((acc, r) => acc + r.rating, 0) / adminReviews.length).toFixed(1)
+                    : '5.0'}{' '}
+                  ★
+                </p>
+              </Panel>
+              <Panel className="p-4">
+                <Hud className="text-warn">PENDING AUDIT</Hud>
+                <p className="mt-2 font-display text-3xl font-black text-warn">
+                  {adminReviews.filter((r) => r.status === 'PENDING').length}
+                </p>
+              </Panel>
+              <Panel className="p-4">
+                <Hud className="text-magenta">FEATURED SPOTLIGHTS</Hud>
+                <p className="mt-2 font-display text-3xl font-black text-magenta">
+                  {adminReviews.filter((r) => r.status === 'FEATURED').length}
+                </p>
+              </Panel>
+            </div>
+
+            {/* Filters & Search */}
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="flex flex-wrap gap-1.5">
+                {['ALL', 'PENDING', 'APPROVED', 'FEATURED', 'HIDDEN'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setReviewStatusFilter(f)}
+                    className={`px-3 py-1 font-mono text-[11px] uppercase border transition-colors ${
+                      reviewStatusFilter === f
+                        ? 'border-cyan bg-cyan/15 text-cyan'
+                        : 'border-white/10 text-dim hover:text-ink'
+                    }`}
+                  >
+                    {f} ({f === 'ALL' ? adminReviews.length : adminReviews.filter((r) => r.status === f).length})
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Search by reviewer or text..."
+                value={reviewSearch}
+                onChange={(e) => setReviewSearch(e.target.value)}
+                className="w-full sm:w-72 border border-white/15 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-mono"
+              />
+            </div>
+
+            {/* Reviews List */}
+            {adminReviews.length === 0 ? (
+              <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                NO REVIEWS FOUND IN DATABASE.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {adminReviews
+                  .filter((r) => {
+                    if (reviewStatusFilter !== 'ALL' && r.status !== reviewStatusFilter) return false
+                    if (reviewSearch) {
+                      const q = reviewSearch.toLowerCase()
+                      const matchesUser = r.user_name?.toLowerCase().includes(q)
+                      const matchesText = r.review_text?.toLowerCase().includes(q)
+                      if (!matchesUser && !matchesText) return false
+                    }
+                    return true
+                  })
+                  .map((r) => (
+                    <Panel key={r.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-2 max-w-3xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display font-black uppercase text-ink text-base">
+                            {r.user_name || 'Anonymous Contender'}
+                          </span>
+                          <span className="border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-cyan">
+                            {r.category || 'PLATFORM'}
+                          </span>
+                          <span
+                            className={`border px-2 py-0.5 font-mono text-[10px] uppercase font-bold ${
+                              r.status === 'FEATURED'
+                                ? 'border-magenta bg-magenta/20 text-magenta'
+                                : r.status === 'APPROVED'
+                                ? 'border-ok/40 bg-ok/10 text-ok'
+                                : r.status === 'PENDING'
+                                ? 'border-warn/40 bg-warn/10 text-warn'
+                                : 'border-white/20 text-dim'
+                            }`}
+                          >
+                            {r.status}
+                          </span>
+                          <div className="flex text-cyan text-xs">
+                            {'★'.repeat(r.rating)}
+                            {'☆'.repeat(5 - r.rating)}
+                          </div>
+                        </div>
+
+                        <p className="font-mono text-xs text-ink/90 italic">"{r.review_text}"</p>
+
+                        <div className="flex flex-wrap items-center gap-4 text-[11px] font-mono text-dim">
+                          <span>Submitted: {r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A'}</span>
+                          {r.admin_notes && (
+                            <span className="text-warn">
+                              Admin Notes: {r.admin_notes}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Moderation Controls */}
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        {r.status !== 'APPROVED' && (
+                          <button
+                            onClick={() => handleModerateReviewAction(r.id, 'APPROVED')}
+                            className="border border-ok/40 bg-ok/10 px-2.5 py-1 font-mono text-[11px] uppercase text-ok hover:bg-ok/20 transition-colors"
+                          >
+                            Approve
+                          </button>
+                        )}
+                        {r.status !== 'FEATURED' && (
+                          <button
+                            onClick={() => handleModerateReviewAction(r.id, 'FEATURED')}
+                            className="border border-magenta/40 bg-magenta/15 px-2.5 py-1 font-mono text-[11px] uppercase text-magenta hover:bg-magenta/25 transition-colors"
+                          >
+                            ★ Feature
+                          </button>
+                        )}
+                        {r.status !== 'HIDDEN' && (
+                          <button
+                            onClick={() => handleModerateReviewAction(r.id, 'HIDDEN')}
+                            className="border border-white/20 bg-surface px-2.5 py-1 font-mono text-[11px] uppercase text-dim hover:text-ink transition-colors"
+                          >
+                            Hide
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedReviewForMod(r)
+                            setModStatus(r.status)
+                            setModNotes(r.admin_notes || '')
+                          }}
+                          className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-[11px] uppercase text-cyan hover:bg-cyan/20 transition-colors"
+                        >
+                          Notes
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReviewAction(r.id)}
+                          className="border border-live/40 bg-live/10 px-2.5 py-1 font-mono text-[11px] uppercase text-live hover:bg-live/20 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </Panel>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -2110,6 +2608,16 @@ export default function Admin() {
                 onChange={(val) => setNewTour({ ...newTour, banner_url: val })}
               />
               <div>
+                <label className="text-dim">Official WhatsApp Group / Community Link</label>
+                <input
+                  placeholder="https://chat.whatsapp.com/... (optional)"
+                  value={newTour.whatsapp_group_url || ''}
+                  onChange={(e) => setNewTour({ ...newTour, whatsapp_group_url: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+                <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
+              </div>
+              <div>
                 <label className="text-dim">Description</label>
                 <textarea rows={3} value={newTour.description} onChange={(e) => setNewTour({ ...newTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
               </div>
@@ -2157,6 +2665,16 @@ export default function Admin() {
                 value={editingTour.banner_url || ''}
                 onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
               />
+              <div>
+                <label className="text-dim">Official WhatsApp Group / Community Link</label>
+                <input
+                  placeholder="https://chat.whatsapp.com/... (optional)"
+                  value={editingTour.whatsapp_group_url || ''}
+                  onChange={(e) => setEditingTour({ ...editingTour, whatsapp_group_url: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+                <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
+              </div>
               <div>
                 <label className="text-dim">Description</label>
                 <textarea rows={3} value={editingTour.description || ''} onChange={(e) => setEditingTour({ ...editingTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -2481,6 +2999,284 @@ export default function Admin() {
                 <button type="submit" className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold">Save Media Config</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE GENRE MODAL */}
+      {isCreateGenreOpen && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-xl border border-white/20 bg-graphite p-6 my-8">
+            <h3 className="font-display text-2xl font-black uppercase text-cyan">Create Dynamic Genre</h3>
+            <p className="text-xs text-dim mt-1">Configure parent genre category that will aggregate multiple game titles.</p>
+            <form onSubmit={handleCreateGenreSubmit} className="mt-4 space-y-3 font-mono text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-dim">Genre Name</label>
+                  <input
+                    required
+                    placeholder="e.g. Battle Royale"
+                    value={newGenre.name}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                      setNewGenre({ ...newGenre, name, slug: newGenre.slug ? newGenre.slug : slug })
+                    }}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="text-dim">Unique Slug</label>
+                  <input
+                    required
+                    placeholder="e.g. battle-royale"
+                    value={newGenre.slug || ''}
+                    onChange={(e) => setNewGenre({ ...newGenre, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-dim">Rotation Interval (Seconds)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={newGenre.rotation_interval_seconds ?? 4}
+                    onChange={(e) => setNewGenre({ ...newGenre, rotation_interval_seconds: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                  <p className="text-[10px] text-dim mt-0.5">Speed for cycling logos on public card</p>
+                </div>
+                <div>
+                  <label className="text-dim">Display Order</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newGenre.display_order ?? 0}
+                    onChange={(e) => setNewGenre({ ...newGenre, display_order: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                  <p className="text-[10px] text-dim mt-0.5">Priority in public grid (lower = first)</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-dim">Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="Tactical high-stakes survivals, battle zones and drop ins..."
+                  value={newGenre.description || ''}
+                  onChange={(e) => setNewGenre({ ...newGenre, description: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+              </div>
+
+              <BannerImageUploader
+                label="Genre Banner Art (16:9 Desktop 1920x1080 / 4:3 Tablet 1200x900)"
+                recommendedRatio="16:9"
+                recommendedRes="1920x1080"
+                value={newGenre.banner_url || ''}
+                onChange={(val) => setNewGenre({ ...newGenre, banner_url: val })}
+              />
+
+              <BannerImageUploader
+                label="Genre Badge / Icon (1:1 Square 800x800 or SVG)"
+                recommendedRatio="1:1"
+                recommendedRes="800x800"
+                value={newGenre.icon_url || ''}
+                onChange={(val) => setNewGenre({ ...newGenre, icon_url: val })}
+              />
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateGenreOpen(false)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold"
+                >
+                  Create Genre
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT GENRE MODAL */}
+      {editingGenre && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-xl border border-white/20 bg-graphite p-6 my-8">
+            <h3 className="font-display text-2xl font-black uppercase text-cyan">Edit Genre: {editingGenre.name}</h3>
+            <p className="text-xs text-dim mt-1">Update parameters, artwork presets, or public visibility.</p>
+            <form onSubmit={handleUpdateGenreSubmit} className="mt-4 space-y-3 font-mono text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-dim">Genre Name</label>
+                  <input
+                    required
+                    value={editingGenre.name}
+                    onChange={(e) => setEditingGenre({ ...editingGenre, name: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="text-dim">Unique Slug</label>
+                  <input
+                    required
+                    value={editingGenre.slug}
+                    onChange={(e) => setEditingGenre({ ...editingGenre, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-dim">Rotation Interval (Seconds)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={editingGenre.rotation_interval_seconds ?? 4}
+                    onChange={(e) => setEditingGenre({ ...editingGenre, rotation_interval_seconds: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="text-dim">Display Order</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingGenre.display_order ?? 0}
+                    onChange={(e) => setEditingGenre({ ...editingGenre, display_order: Number(e.target.value) })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-dim">Visibility Status</label>
+                <select
+                  value={editingGenre.is_active ? 'true' : 'false'}
+                  onChange={(e) => setEditingGenre({ ...editingGenre, is_active: e.target.value === 'true' })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                >
+                  <option value="true">Active & Visible in Catalog</option>
+                  <option value="false">Inactive / Hidden</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-dim">Description</label>
+                <textarea
+                  rows={2}
+                  value={editingGenre.description || ''}
+                  onChange={(e) => setEditingGenre({ ...editingGenre, description: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+              </div>
+
+              <BannerImageUploader
+                label="Genre Banner Art (16:9 Desktop / 4:3 Tablet)"
+                recommendedRatio="16:9"
+                recommendedRes="1920x1080"
+                value={editingGenre.banner_url || ''}
+                onChange={(val) => setEditingGenre((prev) => prev ? { ...prev, banner_url: val } : null)}
+              />
+
+              <BannerImageUploader
+                label="Genre Badge / Icon (1:1 Square 800x800 or SVG)"
+                recommendedRatio="1:1"
+                recommendedRes="800x800"
+                value={editingGenre.icon_url || ''}
+                onChange={(val) => setEditingGenre((prev) => prev ? { ...prev, icon_url: val } : null)}
+              />
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingGenre(null)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODERATE REVIEW MODAL */}
+      {selectedReviewForMod && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8">
+            <h3 className="font-display text-2xl font-black uppercase text-cyan">
+              Moderate Review: {selectedReviewForMod.user_name || 'Contender'}
+            </h3>
+            <p className="font-mono text-xs text-dim mt-1">
+              Rating: {'★'.repeat(selectedReviewForMod.rating)} ({selectedReviewForMod.rating}/5) · Category: {selectedReviewForMod.category}
+            </p>
+            <div className="mt-3 p-3 border border-white/10 bg-surface/50 font-mono text-xs italic text-ink/90">
+              "{selectedReviewForMod.review_text}"
+            </div>
+
+            <div className="mt-4 space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-dim">Moderation Status</label>
+                <select
+                  value={modStatus}
+                  onChange={(e) => setModStatus(e.target.value as any)}
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                >
+                  <option value="APPROVED">APPROVED (Publicly Visible)</option>
+                  <option value="FEATURED">FEATURED (Spotlight Hero Badge)</option>
+                  <option value="PENDING">PENDING (Under Audit)</option>
+                  <option value="HIDDEN">HIDDEN (Moderated Out)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-dim">Internal Admin Notes / Audit Rationale</label>
+                <textarea
+                  rows={3}
+                  value={modNotes}
+                  onChange={(e) => setModNotes(e.target.value)}
+                  placeholder="e.g. Verified champion feedback; featured on public reviews wall."
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedReviewForMod(null)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModerateReviewAction(selectedReviewForMod.id, modStatus, modNotes)}
+                  className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold"
+                >
+                  Apply Moderation
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

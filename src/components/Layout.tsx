@@ -168,13 +168,33 @@ export function Footer() {
       <div className="mx-auto grid max-w-[1600px] gap-10 md:grid-cols-12 relative z-10">
         <div className="md:col-span-5"><Logo /><p className="mt-4 max-w-xs text-sm text-dim">India's gaming battleground. Many games, many tournaments, one arena.</p></div>
         {[
-          ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches', '/matches'], ['Teams', '/teams']]],
+          ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches', '/matches'], ['Teams', '/teams'], ['Contender Reviews', '/reviews']]],
           ['You', [['Profile', '/profile'], ['Wallet', '/wallet'], ['Registrations', '/my/registrations'], ['Settings', '/settings']]],
-          ['AMETHEUS', [['About', '/about'], ['Help Center', '/support'], ['Discord', '/support'], ['Instagram', '/about']]],
+          ['M3S & Community', [['Discord Official', 'https://discord.gg/VzkfuK7We', true], ['Instagram (@official.ametheus)', 'https://www.instagram.com/official.ametheus', true], ['YouTube Channel', 'https://www.youtube.com/@official.ametheus.goodgame', true], ['Help Center', '/support']]],
         ].map(([h, links]) => (
           <div key={h as string} className="md:col-span-2">
             <Hud className="text-cyan">{h as string}</Hud>
-            <ul className="mt-4 space-y-2">{(links as string[][]).map(([l, to]) => <li key={l}><Link to={to} className="text-sm text-ink/70 transition-colors hover:text-cyan">{l}</Link></li>)}</ul>
+            <ul className="mt-4 space-y-2">
+              {(links as any[]).map(([l, to, isExt]) => (
+                <li key={l}>
+                  {isExt ? (
+                    <a
+                      href={to}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-ink/70 transition-colors hover:text-cyan flex items-center gap-1.5"
+                    >
+                      <span>{l}</span>
+                      <span className="text-[10px] text-cyan">↗</span>
+                    </a>
+                  ) : (
+                    <Link to={to} className="text-sm text-ink/70 transition-colors hover:text-cyan">
+                      {l}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>
@@ -201,6 +221,10 @@ export function Footer() {
           <span className="text-white/20">·</span>
           <Link to="/support" className="transition-colors hover:text-cyan">
             Help Center
+          </Link>
+          <span className="text-white/20">·</span>
+          <Link to="/reviews" className="transition-colors hover:text-cyan font-bold text-ink">
+            ★ Contender Reviews
           </Link>
         </div>
       </div>

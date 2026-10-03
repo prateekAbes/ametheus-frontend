@@ -49,6 +49,7 @@ export interface Tournament {
   live_stream_url?: string
   stream_url?: string
   registration_status?: string
+  whatsapp_group_url?: string
 }
 
 export interface NormalizedTournament {
@@ -259,3 +260,14 @@ export async function getMyRegistrations(): Promise<UserRegistrationItem[]> {
   return apiClient<UserRegistrationItem[]>('/tournaments/my-registrations')
 }
 
+export async function closeTournamentRegistration(tournamentId: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/close-registration`, {
+    method: 'POST',
+  })
+}
+
+export async function reopenTournamentRegistration(tournamentId: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${tournamentId}/reopen-registration`, {
+    method: 'POST',
+  })
+}

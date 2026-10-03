@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
+import { getGenres, type Genre } from '../services/genres'
 import { getTournaments, normalizeTournament } from '../services/tournaments'
 import { GAMES, CATALOG, gameBy, img } from '../lib/data'
 import { groupGamesByCategory } from '../lib/categories'
@@ -11,6 +12,8 @@ import CategoryCard from '../components/CategoryCard'
 export default function Games() {
   const [open, setOpen] = useState(0)
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
+  const [genres, setGenres] = useState<Genre[]>([])
+  const [selectedGenre, setSelectedGenre] = useState<string>('ALL')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,6 +28,15 @@ export default function Games() {
       .catch(() => {
         if (isMounted) setLoading(false)
       })
+
+    getGenres()
+      .then((res) => {
+        if (isMounted && Array.isArray(res) && res.length > 0) {
+          setGenres(res)
+        }
+      })
+      .catch((err) => console.warn('Could not load genres:', err))
+
     return () => {
       isMounted = false
     }
@@ -52,6 +64,15 @@ export default function Games() {
 
   const categories = useMemo(() => groupGamesByCategory(apiGames), [apiGames])
 
+  const filteredDisplayGames = useMemo(() => {
+    if (selectedGenre === 'ALL') return displayGames
+    const target = selectedGenre.toLowerCase().replace(/[^a-z0-9]/g, '')
+    return displayGames.filter((g) => {
+      const gGenre = (g.genre || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      return gGenre.includes(target) || target.includes(gGenre)
+    })
+  }, [displayGames, selectedGenre])
+
   return (
     <>
       <PageHero
@@ -64,15 +85,46 @@ export default function Games() {
 
       <section className="py-16 md:py-24">
         <Container>
-          {displayGames.length > 5 ? (
-            <AdaptiveGrid count={displayGames.length} min={260}>
-              {displayGames.map((g, i) => (
+          {/* Genre Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+            <span className="font-mono text-xs text-dim uppercase mr-1">Filter by Genre:</span>
+            <button
+              onClick={() => setSelectedGenre('ALL')}
+              className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                selectedGenre === 'ALL'
+                  ? 'border border-cyan bg-cyan text-void font-bold'
+                  : 'border border-white/10 bg-surface text-dim hover:text-ink'
+              }`}
+            >
+              All Worlds ({displayGames.length})
+            </button>
+            {genres.map((gn) => (
+              <button
+                key={gn.slug}
+                onClick={() => setSelectedGenre(gn.slug === selectedGenre ? 'ALL' : gn.slug)}
+                className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  selectedGenre === gn.slug
+                    ? 'border border-cyan bg-cyan text-void font-bold'
+                    : 'border border-white/10 bg-surface text-dim hover:text-ink'
+                }`}
+              >
+                <span>{gn.name}</span>
+                {gn.games && (
+                  <span className="text-[10px] opacity-75 font-mono">({gn.games.length})</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {filteredDisplayGames.length > 5 ? (
+            <AdaptiveGrid count={filteredDisplayGames.length} min={260}>
+              {filteredDisplayGames.map((g, i) => (
                 <GameCard key={g.slug} g={{ ...g, status: 'active', tournaments: 1 }} i={i} />
               ))}
             </AdaptiveGrid>
           ) : (
             <div className="flex flex-col gap-3 lg:h-[680px] lg:flex-row">
-              {displayGames.map((g, i) => {
+              {filteredDisplayGames.map((g, i) => {
                 const on = open === i
                 return (
                   <Link
@@ -150,24 +202,34 @@ export default function Games() {
         </Container>
       </section>
 
-      {/* Competitive Categories with 5s rotating image cards */}
-      {categories.length > 0 && (
-        <section className="border-t border-white/10 bg-graphite/30 py-16 md:py-24">
-          <Container>
-            <SectionHead
-              idx="02"
-              kicker="Game Categories"
-              title={<>Browse by <span className="outline-text">Genre</span></>}
-              sub="Explore specialized formats, from tactical shooters to battle royale survival arenas."
-            />
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {categories.map((cat, idx) => (
-                <CategoryCard key={cat.slug} category={cat} index={idx} />
-              ))}
-            </div>
-          </Container>
-        </section>
-      )}
+      {/* Dynamic Genre Architecture with rotating image & logo cards */}
+      <section className="border-t border-white/10 bg-graphite/30 py-16 md:py-24" id="genres-section">
+        <Container>
+          <SectionHead
+            idx="02"
+            kicker="Competitive Genres"
+            title={<>Browse by <span className="outline-text">Genre</span></>}
+            sub="Explore specialized formats, from tactical shooters to battle royale survival arenas with rotating contender game titles."
+          />
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {genres.length > 0
+              ? genres.map((gen, idx) => (
+                  <CategoryCard
+                    key={gen.slug}
+                    genre={gen}
+                    index={idx}
+                    onSelectGenre={(s) => {
+                      setSelectedGenre(s === selectedGenre ? 'ALL' : s)
+                      window.scrollTo({ top: 400, behavior: 'smooth' })
+                    }}
+                  />
+                ))
+              : categories.map((cat, idx) => (
+                  <CategoryCard key={cat.slug} category={cat} index={idx} />
+                ))}
+          </div>
+        </Container>
+      </section>
 
       <section className="in-view pb-32 pt-10 md:pb-40">
         <Container>
