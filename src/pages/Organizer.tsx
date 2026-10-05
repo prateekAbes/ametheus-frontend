@@ -18,6 +18,15 @@ import {
   getTournamentRegistrations,
 } from '../services/tournaments'
 import { getMatches, submitMatchResult, updateMatch, ApiMatch } from '../services/matches'
+import {
+  createMatchRequest,
+  getMyMatchRequests,
+  sendOrganizerEmail,
+  getMyOrganizerEmails,
+  replyToOrganizerEmailThread,
+  MatchRequest,
+  OrganizerEmailThread,
+} from '../services/organizerComm'
 import { inr } from '../lib/data'
 
 export default function Organizer() {
@@ -28,6 +37,42 @@ export default function Organizer() {
   const [matches, setMatches] = useState<ApiMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
+
+  // Tab Navigation
+  const [activeTab, setActiveTab] = useState<'TOURNAMENTS' | 'MATCH_REQUESTS' | 'EMAILS'>('TOURNAMENTS')
+
+  // Live Match Requests State
+  const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([])
+  const [matchRequestFilter, setMatchRequestFilter] = useState('ALL')
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
+  const [newRequestForm, setNewRequestForm] = useState({
+    tournament_id: '',
+    title: '',
+    team_a_name: '',
+    team_b_name: '',
+    round_name: '',
+    scheduled_at: '',
+    youtube_live_url: '',
+    notes: '',
+    urgency: 'NORMAL',
+  })
+  const [submittingReq, setSubmittingReq] = useState(false)
+
+  // Email Admin State
+  const [emailThreads, setEmailThreads] = useState<OrganizerEmailThread[]>([])
+  const [emailStatusFilter, setEmailStatusFilter] = useState('ALL')
+  const [isNewEmailOpen, setIsNewEmailOpen] = useState(false)
+  const [newEmailForm, setNewEmailForm] = useState({
+    subject: '',
+    message: '',
+    category: 'GENERAL',
+    urgency: 'NORMAL',
+  })
+  const [submittingEmail, setSubmittingEmail] = useState(false)
+
+  const [activeThread, setActiveThread] = useState<OrganizerEmailThread | null>(null)
+  const [threadReplyText, setThreadReplyText] = useState('')
+  const [submittingReply, setSubmittingReply] = useState(false)
 
   // Creation Wizard State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -78,19 +123,29 @@ export default function Organizer() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [tList, gList, mList] = await Promise.all([
+      const [tList, gList, mList, reqList, mailList] = await Promise.all([
         getMyOrganizedTournaments().catch(() => []),
         getGames(true).catch(() => []),
         getMatches().catch(() => []),
+        getMyMatchRequests().catch(() => []),
+        getMyOrganizerEmails().catch(() => []),
       ])
       setTournaments(tList)
       setGames(gList)
       setMatches(mList)
+      setMatchRequests(reqList)
+      setEmailThreads(mailList)
 
       if (gList.length > 0 && !formData.game_id) {
         setFormData((prev) => ({
           ...prev,
           game_id: gList[0].slug || gList[0].id,
+        }))
+      }
+      if (tList.length > 0 && !newRequestForm.tournament_id) {
+        setNewRequestForm((prev) => ({
+          ...prev,
+          tournament_id: tList[0].id || tList[0].slug,
         }))
       }
     } finally {
@@ -269,6 +324,110 @@ export default function Organizer() {
     }
   }
 
+  const handleOpenMatchRequest = (tournamentId: string) => {
+    setNewRequestForm((prev) => ({
+      ...prev,
+      tournament_id: tournamentId,
+    }))
+    setActiveTab('MATCH_REQUESTS')
+    setIsRequestModalOpen(true)
+  }
+
+  const handleCreateMatchRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newRequestForm.tournament_id) {
+      alert('Please select a tournament.')
+      return
+    }
+    setSubmittingReq(true)
+    try {
+      await createMatchRequest(newRequestForm)
+      setActionMsg('Match request submitted successfully to admin team!')
+      setTimeout(() => setActionMsg(null), 4000)
+      setIsRequestModalOpen(false)
+      setNewRequestForm({
+        tournament_id: tournaments[0]?.id || '',
+        title: '',
+        team_a_name: '',
+        team_b_name: '',
+        round_name: '',
+        scheduled_at: '',
+        youtube_live_url: '',
+        notes: '',
+        urgency: 'NORMAL',
+      })
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit match request')
+    } finally {
+      setSubmittingReq(false)
+    }
+  }
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newEmailForm.subject.trim() || !newEmailForm.message.trim()) {
+      alert('Subject and message are required.')
+      return
+    }
+    setSubmittingEmail(true)
+    try {
+      await sendOrganizerEmail(newEmailForm)
+      setActionMsg('Inquiry sent to admin team successfully!')
+      setTimeout(() => setActionMsg(null), 4000)
+      setIsNewEmailOpen(false)
+      setNewEmailForm({
+        subject: '',
+        message: '',
+        category: 'GENERAL',
+        urgency: 'NORMAL',
+      })
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to send inquiry')
+    } finally {
+      setSubmittingEmail(false)
+    }
+  }
+
+  const handleThreadReply = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeThread || !threadReplyText.trim()) return
+    setSubmittingReply(true)
+    try {
+      const updated = await replyToOrganizerEmailThread(activeThread.id, threadReplyText.trim())
+      setActiveThread(updated)
+      setThreadReplyText('')
+      setActionMsg('Reply sent.')
+      setTimeout(() => setActionMsg(null), 3000)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to send reply')
+    } finally {
+      setSubmittingReply(false)
+    }
+  }
+
+  const isAnyModalOpen =
+    isCreateModalOpen ||
+    !!viewingRostersTour ||
+    !!selectedMatch ||
+    !!selectedLobbyMatch ||
+    isRequestModalOpen ||
+    isNewEmailOpen ||
+    !!activeThread
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isAnyModalOpen])
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-void">
@@ -343,110 +502,146 @@ export default function Organizer() {
           </Panel>
         </div>
 
-        {/* Tournament Management Section */}
-        <div className="mt-12 space-y-6">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <h2 className="font-display text-3xl font-black uppercase">My Organized Tournaments</h2>
-            <Hud className="text-cyan">{tournaments.length} REGISTERED</Hud>
-          </div>
+        {/* Organizer Tab Navigation */}
+        <div className="mt-8 flex flex-wrap gap-2 border-b border-white/10 pb-4">
+          <button
+            onClick={() => setActiveTab('TOURNAMENTS')}
+            className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+              activeTab === 'TOURNAMENTS'
+                ? 'border-b-2 border-cyan bg-cyan/10 text-cyan font-bold'
+                : 'text-dim hover:text-ink'
+            }`}
+          >
+            My Tournaments ({tournaments.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('MATCH_REQUESTS')}
+            className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+              activeTab === 'MATCH_REQUESTS'
+                ? 'border-b-2 border-cyan bg-cyan/10 text-cyan font-bold'
+                : 'text-dim hover:text-ink'
+            }`}
+          >
+            Live Match Requests ({matchRequests.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('EMAILS')}
+            className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+              activeTab === 'EMAILS'
+                ? 'border-b-2 border-cyan bg-cyan/10 text-cyan font-bold'
+                : 'text-dim hover:text-ink'
+            }`}
+          >
+            Email Admin / Inbox ({emailThreads.length})
+          </button>
+        </div>
 
-          {loading ? (
-            <div className="border border-white/10 p-12 text-center">
-              <Hud className="animate-pulse text-cyan">FETCHING ORGANIZER TOURNAMENTS...</Hud>
-            </div>
-          ) : tournaments.length === 0 ? (
-            <div className="border border-dashed border-white/15 p-16 text-center">
-              <p className="font-display text-3xl font-black uppercase text-dim">No Tournaments Organized Yet</p>
-              <p className="mt-2 text-sm text-dim">Click "+ New Tournament" to launch your first sanctioned competitive event.</p>
-              <div className="mt-8">
-                <Cta onClick={() => setIsCreateModalOpen(true)}>Create Tournament</Cta>
+        {activeTab === 'TOURNAMENTS' && (
+          <>
+            {/* Tournament Management Section */}
+            <div className="mt-12 space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <h2 className="font-display text-3xl font-black uppercase">My Organized Tournaments</h2>
+                <Hud className="text-cyan">{tournaments.length} REGISTERED</Hud>
               </div>
-            </div>
-          ) : (
-            tournaments.map((raw) => {
-              const t = normalizeTournament(raw)
-              return (
-                <div
-                  key={t.id}
-                  className="border border-white/15 bg-graphite p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-3">
-                      <Badge s={t.status} />
-                      <Hud className="text-cyan">{t.gameName || t.gameId}</Hud>
-                      <span className="text-xs text-dim">· {t.format}</span>
-                    </div>
-                    <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink truncate">
-                      {t.title}
-                    </h3>
-                    <div className="mt-3 flex flex-wrap gap-6 text-xs text-dim font-mono">
-                      <span>Prize: <strong className="text-ink">{inr(t.prizePoolInr)}</strong></span>
-                      <span>Entry: <strong className="text-ink">{t.entryFeeInr ? inr(t.entryFeeInr) : 'FREE'}</strong></span>
-                      <span>
-                        Registrations:{' '}
-                        <strong className="text-cyan">
-                          {t.registeredTeams} / {t.maxTeams} Teams
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Link
-                      to={`/tournaments/${t.slug || t.id}`}
-                      className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
-                    >
-                      Public Page
-                    </Link>
-
-                    <button
-                      onClick={() => openRostersModal(raw)}
-                      className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-ink text-ink transition-colors"
-                    >
-                      View Rosters
-                    </button>
-
-                    {t.status === 'DRAFT' && (
-                      <button
-                        onClick={() => handlePublish(t.id)}
-                        className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
-                      >
-                        Publish Open
-                      </button>
-                    )}
-
-                    {t.status === 'REGISTRATION_OPEN' && (
-                      <button
-                        onClick={() => handleCloseReg(t.id)}
-                        className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
-                      >
-                        Lock Rosters
-                      </button>
-                    )}
-
-                    {(t.status === 'REGISTRATION_CLOSED' || t.status === 'REGISTRATION_OPEN') && (
-                      <button
-                        onClick={() => handleGenBracket(t.id)}
-                        className="border border-cyan/50 bg-cyan/10 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
-                      >
-                        Generate Bracket
-                      </button>
-                    )}
-
-                    {t.status !== 'CANCELLED' && t.status !== 'COMPLETED' && (
-                      <button
-                        onClick={() => handleCancel(t.id)}
-                        className="border border-live/30 px-3 py-2 font-mono text-xs uppercase text-live/80 hover:bg-live/10 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    )}
+              {loading ? (
+                <div className="border border-white/10 p-12 text-center">
+                  <Hud className="animate-pulse text-cyan">FETCHING ORGANIZER TOURNAMENTS...</Hud>
+                </div>
+              ) : tournaments.length === 0 ? (
+                <div className="border border-dashed border-white/15 p-16 text-center">
+                  <p className="font-display text-3xl font-black uppercase text-dim">No Tournaments Organized Yet</p>
+                  <p className="mt-2 text-sm text-dim">Click "+ New Tournament" to launch your first sanctioned competitive event.</p>
+                  <div className="mt-8">
+                    <Cta onClick={() => setIsCreateModalOpen(true)}>Create Tournament</Cta>
                   </div>
                 </div>
-              )
-            })
-          )}
-        </div>
+              ) : (
+                tournaments.map((raw) => {
+                  const t = normalizeTournament(raw)
+                  return (
+                    <div
+                      key={t.id}
+                      className="border border-white/15 bg-graphite p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <Badge s={t.status} />
+                          <Hud className="text-cyan">{t.gameName || t.gameId}</Hud>
+                          <span className="text-xs text-dim">· {t.format}</span>
+                        </div>
+                        <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink truncate">
+                          {t.title}
+                        </h3>
+                        <div className="mt-3 flex flex-wrap gap-6 text-xs text-dim font-mono">
+                          <span>Prize: <strong className="text-ink">{inr(t.prizePoolInr)}</strong></span>
+                          <span>Entry: <strong className="text-ink">{t.entryFeeInr ? inr(t.entryFeeInr) : 'FREE'}</strong></span>
+                          <span>
+                            Registrations:{' '}
+                            <strong className="text-cyan">
+                              {t.registeredTeams} / {t.maxTeams} Teams
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <Link
+                          to={`/tournaments/${t.slug || t.id}`}
+                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
+                        >
+                          Public Page
+                        </Link>
+
+                        <button
+                          onClick={() => openRostersModal(raw)}
+                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-ink text-ink transition-colors"
+                        >
+                          View Rosters
+                        </button>
+
+                        {t.status === 'DRAFT' && (
+                          <button
+                            onClick={() => handlePublish(t.id)}
+                            className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                          >
+                            Publish Open
+                          </button>
+                        )}
+
+                        {t.status === 'REGISTRATION_OPEN' && (
+                          <button
+                            onClick={() => handleCloseReg(t.id)}
+                            className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
+                          >
+                            Lock Rosters
+                          </button>
+                        )}
+
+                        {(t.status === 'REGISTRATION_CLOSED' || t.status === 'REGISTRATION_OPEN') && (
+                          <button
+                            onClick={() => handleOpenMatchRequest(t.id)}
+                            className="border border-cyan/50 bg-cyan/10 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
+                          >
+                            Request Match
+                          </button>
+                        )}
+
+                        {t.status !== 'CANCELLED' && t.status !== 'COMPLETED' && (
+                          <button
+                            onClick={() => handleCancel(t.id)}
+                            className="border border-live/30 px-3 py-2 font-mono text-xs uppercase text-live/80 hover:bg-live/10 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
 
         {/* Live Matches & Arbitration Queue */}
         <div className="mt-16 space-y-6">
@@ -502,7 +697,279 @@ export default function Organizer() {
               ))}
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
+
+        {/* Live Match Requests Tab */}
+        {activeTab === 'MATCH_REQUESTS' && (
+          <div className="mt-12 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Live Match Requests</h2>
+                <p className="text-xs text-dim">
+                  Submit match scheduling, custom live streams, and bracket arbitration requests directly to Admin.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsRequestModalOpen(true)}
+                className="bg-cyan px-4 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-white transition-colors self-start md:self-auto"
+              >
+                + Request Live Match
+              </button>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-dim uppercase mr-2">Filter Status:</span>
+              {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'SCHEDULED'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setMatchRequestFilter(st)}
+                  className={`px-3 py-1 font-mono text-xs uppercase border transition-colors ${
+                    matchRequestFilter === st
+                      ? 'border-cyan bg-cyan/10 text-cyan font-bold'
+                      : 'border-white/10 text-dim hover:border-white/20 hover:text-ink'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+
+            {/* List */}
+            {matchRequests.filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter).length === 0 ? (
+              <div className="border border-dashed border-white/15 p-16 text-center">
+                <p className="font-display text-2xl font-black uppercase text-dim">No Match Requests Found</p>
+                <p className="mt-2 text-xs text-dim">
+                  {matchRequestFilter === 'ALL'
+                    ? 'You have not submitted any live match requests yet. Click "+ Request Live Match" to begin.'
+                    : `No requests with status "${matchRequestFilter}".`}
+                </p>
+                <div className="mt-6">
+                  <button
+                    onClick={() => setIsRequestModalOpen(true)}
+                    className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20"
+                  >
+                    + Submit New Match Request
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {matchRequests
+                  .filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter)
+                  .map((r) => {
+                    const stColor =
+                      r.status === 'APPROVED'
+                        ? 'text-cyan border-cyan/50 bg-cyan/10'
+                        : r.status === 'SCHEDULED'
+                        ? 'text-ok border-ok/50 bg-ok/10'
+                        : r.status === 'REJECTED'
+                        ? 'text-live border-live/50 bg-live/10'
+                        : 'text-warn border-warn/50 bg-warn/10'
+
+                    return (
+                      <div key={r.id} className="border border-white/15 bg-graphite p-6 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase border ${stColor}`}>
+                              {r.status}
+                            </span>
+                            <span className="font-display text-lg font-black uppercase text-ink">
+                              {r.title || 'Live Match Request'}
+                            </span>
+                            <span className="font-mono text-xs text-dim">· Tournament: {r.tournament_title || r.tournament_name || r.tournament_id}</span>
+                          </div>
+                          <span className="font-mono text-[11px] text-dim">
+                            Requested: {r.created_at ? new Date(r.created_at).toLocaleString() : 'Recent'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+                          <div className="border border-white/10 bg-surface/40 p-3">
+                            <span className="text-[10px] text-dim uppercase block">Matchup</span>
+                            <strong className="text-ink text-sm block mt-1">
+                              {r.team_a_name} <span className="text-cyan">vs</span> {r.team_b_name}
+                            </strong>
+                            <span className="text-dim text-[11px] mt-0.5 block">Round: {r.round_name || 'Standard'}</span>
+                          </div>
+
+                          <div className="border border-white/10 bg-surface/40 p-3">
+                            <span className="text-[10px] text-dim uppercase block">Schedule & Urgency</span>
+                            <strong className="text-ink text-sm block mt-1">
+                              {r.scheduled_at ? new Date(r.scheduled_at).toLocaleString() : 'TBD / Flexible'}
+                            </strong>
+                            <span className="text-[11px] text-warn mt-0.5 block">Urgency: {r.urgency || 'NORMAL'}</span>
+                          </div>
+
+                          <div className="border border-white/10 bg-surface/40 p-3">
+                            <span className="text-[10px] text-dim uppercase block">Live Stream</span>
+                            {r.youtube_live_url ? (
+                              <a
+                                href={r.youtube_live_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-cyan underline text-xs block mt-1 truncate hover:text-white"
+                              >
+                                {r.youtube_live_url}
+                              </a>
+                            ) : (
+                              <span className="text-dim block mt-1">No stream URL specified</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {r.notes && (
+                          <div className="text-xs text-dim bg-surface/30 border border-white/5 p-3">
+                            <strong className="text-ink font-mono text-[10px] uppercase block mb-1">Organizer Notes:</strong>
+                            <p className="whitespace-pre-line">{r.notes}</p>
+                          </div>
+                        )}
+
+                        {r.admin_notes && (
+                          <div className="text-xs bg-warn/5 border border-warn/30 p-3 text-ink">
+                            <strong className="text-warn font-mono text-[10px] uppercase block mb-1">
+                              Super Admin Response / Instructions:
+                            </strong>
+                            <p className="whitespace-pre-line">{r.admin_notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Email Admin / Inbox Tab */}
+        {activeTab === 'EMAILS' && (
+          <div className="mt-12 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Email Admin / Inbox</h2>
+                <p className="text-xs text-dim">
+                  Direct official communications channel with Super Admins. Track inquiries, support replies, and dispute threads.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsNewEmailOpen(true)}
+                className="bg-cyan px-4 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-white transition-colors self-start md:self-auto"
+              >
+                + Email Admin / New Inquiry
+              </button>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-dim uppercase mr-2">Filter Status:</span>
+              {['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setEmailStatusFilter(st)}
+                  className={`px-3 py-1 font-mono text-xs uppercase border transition-colors ${
+                    emailStatusFilter === st
+                      ? 'border-cyan bg-cyan/10 text-cyan font-bold'
+                      : 'border-white/10 text-dim hover:border-white/20 hover:text-ink'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+
+            {/* List */}
+            {emailThreads.filter((t) => emailStatusFilter === 'ALL' || t.status === emailStatusFilter).length === 0 ? (
+              <div className="border border-dashed border-white/15 p-16 text-center">
+                <p className="font-display text-2xl font-black uppercase text-dim">No Email Threads Found</p>
+                <p className="mt-2 text-xs text-dim">
+                  {emailStatusFilter === 'ALL'
+                    ? 'You have not sent any inquiries to admins yet. Click "+ Email Admin / New Inquiry" to reach out.'
+                    : `No threads with status "${emailStatusFilter}".`}
+                </p>
+                <div className="mt-6">
+                  <button
+                    onClick={() => setIsNewEmailOpen(true)}
+                    className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20"
+                  >
+                    + Send Inquiry to Admin
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {emailThreads
+                  .filter((t) => emailStatusFilter === 'ALL' || t.status === emailStatusFilter)
+                  .map((th) => {
+                    const stColor =
+                      th.status === 'RESOLVED'
+                        ? 'text-ok border-ok/50 bg-ok/10'
+                        : th.status === 'IN_PROGRESS'
+                        ? 'text-cyan border-cyan/50 bg-cyan/10'
+                        : th.status === 'CLOSED'
+                        ? 'text-dim border-white/20 bg-surface'
+                        : 'text-warn border-warn/50 bg-warn/10'
+
+                    const lastMsg = th.messages[th.messages.length - 1]
+
+                    return (
+                      <div key={th.id} className="border border-white/15 bg-graphite p-6 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase border ${stColor}`}>
+                              {th.status}
+                            </span>
+                            <span className="font-display text-xl font-black uppercase text-ink">
+                              {th.subject}
+                            </span>
+                            <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-white/15 bg-surface text-dim">
+                              {th.category}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-xs text-warn uppercase">[{th.urgency || 'NORMAL'}]</span>
+                            <span className="font-mono text-[11px] text-dim">
+                              Updated: {th.updated_at ? new Date(th.updated_at).toLocaleString() : 'Recent'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {lastMsg && (
+                          <div className="bg-surface/40 border border-white/5 p-4 rounded-sm">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-mono text-[11px] text-cyan font-bold">
+                                {lastMsg.sender_role === 'ADMIN' ? '🛡️ Super Admin Response' : '👤 You'}
+                              </span>
+                              <span className="font-mono text-[10px] text-dim">
+                                {lastMsg.created_at ? new Date(lastMsg.created_at).toLocaleTimeString() : ''}
+                              </span>
+                            </div>
+                            <p className="text-xs text-dim line-clamp-2">{lastMsg.message}</p>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-mono text-xs text-dim">
+                            {th.messages.length} {th.messages.length === 1 ? 'Message' : 'Messages'} in conversation
+                          </span>
+                          <button
+                            onClick={() => {
+                              setActiveThread(th)
+                              setThreadReplyText('')
+                            }}
+                            className="border border-cyan/40 bg-cyan/10 px-4 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
+                          >
+                            Open Conversation →
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+        )}
       </Container>
 
       {/* Creation Modal */}
@@ -933,6 +1400,359 @@ export default function Organizer() {
                 >
                   {isSavingLobby ? 'Saving...' : 'Save Settings'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Live Match Request Modal */}
+      {isRequestModalOpen && (
+        <div
+          role="dialog"
+          aria-modal
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
+          onClick={() => setIsRequestModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+          >
+            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+              <div>
+                <h3 className="font-display text-2xl font-black uppercase text-ink">Request Live Match</h3>
+                <p className="text-xs text-dim">Submit match scheduling or stream broadcasting request to Admin.</p>
+              </div>
+              <button onClick={() => setIsRequestModalOpen(false)} className="text-dim hover:text-ink text-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateMatchRequest} className="overflow-y-auto p-6 space-y-4 flex-1">
+              <div>
+                <Hud>Target Tournament</Hud>
+                <select
+                  value={newRequestForm.tournament_id}
+                  onChange={(e) => setNewRequestForm({ ...newRequestForm, tournament_id: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                  required
+                >
+                  <option value="">Select Tournament</option>
+                  {tournaments.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title} ({t.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Hud>Match / Stage Title</Hud>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Upper Bracket Quarterfinals"
+                  value={newRequestForm.title}
+                  onChange={(e) => setNewRequestForm({ ...newRequestForm, title: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Hud>Team A Name</Hud>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Team Alpha"
+                    value={newRequestForm.team_a_name}
+                    onChange={(e) => setNewRequestForm({ ...newRequestForm, team_a_name: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <Hud>Team B Name</Hud>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Team Omega"
+                    value={newRequestForm.team_b_name}
+                    onChange={(e) => setNewRequestForm({ ...newRequestForm, team_b_name: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Hud>Round Name</Hud>
+                  <input
+                    type="text"
+                    placeholder="e.g. Round 1 / Group Stage"
+                    value={newRequestForm.round_name}
+                    onChange={(e) => setNewRequestForm({ ...newRequestForm, round_name: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <Hud>Urgency</Hud>
+                  <select
+                    value={newRequestForm.urgency}
+                    onChange={(e) => setNewRequestForm({ ...newRequestForm, urgency: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                  >
+                    <option value="NORMAL">Normal</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent (Starting Soon)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Hud>Proposed Date & Time</Hud>
+                <input
+                  type="datetime-local"
+                  value={newRequestForm.scheduled_at}
+                  onChange={(e) => setNewRequestForm({ ...newRequestForm, scheduled_at: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <Hud>YouTube Live Stream / Cast URL (Optional)</Hud>
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/live/..."
+                  value={newRequestForm.youtube_live_url}
+                  onChange={(e) => setNewRequestForm({ ...newRequestForm, youtube_live_url: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <Hud>Organizer Notes & Special Rules</Hud>
+                <textarea
+                  rows={3}
+                  placeholder="Provide roster details, referee instructions, or server region preferences..."
+                  value={newRequestForm.notes}
+                  onChange={(e) => setNewRequestForm({ ...newRequestForm, notes: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReq}
+                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                >
+                  {submittingReq ? 'Submitting...' : 'Submit Match Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Email Admin / New Inquiry Modal */}
+      {isNewEmailOpen && (
+        <div
+          role="dialog"
+          aria-modal
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
+          onClick={() => setIsNewEmailOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+          >
+            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+              <div>
+                <h3 className="font-display text-2xl font-black uppercase text-ink">Email Admin</h3>
+                <p className="text-xs text-dim">Send an official inquiry or escalation to Super Admins.</p>
+              </div>
+              <button onClick={() => setIsNewEmailOpen(false)} className="text-dim hover:text-ink text-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleSendEmail} className="overflow-y-auto p-6 space-y-4 flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Hud>Category</Hud>
+                  <select
+                    value={newEmailForm.category}
+                    onChange={(e) => setNewEmailForm({ ...newEmailForm, category: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                  >
+                    <option value="GENERAL">General Inquiries</option>
+                    <option value="TOURNAMENT_ISSUE">Tournament Issue</option>
+                    <option value="DISPUTE">Match Dispute</option>
+                    <option value="PRIZE_POOL">Prize Pool / Payout</option>
+                    <option value="TECHNICAL">Technical Issue</option>
+                    <option value="SPONSORSHIP">Sponsorship</option>
+                  </select>
+                </div>
+                <div>
+                  <Hud>Urgency</Hud>
+                  <select
+                    value={newEmailForm.urgency}
+                    onChange={(e) => setNewEmailForm({ ...newEmailForm, urgency: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="NORMAL">Normal</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Hud>Subject Line</Hud>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Requesting Bracket Reschedule for BGMI Qualifiers"
+                  value={newEmailForm.subject}
+                  onChange={(e) => setNewEmailForm({ ...newEmailForm, subject: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <Hud>Detailed Message</Hud>
+                <textarea
+                  required
+                  rows={6}
+                  placeholder="Explain the context, tournament name, team identifiers, and specific resolution required..."
+                  value={newEmailForm.message}
+                  onChange={(e) => setNewEmailForm({ ...newEmailForm, message: e.target.value })}
+                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsNewEmailOpen(false)}
+                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingEmail}
+                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                >
+                  {submittingEmail ? 'Sending...' : 'Send Inquiry to Admin'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Active Email Thread Modal */}
+      {activeThread && (
+        <div
+          role="dialog"
+          aria-modal
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
+          onClick={() => setActiveThread(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+          >
+            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-cyan/40 bg-cyan/10 text-cyan">
+                    {activeThread.status}
+                  </span>
+                  <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-white/10 text-dim">
+                    {activeThread.category}
+                  </span>
+                  <span className="font-mono text-[10px] text-warn uppercase">
+                    [{activeThread.urgency || 'NORMAL'}]
+                  </span>
+                </div>
+                <h3 className="font-display text-2xl font-black uppercase text-ink">{activeThread.subject}</h3>
+              </div>
+              <button onClick={() => setActiveThread(null)} className="text-dim hover:text-ink text-xl">✕</button>
+            </div>
+
+            {/* Conversation Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-void/40 border-y border-white/10">
+              {activeThread.messages.map((m, idx) => {
+                const isAdmin = m.sender_role === 'ADMIN'
+                return (
+                  <div
+                    key={idx}
+                    className={`p-4 border ${
+                      isAdmin
+                        ? 'border-cyan/40 bg-cyan/5 ml-4 md:ml-12'
+                        : 'border-white/15 bg-graphite mr-4 md:mr-12'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`font-mono text-[11px] font-bold uppercase px-2 py-0.5 ${
+                            isAdmin
+                              ? 'bg-cyan text-void'
+                              : 'bg-white/10 text-ink'
+                          }`}
+                        >
+                          {isAdmin ? '🛡️ Super Admin' : '👤 You'}
+                        </span>
+                        <span className="text-xs font-mono text-dim">{m.sender_name}</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-dim">
+                        {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ink whitespace-pre-line leading-relaxed">{m.message}</p>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Reply Composer */}
+            <form onSubmit={handleThreadReply} className="p-6 shrink-0 bg-graphite">
+              <Hud className="text-dim mb-1">Your Reply</Hud>
+              <textarea
+                rows={3}
+                required
+                placeholder="Type your reply to Super Admin..."
+                value={threadReplyText}
+                onChange={(e) => setThreadReplyText(e.target.value)}
+                className="w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+              />
+              <div className="mt-3 flex justify-between items-center">
+                <span className="text-[10px] font-mono text-dim">
+                  Status: <strong className="text-cyan">{activeThread.status}</strong>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveThread(null)}
+                    className="px-4 py-1.5 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingReply || !threadReplyText.trim()}
+                    className="px-6 py-1.5 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs disabled:opacity-50"
+                  >
+                    {submittingReply ? 'Sending...' : 'Send Reply'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

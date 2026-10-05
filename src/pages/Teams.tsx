@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Crest, Avatar, MatchCard, Panel, Brackets, Stat, Particles } from '../components/ui'
-import { SQUAD, MATCHES, TOURNAMENTS, AVATARS, gameBy } from '../lib/data'
-import { getMyTeams, leaveTeam, deleteTeam, type Team } from '../services/teams'
+import { MATCHES, TOURNAMENTS, AVATARS, gameBy } from '../lib/data'
+import { getMyTeams, leaveTeam, deleteTeam, transferTeamLeadership, kickTeamMember, type Team } from '../services/teams'
 import { useAuthContext } from '../context/AuthContext'
 
 export default function Teams() {
@@ -73,9 +73,40 @@ export default function Teams() {
     }
   }
 
+  const handleTransferLeadership = async (targetUserId: string, targetName: string) => {
+    if (!activeTeam) return
+    if (!window.confirm(`Transfer team captaincy of "${activeTeam.name}" to ${targetName}? You will become a regular team member.`)) return
+
+    setActionLoading(true)
+    try {
+      await transferTeamLeadership(activeTeam.id || (activeTeam as any)._id, targetUserId)
+      fetchTeams()
+    } catch (err: any) {
+      alert(err.message || 'Failed to transfer leadership')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleKickMember = async (targetUserId: string, targetName: string) => {
+    if (!activeTeam) return
+    if (!window.confirm(`Remove ${targetName} from the roster of "${activeTeam.name}"?`)) return
+
+    setActionLoading(true)
+    try {
+      await kickTeamMember(activeTeam.id || (activeTeam as any)._id, targetUserId)
+      fetchTeams()
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove member')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   // Active roster
   const mainMembers = activeTeam?.members?.filter((m) => m.role !== 'SUBSTITUTE') || []
   const subMembers = activeTeam?.members?.filter((m) => m.role === 'SUBSTITUTE') || []
+  const isCaptain = Boolean(activeTeam && profile && activeTeam.captain_id === profile.id)
 
   // Upcoming matches for active team
   const upcoming = MATCHES.filter(
@@ -209,7 +240,7 @@ export default function Teams() {
             </div>
 
             <div className="mt-10 grid grid-cols-2 gap-6 border-y border-white/10 py-6 md:grid-cols-4">
-              <Stat k="Members" v={mainMembers.length || 1} />
+              <Stat k="Members" v={mainMembers.length} />
               <Stat k="Substitutes" v={subMembers.length} />
               <Stat k="Registrations" v={regs.length} accent="#3ef2ff" />
               <Stat k="Upcoming Matches" v={upcoming.length} />
@@ -217,43 +248,137 @@ export default function Teams() {
 
             <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_380px]">
               <div>
-                <Hud className="text-cyan">◇ Roster</Hud>
-                <div className="mt-4 divide-y divide-white/10 border border-white/10">
-                  {(mainMembers.length > 0 ? mainMembers : SQUAD.filter((p) => p.role !== 'Substitute')).map(
-                    (p: any, idx: number) => (
-                      <div
-                        key={p.user_id || p.u || idx}
-                        className="flex items-center gap-4 p-4 transition-colors hover:bg-white/[0.03]"
-                      >
-                        <Avatar id={AVATARS[idx % AVATARS.length]} size={52} />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-display text-2xl font-black uppercase">
-                            {p.username || p.u}
-                          </p>
-                          <Hud>{p.role}</Hud>
+                <div className="flex items-center justify-between">
+                  <Hud className="text-cyan">◇ Active Roster ({mainMembers.length}/{activeTeam.max_members || 5})</Hud>
+                  {isCaptain && (
+                    <span className="font-mono text-[10px] text-amber-400">★ You are Team Captain</span>
+                  )}
+                </div>
+
+                <div className="mt-4 divide-y divide-white/10 border border-white/10 bg-surface/30">
+                  {mainMembers.length === 0 ? (
+                    <div className="p-8 text-center text-dim font-mono">
+                      No squad members yet. Share your team code <span className="text-cyan font-bold">{inviteCode}</span> to recruit teammates.
+                    </div>
+                  ) : (
+                    mainMembers.map((p: any, idx: number) => {
+                      const isSelf = p.user_id === profile?.id
+                      const isMemberCaptain = p.role === 'CAPTAIN' || p.user_id === activeTeam.captain_id
+                      return (
+                        <div
+                          key={p.user_id || idx}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-colors hover:bg-white/[0.03]"
+                        >
+                          <div className="flex items-center gap-4">
+                            <Avatar id={AVATARS[idx % AVATARS.length]} size={52} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-display text-2xl font-black uppercase text-ink">
+                                  {p.username || 'Contender'}
+                                </p>
+                                {isSelf && (
+                                  <span className="rounded bg-cyan/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan border border-cyan/30">
+                                    YOU
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`inline-block font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                                  isMemberCaptain ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-dim border border-white/10'
+                                }`}>
+                                  {isMemberCaptain ? '★ CAPTAIN' : 'MEMBER'}
+                                </span>
+                                <span className="font-mono text-xs text-dim">
+                                  Game ID: <strong className="text-ink">{p.game_handle || 'VERIFIED'}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            {isCaptain && !isSelf && (
+                              <>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleTransferLeadership(p.user_id, p.username)}
+                                  className="border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400 hover:bg-amber-500/15 transition-colors disabled:opacity-40"
+                                  title="Transfer team leadership to this member"
+                                >
+                                  Make Captain
+                                </button>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleKickMember(p.user_id, p.username)}
+                                  className="border border-live/30 bg-live/5 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors disabled:opacity-40"
+                                  title="Remove member from squad"
+                                >
+                                  Remove
+                                </button>
+                              </>
+                            )}
+                            {!isCaptain && isSelf && (
+                              <button
+                                disabled={actionLoading}
+                                onClick={handleLeaveOrDelete}
+                                className="border border-live/30 bg-live/5 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors disabled:opacity-40"
+                              >
+                                Leave Team
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <Hud>Game ID</Hud>
-                          <p className="font-mono text-sm">{p.game_handle || p.uid || 'VERIFIED'}</p>
-                        </div>
-                      </div>
-                    )
+                      )
+                    })
                   )}
                 </div>
 
                 {subMembers.length > 0 && (
                   <>
-                    <Hud className="mt-8 block">Substitutes</Hud>
-                    <div className="mt-3 divide-y divide-white/10 border border-dashed border-white/15">
-                      {subMembers.map((p, idx) => (
-                        <div key={p.user_id || idx} className="flex items-center gap-4 p-4 opacity-80">
-                          <Avatar id={AVATARS[(idx + 3) % AVATARS.length]} size={44} />
-                          <p className="flex-1 font-display text-xl font-black uppercase">
-                            {p.username}
-                          </p>
-                          <p className="font-mono text-sm text-dim">{p.game_handle || 'SUB'}</p>
-                        </div>
-                      ))}
+                    <Hud className="mt-8 block">Substitutes ({subMembers.length}/{activeTeam.max_substitutes || 1})</Hud>
+                    <div className="mt-3 divide-y divide-white/10 border border-dashed border-white/15 bg-surface/20">
+                      {subMembers.map((p: any, idx: number) => {
+                        const isSelf = p.user_id === profile?.id
+                        return (
+                          <div key={p.user_id || idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 opacity-90">
+                            <div className="flex items-center gap-4">
+                              <Avatar id={AVATARS[(idx + 3) % AVATARS.length]} size={44} />
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-display text-xl font-black uppercase text-ink">
+                                    {p.username || 'Substitute'}
+                                  </p>
+                                  {isSelf && (
+                                    <span className="rounded bg-cyan/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-cyan border border-cyan/30">
+                                      YOU
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="font-mono text-xs text-dim">Handle: {p.game_handle || 'SUB'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 self-end sm:self-center">
+                              {isCaptain && !isSelf && (
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleKickMember(p.user_id, p.username)}
+                                  className="border border-live/30 bg-live/5 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors disabled:opacity-40"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                              {!isCaptain && isSelf && (
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={handleLeaveOrDelete}
+                                  className="border border-live/30 bg-live/5 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors disabled:opacity-40"
+                                >
+                                  Leave Team
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </>
                 )}

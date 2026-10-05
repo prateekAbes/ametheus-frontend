@@ -66,12 +66,34 @@ export default function Games() {
 
   const filteredDisplayGames = useMemo(() => {
     if (selectedGenre === 'ALL') return displayGames
+    const genreObj = genres.find(
+      (gn) => gn.slug === selectedGenre || gn.id === selectedGenre || gn._id === selectedGenre
+    )
+    if (genreObj) {
+      const genreGameSlugs = new Set((genreObj.games || []).map((g) => (g.slug || '').toLowerCase()))
+      const genreGameTitles = new Set((genreObj.games || []).map((g) => (g.title || '').toLowerCase()))
+      const targetSlug = (genreObj.slug || '').toLowerCase()
+      const targetName = (genreObj.name || '').toLowerCase()
+
+      return displayGames.filter((g) => {
+        const gSlug = (g.slug || '').toLowerCase()
+        const gName = (g.name || '').toLowerCase()
+        const gGenre = (g.genre || '').toLowerCase()
+
+        if (genreGameSlugs.has(gSlug) || genreGameTitles.has(gName)) return true
+        if (targetSlug && (gGenre.includes(targetSlug) || targetSlug.includes(gGenre))) return true
+        if (targetName && (gGenre.includes(targetName) || targetName.includes(gGenre))) return true
+        return false
+      })
+    }
+
     const target = selectedGenre.toLowerCase().replace(/[^a-z0-9]/g, '')
     return displayGames.filter((g) => {
       const gGenre = (g.genre || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-      return gGenre.includes(target) || target.includes(gGenre)
+      const gSlug = (g.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      return gGenre.includes(target) || target.includes(gGenre) || gSlug.includes(target)
     })
-  }, [displayGames, selectedGenre])
+  }, [displayGames, selectedGenre, genres])
 
   return (
     <>
@@ -116,7 +138,20 @@ export default function Games() {
             ))}
           </div>
 
-          {filteredDisplayGames.length > 5 ? (
+          {filteredDisplayGames.length === 0 ? (
+            <div className="border border-white/10 bg-surface/30 p-16 text-center">
+              <Hud className="text-cyan">No titles found</Hud>
+              <p className="mt-2 font-mono text-sm text-dim">
+                No active games currently mapped to this genre filter.
+              </p>
+              <button
+                onClick={() => setSelectedGenre('ALL')}
+                className="mt-6 border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors"
+              >
+                Reset to All Worlds
+              </button>
+            </div>
+          ) : filteredDisplayGames.length > 5 ? (
             <AdaptiveGrid count={filteredDisplayGames.length} min={260}>
               {filteredDisplayGames.map((g, i) => (
                 <GameCard key={g.slug} g={{ ...g, status: 'active', tournaments: 1 }} i={i} />

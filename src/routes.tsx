@@ -8,6 +8,7 @@ import Tournaments from './pages/Tournaments'
 import TournamentDetail from './pages/TournamentDetail'
 import Matches from './pages/Matches'
 import MatchDetail from './pages/MatchDetail'
+import Leaderboard from './pages/Leaderboard'
 import Teams from './pages/Teams'
 import CreateTeam from './pages/CreateTeam'
 import JoinTeam from './pages/JoinTeam'
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: 'tournaments/:id', Component: TournamentDetail },
       { path: 'matches', Component: Matches },
       { path: 'matches/:id', Component: MatchDetail },
+      { path: 'leaderboard', Component: Leaderboard },
       { path: 'teams', Component: Teams },
       {
         path: 'teams/create',

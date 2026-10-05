@@ -26,6 +26,7 @@ import { Panel, Hud, Badge, Brackets } from '../ui'
 interface Props {
   tournaments: Tournament[]
   onMatchesUpdated?: () => void
+  initialTournamentId?: string
 }
 
 const DEFAULT_STAGES = [
@@ -86,9 +87,16 @@ interface FormationMatch {
   status?: string
 }
 
-export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
+export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTournamentId }: Props) {
   // Navigation tabs: Live Operations vs Manual Formation Builder
   const [activeTab, setActiveTab] = useState<'OPERATIONS' | 'FORMATION'>('OPERATIONS')
+
+  useEffect(() => {
+    if (initialTournamentId) {
+      setFormationTournId(initialTournamentId)
+      setActiveTab('FORMATION')
+    }
+  }, [initialTournamentId])
 
   // Banner message
   const [bannerMsg, setBannerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)

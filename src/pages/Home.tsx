@@ -61,12 +61,12 @@ export default function Home() {
     }
   }, [])
 
-  // 60-second dynamic shuffle interval for homepage sections
+  // 10-second dynamic shuffle interval for homepage sections
   const [shuffleTick, setShuffleTick] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => {
       setShuffleTick((prev) => prev + 1)
-    }, 60000)
+    }, 10000)
     return () => clearInterval(timer)
   }, [])
 

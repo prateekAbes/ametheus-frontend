@@ -66,20 +66,22 @@ export default function About() {
   const numberMetrics = [
     [
       stats?.total_payout_inr && stats.total_payout_inr > 0
-        ? `₹${(stats.total_payout_inr / 100000).toFixed(1)}L`
-        : '₹1.2Cr',
+        ? stats.total_payout_inr >= 100000
+          ? `₹${(stats.total_payout_inr / 100000).toFixed(1)}L`
+          : `₹${stats.total_payout_inr.toLocaleString('en-IN')}`
+        : '₹0',
       'Prize pool paid',
     ],
-    [stats?.total_tournaments ? `${stats.total_tournaments}+` : '340+', 'Tournaments run'],
+    [stats?.total_tournaments ? `${stats.total_tournaments}` : '0', 'Tournaments run'],
     [
       stats?.total_users
         ? stats.total_users >= 1000
           ? `${(stats.total_users / 1000).toFixed(1)}K`
           : `${stats.total_users}`
-        : '48K',
+        : '0',
       'Registered players',
     ],
-    [stats?.total_matches ? `${stats.total_matches}` : '92s', stats?.total_matches ? 'Matches played' : 'Avg payout time'],
+    [stats?.total_matches ? `${stats.total_matches}` : '0', 'Matches played'],
   ]
 
   return (

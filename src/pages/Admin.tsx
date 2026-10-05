@@ -29,6 +29,7 @@ import {
   getEmailSystemStatusAdmin,
   sendTestEmailAdmin,
   sendOfficialEmailAdmin,
+  sendPersonalEmailAdmin,
   getAllPageMedia,
   updatePageMedia,
   uploadMediaFile,
@@ -86,6 +87,21 @@ import {
   cancelTournamentOrganizer,
 } from '../services/organizer'
 import { getMatches, updateMatch, ApiMatch } from '../services/matches'
+import {
+  getUsersWithSupportTickets,
+  replyToSupportTicket,
+  toggleArchiveSupportTicket,
+  UserSupportGroup,
+} from '../services/support'
+import {
+  getAdminMatchRequests,
+  actionAdminMatchRequest,
+  MatchRequest,
+  getAdminOrganizerEmails,
+  replyAdminOrganizerEmail,
+  updateAdminOrganizerEmailStatus,
+  OrganizerEmailThread,
+} from '../services/organizerComm'
 import { CANONICAL_CATEGORIES } from '../lib/categories'
 import { resolveMediaUrl } from '../services/apiClient'
 import { inr } from '../lib/data'
@@ -299,6 +315,8 @@ const TABS = [
   'OVERVIEW',
   'TOURNAMENTS',
   'LIVE MATCHES',
+  'ORGANIZER MATCH REQUESTS',
+  'ORGANIZER EMAILS',
   'FEATURED TOURNAMENT',
   'GAMES CATALOG',
   'GENRES & CATEGORIES',
@@ -537,10 +555,57 @@ export default function Admin() {
     }
   }
 
+  // Formation jump state
+  const [selectedFormationTourId, setSelectedFormationTourId] = useState<string>('')
+
+  // Users Tab filtering & search
+  const [userRoleFilter, setUserRoleFilter] = useState<'ALL' | 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN'>('ALL')
+  const [userSearchTerm, setUserSearchTerm] = useState('')
+
+  // Support Tickets User-Centric States
+  const [supportUsers, setSupportUsers] = useState<UserSupportGroup[]>([])
+  const [loadingSupportUsers, setLoadingSupportUsers] = useState(false)
+  const [supportSearchTerm, setSupportSearchTerm] = useState('')
+  const [supportShowArchived, setSupportShowArchived] = useState(false)
+  const [expandedSupportUserId, setExpandedSupportUserId] = useState<string | null>(null)
+  const [activeTicketThread, setActiveTicketThread] = useState<any | null>(null)
+  const [ticketReplyText, setTicketReplyText] = useState('')
+  const [ticketNextStatus, setTicketNextStatus] = useState('WAITING_FOR_USER')
+  const [isSubmittingTicketReply, setIsSubmittingTicketReply] = useState(false)
+
+  // Organizer Match Requests States
+  const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([])
+  const [loadingMatchRequests, setLoadingMatchRequests] = useState(false)
+  const [matchRequestFilter, setMatchRequestFilter] = useState('ALL')
+  const [actioningRequest, setActioningRequest] = useState<MatchRequest | null>(null)
+  const [actionReqStatus, setActionReqStatus] = useState<'APPROVED' | 'REJECTED' | 'IN_REVIEW'>('APPROVED')
+  const [actionReqNotes, setActionReqNotes] = useState('')
+  const [actionReqMakeLive, setActionReqMakeLive] = useState(true)
+  const [isSubmittingReqAction, setIsSubmittingReqAction] = useState(false)
+
+  // Organizer Emails States
+  const [organizerEmailThreads, setOrganizerEmailThreads] = useState<OrganizerEmailThread[]>([])
+  const [loadingOrgEmails, setLoadingOrgEmails] = useState(false)
+  const [orgEmailStatusFilter, setOrgEmailStatusFilter] = useState('ALL')
+  const [activeOrgThread, setActiveOrgThread] = useState<OrganizerEmailThread | null>(null)
+  const [orgThreadReplyText, setOrgThreadReplyText] = useState('')
+  const [orgThreadNextStatus, setOrgThreadNextStatus] = useState('WAITING_FOR_ORGANIZER')
+  const [isSubmittingOrgReply, setIsSubmittingOrgReply] = useState(false)
+
+  // Personal Email Dispatch State
+  const [personalEmailMode, setPersonalEmailMode] = useState<'USER' | 'CUSTOM'>('USER')
+  const [selectedRecipientUserId, setSelectedRecipientUserId] = useState('')
+  const [personalEmailCustomTo, setPersonalEmailCustomTo] = useState('')
+  const [personalEmailSender, setPersonalEmailSender] = useState<'official' | 'support' | 'noreply'>('official')
+  const [personalEmailSubject, setPersonalEmailSubject] = useState('')
+  const [personalEmailMessage, setPersonalEmailMessage] = useState('')
+  const [isSendingPersonalEmail, setIsSendingPersonalEmail] = useState(false)
+  const [personalEmailResult, setPersonalEmailResult] = useState<any | null>(null)
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll, genreList, revList] = await Promise.all([
+      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll, genreList, revList, sUsers, mReqs, orgEmails] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
         getPendingPayments().catch(() => []),
@@ -558,6 +623,9 @@ export default function Admin() {
         getMatches().catch(() => []),
         getGenres(true).catch(() => []),
         getAdminReviews().catch(() => []),
+        getUsersWithSupportTickets().catch(() => []),
+        getAdminMatchRequests().catch(() => []),
+        getAdminOrganizerEmails().catch(() => []),
       ])
 
       if (s) setStats(s)
@@ -577,6 +645,9 @@ export default function Admin() {
       if (Array.isArray(mAll)) setAdminMatches(mAll)
       setGenres(genreList)
       setAdminReviews(revList)
+      setSupportUsers(sUsers)
+      setMatchRequests(mReqs)
+      setOrganizerEmailThreads(orgEmails)
 
       if (fTour) {
         setSelectedFeaturedId(fTour.id || fTour.slug)
@@ -843,10 +914,15 @@ export default function Admin() {
     e.preventDefault()
     if (!editingTour) return
     try {
+      const regStatus = editingTour.status === 'REGISTRATION_CLOSED'
+        ? 'CLOSED'
+        : (editingTour.status === 'REGISTRATION_OPEN' ? 'OPEN' : editingTour.registration_status)
       await updateTournamentOrganizer(editingTour.id || editingTour.slug, {
         title: editingTour.title,
         game_id: editingTour.game_id,
         format: editingTour.format,
+        status: editingTour.status,
+        registration_status: regStatus,
         prize_pool_inr: Number(editingTour.prize_pool_inr),
         entry_fee_inr: Number(editingTour.entry_fee_inr),
         max_teams: Number(editingTour.max_teams),
@@ -1350,10 +1426,13 @@ export default function Admin() {
                                 Reopen Registration
                               </button>
                               <button
-                                onClick={() => handleGenerateBracketTour(t.id || t.slug)}
-                                className="border border-ok bg-ok/15 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30"
+                                onClick={() => {
+                                  setSelectedFormationTourId(t.id || t.slug)
+                                  setTab('LIVE MATCHES')
+                                }}
+                                className="border border-cyan bg-cyan/15 px-2 py-1 font-mono text-[10px] uppercase text-cyan hover:bg-cyan/30"
                               >
-                                Generate Bracket
+                                Match Formation
                               </button>
                             </>
                           )}
@@ -1385,7 +1464,227 @@ export default function Admin() {
         {/* TAB: LIVE MATCHES */}
         {tab === 'LIVE MATCHES' && (
           <div className="mt-8">
-            <LiveMatchesManager tournaments={tournaments} onMatchesUpdated={loadData} />
+            <LiveMatchesManager
+              tournaments={tournaments}
+              onMatchesUpdated={loadData}
+              initialTournamentId={selectedFormationTourId}
+            />
+          </div>
+        )}
+
+        {/* TAB: ORGANIZER MATCH REQUESTS */}
+        {tab === 'ORGANIZER MATCH REQUESTS' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                  <Hud className="text-cyan">ORGANIZER MATCH ARBITRATION</Hud>
+                </div>
+                <h2 className="mt-1 font-display text-3xl font-black uppercase">Organizer Match Requests</h2>
+                <p className="text-xs text-dim">Review requests from tournament organizers to set matches live, feature streams, and arbitrate fixtures.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Hud className="text-dim">{matchRequests.length} TOTAL REQUESTS</Hud>
+                <button onClick={loadData} className="border border-white/15 bg-surface px-3 py-1 font-mono text-xs uppercase hover:border-cyan text-ink">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Filter buttons */}
+            <div className="flex flex-wrap gap-2">
+              {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'IN_REVIEW'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setMatchRequestFilter(st)}
+                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                    matchRequestFilter === st
+                      ? 'border-cyan bg-cyan text-void font-bold'
+                      : 'border-white/15 bg-surface text-dim hover:text-ink'
+                  }`}
+                >
+                  {st} ({st === 'ALL' ? matchRequests.length : matchRequests.filter((r) => r.status === st).length})
+                </button>
+              ))}
+            </div>
+
+            {/* Request list */}
+            {matchRequests.filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter).length === 0 ? (
+              <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                NO ORGANIZER MATCH REQUESTS IN THIS CATEGORY.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {matchRequests
+                  .filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter)
+                  .map((req) => (
+                    <Panel key={req.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-cyan">
+                      <div className="space-y-2 font-mono text-xs flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
+                            req.status === 'APPROVED' ? 'border-ok text-ok bg-ok/10' :
+                            req.status === 'REJECTED' ? 'border-live text-live bg-live/10' :
+                            req.status === 'IN_REVIEW' ? 'border-amber-400 text-amber-400 bg-amber-400/10' :
+                            'border-cyan text-cyan bg-cyan/10'
+                          }`}>
+                            {req.status}
+                          </span>
+                          <span className={`px-2 py-0.5 border text-[10px] uppercase ${
+                            req.urgency === 'URGENT' ? 'border-live text-live font-bold' :
+                            req.urgency === 'HIGH' ? 'border-amber-400 text-amber-400 font-bold' :
+                            'border-white/20 text-dim'
+                          }`}>
+                            {req.urgency} URGENCY
+                          </span>
+                          <span className="text-dim">Submitted: {new Date(req.created_at).toLocaleString()}</span>
+                        </div>
+
+                        <div className="text-sm font-bold text-ink">
+                          {req.title || `${req.team_a_name || 'Team A'} vs ${req.team_b_name || 'Team B'}`}
+                        </div>
+
+                        <div className="text-dim flex flex-wrap gap-4 text-[11px]">
+                          <span>Organizer: <strong className="text-ink">{req.organizer_name}</strong> ({req.organizer_email || 'No email'})</span>
+                          <span>Tournament: <strong className="text-cyan">{req.tournament_name || req.tournament_id}</strong></span>
+                          {req.round_name && <span>Round: <strong className="text-ink">{req.round_name}</strong></span>}
+                          {req.scheduled_at && <span>Schedule: <strong className="text-ink">{req.scheduled_at}</strong></span>}
+                        </div>
+
+                        {req.youtube_live_url && (
+                          <div className="text-[11px] text-cyan truncate">
+                            Live Stream: <a href={req.youtube_live_url} target="_blank" rel="noreferrer" className="underline hover:text-white">{req.youtube_live_url}</a>
+                          </div>
+                        )}
+
+                        {req.notes && (
+                          <div className="text-dim bg-surface/50 border border-white/5 p-2 text-[11px] rounded">
+                            Organizer Notes: {req.notes}
+                          </div>
+                        )}
+
+                        {req.admin_notes && (
+                          <div className="text-amber-400/90 bg-amber-500/5 border border-amber-500/20 p-2 text-[11px] rounded">
+                            Admin Decision Notes: {req.admin_notes}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            setActioningRequest(req)
+                            setActionReqStatus('APPROVED')
+                            setActionReqNotes(req.admin_notes || '')
+                            setActionReqMakeLive(true)
+                          }}
+                          className="border border-cyan bg-cyan/15 px-3 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/30"
+                        >
+                          Review & Action
+                        </button>
+                      </div>
+                    </Panel>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: ORGANIZER EMAILS */}
+        {tab === 'ORGANIZER EMAILS' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-magenta animate-pulse" />
+                  <Hud className="text-magenta">ORGANIZER DIRECT CORRESPONDENCE</Hud>
+                </div>
+                <h2 className="mt-1 font-display text-3xl font-black uppercase">Organizer Inquiries & Email Threads</h2>
+                <p className="text-xs text-dim">Respond to inquiries and personal correspondence from platform tournament organizers.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Hud className="text-dim">{organizerEmailThreads.length} ACTIVE THREADS</Hud>
+                <button onClick={loadData} className="border border-white/15 bg-surface px-3 py-1 font-mono text-xs uppercase hover:border-cyan text-ink">
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Filter buttons */}
+            <div className="flex flex-wrap gap-2">
+              {['ALL', 'UNREAD', 'OPEN', 'WAITING_FOR_ADMIN', 'WAITING_FOR_ORGANIZER', 'RESOLVED', 'CLOSED'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setOrgEmailStatusFilter(st)}
+                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                    orgEmailStatusFilter === st
+                      ? 'border-magenta bg-magenta text-void font-bold'
+                      : 'border-white/15 bg-surface text-dim hover:text-ink'
+                  }`}
+                >
+                  {st} ({st === 'ALL' ? organizerEmailThreads.length : organizerEmailThreads.filter((t) => t.status === st).length})
+                </button>
+              ))}
+            </div>
+
+            {/* Thread list */}
+            {organizerEmailThreads.filter((t) => orgEmailStatusFilter === 'ALL' || t.status === orgEmailStatusFilter).length === 0 ? (
+              <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                NO ORGANIZER EMAIL THREADS IN THIS CATEGORY.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {organizerEmailThreads
+                  .filter((t) => orgEmailStatusFilter === 'ALL' || t.status === orgEmailStatusFilter)
+                  .map((th) => (
+                    <Panel key={th.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-magenta">
+                      <div className="space-y-2 font-mono text-xs flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
+                            th.status === 'RESOLVED' || th.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
+                            th.status === 'WAITING_FOR_ADMIN' || th.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
+                            'border-magenta text-magenta bg-magenta/10'
+                          }`}>
+                            {th.status}
+                          </span>
+                          <span className="border border-white/20 px-2 py-0.5 text-[10px] text-dim uppercase">
+                            {th.category}
+                          </span>
+                          <span className="text-dim">Messages: {th.messages?.length || 1}</span>
+                          <span className="text-dim">Last update: {new Date(th.updated_at || th.created_at).toLocaleString()}</span>
+                        </div>
+
+                        <div className="text-sm font-bold text-ink">
+                          {th.subject}
+                        </div>
+
+                        <div className="text-dim text-[11px]">
+                          Organizer: <strong className="text-ink">{th.organizer_name}</strong> · <span className="text-cyan">{th.organizer_email}</span>
+                        </div>
+
+                        {th.messages && th.messages.length > 0 && (
+                          <div className="text-dim/80 text-[11px] line-clamp-2 bg-surface/50 border border-white/5 p-2 rounded">
+                            Latest: "{th.messages[th.messages.length - 1].message}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            setActiveOrgThread(th)
+                            setOrgThreadReplyText('')
+                            setOrgThreadNextStatus('WAITING_FOR_ORGANIZER')
+                          }}
+                          className="border border-magenta bg-magenta/15 px-3 py-1.5 font-mono text-xs uppercase text-magenta hover:bg-magenta/30"
+                        >
+                          Open Dialogue
+                        </button>
+                      </div>
+                    </Panel>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1954,9 +2253,46 @@ export default function Admin() {
         {/* TAB 3: USERS & ROLES */}
         {tab === 'USERS & ROLES' && (
           <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="font-display text-3xl font-black uppercase">Directory & Role Delegation</h2>
-              <Hud className="text-dim">{users.length} REGISTERED CONTENDERS</Hud>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Directory & Role Delegation</h2>
+                <p className="text-xs text-dim">Filter registered contenders, assign organizer privileges, and delegate administrator access.</p>
+              </div>
+              <Hud className="text-cyan">{users.length} REGISTERED USERS</Hud>
+            </div>
+
+            {/* Role Filter & Search Bar */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'ALL', label: 'All Users', count: users.length },
+                  { key: 'PLAYER', label: 'Players', count: users.filter((u) => u.role === 'PLAYER').length },
+                  { key: 'ORGANIZER', label: 'Organizers', count: users.filter((u) => u.role === 'ORGANIZER').length },
+                  { key: 'SUPER_ADMIN', label: 'Admins', count: users.filter((u) => u.role === 'SUPER_ADMIN').length },
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setUserRoleFilter(f.key as any)}
+                    className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                      userRoleFilter === f.key
+                        ? 'border-cyan bg-cyan text-void font-bold'
+                        : 'border-white/15 bg-surface text-dim hover:text-ink'
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-full md:w-72">
+                <input
+                  type="text"
+                  placeholder="Search user, name, or email..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  className="w-full border border-white/15 bg-surface px-3 py-1.5 font-mono text-xs text-ink outline-none focus:border-cyan"
+                />
+              </div>
             </div>
 
             <div className="overflow-x-auto border border-white/15 bg-graphite">
@@ -1971,56 +2307,82 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {users.map((u) => (
-                    <tr key={u.id}>
-                      <td className="p-4">
-                        <div className="font-bold text-ink">{u.display_name || u.username}</div>
-                        <div className="text-dim text-[11px]">{u.email}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 border ${u.role === 'SUPER_ADMIN' ? 'border-magenta text-magenta' : u.role === 'ORGANIZER' ? 'border-cyan text-cyan' : 'border-white/20 text-dim'}`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="p-4 text-ink">{inr(Number(u.inr_balance || 0))}</td>
-                      <td className="p-4 text-dim">{new Date(u.created_at).toLocaleDateString()}</td>
-                      <td className="p-4 text-right space-x-2">
-                        {u.role !== 'ORGANIZER' && u.role !== 'SUPER_ADMIN' && (
-                          <button
-                            onClick={async () => {
+                  {users
+                    .filter((u) => {
+                      if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false
+                      if (userSearchTerm.trim()) {
+                        const q = userSearchTerm.toLowerCase().trim()
+                        const n = (u.display_name || u.username || '').toLowerCase()
+                        const e = (u.email || '').toLowerCase()
+                        return n.includes(q) || e.includes(q)
+                      }
+                      return true
+                    })
+                    .map((u) => (
+                      <tr key={u.id}>
+                        <td className="p-4">
+                          <div className="font-bold text-ink">{u.display_name || u.username}</div>
+                          <div className="text-dim text-[11px]">{u.email}</div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 border ${u.role === 'SUPER_ADMIN' ? 'border-magenta text-magenta bg-magenta/10' : u.role === 'ORGANIZER' ? 'border-cyan text-cyan bg-cyan/10' : 'border-white/20 text-dim'}`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="p-4 text-ink">{inr(Number(u.inr_balance || 0))}</td>
+                        <td className="p-4 text-dim">{new Date(u.created_at).toLocaleDateString()}</td>
+                        <td className="p-4 text-right space-x-2">
+                          {u.role !== 'ORGANIZER' && u.role !== 'SUPER_ADMIN' && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await promoteUserToOrganizer(u.id)
+                                  showToast(`${u.display_name || u.username} promoted to ORGANIZER successfully!`)
+                                  loadData()
+                                } catch (err: any) {
+                                  alert(err.message || 'Promotion failed')
+                                }
+                              }}
+                              className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] text-cyan hover:bg-cyan/20 uppercase"
+                            >
+                              Promote Organizer
+                            </button>
+                          )}
+                          <select
+                            value={u.role}
+                            onChange={async (e) => {
+                              const newR = e.target.value
                               try {
-                                await promoteUserToOrganizer(u.id)
-                                showToast(`User promoted to ORGANIZER!`)
+                                await setUserRole(u.id, newR)
+                                showToast(`${u.display_name || u.username} role updated to ${newR} successfully!`)
                                 loadData()
                               } catch (err: any) {
-                                alert(err.message || 'Promotion failed')
+                                alert(err.message || 'Role change failed')
                               }
                             }}
-                            className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] text-cyan hover:bg-cyan/20 uppercase"
+                            className="border border-white/15 bg-surface p-1 text-[10px] text-ink outline-none"
                           >
-                            Promote Organizer
-                          </button>
-                        )}
-                        <select
-                          value={u.role}
-                          onChange={async (e) => {
-                            try {
-                              await setUserRole(u.id, e.target.value)
-                              showToast(`Role updated to ${e.target.value}`)
-                              loadData()
-                            } catch (err: any) {
-                              alert(err.message || 'Role change failed')
-                            }
-                          }}
-                          className="border border-white/15 bg-surface p-1 text-[10px] text-ink outline-none"
-                        >
-                          <option value="PLAYER">PLAYER</option>
-                          <option value="ORGANIZER">ORGANIZER</option>
-                          <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                        </select>
+                            <option value="PLAYER">PLAYER</option>
+                            <option value="ORGANIZER">ORGANIZER</option>
+                            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  {users.filter((u) => {
+                    if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false
+                    if (userSearchTerm.trim()) {
+                      const q = userSearchTerm.toLowerCase().trim()
+                      return (u.display_name || u.username || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+                    }
+                    return true
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-dim font-mono">
+                        No contenders found matching current role and search criteria.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2221,53 +2583,194 @@ export default function Admin() {
         {/* TAB 7: SUPPORT TICKETS */}
         {tab === 'SUPPORT TICKETS' && (
           <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="font-display text-3xl font-black uppercase">Helpdesk & Support Inquiries</h2>
-              <Hud className="text-dim">{tickets.length} TICKETS</Hud>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                  <Hud className="text-cyan">USER-CENTRIC HELPDESK WORKSPACE</Hud>
+                </div>
+                <h2 className="mt-1 font-display text-3xl font-black uppercase">Users with Support Tickets</h2>
+                <p className="text-xs text-dim">1st-level organization grouped by user. Inspect inquiry threads, dispatch email replies, and archive closed cases.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Hud className="text-dim">{supportUsers.length} CONTENDERS WITH TICKETS</Hud>
+                <button
+                  onClick={async () => {
+                    const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+                    setSupportUsers(res)
+                  }}
+                  className="border border-white/15 bg-surface px-3 py-1 font-mono text-xs uppercase hover:border-cyan text-ink"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {tickets.map((t) => (
-                <Panel key={t.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs text-cyan font-bold">{t.ticket_id}</span>
-                      <span className="border border-white/20 px-2 py-0.5 font-mono text-[9px] uppercase">{t.status}</span>
-                      <span className="font-mono text-[10px] text-dim">{t.category}</span>
-                    </div>
-                    <h3 className="font-bold text-ink text-sm mt-1">{t.name} ({t.email})</h3>
-                    <p className="text-xs text-dim max-w-xl">{t.description}</p>
-                    {t.internal_notes && <p className="text-xs text-cyan/80 font-mono mt-1">Notes: {t.internal_notes}</p>}
-                  </div>
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    setSupportShowArchived(false)
+                    const res = await getUsersWithSupportTickets(supportSearchTerm, false).catch(() => [])
+                    setSupportUsers(res)
+                  }}
+                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                    !supportShowArchived
+                      ? 'border-cyan bg-cyan text-void font-bold'
+                      : 'border-white/15 bg-surface text-dim hover:text-ink'
+                  }`}
+                >
+                  Active Inquiries ({supportUsers.reduce((acc, u) => acc + (u.open_tickets || 0), 0)} Open)
+                </button>
+                <button
+                  onClick={async () => {
+                    setSupportShowArchived(true)
+                    const res = await getUsersWithSupportTickets(supportSearchTerm, true).catch(() => [])
+                    setSupportUsers(res)
+                  }}
+                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                    supportShowArchived
+                      ? 'border-cyan bg-cyan text-void font-bold'
+                      : 'border-white/15 bg-surface text-dim hover:text-ink'
+                  }`}
+                >
+                  Archived Tickets
+                </button>
+              </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTicket(t)
-                        setTicketStatusVal(t.status)
-                        setTicketNotes(t.internal_notes || '')
-                      }}
-                      className="border border-white/20 bg-surface px-3 py-1.5 font-mono text-xs uppercase text-ink hover:border-cyan"
-                    >
-                      Update Ticket
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await retrySupportTicketEmail(t.id)
-                          showToast('Confirmation email dispatched.')
-                        } catch (err: any) {
-                          alert(err.message || 'Email dispatch failed')
-                        }
-                      }}
-                      className="border border-white/10 px-2.5 py-1.5 font-mono text-xs uppercase text-dim hover:text-cyan"
-                    >
-                      Retry Mail
-                    </button>
-                  </div>
-                </Panel>
-              ))}
+              <div className="w-full md:w-80">
+                <input
+                  type="text"
+                  placeholder="Search user, email, ticket ID..."
+                  value={supportSearchTerm}
+                  onChange={async (e) => {
+                    const q = e.target.value
+                    setSupportSearchTerm(q)
+                    const res = await getUsersWithSupportTickets(q, supportShowArchived).catch(() => [])
+                    setSupportUsers(res)
+                  }}
+                  className="w-full border border-white/15 bg-surface px-3 py-1.5 font-mono text-xs text-ink outline-none focus:border-cyan"
+                />
+              </div>
             </div>
+
+            {/* User-Centric List */}
+            {supportUsers.length === 0 ? (
+              <div className="border border-dashed border-white/15 p-16 text-center font-mono text-xs text-dim">
+                NO USERS WITH SUPPORT TICKETS FOUND MATCHING CRITERIA.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {supportUsers.map((u) => {
+                  const isExpanded = expandedSupportUserId === u._id
+                  return (
+                    <Panel key={u._id} className="p-6 space-y-4 border-l-4 border-l-cyan">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1 font-mono">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-display font-black uppercase text-ink text-lg">
+                              {u.user_name || u.email?.split('@')[0] || 'Contender'}
+                            </span>
+                            <span className="text-dim text-xs">({u.email || 'No email registered'})</span>
+                            {u.open_tickets > 0 && (
+                              <span className="border border-warn/40 bg-warn/10 text-warn px-2 py-0.5 text-[10px] font-bold uppercase animate-pulse">
+                                {u.open_tickets} Actionable
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-dim text-xs flex flex-wrap gap-4">
+                            <span>Total Inquiries: <strong className="text-ink">{u.total_tickets}</strong></span>
+                            <span>Latest Activity: <strong className="text-cyan">{new Date(u.latest_activity).toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setExpandedSupportUserId(isExpanded ? null : u._id)}
+                            className="border border-white/20 bg-surface px-3.5 py-1.5 font-mono text-xs uppercase text-ink hover:border-cyan transition-colors"
+                          >
+                            {isExpanded ? '▲ Collapse Inquiries' : `▼ View Inquiries (${u.tickets?.length || 0})`}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded Ticket Cards */}
+                      {isExpanded && (
+                        <div className="pt-4 border-t border-white/10 space-y-3">
+                          <Hud className="text-dim">ALL TICKETS FILED BY THIS USER</Hud>
+                          <div className="space-y-2">
+                            {u.tickets?.map((t: any) => {
+                              const msgCount = t.messages?.length || 0
+                              return (
+                                <div
+                                  key={t.id || t.ticket_id}
+                                  className="border border-white/10 bg-surface/50 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-white/25 transition-colors"
+                                >
+                                  <div className="space-y-1 font-mono text-xs">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-cyan font-bold">[{t.ticket_id || t.id}]</span>
+                                      <span className="border border-white/20 px-2 py-0.5 text-[10px] uppercase text-dim">
+                                        {t.category}
+                                      </span>
+                                      <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
+                                        t.status === 'RESOLVED' || t.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
+                                        t.status === 'WAITING_FOR_ADMIN' || t.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
+                                        t.status === 'WAITING_FOR_USER' ? 'border-amber-400 text-amber-400 bg-amber-400/10' :
+                                        t.status === 'ARCHIVED' ? 'border-dim text-dim bg-white/5' :
+                                        'border-cyan text-cyan bg-cyan/10'
+                                      }`}>
+                                        {t.status}
+                                      </span>
+                                      <span className="text-dim text-[11px]">{new Date(t.created_at).toLocaleDateString()}</span>
+                                      {msgCount > 0 && (
+                                        <span className="text-cyan/80 text-[11px]">({msgCount} messages)</span>
+                                      )}
+                                    </div>
+                                    <p className="text-ink/90 text-xs line-clamp-2 mt-1">{t.description}</p>
+                                    {t.internal_notes && (
+                                      <p className="text-amber-400/80 text-[11px]">Note: {t.internal_notes}</p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      onClick={() => {
+                                        setActiveTicketThread(t)
+                                        setTicketReplyText('')
+                                        setTicketNextStatus('WAITING_FOR_USER')
+                                      }}
+                                      className="border border-cyan bg-cyan/15 px-3 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/30"
+                                    >
+                                      Open Conversation Thread
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await toggleArchiveSupportTicket(t.id || t.ticket_id)
+                                          showToast('Ticket archive status toggled.')
+                                          const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+                                          setSupportUsers(res)
+                                        } catch (err: any) {
+                                          alert(err.message || 'Archive toggle failed')
+                                        }
+                                      }}
+                                      className="border border-white/10 px-2.5 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink"
+                                    >
+                                      {t.is_archived || t.status === 'ARCHIVED' ? 'Unarchive' : 'Archive'}
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </Panel>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -2325,42 +2828,226 @@ export default function Admin() {
 
             <div className="grid gap-6 md:grid-cols-2">
               <Panel className="p-6 space-y-4">
-                <Hud className="text-cyan">SMTP STATUS</Hud>
+                <Hud className="text-cyan">SMTP RELAY INFRASTRUCTURE</Hud>
                 <h3 className="font-display text-2xl font-black uppercase">System Mail Relays</h3>
                 <div className="space-y-3 font-mono text-xs">
                   <div className="flex justify-between border-b border-white/5 pb-2">
                     <span className="text-dim">Support Mail:</span>
-                    <span className="text-ok font-bold">{emailStatus?.services.support.status || 'Configured'}</span>
+                    <span className="text-ok font-bold">{emailStatus?.services.support.status || 'Configured'} ({emailStatus?.services.support.email || 'support@ametheus.games'})</span>
                   </div>
                   <div className="flex justify-between border-b border-white/5 pb-2">
                     <span className="text-dim">Automated Noreply:</span>
-                    <span className="text-ok font-bold">{emailStatus?.services.noreply.status || 'Configured'}</span>
+                    <span className="text-ok font-bold">{emailStatus?.services.noreply.status || 'Configured'} ({emailStatus?.services.noreply.email || 'noreply@ametheus.games'})</span>
                   </div>
                   <div className="flex justify-between border-b border-white/5 pb-2">
                     <span className="text-dim">Official Dispatch:</span>
-                    <span className="text-ok font-bold">{emailStatus?.services.official.status || 'Configured'}</span>
+                    <span className="text-ok font-bold">{emailStatus?.services.official.status || 'Configured'} ({emailStatus?.services.official.email || 'official@ametheus.games'})</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-dim">SMTP Host:</span>
+                    <span className="text-ink font-mono">{emailStatus?.services.official.smtp_host || 'smtp-relay.brevo.com'}</span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/10 space-y-3">
+                  <Hud className="text-cyan">TEST SMTP RELAY</Hud>
+                  <p className="text-[11px] font-mono text-dim">Send a test probe to verify TLS socket connectivity to Brevo relay.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={testEmailTo}
+                      onChange={(e) => setTestEmailTo(e.target.value)}
+                      placeholder="Recipient email"
+                      className="flex-1 border border-white/15 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan font-mono"
+                    />
+                    <button
+                      onClick={handleSendTestMail}
+                      disabled={isSendingTestMail}
+                      className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors disabled:opacity-50"
+                    >
+                      {isSendingTestMail ? 'Testing...' : 'Send Test'}
+                    </button>
                   </div>
                 </div>
               </Panel>
 
-              <Panel className="p-6 space-y-4">
-                <Hud className="text-cyan">TEST SMTP RELAY</Hud>
-                <h3 className="font-display text-2xl font-black uppercase">Send Diagnostic Mail</h3>
-                <div className="space-y-3">
-                  <input
-                    type="email"
-                    value={testEmailTo}
-                    onChange={(e) => setTestEmailTo(e.target.value)}
-                    placeholder="Recipient email"
-                    className="w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
-                  />
+              {/* PERSONAL / DIRECT EMAIL COMPOSER */}
+              <Panel className="p-6 space-y-4 border-l-4 border-l-cyan">
+                <Hud className="text-cyan">DIRECT CORRESPONDENCE COMPOSER</Hud>
+                <h3 className="font-display text-2xl font-black uppercase">Send Personal Email</h3>
+                <p className="text-xs text-dim">Send an official, authenticated direct email to a specific user, organizer, or external contact.</p>
+
+                <div className="space-y-3 font-mono text-xs">
+                  {/* Recipient Mode */}
+                  <div>
+                    <label className="text-dim">Recipient Destination</label>
+                    <div className="mt-1 flex gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-ink">
+                        <input
+                          type="radio"
+                          name="pEmailMode"
+                          checked={personalEmailMode === 'USER'}
+                          onChange={() => setPersonalEmailMode('USER')}
+                        />
+                        <span>Registered User / Organizer</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-ink">
+                        <input
+                          type="radio"
+                          name="pEmailMode"
+                          checked={personalEmailMode === 'CUSTOM'}
+                          onChange={() => setPersonalEmailMode('CUSTOM')}
+                        />
+                        <span>Custom Email Address</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {personalEmailMode === 'USER' ? (
+                    <div>
+                      <label className="text-dim">Select Registered Contender</label>
+                      <select
+                        value={selectedRecipientUserId}
+                        onChange={(e) => setSelectedRecipientUserId(e.target.value)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                      >
+                        <option value="">-- Choose a user or organizer ({users.length} available) --</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            [{u.role}] {u.display_name || u.username} — {u.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-dim">Custom Destination Email</label>
+                      <input
+                        type="email"
+                        placeholder="contender@example.com"
+                        value={personalEmailCustomTo}
+                        onChange={(e) => setPersonalEmailCustomTo(e.target.value)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-dim">Sender Identity</label>
+                      <select
+                        value={personalEmailSender}
+                        onChange={(e) => setPersonalEmailSender(e.target.value as any)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2 text-cyan font-bold outline-none focus:border-cyan uppercase"
+                      >
+                        <option value="official">Official (official@ametheus.games)</option>
+                        <option value="support">Support (support@ametheus.games)</option>
+                        <option value="noreply">Automated (noreply@ametheus.games)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-dim">Subject Line</label>
+                      <input
+                        type="text"
+                        placeholder="Important update regarding..."
+                        value={personalEmailSubject}
+                        onChange={(e) => setPersonalEmailSubject(e.target.value)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-dim">Message Body</label>
+                    <textarea
+                      rows={4}
+                      placeholder="Compose message text to contender..."
+                      value={personalEmailMessage}
+                      onChange={(e) => setPersonalEmailMessage(e.target.value)}
+                      className="mt-1 w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
                   <button
-                    onClick={handleSendTestMail}
-                    disabled={isSendingTestMail}
-                    className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
+                    disabled={isSendingPersonalEmail || (!personalEmailSubject.trim()) || (!personalEmailMessage.trim())}
+                    onClick={async () => {
+                      let destEmail = ''
+                      let destName = 'Contender'
+                      if (personalEmailMode === 'USER') {
+                        const targetUser = users.find((u) => u.id === selectedRecipientUserId)
+                        if (!targetUser || !targetUser.email) {
+                          alert('Please select a registered contender with a valid email address.')
+                          return
+                        }
+                        destEmail = targetUser.email
+                        destName = targetUser.display_name || targetUser.username
+                      } else {
+                        destEmail = personalEmailCustomTo.trim()
+                        if (!destEmail) {
+                          alert('Please enter a valid destination email address.')
+                          return
+                        }
+                      }
+
+                      setIsSendingPersonalEmail(true)
+                      setPersonalEmailResult(null)
+                      try {
+                        const res = await sendPersonalEmailAdmin({
+                          recipient_email: destEmail,
+                          recipient_name: destName,
+                          sender_identity: personalEmailSender,
+                          subject: personalEmailSubject.trim(),
+                          message: personalEmailMessage.trim(),
+                        })
+                        setPersonalEmailResult(res)
+                        if (res.success) {
+                          showToast(`Email delivered successfully to ${destEmail}!`)
+                          setPersonalEmailSubject('')
+                          setPersonalEmailMessage('')
+                        } else {
+                          alert(`Brevo SMTP relay returned error: ${res.error_detail || res.error_code || 'Delivery failed'}`)
+                        }
+                      } catch (err: any) {
+                        setPersonalEmailResult({
+                          success: false,
+                          error_code: 'CLIENT_ERROR',
+                          error_detail: err.message || 'Failed to dispatch email request',
+                        })
+                        alert(err.message || 'Email dispatch failed')
+                      } finally {
+                        setIsSendingPersonalEmail(false)
+                      }
+                    }}
+                    className="border border-cyan bg-cyan px-5 py-2 uppercase text-void font-bold hover:brightness-110 disabled:opacity-40 transition-all"
                   >
-                    {isSendingTestMail ? 'Dispatching...' : 'Dispatch Test Email'}
+                    {isSendingPersonalEmail ? 'Dispatching via Brevo...' : 'Dispatch Personal Email'}
                   </button>
+
+                  {/* Real-time Brevo Delivery Status Feedback */}
+                  {personalEmailResult && (
+                    <div className={`mt-3 p-3 border font-mono text-[11px] ${
+                      personalEmailResult.success
+                        ? 'border-ok/40 bg-ok/10 text-ok'
+                        : 'border-live/40 bg-live/10 text-live'
+                    }`}>
+                      <div className="font-bold uppercase">
+                        {personalEmailResult.success ? '✓ Delivered via Brevo SMTP' : '✕ Brevo Relay Delivery Failure'}
+                      </div>
+                      {personalEmailResult.success ? (
+                        <div className="mt-1 space-y-0.5 text-[10px] text-ink/80">
+                          <div>Recipient: {personalEmailResult.recipient}</div>
+                          <div>Identity: {personalEmailResult.sender}</div>
+                          {personalEmailResult.message_id && <div>Message-ID: {personalEmailResult.message_id}</div>}
+                          <div>Dispatched at: {personalEmailResult.timestamp}</div>
+                        </div>
+                      ) : (
+                        <div className="mt-1 space-y-0.5 text-[10px]">
+                          <div>Error Code: <strong>{personalEmailResult.error_code || 'UNKNOWN'}</strong></div>
+                          <div>Details: {personalEmailResult.error_detail || 'No diagnostic message returned.'}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Panel>
             </div>
@@ -2755,82 +3442,121 @@ export default function Admin() {
 
       {/* EDIT TOURNAMENT MODAL */}
       {editingTour && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-xl border border-white/20 bg-graphite p-6 my-8">
-            <h3 className="font-display text-2xl font-black uppercase text-cyan">Edit Tournament {editingTour.title}</h3>
-            <form onSubmit={handleUpdateTourSubmit} className="mt-4 space-y-3 font-mono text-xs">
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-hidden">
+          <div className="w-full max-w-xl border border-white/20 bg-graphite max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 p-6 pb-4 shrink-0">
               <div>
-                <label className="text-dim">Title</label>
-                <input required value={editingTour.title} onChange={(e) => setEditingTour({ ...editingTour, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                <Hud className="text-cyan">TOURNAMENT CONFIGURATION</Hud>
+                <h3 className="font-display text-2xl font-black uppercase text-ink">Edit Tournament</h3>
+                <p className="font-mono text-xs text-dim truncate max-w-md">{editingTour.title}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setEditingTour(null)}
+                className="text-dim hover:text-ink font-mono text-xs uppercase border border-white/15 px-2.5 py-1"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateTourSubmit} className="flex flex-col min-h-0 flex-1">
+              <div className="overflow-y-auto p-6 space-y-4 font-mono text-xs flex-1">
                 <div>
-                  <label className="text-dim">Format</label>
-                  <input required value={editingTour.format} onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <label className="text-dim uppercase font-bold text-cyan">Tournament Status Control</label>
+                  <select
+                    value={editingTour.status || 'REGISTRATION_OPEN'}
+                    onChange={(e) => {
+                      const newStatus = e.target.value
+                      const newReg = newStatus === 'REGISTRATION_CLOSED' ? 'CLOSED' : (newStatus === 'REGISTRATION_OPEN' ? 'OPEN' : editingTour.registration_status)
+                      setEditingTour({ ...editingTour, status: newStatus as any, registration_status: newReg })
+                    }}
+                    className="mt-1 w-full border border-cyan/40 bg-surface p-2.5 text-cyan font-bold uppercase outline-none focus:border-cyan"
+                  >
+                    <option value="REGISTRATION_OPEN">● REGISTRATION OPEN (ACCEPTING TEAMS)</option>
+                    <option value="REGISTRATION_CLOSED">■ REGISTRATION CLOSED (LOCKED ROSTERS)</option>
+                    <option value="LIVE">▲ LIVE NOW (MATCHES IN PROGRESS)</option>
+                    <option value="COMPLETED">✓ COMPLETED (RESULTS CERTIFIED)</option>
+                    <option value="CANCELLED">✕ CANCELLED</option>
+                  </select>
+                  <p className="mt-1 text-[10px] text-dim">
+                    Setting to REGISTRATION CLOSED locks rosters and enables Match Formation.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-dim">Title</label>
+                  <input required value={editingTour.title} onChange={(e) => setEditingTour({ ...editingTour, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-dim">Format</label>
+                    <input required value={editingTour.format} onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                  </div>
+                  <div>
+                    <label className="text-dim">Max Teams</label>
+                    <input required type="number" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-dim">Prize Pool (₹)</label>
+                    <input required type="number" value={editingTour.prize_pool_inr} onChange={(e) => setEditingTour({ ...editingTour, prize_pool_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                  </div>
+                  <div>
+                    <label className="text-dim">Entry Fee (₹)</label>
+                    <input required type="number" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                  </div>
+                </div>
+                <div className="space-y-3 border-t border-white/10 pt-3">
+                  <div className="font-bold uppercase text-cyan text-[11px]">Responsive Tournament Media Assets</div>
+                  <BannerImageUploader
+                    label="Desktop Banner (16:9 Widescreen)"
+                    recommendedRatio="16:9"
+                    recommendedRes="1920x1080"
+                    value={editingTour.banner_url || ''}
+                    onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
+                  />
+                  <BannerImageUploader
+                    label="Tablet Banner (4:3 Medium)"
+                    recommendedRatio="4:3"
+                    recommendedRes="1600x1200"
+                    value={editingTour.banner_tablet_url || ''}
+                    onChange={(val) => setEditingTour({ ...editingTour, banner_tablet_url: val })}
+                  />
+                  <BannerImageUploader
+                    label="Mobile Story Banner (9:16 Vertical)"
+                    recommendedRatio="9:16"
+                    recommendedRes="1080x1920"
+                    value={editingTour.banner_mobile_url || ''}
+                    onChange={(val) => setEditingTour({ ...editingTour, banner_mobile_url: val })}
+                  />
+                  <BannerImageUploader
+                    label="Tournament Logo / Emblem (1:1 Square or SVG)"
+                    recommendedRatio="1:1"
+                    recommendedRes="512x512"
+                    value={editingTour.logo_url || ''}
+                    onChange={(val) => setEditingTour({ ...editingTour, logo_url: val })}
+                  />
                 </div>
                 <div>
-                  <label className="text-dim">Max Teams</label>
-                  <input required type="number" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <label className="text-dim">Official WhatsApp Group / Community Link</label>
+                  <input
+                    placeholder="https://chat.whatsapp.com/... (optional)"
+                    value={editingTour.whatsapp_group_url || ''}
+                    onChange={(e) => setEditingTour({ ...editingTour, whatsapp_group_url: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                  <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-dim">Prize Pool (₹)</label>
-                  <input required type="number" value={editingTour.prize_pool_inr} onChange={(e) => setEditingTour({ ...editingTour, prize_pool_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                </div>
-                <div>
-                  <label className="text-dim">Entry Fee (₹)</label>
-                  <input required type="number" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <label className="text-dim">Description</label>
+                  <textarea rows={3} value={editingTour.description || ''} onChange={(e) => setEditingTour({ ...editingTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                 </div>
               </div>
-              <div className="space-y-3 border-t border-white/10 pt-3">
-                <div className="font-bold uppercase text-cyan text-[11px]">Responsive Tournament Media Assets</div>
-                <BannerImageUploader
-                  label="Desktop Banner (16:9 Widescreen)"
-                  recommendedRatio="16:9"
-                  recommendedRes="1920x1080"
-                  value={editingTour.banner_url || ''}
-                  onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
-                />
-                <BannerImageUploader
-                  label="Tablet Banner (4:3 Medium)"
-                  recommendedRatio="4:3"
-                  recommendedRes="1600x1200"
-                  value={editingTour.banner_tablet_url || ''}
-                  onChange={(val) => setEditingTour({ ...editingTour, banner_tablet_url: val })}
-                />
-                <BannerImageUploader
-                  label="Mobile Story Banner (9:16 Vertical)"
-                  recommendedRatio="9:16"
-                  recommendedRes="1080x1920"
-                  value={editingTour.banner_mobile_url || ''}
-                  onChange={(val) => setEditingTour({ ...editingTour, banner_mobile_url: val })}
-                />
-                <BannerImageUploader
-                  label="Tournament Logo / Emblem (1:1 Square or SVG)"
-                  recommendedRatio="1:1"
-                  recommendedRes="512x512"
-                  value={editingTour.logo_url || ''}
-                  onChange={(val) => setEditingTour({ ...editingTour, logo_url: val })}
-                />
-              </div>
-              <div>
-                <label className="text-dim">Official WhatsApp Group / Community Link</label>
-                <input
-                  placeholder="https://chat.whatsapp.com/... (optional)"
-                  value={editingTour.whatsapp_group_url || ''}
-                  onChange={(e) => setEditingTour({ ...editingTour, whatsapp_group_url: e.target.value })}
-                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                />
-                <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
-              </div>
-              <div>
-                <label className="text-dim">Description</label>
-                <textarea rows={3} value={editingTour.description || ''} onChange={(e) => setEditingTour({ ...editingTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-              </div>
-              <div className="pt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setEditingTour(null)} className="border border-white/20 px-3 py-1.5 uppercase text-dim">Cancel</button>
-                <button type="submit" className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold">Save Changes</button>
+
+              <div className="flex justify-end gap-3 border-t border-white/10 p-4 shrink-0 bg-graphite">
+                <button type="button" onClick={() => setEditingTour(null)} className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink">Cancel</button>
+                <button type="submit" className="border border-cyan bg-cyan px-6 py-2 uppercase text-void font-bold hover:brightness-110">Save Changes</button>
               </div>
             </form>
           </div>
@@ -3601,6 +4327,431 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {/* SUPPORT TICKET CONVERSATION THREAD MODAL */}
+      {activeTicketThread && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-hidden">
+          <div className="w-full max-w-2xl border border-white/20 bg-graphite max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 p-5 shrink-0 bg-surface/50">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan font-bold text-sm">[{activeTicketThread.ticket_id || activeTicketThread.id}]</span>
+                  <span className="border border-white/20 px-2 py-0.5 text-[10px] text-dim uppercase">
+                    {activeTicketThread.category}
+                  </span>
+                  <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
+                    activeTicketThread.status === 'RESOLVED' || activeTicketThread.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
+                    activeTicketThread.status === 'WAITING_FOR_ADMIN' || activeTicketThread.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
+                    'border-cyan text-cyan bg-cyan/10'
+                  }`}>
+                    {activeTicketThread.status}
+                  </span>
+                </div>
+                <div className="text-xs text-ink font-bold mt-1">
+                  {activeTicketThread.name || 'Contender'} · <span className="text-dim">{activeTicketThread.email}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={activeTicketThread.status}
+                  onChange={async (e) => {
+                    const newSt = e.target.value
+                    try {
+                      await updateSupportTicket(activeTicketThread.id || activeTicketThread.ticket_id, { status: newSt })
+                      setActiveTicketThread({ ...activeTicketThread, status: newSt })
+                      showToast(`Ticket status updated to ${newSt}`)
+                      const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+                      setSupportUsers(res)
+                    } catch (err: any) {
+                      alert(err.message || 'Status update failed')
+                    }
+                  }}
+                  className="border border-white/15 bg-surface p-1 text-[10px] text-cyan font-bold outline-none uppercase"
+                >
+                  <option value="NEW">NEW</option>
+                  <option value="OPEN">OPEN</option>
+                  <option value="WAITING_FOR_USER">WAITING FOR USER</option>
+                  <option value="WAITING_FOR_ADMIN">WAITING FOR ADMIN</option>
+                  <option value="UNREAD">UNREAD</option>
+                  <option value="IN_PROGRESS">IN PROGRESS</option>
+                  <option value="ON_HOLD">ON HOLD</option>
+                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="ARCHIVED">ARCHIVED</option>
+                </select>
+
+                <button
+                  onClick={() => setActiveTicketThread(null)}
+                  className="text-dim hover:text-ink text-xs uppercase border border-white/15 px-2.5 py-1"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Conversation Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+              {/* Initial Issue Card */}
+              <div className="border border-white/10 bg-surface/30 p-4 rounded space-y-2">
+                <div className="flex justify-between text-[10px] text-dim">
+                  <span>INITIAL SUBMISSION DETAILS</span>
+                  <span>{new Date(activeTicketThread.created_at).toLocaleString()}</span>
+                </div>
+                <p className="text-ink/90 whitespace-pre-wrap">{activeTicketThread.description}</p>
+                {activeTicketThread.internal_notes && (
+                  <div className="text-amber-400/90 text-[11px] pt-2 border-t border-white/5">
+                    Internal Notes: {activeTicketThread.internal_notes}
+                  </div>
+                )}
+              </div>
+
+              {/* Message Thread */}
+              <div className="space-y-3 pt-2">
+                <Hud className="text-dim">CONVERSATION THREAD</Hud>
+                {(!activeTicketThread.messages || activeTicketThread.messages.length === 0) ? (
+                  <p className="text-dim text-[11px] italic">No replies dispatched yet. Compose an administrative reply below.</p>
+                ) : (
+                  activeTicketThread.messages.map((m: any, idx: number) => {
+                    const isAdmin = m.sender_role === 'ADMIN' || m.sender_name?.includes('Admin') || m.sender_name?.includes('Arbiter')
+                    return (
+                      <div
+                        key={m.id || idx}
+                        className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                      >
+                        <div className="flex items-center gap-2 text-[10px] text-dim mb-1">
+                          <span className={isAdmin ? 'text-cyan font-bold' : 'text-ink font-bold'}>
+                            {m.sender_name || (isAdmin ? 'Admin Arbiter' : 'Contender')}
+                          </span>
+                          <span>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div
+                          className={`max-w-[85%] p-3 rounded text-xs whitespace-pre-wrap ${
+                            isAdmin
+                              ? 'bg-cyan/15 border border-cyan/30 text-ink'
+                              : 'bg-surface border border-white/15 text-ink'
+                          }`}
+                        >
+                          {m.message}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Reply Composer Footer */}
+            <div className="border-t border-white/10 p-4 shrink-0 bg-surface/80 space-y-3">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-dim text-[11px]">Next Status upon Reply:</span>
+                <select
+                  value={ticketNextStatus}
+                  onChange={(e) => setTicketNextStatus(e.target.value)}
+                  className="border border-white/15 bg-surface p-1 text-[11px] text-ink outline-none uppercase"
+                >
+                  <option value="WAITING_FOR_USER">WAITING FOR USER (DEFAULT)</option>
+                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="IN_PROGRESS">IN PROGRESS</option>
+                  <option value="ON_HOLD">ON HOLD</option>
+                </select>
+              </div>
+
+              <textarea
+                rows={3}
+                placeholder="Write reply to contender (will be dispatched via email and in-app notification)..."
+                value={ticketReplyText}
+                onChange={(e) => setTicketReplyText(e.target.value)}
+                className="w-full border border-white/15 bg-surface p-2.5 text-xs text-ink outline-none focus:border-cyan"
+              />
+
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={async () => {
+                    try {
+                      await retrySupportTicketEmail(activeTicketThread.id || activeTicketThread.ticket_id)
+                      showToast('Confirmation email redelivery triggered.')
+                    } catch (err: any) {
+                      alert(err.message || 'Email dispatch failed')
+                    }
+                  }}
+                  className="border border-white/15 px-3 py-1.5 text-[10px] uppercase text-dim hover:text-cyan"
+                >
+                  Retry Initial Confirmation Email
+                </button>
+
+                <button
+                  disabled={isSubmittingTicketReply || !ticketReplyText.trim()}
+                  onClick={async () => {
+                    setIsSubmittingTicketReply(true)
+                    try {
+                      const updated = await replyToSupportTicket(
+                        activeTicketThread.id || activeTicketThread.ticket_id,
+                        ticketReplyText.trim(),
+                        ticketNextStatus
+                      )
+                      setActiveTicketThread(updated)
+                      setTicketReplyText('')
+                      showToast('Reply dispatched to contender!')
+                      const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+                      setSupportUsers(res)
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to send reply')
+                    } finally {
+                      setIsSubmittingTicketReply(false)
+                    }
+                  }}
+                  className="border border-cyan bg-cyan px-5 py-2 text-xs uppercase text-void font-bold hover:brightness-110 disabled:opacity-40"
+                >
+                  {isSubmittingTicketReply ? 'Dispatching...' : 'Dispatch Reply & Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ORGANIZER MATCH REQUEST ACTION MODAL */}
+      {actioningRequest && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-hidden font-mono text-xs">
+          <div className="w-full max-w-lg border border-white/20 bg-graphite max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 p-5 shrink-0 bg-surface/50">
+              <div>
+                <Hud className="text-cyan">MATCH REQUEST ARBITRATION</Hud>
+                <h3 className="font-display text-xl font-black uppercase text-ink">Action Live Match Request</h3>
+              </div>
+              <button
+                onClick={() => setActioningRequest(null)}
+                className="text-dim hover:text-ink text-xs uppercase border border-white/15 px-2.5 py-1"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="border border-white/10 bg-surface/40 p-3 space-y-1 rounded text-[11px]">
+                <div>Match: <strong className="text-ink">{actioningRequest.title || `${actioningRequest.team_a_name} vs ${actioningRequest.team_b_name}`}</strong></div>
+                <div>Tournament: <strong className="text-cyan">{actioningRequest.tournament_name || actioningRequest.tournament_id}</strong></div>
+                <div>Organizer: <strong className="text-ink">{actioningRequest.organizer_name}</strong> ({actioningRequest.organizer_email})</div>
+                {actioningRequest.round_name && <div>Round: {actioningRequest.round_name}</div>}
+                {actioningRequest.youtube_live_url && <div>Stream: <a href={actioningRequest.youtube_live_url} target="_blank" rel="noreferrer" className="text-cyan underline">{actioningRequest.youtube_live_url}</a></div>}
+                {actioningRequest.notes && <div>Organizer Notes: {actioningRequest.notes}</div>}
+              </div>
+
+              <div>
+                <label className="text-dim font-bold uppercase">Decision Status</label>
+                <select
+                  value={actionReqStatus}
+                  onChange={(e) => setActionReqStatus(e.target.value as any)}
+                  className="mt-1 w-full border border-cyan/40 bg-surface p-2.5 text-cyan font-bold outline-none uppercase"
+                >
+                  <option value="APPROVED">APPROVE REQUEST</option>
+                  <option value="REJECTED">REJECT REQUEST</option>
+                  <option value="IN_REVIEW">SET IN REVIEW</option>
+                </select>
+              </div>
+
+              {actionReqStatus === 'APPROVED' && (
+                <label className="flex items-center gap-2 cursor-pointer text-ink text-xs">
+                  <input
+                    type="checkbox"
+                    checked={actionReqMakeLive}
+                    onChange={(e) => setActionReqMakeLive(e.target.checked)}
+                  />
+                  <span>Automatically set target match to LIVE status now</span>
+                </label>
+              )}
+
+              <div>
+                <label className="text-dim">Administrative Rationale / Notes</label>
+                <textarea
+                  rows={3}
+                  value={actionReqNotes}
+                  onChange={(e) => setActionReqNotes(e.target.value)}
+                  placeholder="Notes explaining approval or rejection reason..."
+                  className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 p-4 shrink-0 bg-graphite flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setActioningRequest(null)}
+                className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingReqAction}
+                onClick={async () => {
+                  setIsSubmittingReqAction(true)
+                  try {
+                    await actionAdminMatchRequest(actioningRequest.id, {
+                      status: actionReqStatus,
+                      admin_notes: actionReqNotes.trim() || undefined,
+                      make_match_live: actionReqMakeLive,
+                    })
+                    showToast(`Match request updated to ${actionReqStatus}!`)
+                    setActioningRequest(null)
+                    loadData()
+                  } catch (err: any) {
+                    alert(err.message || 'Failed to action request')
+                  } finally {
+                    setIsSubmittingReqAction(false)
+                  }
+                }}
+                className="border border-cyan bg-cyan px-5 py-2 uppercase text-void font-bold hover:brightness-110 disabled:opacity-40"
+              >
+                {isSubmittingReqAction ? 'Saving...' : 'Apply Decision'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ORGANIZER EMAIL THREAD DIALOGUE MODAL */}
+      {activeOrgThread && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-hidden font-mono text-xs">
+          <div className="w-full max-w-2xl border border-white/20 bg-graphite max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 p-5 shrink-0 bg-surface/50">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-ink text-sm">{activeOrgThread.subject}</span>
+                  <span className={`px-2 py-0.5 border text-[10px] uppercase font-bold ${
+                    activeOrgThread.status === 'RESOLVED' || activeOrgThread.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
+                    activeOrgThread.status === 'WAITING_FOR_ADMIN' || activeOrgThread.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
+                    'border-magenta text-magenta bg-magenta/10'
+                  }`}>
+                    {activeOrgThread.status}
+                  </span>
+                </div>
+                <div className="text-[11px] text-dim mt-0.5">
+                  Organizer: <strong className="text-ink">{activeOrgThread.organizer_name}</strong> ({activeOrgThread.organizer_email}) · Category: {activeOrgThread.category}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={activeOrgThread.status}
+                  onChange={async (e) => {
+                    const newSt = e.target.value
+                    try {
+                      await updateAdminOrganizerEmailStatus(activeOrgThread.id, newSt)
+                      setActiveOrgThread({ ...activeOrgThread, status: newSt })
+                      showToast(`Thread status updated to ${newSt}`)
+                      loadData()
+                    } catch (err: any) {
+                      alert(err.message || 'Status update failed')
+                    }
+                  }}
+                  className="border border-white/15 bg-surface p-1 text-[10px] text-magenta font-bold outline-none uppercase"
+                >
+                  <option value="UNREAD">UNREAD</option>
+                  <option value="OPEN">OPEN</option>
+                  <option value="WAITING_FOR_ADMIN">WAITING FOR ADMIN</option>
+                  <option value="WAITING_FOR_ORGANIZER">WAITING FOR ORGANIZER</option>
+                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="CLOSED">CLOSED</option>
+                </select>
+
+                <button
+                  onClick={() => setActiveOrgThread(null)}
+                  className="text-dim hover:text-ink text-xs uppercase border border-white/15 px-2.5 py-1"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Messages Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {(!activeOrgThread.messages || activeOrgThread.messages.length === 0) ? (
+                <p className="text-dim italic">No messages found in this dialogue.</p>
+              ) : (
+                activeOrgThread.messages.map((m: any, idx: number) => {
+                  const isAdmin = m.sender_role === 'ADMIN'
+                  return (
+                    <div key={m.id || idx} className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2 text-[10px] text-dim mb-1">
+                        <span className={isAdmin ? 'text-cyan font-bold' : 'text-magenta font-bold'}>
+                          {m.sender_name || (isAdmin ? 'Admin' : 'Organizer')}
+                        </span>
+                        <span>{new Date(m.created_at).toLocaleString()}</span>
+                      </div>
+                      <div
+                        className={`max-w-[85%] p-3 rounded text-xs whitespace-pre-wrap ${
+                          isAdmin
+                            ? 'bg-cyan/15 border border-cyan/30 text-ink'
+                            : 'bg-magenta/15 border border-magenta/30 text-ink'
+                        }`}
+                      >
+                        {m.message}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Reply Composer */}
+            <div className="border-t border-white/10 p-4 shrink-0 bg-surface/80 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-dim text-[11px]">Next Status upon Reply:</span>
+                <select
+                  value={orgThreadNextStatus}
+                  onChange={(e) => setOrgThreadNextStatus(e.target.value)}
+                  className="border border-white/15 bg-surface p-1 text-[11px] text-ink outline-none uppercase"
+                >
+                  <option value="WAITING_FOR_ORGANIZER">WAITING FOR ORGANIZER</option>
+                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="OPEN">OPEN</option>
+                </select>
+              </div>
+
+              <textarea
+                rows={3}
+                placeholder="Compose reply to organizer (dispatched via Brevo email and organizer panel)..."
+                value={orgThreadReplyText}
+                onChange={(e) => setOrgThreadReplyText(e.target.value)}
+                className="w-full border border-white/15 bg-surface p-2.5 text-xs text-ink outline-none focus:border-cyan"
+              />
+
+              <div className="flex justify-end">
+                <button
+                  disabled={isSubmittingOrgReply || !orgThreadReplyText.trim()}
+                  onClick={async () => {
+                    setIsSubmittingOrgReply(true)
+                    try {
+                      const updated = await replyAdminOrganizerEmail(
+                        activeOrgThread.id,
+                        orgThreadReplyText.trim(),
+                        orgThreadNextStatus
+                      )
+                      setActiveOrgThread(updated)
+                      setOrgThreadReplyText('')
+                      showToast('Reply dispatched to organizer!')
+                      loadData()
+                    } catch (err: any) {
+                      alert(err.message || 'Failed to dispatch reply')
+                    } finally {
+                      setIsSubmittingOrgReply(false)
+                    }
+                  }}
+                  className="border border-magenta bg-magenta px-5 py-2 text-xs uppercase text-void font-bold hover:brightness-110 disabled:opacity-40"
+                >
+                  {isSubmittingOrgReply ? 'Dispatching...' : 'Dispatch Reply to Organizer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

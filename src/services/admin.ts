@@ -387,6 +387,28 @@ export async function sendOfficialEmailAdmin(payload: {
   })
 }
 
+export async function sendPersonalEmailAdmin(payload: {
+  recipient_email: string
+  recipient_name?: string
+  sender_identity?: string
+  subject: string
+  message: string
+}): Promise<{
+  success: boolean
+  error_code?: string
+  error_detail?: string
+  message_id?: string
+  sender?: string
+  recipient?: string
+  timestamp?: string
+}> {
+  return apiClient('/admin/email/send-personal', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+
 // Page Media
 export async function getAllPageMedia(): Promise<PageMediaConfig[]> {
   try {

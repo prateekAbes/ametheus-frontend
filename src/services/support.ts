@@ -67,10 +67,36 @@ export async function createSupportTicket(payload: {
 
 export async function replyToSupportTicket(
   ticketId: string,
-  message: string
+  message: string,
+  status?: string
 ): Promise<SupportTicket> {
   return apiClient<SupportTicket>(`/support/tickets/${ticketId}/reply`, {
     method: 'POST',
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, status }),
+  })
+}
+
+export interface UserSupportGroup {
+  _id: string
+  email?: string
+  user_name?: string
+  user_id?: string
+  total_tickets: number
+  open_tickets: number
+  latest_activity: string
+  tickets: SupportTicket[]
+}
+
+export async function getUsersWithSupportTickets(search?: string, isArchived: boolean = false): Promise<UserSupportGroup[]> {
+  const params = new URLSearchParams()
+  if (search) params.set('search', search)
+  if (isArchived) params.set('is_archived', 'true')
+  const qs = params.toString()
+  return apiClient<UserSupportGroup[]>(`/support/users-with-tickets${qs ? `?${qs}` : ''}`)
+}
+
+export async function toggleArchiveSupportTicket(ticketId: string): Promise<SupportTicket> {
+  return apiClient<SupportTicket>(`/support/tickets/${ticketId}/archive`, {
+    method: 'POST',
   })
 }

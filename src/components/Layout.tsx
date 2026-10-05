@@ -13,6 +13,7 @@ const MAIN = [
   ['Games', '/games'],
   ['Tournaments', '/tournaments'],
   ['Matches', '/matches'],
+  ['Leaderboard', '/leaderboard'],
   ['Teams', '/teams'],
   ['Wallet', '/wallet'],
   ['Support', '/support'],
@@ -52,13 +53,23 @@ export function Logo() {
 }
 
 function Nav() {
+  const location = useLocation()
   const [drawer, setDrawer] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const { isSignedIn } = useAuthContext()
-  const loc = useLocation()
+  useEffect(() => { setDrawer(false) }, [location.pathname])
 
-  useEffect(() => { setDrawer(false) }, [loc.pathname])
+  useEffect(() => {
+    if (drawer) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [drawer])
 
   useEffect(() => {
     if (isSignedIn) {
@@ -68,7 +79,7 @@ function Nav() {
     } else {
       setUnreadCount(0)
     }
-  }, [isSignedIn, loc.pathname])
+  }, [isSignedIn, location.pathname])
 
   useEffect(() => {
     // sentinel observer: no scroll listener, state flips only at the threshold
@@ -122,28 +133,87 @@ function Nav() {
       </header>
 
       {/* drawer */}
-      <div className={`fixed inset-0 z-[60] bg-void transition-opacity duration-500 xl:hidden ${drawer ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
-        <div className="flex items-center justify-between px-6 pt-6"><Logo /><button onClick={() => setDrawer(false)} className="font-mono text-[11px] tracking-[0.2em]">CLOSE ✕</button></div>
-        <div className="no-scrollbar h-[calc(100%-80px)] overflow-y-auto px-6 pb-28 pt-10">
-          <ul>
+      <div className={`fixed inset-0 z-[60] flex flex-col bg-void transition-opacity duration-300 xl:hidden ${drawer ? 'opacity-100 pointer-events-auto' : 'pointer-events-none opacity-0'}`}>
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5 md:px-10">
+          <Logo />
+          <button
+            onClick={() => setDrawer(false)}
+            className="flex items-center gap-2 border border-white/15 bg-surface/50 px-3 py-1.5 font-mono text-[11px] font-bold tracking-[0.2em] text-ink hover:border-cyan hover:text-cyan transition-colors"
+          >
+            CLOSE ✕
+          </button>
+        </div>
+        <div className="no-scrollbar flex-1 overflow-y-auto px-6 pb-32 pt-8">
+          <ul className="space-y-1">
             {MAIN.map(([l, to], i) => (
-              <li key={l} style={{ transitionDelay: `${i * 40}ms` }} className={`transition-all duration-500 ${drawer ? 'translate-x-0 opacity-100' : '-translate-x-6 opacity-0'}`}>
-                <NavLink to={to} end={to === '/'} className={({ isActive }) => `flex items-baseline gap-4 py-1 font-display text-5xl font-black uppercase ${isActive ? 'text-cyan' : ''}`}><span className="font-mono text-xs text-dim">0{i + 1}</span>{l}</NavLink>
+              <li
+                key={l}
+                style={{ transitionDelay: `${i * 35}ms` }}
+                className={`transition-all duration-300 ${drawer ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'}`}
+              >
+                <NavLink
+                  to={to}
+                  end={to === '/'}
+                  onClick={() => setDrawer(false)}
+                  className={({ isActive }) => `flex items-baseline gap-3 py-1.5 font-display text-[clamp(1.75rem,6.5vw,2.75rem)] font-black uppercase tracking-tight transition-colors ${isActive ? 'text-cyan' : 'text-ink/80 hover:text-cyan'}`}
+                >
+                  <span className="font-mono text-xs text-dim">0{i + 1}</span>
+                  {l}
+                </NavLink>
               </li>
             ))}
           </ul>
-          <div className="mt-10 grid grid-cols-2 gap-px border border-white/10 bg-white/10">
+          <div className="mt-8 grid grid-cols-2 gap-px border border-white/10 bg-white/10">
             {isSignedIn ? (
               <>
-                {PROFILE.map(([l, to]) => <Link key={l} to={to} className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">{l}</Link>)}
-                <Link to="/login" className="bg-void px-4 py-3 text-sm text-live">Logout</Link>
+                {PROFILE.map(([l, to]) => (
+                  <Link
+                    key={l}
+                    to={to}
+                    onClick={() => setDrawer(false)}
+                    className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
+                  >
+                    {l}
+                  </Link>
+                ))}
+                <Link
+                  to="/login"
+                  onClick={() => setDrawer(false)}
+                  className="bg-void px-4 py-3 text-sm text-live font-mono"
+                >
+                  Logout
+                </Link>
               </>
             ) : (
               <>
-                <Link to="/login" className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider">Log In</Link>
-                <Link to="/signup" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider">Sign Up</Link>
-                <Link to="/support" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">Support</Link>
-                <Link to="/about" className="bg-void px-4 py-3 text-sm text-dim hover:text-ink">About</Link>
+                <Link
+                  to="/login"
+                  onClick={() => setDrawer(false)}
+                  className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setDrawer(false)}
+                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider"
+                >
+                  Sign Up
+                </Link>
+                <Link
+                  to="/support"
+                  onClick={() => setDrawer(false)}
+                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
+                >
+                  Support
+                </Link>
+                <Link
+                  to="/about"
+                  onClick={() => setDrawer(false)}
+                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
+                >
+                  About
+                </Link>
               </>
             )}
           </div>

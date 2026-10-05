@@ -20,6 +20,8 @@ export interface Team {
   members: TeamMember[]
   logo_url?: string
   banner_url?: string
+  max_members?: number
+  max_substitutes?: number
   is_active: boolean
   created_at?: string
 }
@@ -78,8 +80,21 @@ export async function leaveTeam(teamId: string): Promise<any> {
   })
 }
 
+export async function transferTeamLeadership(teamId: string, newCaptainId: string): Promise<Team> {
+  return apiClient<Team>(`/teams/${teamId}/transfer-leadership/${newCaptainId}`, {
+    method: 'POST',
+  })
+}
+
+export async function kickTeamMember(teamId: string, userId: string): Promise<any> {
+  return apiClient(`/teams/${teamId}/kick/${userId}`, {
+    method: 'POST',
+  })
+}
+
 export async function deleteTeam(teamId: string): Promise<any> {
   return apiClient(`/teams/${teamId}`, {
     method: 'DELETE',
   })
 }
+
