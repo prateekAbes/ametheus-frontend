@@ -5,7 +5,6 @@ import {
   createMatchAdmin,
   updateMatchDetailsAdmin,
   deleteMatchAdmin,
-  markMatchLiveAdmin,
   completeMatchAdmin,
   swapTeamsAdmin,
   updateMatchStatus,
@@ -16,10 +15,12 @@ import {
   getTournamentRoundsRosters,
   publishRosterAdmin,
   publishAllRostersAdmin,
+  saveLiveMatchStructureAdmin,
   type RegisteredRosterTeam,
   type TournamentRoundsRostersResponse,
 } from '../../services/matches'
 import { type Tournament } from '../../services/tournaments'
+import { resolveMediaUrl } from '../../services/apiClient'
 import { Panel, Hud, Badge, Brackets } from '../ui'
 
 interface Props {
@@ -40,23 +41,461 @@ const DEFAULT_STAGES = [
 ]
 
 export const COMPETITION_FORMATS = [
-  'Single Elimination',
   'Knockout',
+  'Single Elimination',
   'Double Elimination',
   'Round Robin',
   'Battle Royale',
   'Drop-in',
 ] as const
 
+interface FormationRound {
+  round_name: string
+  round_number: number
+  format?: string
+}
+
+interface FormationMatch {
+  id?: string
+  round_name: string
+  round_number: number
+  match_number: number
+  stage: string
+  format: string
+  series_format: string
+  roster_status: 'DRAFT' | 'PUBLISHED'
+  team_a_id?: string
+  team_b_id?: string
+  team_a_name?: string
+  team_b_name?: string
+  team_a_placeholder?: string
+  team_b_placeholder?: string
+  team_ids?: string[]
+  teams?: Array<{ id: string; name: string; tag?: string }>
+  next_match_slot?: string
+  advancement_label?: string
+  scheduled_date?: string
+  scheduled_time?: string
+  youtube_live_url?: string
+  lobby_code?: string
+  lobby_password?: string
+  server_region?: string
+  score_a?: number
+  score_b?: number
+  winner_team_id?: string
+  status?: string
+}
+
 export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
+  // Navigation tabs: Live Operations vs Manual Formation Builder
+  const [activeTab, setActiveTab] = useState<'OPERATIONS' | 'FORMATION'>('OPERATIONS')
+
+  // Banner message
+  const [bannerMsg, setBannerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const showBanner = (text: string, type: 'ok' | 'err' = 'ok') => {
+    setBannerMsg({ type, text })
+    setTimeout(() => setBannerMsg(null), 5000)
+  }
+
+  // -------------------------------------------------------------
+  // CLOSED TOURNAMENTS ONLY FILTER (Excludes open, upcoming, completed, cancelled)
+  // -------------------------------------------------------------
+  const closedTournaments = useMemo(() => {
+    return tournaments.filter((t) => {
+      const regStatus = (t.registration_status || '').toUpperCase()
+      const status = (t.status || '').toUpperCase()
+      const isRegClosed = regStatus === 'CLOSED' || status === 'REGISTRATION_CLOSED'
+      const isCompletedOrCancelled = status === 'COMPLETED' || status === 'CANCELLED'
+      return isRegClosed && !isCompletedOrCancelled
+    })
+  }, [tournaments])
+
+  // -------------------------------------------------------------
+  // FORMATION WORKSPACE STATE (Initial state: strictly ZERO rounds & ZERO matches)
+  // -------------------------------------------------------------
+  const [formationTournId, setFormationTournId] = useState<string>('')
+  const [formationStatus, setFormationStatus] = useState<'DRAFT' | 'PUBLISHED'>('DRAFT')
+  const [savingFormation, setSavingFormation] = useState(false)
+  const [loadingFormation, setLoadingFormation] = useState(false)
+  const [formationRounds, setFormationRounds] = useState<FormationRound[]>([])
+  const [formationMatches, setFormationMatches] = useState<FormationMatch[]>([])
+  const [formationRosters, setFormationRosters] = useState<RegisteredRosterTeam[]>([])
+  const [formationStreamUrl, setFormationStreamUrl] = useState('')
+  const [savingFormationStream, setSavingFormationStream] = useState(false)
+  const [formationSquadSearch, setFormationSquadSearch] = useState('')
+
+  // Round creation modal/popover in Formation Workspace
+  const [isAddRoundModalOpen, setIsAddRoundModalOpen] = useState(false)
+  const [newRoundInputName, setNewRoundInputName] = useState('')
+
+  // Match creation modal in Formation Workspace
+  const [isAddFormationMatchOpen, setIsAddFormationMatchOpen] = useState(false)
+  const [formationMatchRound, setFormationMatchRound] = useState<string>('')
+  const [formationMatchFormData, setFormationMatchFormData] = useState({
+    format: 'Knockout' as (typeof COMPETITION_FORMATS)[number],
+    series_format: 'BO1',
+    team_a_mode: 'ROSTER' as 'ROSTER' | 'PLACEHOLDER',
+    team_b_mode: 'ROSTER' as 'ROSTER' | 'PLACEHOLDER',
+    team_a_id: '',
+    team_b_id: '',
+    team_a_placeholder: '',
+    team_b_placeholder: '',
+    selected_team_ids: [] as string[],
+    next_match_slot: '',
+    advancement_label: '',
+    scheduled_date: '',
+    scheduled_time: '',
+    youtube_live_url: '',
+    server_region: 'AWS Mumbai (ap-south-1)',
+    match_number: 1,
+  })
+
+  // Selected tournament object for Formation
+  const currentFormationTourn = useMemo(
+    () => tournaments.find((t) => (t.id || t.slug) === formationTournId),
+    [tournaments, formationTournId]
+  )
+
+  // Load Formation Data for selected closed tournament
+  const loadFormationData = useCallback(async (tournId: string) => {
+    if (!tournId) {
+      setFormationRounds([])
+      setFormationMatches([])
+      setFormationRosters([])
+      setFormationStreamUrl('')
+      return
+    }
+
+    setLoadingFormation(true)
+    try {
+      // 1. Fetch registered teams
+      const rostersRes = await getTournamentRegisteredRosters(tournId)
+      if (rostersRes && Array.isArray(rostersRes.teams)) {
+        setFormationRosters(rostersRes.teams)
+      } else {
+        setFormationRosters([])
+      }
+
+      // 2. Fetch existing saved rounds and matches (if already created and saved)
+      const data = await getTournamentRoundsRosters(tournId)
+      if (data?.tournament?.live_stream_url) {
+        setFormationStreamUrl(data.tournament.live_stream_url)
+      }
+
+      const existingRounds: FormationRound[] = []
+      const existingMatches: FormationMatch[] = []
+
+      if (data?.rounds && data.rounds.length > 0) {
+        data.rounds.forEach((r, idx) => {
+          existingRounds.push({
+            round_name: r.round_name,
+            round_number: r.round_number || idx + 1,
+            format: (r.matches?.[0] as any)?.format || data.tournament.format || 'Knockout',
+          })
+          if (Array.isArray(r.matches)) {
+            r.matches.forEach((m) => {
+              existingMatches.push({
+                id: m.id,
+                round_name: r.round_name,
+                round_number: m.round_number || idx + 1,
+                match_number: m.match_number || m.order || 1,
+                stage: m.stage || r.round_name,
+                format: m.format || 'Knockout',
+                series_format: m.series_format || 'BO1',
+                roster_status: (m.roster_status?.toUpperCase() as any) || 'DRAFT',
+                team_a_id: m.team_a_id || m.team_a?.id,
+                team_b_id: m.team_b_id || m.team_b?.id,
+                team_a_name: m.team_a_name || m.team_a?.name,
+                team_b_name: m.team_b_name || m.team_b?.name,
+                team_a_placeholder: m.team_a_placeholder,
+                team_b_placeholder: m.team_b_placeholder,
+                team_ids: m.team_ids || [],
+                teams: m.teams || [],
+                next_match_slot: m.next_match_slot,
+                advancement_label: m.advancement_label,
+                scheduled_date: m.scheduled_date,
+                scheduled_time: m.scheduled_time,
+                youtube_live_url: m.youtube_live_url || m.live_link,
+                lobby_code: m.lobby_code,
+                lobby_password: m.lobby_password,
+                server_region: m.server_region,
+                score_a: m.team_a?.score ?? m.score_a ?? 0,
+                score_b: m.team_b?.score ?? m.score_b ?? 0,
+                winner_team_id: m.winner_team_id,
+                status: m.status || 'SCHEDULED',
+              })
+            })
+          }
+        })
+      } else if (data?.tournament?.custom_rounds && data.tournament.custom_rounds.length > 0) {
+        data.tournament.custom_rounds.forEach((rn, idx) => {
+          existingRounds.push({
+            round_name: rn,
+            round_number: idx + 1,
+            format: data.tournament.format || 'Knockout',
+          })
+        })
+      }
+
+      // STRICT REQUIREMENT: Initial state contains ZERO ROUNDS and ZERO MATCHES if not previously saved!
+      setFormationRounds(existingRounds)
+      setFormationMatches(existingMatches)
+    } catch (err: any) {
+      console.warn('Could not load formation details:', err)
+      setFormationRounds([])
+      setFormationMatches([])
+    } finally {
+      setLoadingFormation(false)
+    }
+  }, [])
+
+  // Re-fetch when target tournament in formation workspace changes
+  useEffect(() => {
+    if (formationTournId) {
+      loadFormationData(formationTournId)
+    }
+  }, [formationTournId, loadFormationData])
+
+  // Compute paired teams in Formation Workspace
+  const pairedFormationTeamIds = useMemo(() => {
+    const s = new Set<string>()
+    formationMatches.forEach((m) => {
+      if (m.team_a_id) s.add(String(m.team_a_id))
+      if (m.team_b_id) s.add(String(m.team_b_id))
+      if (m.team_ids && Array.isArray(m.team_ids)) {
+        m.team_ids.forEach((id) => s.add(String(id)))
+      }
+    })
+    return s
+  }, [formationMatches])
+
+  // Handle Add Round in Formation Workspace
+  const handleAddRoundToFormation = (roundName: string) => {
+    const clean = roundName.trim()
+    if (!clean) return
+    if (formationRounds.some((r) => r.round_name.toLowerCase() === clean.toLowerCase())) {
+      showBanner(`Round "${clean}" already exists in the formation.`, 'err')
+      return
+    }
+
+    const newRound: FormationRound = {
+      round_name: clean,
+      round_number: formationRounds.length + 1,
+      format: currentFormationTourn?.format || 'Knockout',
+    }
+    setFormationRounds((prev) => [...prev, newRound])
+    showBanner(`Round "${clean}" container created!`)
+    setIsAddRoundModalOpen(false)
+    setNewRoundInputName('')
+  }
+
+  // Handle Delete Round in Formation Workspace
+  const handleDeleteRoundFromFormation = (roundName: string) => {
+    if (!confirm(`Permanently remove round "${roundName}" and all its matches from this formation?`)) return
+    setFormationRounds((prev) => prev.filter((r) => r.round_name !== roundName))
+    setFormationMatches((prev) => prev.filter((m) => m.round_name !== roundName))
+    showBanner(`Round "${roundName}" removed.`)
+  }
+
+  // Handle Delete Match in Formation Workspace
+  const handleDeleteMatchFromFormation = (roundName: string, matchIndexInRound: number) => {
+    const matchesInRound = formationMatches.filter((m) => m.round_name === roundName)
+    const targetMatch = matchesInRound[matchIndexInRound]
+    if (!targetMatch) return
+
+    setFormationMatches((prev) => prev.filter((m) => m !== targetMatch))
+    showBanner(`Match removed from ${roundName}.`)
+  }
+
+  // Handle Open Add Match to specific round in Formation Workspace
+  const handleOpenAddMatchForRound = (roundName: string) => {
+    const roundObj = formationRounds.find((r) => r.round_name === roundName)
+    const matchesInRound = formationMatches.filter((m) => m.round_name === roundName)
+    const defaultFormat = (roundObj?.format as any) || (currentFormationTourn?.format as any) || 'Knockout'
+
+    setFormationMatchRound(roundName)
+    setFormationMatchFormData({
+      format: defaultFormat,
+      series_format: 'BO1',
+      team_a_mode: 'ROSTER',
+      team_b_mode: 'ROSTER',
+      team_a_id: '',
+      team_b_id: '',
+      team_a_placeholder: '',
+      team_b_placeholder: '',
+      selected_team_ids: [],
+      next_match_slot: '',
+      advancement_label: '',
+      scheduled_date: '',
+      scheduled_time: '',
+      youtube_live_url: formationStreamUrl || '',
+      server_region: currentFormationTourn?.server_region || 'AWS Mumbai (ap-south-1)',
+      match_number: matchesInRound.length + 1,
+    })
+    setIsAddFormationMatchOpen(true)
+  }
+
+  // Handle Submit New Match inside Formation Workspace
+  const handleSaveMatchToFormation = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formationMatchRound) return
+
+    const roundObj = formationRounds.find((r) => r.round_name === formationMatchRound)
+    const rNum = roundObj?.round_number || 1
+    const mNum = Number(formationMatchFormData.match_number) || 1
+
+    let teamAName: string | undefined = undefined
+    let teamBName: string | undefined = undefined
+    let teamsList: Array<{ id: string; name: string; tag?: string }> | undefined = undefined
+
+    if (formationMatchFormData.format === 'Battle Royale') {
+      if (formationMatchFormData.selected_team_ids.length < 2) {
+        alert('Please select at least 2 contender squads for a Battle Royale match.')
+        return
+      }
+      teamsList = formationRosters
+        .filter((r) => formationMatchFormData.selected_team_ids.includes(r.team_id))
+        .map((r) => ({ id: r.team_id, name: r.team_name, tag: r.team_tag }))
+    } else {
+      if (formationMatchFormData.team_a_mode === 'ROSTER') {
+        const t = formationRosters.find((r) => r.team_id === formationMatchFormData.team_a_id)
+        teamAName = t?.team_name
+      } else {
+        teamAName = formationMatchFormData.team_a_placeholder.trim() || 'TBD (Team A)'
+      }
+
+      if (formationMatchFormData.team_b_mode === 'ROSTER') {
+        const t = formationRosters.find((r) => r.team_id === formationMatchFormData.team_b_id)
+        teamBName = t?.team_name
+      } else {
+        teamBName = formationMatchFormData.team_b_placeholder.trim() || 'TBD (Team B)'
+      }
+    }
+
+    const newMatch: FormationMatch = {
+      round_name: formationMatchRound,
+      round_number: rNum,
+      match_number: mNum,
+      stage: formationMatchRound,
+      format: formationMatchFormData.format,
+      series_format: formationMatchFormData.series_format,
+      roster_status: formationStatus,
+      team_a_id:
+        formationMatchFormData.format === 'Battle Royale'
+          ? undefined
+          : formationMatchFormData.team_a_mode === 'ROSTER'
+          ? formationMatchFormData.team_a_id
+          : undefined,
+      team_b_id:
+        formationMatchFormData.format === 'Battle Royale'
+          ? undefined
+          : formationMatchFormData.team_b_mode === 'ROSTER'
+          ? formationMatchFormData.team_b_id
+          : undefined,
+      team_a_name: teamAName,
+      team_b_name: teamBName,
+      team_a_placeholder:
+        formationMatchFormData.team_a_mode === 'PLACEHOLDER'
+          ? formationMatchFormData.team_a_placeholder.trim()
+          : undefined,
+      team_b_placeholder:
+        formationMatchFormData.team_b_mode === 'PLACEHOLDER'
+          ? formationMatchFormData.team_b_placeholder.trim()
+          : undefined,
+      team_ids:
+        formationMatchFormData.format === 'Battle Royale'
+          ? formationMatchFormData.selected_team_ids
+          : undefined,
+      teams: teamsList,
+      next_match_slot: formationMatchFormData.next_match_slot.trim() || undefined,
+      advancement_label: formationMatchFormData.advancement_label.trim() || undefined,
+      scheduled_date: formationMatchFormData.scheduled_date || undefined,
+      scheduled_time: formationMatchFormData.scheduled_time || undefined,
+      youtube_live_url: formationMatchFormData.youtube_live_url.trim() || undefined,
+      server_region: formationMatchFormData.server_region,
+      status: 'SCHEDULED',
+    }
+
+    setFormationMatches((prev) => [...prev, newMatch])
+    showBanner(`Match #${mNum} added to ${formationMatchRound}!`)
+    setIsAddFormationMatchOpen(false)
+  }
+
+  // Handle Save Complete Match Formation to Database
+  const handleSaveMatchFormation = async () => {
+    if (!formationTournId) return
+    setSavingFormation(true)
+    try {
+      const payload = {
+        match_format: currentFormationTourn?.format || 'Knockout',
+        series_format: 'BO1',
+        formation_status: formationStatus,
+        rounds: formationRounds.map((r, idx) => ({
+          round_name: r.round_name,
+          round_number: r.round_number || idx + 1,
+        })),
+        matches: formationMatches.map((m, idx) => ({
+          id: m.id,
+          round_number: m.round_number || 1,
+          match_number: m.match_number || idx + 1,
+          stage: m.round_name,
+          round_name: m.round_name,
+          format: m.format,
+          series_format: m.series_format || 'BO1',
+          roster_status: formationStatus,
+          team_a_id: m.team_a_id || undefined,
+          team_b_id: m.team_b_id || undefined,
+          team_a_name: m.team_a_name || undefined,
+          team_b_name: m.team_b_name || undefined,
+          team_a_placeholder: m.team_a_placeholder || undefined,
+          team_b_placeholder: m.team_b_placeholder || undefined,
+          team_ids: m.team_ids || [],
+          teams: m.teams || [],
+          next_match_slot: m.next_match_slot || undefined,
+          advancement_label: m.advancement_label || undefined,
+          scheduled_date: m.scheduled_date || undefined,
+          scheduled_time: m.scheduled_time || undefined,
+          youtube_live_url: m.youtube_live_url || undefined,
+        })),
+      }
+
+      await saveLiveMatchStructureAdmin(formationTournId, payload)
+      showBanner(
+        `✓ Match formation successfully persisted to database! (${formationMatches.length} matches across ${formationRounds.length} rounds)`
+      )
+      fetchMatches()
+      loadFormationData(formationTournId)
+      onMatchesUpdated?.()
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to save match formation', 'err')
+    } finally {
+      setSavingFormation(false)
+    }
+  }
+
+  // Handle Save Stream URL in Formation Workspace
+  const handleSaveFormationStream = async () => {
+    if (!formationTournId) return
+    setSavingFormationStream(true)
+    try {
+      await updateTournamentStream(formationTournId, formationStreamUrl.trim())
+      showBanner('Tournament live broadcast stream URL updated!')
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to update stream URL', 'err')
+    } finally {
+      setSavingFormationStream(false)
+    }
+  }
+
+  // -------------------------------------------------------------
+  // OPERATIONS VIEW STATE & FUNCTIONALITY
+  // -------------------------------------------------------------
   const [matches, setMatches] = useState<ApiMatch[]>([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedTournId, setSelectedTournId] = useState<string>('ALL')
   const [selectedRoundTab, setSelectedRoundTab] = useState<string>('ALL')
-  const [bannerMsg, setBannerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
-  // Tournament Stream & Rosters state
   const [tournRosters, setTournRosters] = useState<RegisteredRosterTeam[]>([])
   const [loadingRosters, setLoadingRosters] = useState(false)
   const [tournStreamUrl, setTournStreamUrl] = useState('')
@@ -66,16 +505,12 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
   const [showRostersDrawer, setShowRostersDrawer] = useState(false)
   const [squadSearch, setSquadSearch] = useState('')
 
-  // Multi-Round & Mixed Formats state
   const [customRounds, setCustomRounds] = useState<string[]>([])
   const [newRoundName, setNewRoundName] = useState('')
   const [roundFormatMap, setRoundFormatMap] = useState<Record<string, string>>({})
-
-  // Round Builder Data
   const [roundsRostersData, setRoundsRostersData] = useState<TournamentRoundsRostersResponse | null>(null)
-  const [loadingRoundsData, setLoadingRoundsData] = useState(false)
 
-  // Modals
+  // Operations Modals
   const [isAddMatchOpen, setIsAddMatchOpen] = useState(false)
   const [addMatchData, setAddMatchData] = useState({
     tournament_id: '',
@@ -83,6 +518,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     round_name: 'Round 1',
     round_number: 1,
     match_number: 1,
+    format: 'Knockout',
+    selected_team_ids: [] as string[],
     roster_status: 'DRAFT' as 'DRAFT' | 'PUBLISHED',
     team_a_mode: 'ROSTER' as 'ROSTER' | 'PLACEHOLDER',
     team_b_mode: 'ROSTER' as 'ROSTER' | 'PLACEHOLDER',
@@ -102,13 +539,11 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
   })
   const [submittingAdd, setSubmittingAdd] = useState(false)
 
-  // Single Match Publish Modal
   const [publishModalMatch, setPublishModalMatch] = useState<ApiMatch | null>(null)
   const [publishNotifyLeaders, setPublishNotifyLeaders] = useState(true)
   const [publishMatchNotes, setPublishMatchNotes] = useState('')
   const [submittingPublish, setSubmittingPublish] = useState(false)
 
-  // Batch Publish Modal
   const [isBatchPublishOpen, setIsBatchPublishOpen] = useState(false)
   const [submittingBatchPublish, setSubmittingBatchPublish] = useState(false)
 
@@ -140,11 +575,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
   })
   const [submittingEdit, setSubmittingEdit] = useState(false)
 
-  const showBanner = (text: string, type: 'ok' | 'err' = 'ok') => {
-    setBannerMsg({ type, text })
-    setTimeout(() => setBannerMsg(null), 5000)
-  }
-
+  // Fetch all matches for Operations View
   const fetchMatches = useCallback(async () => {
     setLoading(true)
     try {
@@ -173,19 +604,14 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
       setRoundsRostersData(null)
       return
     }
-    setLoadingRoundsData(true)
     try {
       const res = await getTournamentRoundsRosters(tournId)
       setRoundsRostersData(res)
     } catch (err) {
-      console.warn('Could not fetch tournament round roster data:', err)
       setRoundsRostersData(null)
-    } finally {
-      setLoadingRoundsData(false)
     }
   }, [])
 
-  // Fetch rosters, stream, and rounds data when tournament is selected
   useEffect(() => {
     if (selectedTournId === 'ALL' || !selectedTournId) {
       setTournRosters([])
@@ -212,39 +638,29 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     setSelectedRoundTab('ALL')
   }, [selectedTournId, currentTournament, fetchRoundsData])
 
-  // Extract distinct round tabs for the current tournament scope
   const availableRoundTabs = useMemo(() => {
     const roundsSet = new Set<string>()
-
-    // From rounds data API if available
     if (roundsRostersData?.rounds && roundsRostersData.rounds.length > 0) {
       roundsRostersData.rounds.forEach((r) => {
         if (r.round_name) roundsSet.add(r.round_name)
       })
     }
-
-    // From matches in state
-    const scopedMatches = selectedTournId === 'ALL'
-      ? matches
-      : matches.filter((m) => m.tournament_id === selectedTournId || (currentTournament?.slug && m.tournament_id === currentTournament.slug))
-
+    const scopedMatches =
+      selectedTournId === 'ALL'
+        ? matches
+        : matches.filter(
+            (m) =>
+              m.tournament_id === selectedTournId ||
+              (currentTournament?.slug && m.tournament_id === currentTournament.slug)
+          )
     scopedMatches.forEach((m) => {
       const rName = m.round_name || m.stage || (m.round_number ? `Round ${m.round_number}` : '')
       if (rName) roundsSet.add(rName)
     })
-
-    // Add any admin created custom rounds
     customRounds.forEach((cr) => roundsSet.add(cr))
-
-    // If empty and a tournament is selected, provide sensible defaults
-    if (roundsSet.size === 0 && selectedTournId !== 'ALL') {
-      DEFAULT_STAGES.slice(0, 4).forEach((s) => roundsSet.add(s))
-    }
-
     return Array.from(roundsSet)
   }, [roundsRostersData, matches, selectedTournId, currentTournament, customRounds])
 
-  // Handle Save Tournament Stream
   const handleSaveTournStream = async () => {
     if (!selectedTournId || selectedTournId === 'ALL') return
     setSavingStream(true)
@@ -258,14 +674,13 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Close Tournament Registration
   const handleCloseRegistration = async () => {
     if (!selectedTournId || selectedTournId === 'ALL') return
     if (!confirm('Close registration and lock rosters for this tournament?')) return
     setClosingReg(true)
     try {
       await closeTournamentRegistration(selectedTournId)
-      showBanner('Tournament registrations locked. Ready for match creation & bracket progression.')
+      showBanner('Tournament registrations locked. Ready for match formation.')
       if (currentTournament) {
         currentTournament.status = 'REGISTRATION_CLOSED'
         currentTournament.registration_status = 'CLOSED'
@@ -279,7 +694,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Reopen Tournament Registration
   const handleReopenRegistration = async () => {
     if (!selectedTournId || selectedTournId === 'ALL') return
     if (!confirm('Reopen registrations for this tournament? New teams will be able to register.')) return
@@ -300,7 +714,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Add New Custom Round
   const handleAddNewRound = (e?: React.FormEvent) => {
     e?.preventDefault()
     const trimmed = newRoundName.trim()
@@ -316,14 +729,12 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     showBanner(`Round "${trimmed}" added to workspace!`)
   }
 
-  // Handle Set Format for Current Round
   const handleSetRoundFormat = (fmt: string) => {
     if (selectedRoundTab === 'ALL') return
     setRoundFormatMap((prev) => ({ ...prev, [selectedRoundTab]: fmt }))
     showBanner(`Format for "${selectedRoundTab}" set to ${fmt}`)
   }
 
-  // Handle Quick Status
   const handleQuickStatus = async (matchId: string, status: string) => {
     try {
       await updateMatchStatus(matchId, status)
@@ -336,7 +747,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Swap Teams
   const handleSwapTeams = async (matchId: string) => {
     try {
       await swapTeamsAdmin(matchId)
@@ -349,7 +759,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Delete Match
   const handleDeleteMatch = async (matchId: string) => {
     if (!confirm('Are you sure you want to permanently delete this match?')) return
     try {
@@ -363,7 +772,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Add Match Submit
   const handleAddMatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const targetTournId = addMatchData.tournament_id || selectedTournId
@@ -380,6 +788,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         round_name: addMatchData.round_name || addMatchData.stage,
         round_number: Number(addMatchData.round_number) || 1,
         match_number: Number(addMatchData.match_number) || 1,
+        format: addMatchData.format,
         roster_status: addMatchData.roster_status,
         series_format: addMatchData.series_format,
         scheduled_time: addMatchData.scheduled_time || 'TBD',
@@ -393,26 +802,33 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         status: 'SCHEDULED',
       }
 
-      if (addMatchData.team_a_mode === 'ROSTER' && addMatchData.team_a_id) {
-        payload.team_a_id = addMatchData.team_a_id
-        const t = tournRosters.find((r) => r.team_id === addMatchData.team_a_id)
-        if (t) payload.team_a_name = t.team_name
+      if (addMatchData.format === 'Battle Royale') {
+        payload.team_ids = addMatchData.selected_team_ids
+        payload.teams = tournRosters
+          .filter((r) => addMatchData.selected_team_ids.includes(r.team_id))
+          .map((r) => ({ id: r.team_id, name: r.team_name, tag: r.team_tag }))
       } else {
-        payload.team_a_placeholder = addMatchData.team_a_placeholder.trim() || 'TBD (Team A)'
-      }
+        if (addMatchData.team_a_mode === 'ROSTER' && addMatchData.team_a_id) {
+          payload.team_a_id = addMatchData.team_a_id
+          const t = tournRosters.find((r) => r.team_id === addMatchData.team_a_id)
+          if (t) payload.team_a_name = t.team_name
+        } else {
+          payload.team_a_placeholder = addMatchData.team_a_placeholder.trim() || 'TBD (Team A)'
+        }
 
-      if (addMatchData.team_b_mode === 'ROSTER' && addMatchData.team_b_id) {
-        payload.team_b_id = addMatchData.team_b_id
-        const t = tournRosters.find((r) => r.team_id === addMatchData.team_b_id)
-        if (t) payload.team_b_name = t.team_name
-      } else {
-        payload.team_b_placeholder = addMatchData.team_b_placeholder.trim() || 'TBD (Team B)'
+        if (addMatchData.team_b_mode === 'ROSTER' && addMatchData.team_b_id) {
+          payload.team_b_id = addMatchData.team_b_id
+          const t = tournRosters.find((r) => r.team_id === addMatchData.team_b_id)
+          if (t) payload.team_b_name = t.team_name
+        } else {
+          payload.team_b_placeholder = addMatchData.team_b_placeholder.trim() || 'TBD (Team B)'
+        }
       }
 
       await createMatchAdmin(payload)
       showBanner(
         addMatchData.roster_status === 'PUBLISHED'
-          ? 'Match roster created and PUBLISHED! Team captains notified.'
+          ? 'Match roster created and PUBLISHED! Contenders notified.'
           : 'Match created as DRAFT. Remember to review and publish when finalized.'
       )
       setIsAddMatchOpen(false)
@@ -426,7 +842,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Single Match Publish Roster Submit
   const handlePublishRosterSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!publishModalMatch) return
@@ -436,66 +851,62 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         notify_leaders: publishNotifyLeaders,
         match_notes: publishMatchNotes.trim() || undefined,
       })
-      showBanner(
-        `✓ Roster Published! ${res.notified_count} captain(s) notified via in-app & Brevo email.`
-      )
+      showBanner(`✓ Roster Published! ${res.notified_count} captain(s) notified via in-app & email.`)
       setPublishModalMatch(null)
       fetchMatches()
       if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
       onMatchesUpdated?.()
     } catch (err: any) {
-      alert(err?.message || 'Failed to publish roster')
+      alert(err?.message || 'Failed to publish match roster')
     } finally {
       setSubmittingPublish(false)
     }
   }
 
-  // Handle Batch Publish All Drafts Submit
   const handleBatchPublishSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedTournId || selectedTournId === 'ALL') {
-      alert('Please select a specific tournament to batch publish rosters.')
-      return
-    }
-
+    if (!selectedTournId || selectedTournId === 'ALL') return
     setSubmittingBatchPublish(true)
     try {
-      const roundTarget = selectedRoundTab !== 'ALL' ? selectedRoundTab : undefined
-      const res = await publishAllRostersAdmin(selectedTournId, roundTarget)
+      const res = await publishAllRostersAdmin(
+        selectedTournId,
+        selectedRoundTab !== 'ALL' ? selectedRoundTab : undefined
+      )
       showBanner(
-        `✓ Batch Published! ${res.published_matches} match(es) published and ${res.notified_leaders} team captains notified.`
+        `✓ All Draft Rosters Published! ${res.published_matches} match(es) published, ${res.notified_leaders} captain(s) alerted.`
       )
       setIsBatchPublishOpen(false)
       fetchMatches()
       fetchRoundsData(selectedTournId)
       onMatchesUpdated?.()
     } catch (err: any) {
-      alert(err?.message || 'Failed to batch publish rosters')
+      alert(err?.message || 'Failed to batch publish draft rosters')
     } finally {
       setSubmittingBatchPublish(false)
     }
   }
 
-  // Handle Go Live Submit
   const handleGoLiveSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!goLiveMatch) return
     setSubmittingLive(true)
     try {
-      await markMatchLiveAdmin(goLiveMatch.id, goLiveUrl.trim())
-      showBanner(`Match marked LIVE with broadcast stream!`)
+      await updateMatchDetailsAdmin(goLiveMatch.id, {
+        status: 'LIVE',
+        youtube_live_url: goLiveUrl.trim(),
+      })
+      showBanner(`Match is now LIVE with active broadcast link!`)
       setGoLiveMatch(null)
       fetchMatches()
       if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
       onMatchesUpdated?.()
     } catch (err: any) {
-      alert(err?.message || 'Failed to mark match live')
+      alert(err?.message || 'Failed to start live stream')
     } finally {
       setSubmittingLive(false)
     }
   }
 
-  // Handle Score & Complete Submit
   const handleScoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!scoreMatch) return
@@ -506,9 +917,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         score_b: Number(scoreForm.score_b),
         winner_team_id: scoreForm.winner_team_id || undefined,
       })
-      showBanner(
-        `Match completed! Winner automatically advanced into next round roster slot.`
-      )
+      showBanner(`Match completed! Winner automatically advanced into configured next-round slot.`)
       setScoreMatch(null)
       fetchMatches()
       if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
@@ -520,7 +929,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Handle Edit Match Submit
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editMatch) return
@@ -555,7 +963,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     }
   }
 
-  // Filtered Matches
+  // Filtered Matches in Operations
   const filteredMatches = matches.filter((m) => {
     const statusMatch =
       statusFilter === 'ALL' || (m.status || '').toUpperCase() === statusFilter
@@ -563,17 +971,14 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
       selectedTournId === 'ALL' ||
       m.tournament_id === selectedTournId ||
       (currentTournament?.slug && m.tournament_id === currentTournament.slug)
-
     const roundMatch =
       selectedRoundTab === 'ALL' ||
       m.round_name === selectedRoundTab ||
       m.stage === selectedRoundTab ||
       (m.round_number && `Round ${m.round_number}` === selectedRoundTab)
-
     return statusMatch && tourMatch && roundMatch
   })
 
-  // Draft matches in current tournament/round scope
   const draftMatchesInScope = useMemo(() => {
     return filteredMatches.filter((m) => (m.roster_status || '').toUpperCase() === 'DRAFT')
   }, [filteredMatches])
@@ -595,91 +1000,36 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
     currentTournament?.status === 'IN_PROGRESS' ||
     currentTournament?.status === 'COMPLETED'
 
-  const closedTournaments = useMemo(() => {
-    return tournaments.filter(
-      (t) =>
-        t.registration_status === 'CLOSED' ||
-        t.status === 'REGISTRATION_CLOSED' ||
-        t.status === 'IN_PROGRESS' ||
-        t.status === 'COMPLETED'
-    )
-  }, [tournaments])
-
   return (
     <div className="space-y-6 font-mono text-xs">
-      {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-3xl font-black uppercase text-ink">
-              Match Engine &amp; Roster Progression
-            </h2>
-            <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] text-cyan font-bold uppercase">
-              Automated Brackets
-            </span>
-          </div>
-          <p className="text-xs text-dim">
-            Authoritative match formation: configure round rosters, draft vs published visibility, auto-advancing winners, and live broadcast streams.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => {
-              if (closedTournaments.length === 0) {
-                showBanner(
-                  'Cannot create matches: Tournament registration must be CLOSED before match rosters can be formed. Please close registration on a tournament first.',
-                  'err'
-                )
-                return
-              }
-              const defaultRound =
-                selectedRoundTab !== 'ALL'
-                  ? selectedRoundTab
-                  : availableRoundTabs[0] || 'Round 1'
-              const initialTournId =
-                selectedTournId !== 'ALL' && closedTournaments.some((t) => (t.id || t.slug) === selectedTournId)
-                  ? selectedTournId
-                  : closedTournaments[0]?.id || closedTournaments[0]?.slug || ''
-              setAddMatchData({
-                tournament_id: initialTournId,
-                stage: defaultRound,
-                round_name: defaultRound,
-                round_number: 1,
-                match_number: filteredMatches.length + 1,
-                roster_status: 'DRAFT',
-                team_a_mode: 'ROSTER',
-                team_b_mode: 'ROSTER',
-                team_a_id: '',
-                team_b_id: '',
-                team_a_placeholder: '',
-                team_b_placeholder: '',
-                next_match_slot: '',
-                advancement_label: '',
-                series_format: 'BO1',
-                scheduled_time: '',
-                scheduled_date: '',
-                youtube_live_url: '',
-                server_region: 'AWS Mumbai (ap-south-1)',
-                lobby_code: '',
-                lobby_password: '',
-              })
-              setIsAddMatchOpen(true)
-            }}
-            className="border border-cyan bg-cyan px-4 py-2 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-xs"
-          >
-            + Form Match Roster
-          </button>
-          <button
-            onClick={() => {
-              fetchMatches()
-              if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
-            }}
-            disabled={loading}
-            className="border border-white/20 bg-surface px-3 py-2 uppercase text-dim hover:text-ink hover:border-white/40 cursor-pointer"
-          >
-            {loading ? 'Refreshing...' : '↻ Refresh'}
-          </button>
-        </div>
+      {/* VIEW SWITCHER TABS: Live Operations vs Manual Formation Builder */}
+      <div className="flex border-b border-white/10 bg-void/80 p-1 gap-2">
+        <button
+          onClick={() => setActiveTab('OPERATIONS')}
+          className={`px-4 py-2 font-display text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border ${
+            activeTab === 'OPERATIONS'
+              ? 'border-cyan bg-cyan/15 text-cyan'
+              : 'border-white/10 bg-surface/50 text-dim hover:text-ink'
+          }`}
+        >
+          ⚡ Live Matches &amp; Operations
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('FORMATION')
+            if (!formationTournId && closedTournaments.length > 0) {
+              const defaultClosedId = closedTournaments[0].id || closedTournaments[0].slug || ''
+              setFormationTournId(defaultClosedId)
+            }
+          }}
+          className={`px-4 py-2 font-display text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border ${
+            activeTab === 'FORMATION'
+              ? 'border-cyan bg-cyan/15 text-cyan'
+              : 'border-white/10 bg-surface/50 text-dim hover:text-ink'
+          }`}
+        >
+          🎯 Create Match &amp; Formation Workspace
+        </button>
       </div>
 
       {bannerMsg && (
@@ -694,274 +1044,679 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* KPI Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <Panel className="p-3 text-center">
-          <Hud className="text-dim">Total Matches</Hud>
-          <p className="font-display text-2xl font-black text-ink">{matches.length}</p>
-        </Panel>
-        <Panel className="p-3 text-center border-warn/40 bg-warn/[0.03]">
-          <Hud className="text-warn">Draft Rosters</Hud>
-          <p className="font-display text-2xl font-black text-warn">{totalDraftCount}</p>
-        </Panel>
-        <Panel className="p-3 text-center border-live/40 bg-live/[0.03]">
-          <Hud className="text-live">🔴 Live Now</Hud>
-          <p className="font-display text-2xl font-black text-live">{liveCount}</p>
-        </Panel>
-        <Panel className="p-3 text-center">
-          <Hud className="text-cyan">Scheduled</Hud>
-          <p className="font-display text-2xl font-black text-cyan">{scheduledCount}</p>
-        </Panel>
-        <Panel className="p-3 text-center">
-          <Hud className="text-ok">Completed</Hud>
-          <p className="font-display text-2xl font-black text-ok">{completedCount}</p>
-        </Panel>
-      </div>
-
-      {/* Tournament Scope Selector & Broadcast Bar */}
-      <Panel className="p-4 md:p-5 space-y-4 border-white/15 bg-surface/50">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold text-ink uppercase tracking-wider">Tournament Scope:</span>
-            <select
-              value={selectedTournId}
-              onChange={(e) => setSelectedTournId(e.target.value)}
-              className="border border-white/20 bg-void px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan min-w-[240px]"
-            >
-              <option value="ALL">All Tournaments (Global View)</option>
-              {tournaments.map((t) => (
-                <option key={t.id || t.slug} value={t.id || t.slug}>
-                  {t.title} ({t.status || 'ACTIVE'})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedTournId !== 'ALL' && currentTournament && (
-            <div className="flex flex-wrap items-center gap-2">
-              {!isRegistrationClosed ? (
-                <button
-                  onClick={handleCloseRegistration}
-                  disabled={closingReg}
-                  className="border border-warn/40 bg-warn/15 px-3 py-1.5 text-[11px] font-bold text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer"
-                >
-                  {closingReg ? 'Closing...' : '🔒 Close Reg & Finalize Rosters'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="border border-dim bg-dim/10 px-2.5 py-1 text-[10px] text-dim font-bold uppercase">
-                    ✓ Registrations Closed
-                  </span>
-                  <button
-                    onClick={handleReopenRegistration}
-                    disabled={reopeningReg}
-                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
-                  >
-                    {reopeningReg ? 'Reopening...' : '🔓 Reopen Registration'}
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={() => setShowRostersDrawer(!showRostersDrawer)}
-                className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
-              >
-                {showRostersDrawer ? 'Hide Rosters' : `View Contenders (${tournRosters.length})`}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Warning if selected tournament registration is OPEN */}
-        {selectedTournId !== 'ALL' && currentTournament && !isRegistrationClosed && (
-          <div className="p-3 border border-warn/40 bg-warn/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-warn">
-              <span className="text-base">⚠️</span>
+      {/* ========================================================================= */}
+      {/* VIEW 1: CREATE MATCH & FORMATION WORKSPACE (Strict Zero Default Rounds/Matches) */}
+      {/* ========================================================================= */}
+      {activeTab === 'FORMATION' && (
+        <div className="space-y-6">
+          {/* Target Tournament Dropdown (ONLY Registration Closed tournaments) */}
+          <Panel className="p-4 md:p-5 border-white/15 bg-surface/50 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <strong>Registration is OPEN for {currentTournament.title}.</strong>
-                <p className="text-[11px] text-dim">
-                  Match rosters can only be formed once registration is closed and contenders are locked.
+                <Hud className="text-cyan">Create Match Formation</Hud>
+                <h3 className="font-display text-xl font-black uppercase text-ink mt-1">
+                  Target Tournament Selector
+                </h3>
+                <p className="text-xs text-dim">
+                  Select a tournament whose registration is closed to build its round rosters and manual progression.
                 </p>
               </div>
-            </div>
-            <button
-              onClick={handleCloseRegistration}
-              disabled={closingReg}
-              className="border border-warn bg-warn px-3 py-1.5 text-xs font-bold text-void uppercase tracking-wider hover:bg-warn/90 transition-colors shrink-0 cursor-pointer"
-            >
-              {closingReg ? 'Closing...' : '🔒 Close Registration & Lock Rosters'}
-            </button>
-          </div>
-        )}
 
-        {/* Tournament Broadcast Stream Bar */}
-        {selectedTournId !== 'ALL' && currentTournament && (
-          <div className="pt-3 border-t border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-void/50 p-3">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-live font-bold uppercase tracking-wider shrink-0">
-                🔴 Tournament Stream:
-              </span>
-              <input
-                type="url"
-                placeholder="https://www.youtube.com/watch?v=... or /live/..."
-                value={tournStreamUrl}
-                onChange={(e) => setTournStreamUrl(e.target.value)}
-                className="w-full border border-white/15 bg-surface px-3 py-1 text-xs text-ink outline-none focus:border-cyan"
-              />
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleSaveTournStream}
-                disabled={savingStream}
-                className="border border-live bg-live/20 px-3 py-1 text-[11px] font-bold text-live hover:bg-live hover:text-white transition-colors cursor-pointer"
-              >
-                {savingStream ? 'Saving...' : 'Broadcast Stream'}
-              </button>
-              {tournStreamUrl && (
-                <a
-                  href={tournStreamUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="border border-white/20 px-2.5 py-1 text-[11px] text-dim hover:text-ink"
+              <div className="flex items-center gap-3">
+                <span className="text-dim uppercase font-bold text-[11px] shrink-0">Closed Tournaments:</span>
+                <select
+                  value={formationTournId}
+                  onChange={(e) => setFormationTournId(e.target.value)}
+                  className="border border-white/20 bg-void px-3 py-2 text-xs text-ink outline-none focus:border-cyan min-w-[260px]"
                 >
-                  Watch ↗
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Registered Contenders & Unpaired Roster Drawer */}
-        {showRostersDrawer && selectedTournId !== 'ALL' && (
-          <div className="pt-3 border-t border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <Hud className="text-cyan">
-                Registered Contenders &amp; Rosters ({tournRosters.length} Teams)
-              </Hud>
-              {loadingRosters && <span className="text-dim">Loading rosters...</span>}
-            </div>
-
-            {tournRosters.length === 0 ? (
-              <div className="p-4 border border-dashed border-white/10 text-center text-dim">
-                No teams have registered for this tournament yet.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[280px] overflow-y-auto">
-                {tournRosters.map((team) => (
-                  <div
-                    key={team.team_id}
-                    className="border border-white/10 bg-void/80 p-2.5 space-y-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-display font-black uppercase text-ink truncate max-w-[180px]">
-                        {team.team_name} [{team.team_tag}]
-                      </span>
-                      <span
-                        className={`text-[9px] px-1.5 py-0.2 border uppercase ${
-                          team.is_paired
-                            ? 'border-ok/40 text-ok bg-ok/10'
-                            : 'border-warn/40 text-warn bg-warn/10'
-                        }`}
-                      >
-                        {team.is_paired ? 'Paired' : 'Unpaired'}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-dim">
-                      Captain: @{team.captain?.username || team.captain_username || 'TBD'}
-                    </div>
-                    {team.members && team.members.length > 0 && (
-                      <div className="text-[10px] text-dim/80 truncate">
-                        Members: {team.members.map((m) => m.username || m.game_id).join(', ')}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </Panel>
-
-      {/* MULTI-ROUND WORKSPACE */}
-      <div className="flex flex-col lg:flex-row gap-5 items-start">
-        {/* LEFT COLUMN: COMPACT SQUADS / CONTENDERS RAIL (<300px) */}
-        <div className="w-full lg:w-72 max-w-full lg:max-w-[280px] shrink-0 space-y-3">
-          <Panel className="p-3 border-white/15 bg-surface/50 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <Hud className="text-cyan">Squad Contenders</Hud>
-              <span className="border border-white/20 bg-void px-1.5 py-0.5 text-[10px] text-ink font-bold">
-                {tournRosters.length} Teams
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-dim px-0.5">
-              <span>Paired: <strong className="text-ok">{tournRosters.filter(t => t.is_paired).length}</strong></span>
-              <span>Unpaired: <strong className="text-warn">{tournRosters.filter(t => !t.is_paired).length}</strong></span>
-            </div>
-
-            {/* Squad Search Input */}
-            <input
-              type="text"
-              placeholder="Filter squads..."
-              value={squadSearch}
-              onChange={(e) => setSquadSearch(e.target.value)}
-              className="w-full border border-white/15 bg-void px-2 py-1 text-[11px] text-ink placeholder:text-dim/50 outline-none focus:border-cyan"
-            />
-
-            {/* Roster List */}
-            {tournRosters.length === 0 ? (
-              <div className="p-4 border border-dashed border-white/10 text-center text-dim text-[11px]">
-                {selectedTournId === 'ALL'
-                  ? 'Select a tournament above to view contenders.'
-                  : 'No teams registered yet.'}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-                {tournRosters
-                  .filter(
-                    (t) =>
-                      !squadSearch.trim() ||
-                      t.team_name.toLowerCase().includes(squadSearch.toLowerCase()) ||
-                      t.team_tag.toLowerCase().includes(squadSearch.toLowerCase()) ||
-                      (t.captain?.username || '').toLowerCase().includes(squadSearch.toLowerCase())
-                  )
-                  .map((team, idx) => (
-                    <div
-                      key={team.team_id}
-                      className="border border-white/10 bg-void/80 p-2 space-y-1 hover:border-cyan/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-display font-black uppercase text-ink truncate text-[11px]" title={team.team_name}>
-                          <span className="text-cyan mr-1 font-mono">#{idx + 1}</span>
-                          {team.team_name} [{team.team_tag}]
-                        </span>
-                        <span
-                          className={`text-[8px] px-1 py-0.2 border uppercase shrink-0 font-bold ${
-                            team.is_paired
-                              ? 'border-ok/40 text-ok bg-ok/10'
-                              : 'border-warn/40 text-warn bg-warn/10'
-                          }`}
-                        >
-                          {team.is_paired ? 'Paired' : 'Unpaired'}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-dim flex items-center justify-between">
-                        <span className="truncate max-w-[150px]">
-                          Capt: @{team.captain?.username || team.captain_username || 'TBD'}
-                        </span>
-                        {team.members && team.members.length > 0 && (
-                          <span className="text-dim/70 shrink-0 font-mono">({team.members.length}p)</span>
-                        )}
-                      </div>
-                    </div>
+                  <option value="">-- Select Closed Tournament --</option>
+                  {closedTournaments.map((t) => (
+                    <option key={t.id || t.slug} value={t.id || t.slug}>
+                      {t.title} [REGISTRATION CLOSED]
+                    </option>
                   ))}
+                </select>
+              </div>
+            </div>
+
+            {closedTournaments.length === 0 && (
+              <div className="p-3 border border-warn/40 bg-warn/10 text-warn text-xs">
+                ⚠️ No tournaments currently have closed registrations. Tournament registration must be CLOSED before match formation can begin.
               </div>
             )}
           </Panel>
-        </div>
 
-        {/* RIGHT / MAIN COLUMN: MULTI-ROUND SYSTEM & MATCH FORMATIONS */}
-        <div className="flex-1 min-w-0 space-y-4">
-          {/* ROUND SELECTION TABS & ROSTER BATCH PUBLISH BAR */}
+          {/* If a tournament is selected, render Minimum Tournament Identification Card */}
+          {formationTournId && currentFormationTourn && (
+            <Panel className="p-4 md:p-5 border-cyan/30 bg-surface/80 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  {currentFormationTourn.banner_url ? (
+                    <img
+                      src={resolveMediaUrl(currentFormationTourn.banner_url)}
+                      alt={currentFormationTourn.title}
+                      className="size-16 object-cover border border-white/20 rounded shrink-0 bg-void"
+                    />
+                  ) : (
+                    <div className="size-16 grid place-items-center bg-void border border-white/10 text-dim text-[10px] font-bold uppercase shrink-0">
+                      Banner
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="border border-ok/40 bg-ok/10 text-ok px-2 py-0.5 text-[10px] font-bold uppercase">
+                        🔒 REGISTRATION CLOSED
+                      </span>
+                      <span className="border border-cyan/40 bg-cyan/10 text-cyan px-2 py-0.5 text-[10px] font-bold uppercase">
+                        👁️ VISIBLE
+                      </span>
+                      <span className="border border-white/20 bg-void px-2 py-0.5 text-[10px] text-dim uppercase">
+                        Format: {currentFormationTourn.format || 'Knockout'}
+                      </span>
+                    </div>
+                    <h2 className="font-display text-2xl font-black uppercase text-ink truncate mt-1">
+                      {currentFormationTourn.title}
+                    </h2>
+                    <p className="text-xs text-dim">
+                      Formation: {formationRounds.length === 0 ? 'No rounds created' : `${formationRounds.length} Rounds`} · Matches: {formationMatches.length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Draft vs Published Toggle & Save Button */}
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="flex items-center border border-white/20 bg-void p-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setFormationStatus('DRAFT')}
+                      className={`px-3 py-1 text-[11px] font-bold uppercase transition-colors cursor-pointer ${
+                        formationStatus === 'DRAFT'
+                          ? 'bg-warn text-void font-black'
+                          : 'text-dim hover:text-ink'
+                      }`}
+                    >
+                      Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormationStatus('PUBLISHED')}
+                      className={`px-3 py-1 text-[11px] font-bold uppercase transition-colors cursor-pointer ${
+                        formationStatus === 'PUBLISHED'
+                          ? 'bg-cyan text-void font-black'
+                          : 'text-dim hover:text-ink'
+                      }`}
+                    >
+                      Published
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleSaveMatchFormation}
+                    disabled={savingFormation}
+                    className="border border-cyan bg-cyan px-4 py-2 font-display text-xs font-black uppercase text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-xs"
+                  >
+                    {savingFormation ? 'Saving Formation...' : 'Save Match Formation'}
+                  </button>
+
+                  <button
+                    onClick={() => setFormationTournId('')}
+                    className="border border-white/20 px-3 py-2 text-xs uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Switch Tournament
+                  </button>
+                </div>
+              </div>
+
+              {/* YouTube / Stream Broadcast Box — ONLY CONFIGURED AFTER MATCH FORMATION EXISTS */}
+              {(formationRounds.length > 0 || formationMatches.length > 0) && (
+                <div className="pt-3 border-t border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-void/60 p-3">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-live font-bold uppercase tracking-wider shrink-0 text-[11px]">
+                      🔴 Live Match Broadcast URL:
+                    </span>
+                    <input
+                      type="url"
+                      placeholder="https://www.youtube.com/watch?v=... or /live/..."
+                      value={formationStreamUrl}
+                      onChange={(e) => setFormationStreamUrl(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-1 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleSaveFormationStream}
+                      disabled={savingFormationStream}
+                      className="border border-live bg-live/20 px-3 py-1 text-[11px] font-bold text-live hover:bg-live hover:text-white transition-colors cursor-pointer"
+                    >
+                      {savingFormationStream ? 'Saving...' : 'Broadcast Stream'}
+                    </button>
+                    {formationStreamUrl && (
+                      <a
+                        href={formationStreamUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="border border-white/20 px-2.5 py-1 text-[11px] text-dim hover:text-ink"
+                      >
+                        Watch ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Panel>
+          )}
+
+          {/* MAIN FORMATION WORKSPACE (2-Columns) */}
+          {formationTournId && currentFormationTourn && (
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+              {/* LEFT RAIL: CONTENDER SQUADS (<300px) */}
+              <div className="w-full lg:w-72 max-w-full lg:max-w-[280px] shrink-0 space-y-3">
+                <Panel className="p-3 border-white/15 bg-surface/50 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <Hud className="text-cyan">Contender Squads</Hud>
+                    <span className="border border-white/20 bg-void px-1.5 py-0.5 text-[10px] text-ink font-bold">
+                      {formationRosters.length} Teams
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-dim px-0.5">
+                    <span>
+                      Paired:{' '}
+                      <strong className="text-ok">
+                        {formationRosters.filter((t) => pairedFormationTeamIds.has(String(t.team_id))).length}
+                      </strong>
+                    </span>
+                    <span>
+                      Unpaired:{' '}
+                      <strong className="text-warn">
+                        {formationRosters.filter((t) => !pairedFormationTeamIds.has(String(t.team_id))).length}
+                      </strong>
+                    </span>
+                  </div>
+
+                  {/* Filter search */}
+                  <input
+                    type="text"
+                    placeholder="Filter squads..."
+                    value={formationSquadSearch}
+                    onChange={(e) => setFormationSquadSearch(e.target.value)}
+                    className="w-full border border-white/15 bg-void px-2 py-1 text-[11px] text-ink placeholder:text-dim/50 outline-none focus:border-cyan"
+                  />
+
+                  {/* Squad List */}
+                  {formationRosters.length === 0 ? (
+                    <div className="p-4 border border-dashed border-white/10 text-center text-dim text-[11px]">
+                      No teams registered for this tournament yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[540px] overflow-y-auto pr-1">
+                      {formationRosters
+                        .filter(
+                          (t) =>
+                            !formationSquadSearch.trim() ||
+                            t.team_name.toLowerCase().includes(formationSquadSearch.toLowerCase()) ||
+                            t.team_tag.toLowerCase().includes(formationSquadSearch.toLowerCase()) ||
+                            (t.captain?.username || '').toLowerCase().includes(formationSquadSearch.toLowerCase())
+                        )
+                        .map((team, idx) => {
+                          const isPaired = pairedFormationTeamIds.has(String(team.team_id))
+                          return (
+                            <div
+                              key={team.team_id}
+                              className="border border-white/10 bg-void/80 p-2 space-y-1 hover:border-cyan/40 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className="font-display font-black uppercase text-ink truncate text-[11px]"
+                                  title={team.team_name}
+                                >
+                                  <span className="text-cyan mr-1 font-mono">#{idx + 1}</span>
+                                  {team.team_name} [{team.team_tag}]
+                                </span>
+                                <span
+                                  className={`text-[8px] px-1 py-0.2 border uppercase shrink-0 font-bold ${
+                                    isPaired
+                                      ? 'border-ok/40 text-ok bg-ok/10'
+                                      : 'border-warn/40 text-warn bg-warn/10'
+                                  }`}
+                                >
+                                  {isPaired ? 'Paired' : 'Unpaired'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-dim flex items-center justify-between">
+                                <span className="truncate max-w-[150px]">
+                                  Capt: @{team.captain?.username || team.captain_username || 'TBD'}
+                                </span>
+                                {team.members && team.members.length > 0 && (
+                                  <span className="text-dim/70 shrink-0 font-mono">
+                                    ({team.members.length}p)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
+                </Panel>
+              </div>
+
+              {/* RIGHT WORKSPACE: ROUNDS & MATCH FORMATION */}
+              <div className="flex-1 min-w-0 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-surface/60 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-ink uppercase tracking-wider">Formation Structure:</span>
+                    <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-cyan font-bold text-[11px]">
+                      {formationRounds.length} Rounds Created
+                    </span>
+                    <span className="border border-white/20 bg-void px-2 py-0.5 text-dim font-bold text-[11px]">
+                      {formationMatches.length} Matches Formed
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setNewRoundInputName(`Round ${formationRounds.length + 1}`)
+                      setIsAddRoundModalOpen(true)
+                    }}
+                    className="border border-cyan bg-cyan px-3 py-1.5 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer"
+                  >
+                    + Add Round
+                  </button>
+                </div>
+
+                {/* ZERO ROUNDS INITIAL STATE */}
+                {formationRounds.length === 0 ? (
+                  <Panel className="border border-dashed border-white/20 p-12 text-center space-y-3 bg-surface/30">
+                    <div className="text-2xl">📋</div>
+                    <h3 className="font-display text-2xl font-black uppercase text-ink">
+                      Formation: No rounds created
+                    </h3>
+                    <p className="text-xs text-dim max-w-md mx-auto">
+                      Matches: 0. The initial match structure is completely empty. The admin decides how many rounds,
+                      their names, and matchups manually.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        onClick={() => {
+                          setNewRoundInputName('Round 1')
+                          setIsAddRoundModalOpen(true)
+                        }}
+                        className="border border-cyan bg-cyan px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-cyan/90 transition-all cursor-pointer"
+                      >
+                        + Add Round
+                      </button>
+                    </div>
+                  </Panel>
+                ) : (
+                  /* ROUND CONTAINERS */
+                  <div className="space-y-6">
+                    {formationRounds.map((rnd) => {
+                      const matchesInRound = formationMatches.filter(
+                        (m) => m.round_name === rnd.round_name
+                      )
+
+                      return (
+                        <Panel
+                          key={rnd.round_name}
+                          className="border border-white/15 bg-surface/40 p-4 space-y-4"
+                        >
+                          {/* Round Container Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="size-2 rounded-full bg-cyan" />
+                              <h3 className="font-display text-xl font-black uppercase text-cyan">
+                                {rnd.round_name}
+                              </h3>
+                              <span className="border border-white/20 bg-void px-2 py-0.5 text-[10px] text-ink font-bold uppercase">
+                                Matches: {matchesInRound.length}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenAddMatchForRound(rnd.round_name)}
+                                className="border border-cyan/60 bg-cyan/15 px-3 py-1 font-display text-[11px] font-black uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                              >
+                                + Add Match to {rnd.round_name}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRoundFromFormation(rnd.round_name)}
+                                className="border border-live/30 px-2 py-1 text-[11px] uppercase text-live hover:bg-live hover:text-white transition-colors cursor-pointer"
+                                title="Delete Round and its matches"
+                              >
+                                Delete Round
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Matches in Round */}
+                          {matchesInRound.length === 0 ? (
+                            <div className="p-6 border border-dashed border-white/10 text-center text-dim text-xs">
+                              No matches formed in {rnd.round_name} yet. Click &quot;+ Add Match to {rnd.round_name}&quot; to pair contenders.
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {matchesInRound.map((m, mIdx) => {
+                                const teamAName =
+                                  m.team_a_name || m.team_a_placeholder || 'TBD (Team A)'
+                                const teamBName =
+                                  m.team_b_name || m.team_b_placeholder || 'TBD (Team B)'
+
+                                return (
+                                  <div
+                                    key={mIdx}
+                                    className="border border-white/10 bg-void/80 p-3.5 space-y-2 hover:border-cyan/30 transition-colors"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-display font-black text-xs uppercase text-cyan">
+                                          Match #{m.match_number || mIdx + 1}
+                                        </span>
+                                        <span className="text-white/20">|</span>
+                                        <span className="border border-white/20 px-1.5 py-0.2 text-[9px] uppercase text-dim">
+                                          Format: {m.format} ({m.series_format})
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => handleDeleteMatchFromFormation(rnd.round_name, mIdx)}
+                                          className="text-live/70 hover:text-live text-[11px] uppercase cursor-pointer"
+                                        >
+                                          Delete Match
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* VISUAL WHO IS PLAYING WHOM */}
+                                    {m.format === 'Battle Royale' ? (
+                                      <div className="py-1">
+                                        <div className="text-[11px] text-cyan font-bold uppercase mb-1">
+                                          Battle Royale Contenders ({m.teams?.length || m.team_ids?.length || 0} Squads):
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {m.teams?.map((tm) => (
+                                            <span
+                                              key={tm.id}
+                                              className="border border-white/15 bg-surface px-2 py-0.5 text-[10px] text-ink font-bold uppercase"
+                                            >
+                                              {tm.name} [{tm.tag || 'TEAM'}]
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between gap-3 py-1">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                          <div className="size-6 rounded bg-surface border border-white/10 flex items-center justify-center font-display font-black text-[10px] text-ink shrink-0">
+                                            A
+                                          </div>
+                                          <span className="font-display text-sm font-black uppercase truncate text-ink">
+                                            {teamAName}
+                                          </span>
+                                        </div>
+
+                                        <div className="font-display font-black text-dim text-xs tracking-wider shrink-0 px-2">
+                                          VS
+                                        </div>
+
+                                        <div className="flex items-center justify-end gap-2 min-w-0 flex-1 text-right">
+                                          <span className="font-display text-sm font-black uppercase truncate text-ink">
+                                            {teamBName}
+                                          </span>
+                                          <div className="size-6 rounded bg-surface border border-white/10 flex items-center justify-center font-display font-black text-[10px] text-ink shrink-0">
+                                            B
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Schedule & Advancement routing */}
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-dim border-t border-white/5 pt-1.5">
+                                      <div className="flex flex-wrap items-center gap-3">
+                                        {(m.scheduled_date || m.scheduled_time) && (
+                                          <span>
+                                            Schedule:{' '}
+                                            <strong className="text-cyan">
+                                              {[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' ')}
+                                            </strong>
+                                          </span>
+                                        )}
+                                        {m.server_region && (
+                                          <span>Region: <strong className="text-ink">{m.server_region}</strong></span>
+                                        )}
+                                      </div>
+
+                                      {m.next_match_slot && (
+                                        <div className="text-cyan font-mono">
+                                          ──► Winner Advances to: <strong>{m.next_match_slot}</strong>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </Panel>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VIEW 2: OPERATIONS DASHBOARD (Total Matches, Live Now, Go Live, Score/Complete) */}
+      {/* ========================================================================= */}
+      {activeTab === 'OPERATIONS' && (
+        <div className="space-y-6">
+          {/* Header Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-3xl font-black uppercase text-ink">
+                  Match Engine &amp; Operations
+                </h2>
+                <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] text-cyan font-bold uppercase">
+                  Live Operations
+                </span>
+              </div>
+              <p className="text-xs text-dim">
+                Real-time match progression: review rosters, launch broadcasts, score matches, and advance winners.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => {
+                  setActiveTab('FORMATION')
+                  if (!formationTournId && closedTournaments.length > 0) {
+                    setFormationTournId(closedTournaments[0].id || closedTournaments[0].slug || '')
+                  }
+                }}
+                className="border border-cyan bg-cyan px-4 py-2 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-xs"
+              >
+                + Create Match / Formation
+              </button>
+              <button
+                onClick={() => {
+                  fetchMatches()
+                  if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+                }}
+                disabled={loading}
+                className="border border-white/20 bg-surface px-3 py-2 uppercase text-dim hover:text-ink hover:border-white/40 cursor-pointer"
+              >
+                {loading ? 'Refreshing...' : '↻ Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Stats KPI Bar (Preserving Total Matches and Live Now) */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <Panel className="p-3 text-center">
+              <Hud className="text-dim">Total Matches</Hud>
+              <p className="font-display text-2xl font-black text-ink">{matches.length}</p>
+            </Panel>
+            <Panel className="p-3 text-center border-warn/40 bg-warn/[0.03]">
+              <Hud className="text-warn">Draft Rosters</Hud>
+              <p className="font-display text-2xl font-black text-warn">{totalDraftCount}</p>
+            </Panel>
+            <Panel className="p-3 text-center border-live/40 bg-live/[0.03]">
+              <Hud className="text-live">🔴 Live Now</Hud>
+              <p className="font-display text-2xl font-black text-live">{liveCount}</p>
+            </Panel>
+            <Panel className="p-3 text-center">
+              <Hud className="text-cyan">Scheduled</Hud>
+              <p className="font-display text-2xl font-black text-cyan">{scheduledCount}</p>
+            </Panel>
+            <Panel className="p-3 text-center">
+              <Hud className="text-ok">Completed</Hud>
+              <p className="font-display text-2xl font-black text-ok">{completedCount}</p>
+            </Panel>
+          </div>
+
+          {/* Scope Selector Bar */}
+          <Panel className="p-4 md:p-5 space-y-4 border-white/15 bg-surface/50">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-bold text-ink uppercase tracking-wider">Tournament Scope:</span>
+                <select
+                  value={selectedTournId}
+                  onChange={(e) => setSelectedTournId(e.target.value)}
+                  className="border border-white/20 bg-void px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan min-w-[240px]"
+                >
+                  <option value="ALL">All Tournaments (Global View)</option>
+                  {tournaments.map((t) => (
+                    <option key={t.id || t.slug} value={t.id || t.slug}>
+                      {t.title} ({t.status || 'ACTIVE'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedTournId !== 'ALL' && currentTournament && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {!isRegistrationClosed ? (
+                    <button
+                      onClick={handleCloseRegistration}
+                      disabled={closingReg}
+                      className="border border-warn/40 bg-warn/15 px-3 py-1.5 text-[11px] font-bold text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer"
+                    >
+                      {closingReg ? 'Closing...' : '🔒 Close Reg & Finalize Rosters'}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="border border-dim bg-dim/10 px-2.5 py-1 text-[10px] text-dim font-bold uppercase">
+                        ✓ Registrations Closed
+                      </span>
+                      <button
+                        onClick={handleReopenRegistration}
+                        disabled={reopeningReg}
+                        className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                      >
+                        {reopeningReg ? 'Reopening...' : '🔓 Reopen Registration'}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowRostersDrawer(!showRostersDrawer)}
+                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                  >
+                    {showRostersDrawer ? 'Hide Rosters' : `View Contenders (${tournRosters.length})`}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Broadcast Stream Bar */}
+            {selectedTournId !== 'ALL' && currentTournament && (
+              <div className="pt-3 border-t border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-void/50 p-3">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-live font-bold uppercase tracking-wider shrink-0">
+                    🔴 Tournament Stream:
+                  </span>
+                  <input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=... or /live/..."
+                    value={tournStreamUrl}
+                    onChange={(e) => setTournStreamUrl(e.target.value)}
+                    className="w-full border border-white/15 bg-surface px-3 py-1 text-xs text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleSaveTournStream}
+                    disabled={savingStream}
+                    className="border border-live bg-live/20 px-3 py-1 text-[11px] font-bold text-live hover:bg-live hover:text-white transition-colors cursor-pointer"
+                  >
+                    {savingStream ? 'Saving...' : 'Broadcast Stream'}
+                  </button>
+                  {tournStreamUrl && (
+                    <a
+                      href={tournStreamUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="border border-white/20 px-2.5 py-1 text-[11px] text-dim hover:text-ink"
+                    >
+                      Watch ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Roster Drawer */}
+            {showRostersDrawer && selectedTournId !== 'ALL' && (
+              <div className="pt-3 border-t border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Hud className="text-cyan">
+                    Registered Contenders &amp; Rosters ({tournRosters.length} Teams)
+                  </Hud>
+                  {loadingRosters && <span className="text-dim">Loading rosters...</span>}
+                </div>
+
+                {tournRosters.length === 0 ? (
+                  <div className="p-4 border border-dashed border-white/10 text-center text-dim">
+                    No teams have registered for this tournament yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[280px] overflow-y-auto">
+                    {tournRosters.map((team) => (
+                      <div
+                        key={team.team_id}
+                        className="border border-white/10 bg-void/80 p-2.5 space-y-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-display font-black uppercase text-ink truncate max-w-[180px]">
+                            {team.team_name} [{team.team_tag}]
+                          </span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 border uppercase ${
+                              team.is_paired
+                                ? 'border-ok/40 text-ok bg-ok/10'
+                                : 'border-warn/40 text-warn bg-warn/10'
+                            }`}
+                          >
+                            {team.is_paired ? 'Paired' : 'Unpaired'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-dim">
+                          Captain: @{team.captain?.username || team.captain_username || 'TBD'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Panel>
+
+          {/* Round Tabs & Status Filters */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-graphite p-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -988,10 +1743,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                       (m.round_number && `Round ${m.round_number}` === r)
                     return tourMatch && isRound
                   })
-                  const rDrafts = rMatches.filter(
-                    (m) => (m.roster_status || '').toUpperCase() === 'DRAFT'
-                  ).length
-
                   return (
                     <button
                       key={r}
@@ -1004,14 +1755,10 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     >
                       <span>{r}</span>
                       <span className="text-[10px] opacity-75">({rMatches.length})</span>
-                      {rDrafts > 0 && (
-                        <span className="size-2 rounded-full bg-warn inline-block" title={`${rDrafts} draft rosters`} />
-                      )}
                     </button>
                   )
                 })}
 
-                {/* Inline Add Round Form */}
                 <form onSubmit={handleAddNewRound} className="flex items-center gap-1 ml-1">
                   <input
                     type="text"
@@ -1029,26 +1776,395 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 </form>
               </div>
 
-              {/* Batch Publish Button if there are draft rosters in scope */}
               {draftMatchesInScope.length > 0 && selectedTournId !== 'ALL' && (
                 <button
                   onClick={() => setIsBatchPublishOpen(true)}
-                  className="border border-warn bg-warn/15 px-3 py-1 font-mono text-xs font-bold uppercase text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="border border-warn bg-warn/15 px-3 py-1 font-mono text-xs font-bold uppercase text-warn hover:bg-warn hover:text-void transition-colors cursor-pointer"
                 >
-                  <span>📢 Publish All Drafts in {selectedRoundTab === 'ALL' ? 'Tournament' : selectedRoundTab} ({draftMatchesInScope.length})</span>
+                  📢 Publish All Drafts ({draftMatchesInScope.length})
                 </button>
               )}
             </div>
 
-            {/* Round Competition Format Selector Bar */}
-            {selectedRoundTab !== 'ALL' && (
-              <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 border border-white/10 bg-void/70 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-dim uppercase font-bold text-[11px]">Round Competition Format:</span>
+            {/* Lifecycle Status Filter */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-dim uppercase font-bold text-[11px] mr-1">Status:</span>
+                {['ALL', 'LIVE', 'CHECK_IN_OPEN', 'SCHEDULED', 'COMPLETED'].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
+                      statusFilter === s
+                        ? 'border border-cyan text-cyan font-bold bg-cyan/10'
+                        : 'text-dim hover:text-ink'
+                    }`}
+                  >
+                    {s === 'LIVE' ? '🔴 LIVE' : s}
+                  </button>
+                ))}
+              </div>
+              <Hud className="text-cyan">{filteredMatches.length} Match Formations Listed</Hud>
+            </div>
+          </div>
+
+          {/* MATCHES LIST */}
+          <div className="space-y-4">
+            {filteredMatches.map((m) => {
+              const isLive = (m.status || '').toUpperCase() === 'LIVE'
+              const isCheckIn = (m.status || '').toUpperCase() === 'CHECK_IN_OPEN'
+              const isDone = (m.status || '').toUpperCase() === 'COMPLETED'
+              const isDraft = (m.roster_status || '').toUpperCase() === 'DRAFT'
+              const isUpdated = (m.roster_status || '').toUpperCase() === 'UPDATED'
+
+              const teamAName = m.team_a?.name || m.team_a_name || m.team_a_placeholder || 'TBD (Team A)'
+              const teamBName = m.team_b?.name || m.team_b_name || m.team_b_placeholder || 'TBD (Team B)'
+              const isTeamAPlaceholder = !m.team_a_id && Boolean(m.team_a_placeholder)
+              const isTeamBPlaceholder = !m.team_b_id && Boolean(m.team_b_placeholder)
+
+              const scoreA = m.team_a?.score ?? m.score_a ?? 0
+              const scoreB = m.team_b?.score ?? m.score_b ?? 0
+              const streamUrl = m.youtube_live_url || m.live_link
+              const roundTitle = m.round_name || m.stage || `Round ${m.round_number || 1}`
+              const matchNum = m.match_number || m.order || 1
+
+              return (
+                <Panel
+                  key={m.id}
+                  className={`p-4 md:p-5 transition-colors relative ${
+                    isLive
+                      ? 'border-live/60 bg-live/[0.04]'
+                      : isDraft
+                      ? 'border-warn/40 bg-warn/[0.02]'
+                      : isCheckIn
+                      ? 'border-cyan/40 bg-cyan/[0.02]'
+                      : 'border-white/10 bg-surface/50'
+                  }`}
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      {/* Round Header & Status Badges */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-display font-black text-sm uppercase text-cyan tracking-wider">
+                          {roundTitle} · MATCH {matchNum}
+                        </span>
+                        <span className="text-white/20">|</span>
+                        <span className="text-dim text-[11px] truncate max-w-[200px]">
+                          {m.tournament_title || currentTournament?.title || 'Tournament'}
+                        </span>
+                        <span className="text-white/20">|</span>
+
+                        {isDraft ? (
+                          <span className="border border-warn bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warn">
+                            ⚠️ DRAFT (HIDDEN)
+                          </span>
+                        ) : isUpdated ? (
+                          <span className="border border-cyan bg-cyan/15 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan">
+                            🔄 UPDATED
+                          </span>
+                        ) : (
+                          <span className="border border-ok/40 bg-ok/10 px-2 py-0.5 text-[10px] font-bold uppercase text-ok">
+                            ✓ PUBLISHED
+                          </span>
+                        )}
+
+                        <Badge
+                          s={
+                            isLive
+                              ? 'live'
+                              : isDone
+                              ? 'completed'
+                              : isCheckIn
+                              ? 'warn'
+                              : 'upcoming'
+                          }
+                          label={m.status || 'SCHEDULED'}
+                        />
+
+                        {streamUrl && (
+                          <a
+                            href={streamUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-live/20 px-2 py-0.5 text-[10px] font-bold text-live border border-live/30 hover:bg-live/30"
+                          >
+                            🔴 Stream Active ↗
+                          </a>
+                        )}
+                      </div>
+
+                      {/* VISUAL WHO IS PLAYING WHOM */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-2 border-y border-white/5 my-1">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
+                            A
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className={`font-display text-base md:text-lg font-black uppercase truncate ${
+                                isTeamAPlaceholder ? 'italic text-dim' : 'text-ink'
+                              }`}
+                            >
+                              {teamAName}
+                            </span>
+                            {isTeamAPlaceholder && (
+                              <span className="text-[9px] text-dim block">Advancement Placeholder</span>
+                            )}
+                          </div>
+                          <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
+                            {scoreA}
+                          </span>
+                        </div>
+
+                        <div className="flex sm:flex-col items-center justify-center px-3 py-1 font-display font-black text-dim text-xs tracking-wider shrink-0">
+                          <span>─── VS ───</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
+                            {scoreB}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className={`font-display text-base md:text-lg font-black uppercase truncate ${
+                                isTeamBPlaceholder ? 'italic text-dim' : 'text-ink'
+                              }`}
+                            >
+                              {teamBName}
+                            </span>
+                            {isTeamBPlaceholder && (
+                              <span className="text-[9px] text-dim block">Advancement Placeholder</span>
+                            )}
+                          </div>
+                          <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
+                            B
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Metadata & Advancement */}
+                      <div className="flex flex-wrap items-center gap-4 text-[11px] text-dim">
+                        <span>Format: <strong className="text-ink">{m.format || m.series_format || 'BO1'}</strong></span>
+                        <span>Region: <strong className="text-ink">{m.server_region || 'AWS Mumbai'}</strong></span>
+                        {(m.scheduled_date || m.scheduled_time) && (
+                          <span>
+                            Schedule:{' '}
+                            <strong className="text-cyan">
+                              {[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' ')}
+                            </strong>
+                          </span>
+                        )}
+                        {m.lobby_code && (
+                          <span className="text-ink">Lobby: <strong className="text-cyan">{m.lobby_code}</strong></span>
+                        )}
+                      </div>
+
+                      {(m.next_match_slot || isDone) && (
+                        <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                          {isDone && m.winner_team_id && (
+                            <span className="border border-ok/50 bg-ok/10 text-ok px-2 py-0.5 font-bold">
+                              🏆 Winner: {m.winner_team_id === m.team_a_id ? teamAName : teamBName}
+                            </span>
+                          )}
+                          {m.next_match_slot && (
+                            <span className="text-cyan font-mono">
+                              ──► Winner Advances to: <strong>{m.next_match_slot}</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Operational Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-white/10">
+                      {isDraft && (
+                        <button
+                          onClick={() => {
+                            setPublishModalMatch(m)
+                            setPublishNotifyLeaders(true)
+                            setPublishMatchNotes('')
+                          }}
+                          className="border border-warn bg-warn/20 px-3 py-1.5 uppercase text-xs font-bold text-warn hover:bg-warn hover:text-void transition-all cursor-pointer"
+                        >
+                          📢 Publish Roster
+                        </button>
+                      )}
+
+                      {!isLive && !isDone && (
+                        <button
+                          onClick={() => {
+                            setGoLiveMatch(m)
+                            setGoLiveUrl(m.youtube_live_url || m.live_link || currentTournament?.live_stream_url || '')
+                          }}
+                          className="border border-live bg-live/20 px-3 py-1.5 uppercase text-xs font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
+                        >
+                          🔴 Go Live
+                        </button>
+                      )}
+
+                      {!isCheckIn && !isLive && !isDone && (
+                        <button
+                          onClick={() => handleQuickStatus(m.id, 'CHECK_IN_OPEN')}
+                          className="border border-warn/40 bg-warn/10 px-3 py-1.5 uppercase text-xs text-warn hover:bg-warn/20 transition-all cursor-pointer"
+                        >
+                          Open Check-In
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setScoreMatch(m)
+                          setScoreForm({
+                            score_a: m.team_a?.score ?? m.score_a ?? 0,
+                            score_b: m.team_b?.score ?? m.score_b ?? 0,
+                            winner_team_id: m.winner_team_id || '',
+                          })
+                        }}
+                        className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
+                      >
+                        🏁 Score / Complete
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditMatch(m)
+                          setEditForm({
+                            status: m.status || 'SCHEDULED',
+                            roster_status: m.roster_status || 'PUBLISHED',
+                            round_name: m.round_name || m.stage || 'Round 1',
+                            round_number: m.round_number || 1,
+                            match_number: m.match_number || 1,
+                            scheduled_time: m.scheduled_time || '',
+                            scheduled_date: m.scheduled_date || '',
+                            next_match_slot: m.next_match_slot || '',
+                            youtube_live_url: m.youtube_live_url || m.live_link || '',
+                            lobby_code: m.lobby_code || '',
+                            lobby_password: m.lobby_password || '',
+                            server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
+                            score_a: m.team_a?.score ?? m.score_a ?? 0,
+                            score_b: m.team_b?.score ?? m.score_b ?? 0,
+                            winner_team_id: m.winner_team_id || '',
+                          })
+                        }}
+                        className="border border-cyan bg-cyan/15 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
+                      >
+                        Edit Lobby
+                      </button>
+
+                      <button
+                        onClick={() => handleSwapTeams(m.id)}
+                        title="Swap Team A and Team B sides"
+                        className="border border-white/20 px-2 py-1.5 uppercase text-xs text-dim hover:text-ink cursor-pointer"
+                      >
+                        ⇄ Swap
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteMatch(m.id)}
+                        title="Delete Match"
+                        className="border border-live/30 px-2 py-1.5 uppercase text-xs text-live/80 hover:bg-live hover:text-white cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              )
+            })}
+
+            {filteredMatches.length === 0 && (
+              <div className="border border-white/10 p-12 text-center text-dim bg-surface/30">
+                No matches found for the selected round and criteria. Use &quot;+ Create Match / Formation&quot; above to configure round formations.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ADD ROUND CONTAINER (Formation Workspace) */}
+      {/* ========================================================================= */}
+      {isAddRoundModalOpen && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
+          <div className="w-full max-w-sm border border-cyan/50 bg-graphite p-6 relative">
+            <Brackets color="border-cyan/50" />
+            <h3 className="font-display text-xl font-black uppercase text-ink">Add New Round Container</h3>
+            <p className="text-xs text-dim mt-1">
+              Add a named round stage (e.g. Round 1, Quarter Finals, Group A) to this formation.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleAddRoundToFormation(newRoundInputName)
+              }}
+              className="mt-4 space-y-4 font-mono text-xs"
+            >
+              <div>
+                <label className="block text-dim uppercase mb-1">Round Stage Name</label>
+                <input
+                  type="text"
+                  list="formation-stages-suggestions"
+                  required
+                  placeholder="e.g. Round 1 or Quarter Finals"
+                  value={newRoundInputName}
+                  onChange={(e) => setNewRoundInputName(e.target.value)}
+                  className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                />
+                <datalist id="formation-stages-suggestions">
+                  {DEFAULT_STAGES.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsAddRoundModalOpen(false)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer"
+                >
+                  Create Container
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ADD MATCH TO SPECIFIC ROUND (Formation Workspace) */}
+      {/* ========================================================================= */}
+      {isAddFormationMatchOpen && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative max-h-[90vh] overflow-y-auto">
+            <Brackets color="border-cyan/50" />
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <h3 className="font-display text-xl font-black uppercase text-ink">
+                Add Match to {formationMatchRound}
+              </h3>
+              <span className="text-[10px] text-cyan font-bold uppercase">{currentFormationTourn?.title}</span>
+            </div>
+
+            <form onSubmit={handleSaveMatchToFormation} className="mt-4 space-y-4 font-mono text-xs">
+              {/* Competition Format Selector */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-dim uppercase mb-1">Competition Format</label>
                   <select
-                    value={roundFormatMap[selectedRoundTab] || currentTournament?.format || 'Knockout'}
-                    onChange={(e) => handleSetRoundFormat(e.target.value)}
-                    className="border border-white/20 bg-surface px-2.5 py-1 text-xs text-ink outline-none focus:border-cyan"
+                    value={formationMatchFormData.format}
+                    onChange={(e) =>
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        format: e.target.value as any,
+                      })
+                    }
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
                   >
                     {COMPETITION_FORMATS.map((fmt) => (
                       <option key={fmt} value={fmt}>
@@ -1057,453 +2173,17 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     ))}
                   </select>
                 </div>
-                <div className="text-dim text-[11px]">
-                  Configuring pairings &amp; advancement for: <strong className="text-cyan">{selectedRoundTab}</strong>
-                </div>
-              </div>
-            )}
-          </div>
-
-        {/* Secondary Filter: Match Lifecycle Status */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-dim uppercase font-bold text-[11px] mr-1">Status:</span>
-            {['ALL', 'LIVE', 'CHECK_IN_OPEN', 'SCHEDULED', 'COMPLETED'].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
-                  statusFilter === s
-                    ? 'border border-cyan text-cyan font-bold bg-cyan/10'
-                    : 'text-dim hover:text-ink'
-                }`}
-              >
-                {s === 'LIVE' ? '🔴 LIVE' : s}
-              </button>
-            ))}
-          </div>
-          <Hud className="text-cyan">{filteredMatches.length} Match Formations Listed</Hud>
-        </div>
-
-        {/* MATCH FORMATIONS LIST: WHO IS PLAYING WHOM */}
-        <div className="space-y-4">
-        {filteredMatches.map((m) => {
-          const isLive = (m.status || '').toUpperCase() === 'LIVE'
-          const isCheckIn = (m.status || '').toUpperCase() === 'CHECK_IN_OPEN'
-          const isDone = (m.status || '').toUpperCase() === 'COMPLETED'
-          const isDraft = (m.roster_status || '').toUpperCase() === 'DRAFT'
-          const isUpdated = (m.roster_status || '').toUpperCase() === 'UPDATED'
-
-          const teamAName = m.team_a?.name || m.team_a_name || m.team_a_placeholder || 'TBD (Team A)'
-          const teamBName = m.team_b?.name || m.team_b_name || m.team_b_placeholder || 'TBD (Team B)'
-          const isTeamAPlaceholder = !m.team_a_id && Boolean(m.team_a_placeholder)
-          const isTeamBPlaceholder = !m.team_b_id && Boolean(m.team_b_placeholder)
-
-          const scoreA = m.team_a?.score ?? m.score_a ?? 0
-          const scoreB = m.team_b?.score ?? m.score_b ?? 0
-          const streamUrl = m.youtube_live_url || m.live_link
-
-          const roundTitle = m.round_name || m.stage || `Round ${m.round_number || 1}`
-          const matchNum = m.match_number || m.order || 1
-
-          return (
-            <Panel
-              key={m.id}
-              className={`p-4 md:p-5 transition-colors relative ${
-                isLive
-                  ? 'border-live/60 bg-live/[0.04]'
-                  : isDraft
-                  ? 'border-warn/40 bg-warn/[0.02]'
-                  : isCheckIn
-                  ? 'border-cyan/40 bg-cyan/[0.02]'
-                  : 'border-white/10 bg-surface/50'
-              }`}
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="space-y-2.5 flex-1 min-w-0">
-                  {/* Round Header & Status Badges */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-display font-black text-sm uppercase text-cyan tracking-wider">
-                      {roundTitle} · MATCH {matchNum}
-                    </span>
-                    <span className="text-white/20">|</span>
-                    <span className="text-dim text-[11px] truncate max-w-[200px]">
-                      {m.tournament_title || currentTournament?.title || 'Tournament'}
-                    </span>
-                    <span className="text-white/20">|</span>
-
-                    {/* Roster Publication Badge */}
-                    {isDraft ? (
-                      <span className="border border-warn bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warn">
-                        ⚠️ DRAFT (HIDDEN FROM PUBLIC)
-                      </span>
-                    ) : isUpdated ? (
-                      <span className="border border-cyan bg-cyan/15 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan">
-                        🔄 ROSTER UPDATED
-                      </span>
-                    ) : (
-                      <span className="border border-ok/40 bg-ok/10 px-2 py-0.5 text-[10px] font-bold uppercase text-ok">
-                        ✓ PUBLISHED &amp; PUBLIC
-                      </span>
-                    )}
-
-                    {/* Match Lifecycle Badge */}
-                    <Badge
-                      s={
-                        isLive
-                          ? 'live'
-                          : isDone
-                          ? 'completed'
-                          : isCheckIn
-                          ? 'warn'
-                          : 'upcoming'
-                      }
-                      label={m.status || 'SCHEDULED'}
-                    />
-
-                    {streamUrl && (
-                      <a
-                        href={streamUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded bg-live/20 px-2 py-0.5 text-[10px] font-bold text-live border border-live/30 hover:bg-live/30"
-                      >
-                        🔴 Stream Active ↗
-                      </a>
-                    )}
-                  </div>
-
-                  {/* VISUAL WHO IS PLAYING WHOM */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-2 border-y border-white/5 my-1">
-                    {/* Team A */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
-                        A
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-display text-base md:text-lg font-black uppercase truncate ${
-                              isTeamAPlaceholder ? 'italic text-dim' : 'text-ink'
-                            }`}
-                          >
-                            {teamAName}
-                          </span>
-                          {m.team_a?.tag && (
-                            <span className="text-[10px] text-cyan font-mono">[{m.team_a.tag}]</span>
-                          )}
-                        </div>
-                        {isTeamAPlaceholder && (
-                          <span className="text-[9px] text-dim block">Advancement Placeholder</span>
-                        )}
-                      </div>
-                      <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
-                        {scoreA}
-                      </span>
-                    </div>
-
-                    {/* VS Bridge */}
-                    <div className="flex sm:flex-col items-center justify-center px-3 py-1 font-display font-black text-dim text-xs tracking-wider shrink-0">
-                      <span>─── VS ───</span>
-                    </div>
-
-                    {/* Team B */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
-                        {scoreB}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-display text-base md:text-lg font-black uppercase truncate ${
-                              isTeamBPlaceholder ? 'italic text-dim' : 'text-ink'
-                            }`}
-                          >
-                            {teamBName}
-                          </span>
-                          {m.team_b?.tag && (
-                            <span className="text-[10px] text-cyan font-mono">[{m.team_b.tag}]</span>
-                          )}
-                        </div>
-                        {isTeamBPlaceholder && (
-                          <span className="text-[9px] text-dim block">Advancement Placeholder</span>
-                        )}
-                      </div>
-                      <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
-                        B
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Metadata & Advancement Progression */}
-                  <div className="flex flex-wrap items-center gap-4 text-[11px] text-dim">
-                    <span>Format: <strong className="text-ink">{m.format || m.series_format || 'BO1'}</strong></span>
-                    <span>Region: <strong className="text-ink">{m.server_region || 'AWS Mumbai'}</strong></span>
-                    {(m.scheduled_date || m.scheduled_time) && (
-                      <span>Schedule: <strong className="text-cyan">{[m.scheduled_date, m.scheduled_time].filter(Boolean).join(' ')}</strong></span>
-                    )}
-                    {m.lobby_code && (
-                      <span className="text-ink">
-                        Lobby: <strong className="text-cyan">{m.lobby_code}</strong>
-                      </span>
-                    )}
-                    {m.lobby_password && (
-                      <span className="text-ink">
-                        Pass: <strong className="text-warn">{m.lobby_password}</strong>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Winner / Auto-Advancement Destination Banner */}
-                  {(m.next_match_slot || m.advancement_label || isDone) && (
-                    <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                      {isDone && m.winner_team_id && (
-                        <span className="border border-ok/50 bg-ok/10 text-ok px-2 py-0.5 font-bold">
-                          🏆 Winner: {m.winner_team_id === m.team_a_id ? teamAName : teamBName}
-                        </span>
-                      )}
-                      {m.next_match_slot ? (
-                        <span className="text-cyan font-mono">
-                          ──► Winner Advances to: <strong>{m.next_match_slot}</strong>
-                        </span>
-                      ) : m.advancement_label ? (
-                        <span className="text-cyan font-mono">
-                          ──► Progression: <strong>{m.advancement_label}</strong>
-                        </span>
-                      ) : isDone ? (
-                        <span className="text-ok font-mono text-[10px]">
-                          ✓ Bracket Engine: Winner automatically advanced into next round slot.
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-
-                {/* Operations & Authoritative Actions */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-white/10">
-                  {/* Publish Roster Button (If in Draft) */}
-                  {isDraft && (
-                    <button
-                      onClick={() => {
-                        setPublishModalMatch(m)
-                        setPublishNotifyLeaders(true)
-                        setPublishMatchNotes('')
-                      }}
-                      className="border border-warn bg-warn/20 px-3 py-1.5 uppercase text-xs font-bold text-warn hover:bg-warn hover:text-void transition-all cursor-pointer"
-                    >
-                      📢 Publish Roster
-                    </button>
-                  )}
-
-                  {!isLive && !isDone && (
-                    <button
-                      onClick={() => {
-                        setGoLiveMatch(m)
-                        setGoLiveUrl(
-                          m.youtube_live_url ||
-                            m.live_link ||
-                            currentTournament?.live_stream_url ||
-                            ''
-                        )
-                      }}
-                      className="border border-live bg-live/20 px-3 py-1.5 uppercase text-xs font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
-                    >
-                      🔴 Go Live
-                    </button>
-                  )}
-
-                  {!isCheckIn && !isLive && !isDone && (
-                    <button
-                      onClick={() => handleQuickStatus(m.id, 'CHECK_IN_OPEN')}
-                      className="border border-warn/40 bg-warn/10 px-3 py-1.5 uppercase text-xs text-warn hover:bg-warn/20 transition-all cursor-pointer"
-                    >
-                      Open Check-In
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setScoreMatch(m)
-                      setScoreForm({
-                        score_a: m.team_a?.score ?? m.score_a ?? 0,
-                        score_b: m.team_b?.score ?? m.score_b ?? 0,
-                        winner_team_id: m.winner_team_id || '',
-                      })
-                    }}
-                    className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
-                  >
-                    🏁 Score / Complete
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setEditMatch(m)
-                      setEditForm({
-                        status: m.status || 'SCHEDULED',
-                        roster_status: m.roster_status || 'PUBLISHED',
-                        round_name: m.round_name || m.stage || 'Round 1',
-                        round_number: m.round_number || 1,
-                        match_number: m.match_number || 1,
-                        scheduled_time: m.scheduled_time || '',
-                        scheduled_date: m.scheduled_date || '',
-                        next_match_slot: m.next_match_slot || '',
-                        youtube_live_url: m.youtube_live_url || m.live_link || '',
-                        lobby_code: m.lobby_code || '',
-                        lobby_password: m.lobby_password || '',
-                        server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
-                        score_a: m.team_a?.score ?? m.score_a ?? 0,
-                        score_b: m.team_b?.score ?? m.score_b ?? 0,
-                        winner_team_id: m.winner_team_id || '',
-                      })
-                    }}
-                    className="border border-cyan bg-cyan/15 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
-                  >
-                    Edit Lobby
-                  </button>
-
-                  <button
-                    onClick={() => handleSwapTeams(m.id)}
-                    title="Swap Team A and Team B sides"
-                    className="border border-white/20 px-2 py-1.5 uppercase text-xs text-dim hover:text-ink cursor-pointer"
-                  >
-                    ⇄ Swap
-                  </button>
-
-                  <button
-                    onClick={() => handleDeleteMatch(m.id)}
-                    title="Delete Match"
-                    className="border border-live/30 px-2 py-1.5 uppercase text-xs text-live/80 hover:bg-live hover:text-white cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </Panel>
-          )
-        })}
-
-        {filteredMatches.length === 0 && (
-          <div className="border border-white/10 p-12 text-center text-dim bg-surface/30">
-            No matches found for the selected round and criteria. Use &quot;+ Form Match Roster&quot; above to configure round formations.
-          </div>
-        )}
-          </div>
-        </div>
-      </div>
-
-      {/* MODAL 1: ADD / FORM MATCH ROSTER */}
-      {isAddMatchOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto"
-        >
-          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative max-h-[90vh] overflow-y-auto">
-            <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Form Round Match Roster
-            </h3>
-            <p className="text-xs text-dim mt-1">
-              Configure who plays whom for this round with advancement routing and draft control.
-            </p>
-
-            <form onSubmit={handleAddMatchSubmit} className="mt-5 space-y-4 font-mono text-xs">
-              {/* Target Tournament */}
-              {/* Target Tournament (Closed Only) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-dim uppercase">Target Tournament (Closed Only)</label>
-                  <span className="text-[10px] text-ok font-bold uppercase">✓ Registration Closed</span>
-                </div>
-                {closedTournaments.length === 0 ? (
-                  <div className="p-3 border border-warn/40 bg-warn/10 text-warn text-xs space-y-2">
-                    <p>⚠️ No tournaments currently have closed registrations. Tournament registration must be closed before match rosters can be formed.</p>
-                  </div>
-                ) : (
-                  <select
-                    value={addMatchData.tournament_id}
-                    onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, tournament_id: e.target.value })
-                    }
-                    required
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
-                  >
-                    {closedTournaments.map((t) => (
-                      <option key={t.id || t.slug} value={t.id || t.slug}>
-                        {t.title} ({t.status || 'CLOSED'})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Roster Publication Initial State */}
-              <div className="border border-warn/30 bg-warn/[0.04] p-3 space-y-1">
-                <label className="block text-warn font-bold uppercase">
-                  Roster Visibility Status
-                </label>
-                <div className="flex items-center gap-4 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="roster_status"
-                      value="DRAFT"
-                      checked={addMatchData.roster_status === 'DRAFT'}
-                      onChange={() => setAddMatchData({ ...addMatchData, roster_status: 'DRAFT' })}
-                      className="accent-warn"
-                    />
-                    <span className="text-ink font-bold">DRAFT (Review first, hidden from public)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="roster_status"
-                      value="PUBLISHED"
-                      checked={addMatchData.roster_status === 'PUBLISHED'}
-                      onChange={() => setAddMatchData({ ...addMatchData, roster_status: 'PUBLISHED' })}
-                      className="accent-cyan"
-                    />
-                    <span className="text-ink font-bold">PUBLISHED (Immediately public &amp; notify)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Stage / Round Selection */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Round / Stage Name</label>
-                  <input
-                    type="text"
-                    list="available-rounds-list"
-                    value={addMatchData.round_name}
-                    onChange={(e) =>
-                      setAddMatchData({
-                        ...addMatchData,
-                        round_name: e.target.value,
-                        stage: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. Quarterfinals or Round 1"
-                    required
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                  <datalist id="available-rounds-list">
-                    {availableRoundTabs.map((st) => (
-                      <option key={st} value={st} />
-                    ))}
-                    {DEFAULT_STAGES.map((st) => (
-                      <option key={st} value={st} />
-                    ))}
-                  </datalist>
-                </div>
                 <div>
                   <label className="block text-dim uppercase mb-1">Series Format</label>
                   <select
-                    value={addMatchData.series_format}
+                    value={formationMatchFormData.series_format}
                     onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, series_format: e.target.value })
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        series_format: e.target.value,
+                      })
                     }
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
                   >
                     <option value="BO1">Best of 1 (BO1)</option>
                     <option value="BO3">Best of 3 (BO3)</option>
@@ -1512,186 +2192,255 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 </div>
               </div>
 
-              {/* Round & Match Ordering Numbers */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Round Number</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={addMatchData.round_number}
-                    onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, round_number: Number(e.target.value) })
-                    }
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
+              {/* BATTLE ROYALE MULTI-TEAM CHECKBOXES */}
+              {formationMatchFormData.format === 'Battle Royale' ? (
+                <div className="border border-white/10 bg-void/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-ink uppercase">Select Contender Squads</span>
+                    <span className="text-[10px] text-cyan font-bold">
+                      {formationMatchFormData.selected_team_ids.length} Selected
+                    </span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 border border-white/10 p-2 bg-surface">
+                    {formationRosters.map((tm) => {
+                      const checked = formationMatchFormData.selected_team_ids.includes(tm.team_id)
+                      return (
+                        <label
+                          key={tm.team_id}
+                          className="flex items-center gap-2 p-1 hover:bg-void/40 cursor-pointer text-[11px]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormationMatchFormData({
+                                  ...formationMatchFormData,
+                                  selected_team_ids: [
+                                    ...formationMatchFormData.selected_team_ids,
+                                    tm.team_id,
+                                  ],
+                                })
+                              } else {
+                                setFormationMatchFormData({
+                                  ...formationMatchFormData,
+                                  selected_team_ids: formationMatchFormData.selected_team_ids.filter(
+                                    (id) => id !== tm.team_id
+                                  ),
+                                })
+                              }
+                            }}
+                            className="accent-cyan"
+                          />
+                          <span className="text-ink font-bold">
+                            {tm.team_name} [{tm.team_tag}]
+                          </span>
+                          <span className="text-dim text-[10px]">
+                            (Capt: @{tm.captain?.username || tm.captain_username || 'TBD'})
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
+              ) : (
+                /* 2-TEAM PAIRING (Team A vs Team B) */
+                <div className="space-y-3">
+                  {/* Team A */}
+                  <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-ink uppercase">Team A</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_a_mode: 'ROSTER',
+                            })
+                          }
+                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                            formationMatchFormData.team_a_mode === 'ROSTER'
+                              ? 'border border-cyan bg-cyan text-void font-bold'
+                              : 'text-dim hover:text-ink'
+                          }`}
+                        >
+                          Registered Squad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_a_mode: 'PLACEHOLDER',
+                            })
+                          }
+                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                            formationMatchFormData.team_a_mode === 'PLACEHOLDER'
+                              ? 'border border-cyan bg-cyan text-void font-bold'
+                              : 'text-dim hover:text-ink'
+                          }`}
+                        >
+                          Placeholder
+                        </button>
+                      </div>
+                    </div>
+
+                    {formationMatchFormData.team_a_mode === 'ROSTER' ? (
+                      <select
+                        value={formationMatchFormData.team_a_id}
+                        onChange={(e) =>
+                          setFormationMatchFormData({
+                            ...formationMatchFormData,
+                            team_a_id: e.target.value,
+                          })
+                        }
+                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                      >
+                        <option value="">Select Registered Squad...</option>
+                        {formationRosters.map((r) => (
+                          <option key={r.team_id} value={r.team_id}>
+                            {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="e.g. Winner of Match 1 or Alpha Squad"
+                        value={formationMatchFormData.team_a_placeholder}
+                        onChange={(e) =>
+                          setFormationMatchFormData({
+                            ...formationMatchFormData,
+                            team_a_placeholder: e.target.value,
+                          })
+                        }
+                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                      />
+                    )}
+                  </div>
+
+                  {/* Team B */}
+                  <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-ink uppercase">Team B</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_b_mode: 'ROSTER',
+                            })
+                          }
+                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                            formationMatchFormData.team_b_mode === 'ROSTER'
+                              ? 'border border-cyan bg-cyan text-void font-bold'
+                              : 'text-dim hover:text-ink'
+                          }`}
+                        >
+                          Registered Squad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_b_mode: 'PLACEHOLDER',
+                            })
+                          }
+                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                            formationMatchFormData.team_b_mode === 'PLACEHOLDER'
+                              ? 'border border-cyan bg-cyan text-void font-bold'
+                              : 'text-dim hover:text-ink'
+                          }`}
+                        >
+                          Placeholder
+                        </button>
+                      </div>
+                    </div>
+
+                    {formationMatchFormData.team_b_mode === 'ROSTER' ? (
+                      <select
+                        value={formationMatchFormData.team_b_id}
+                        onChange={(e) =>
+                          setFormationMatchFormData({
+                            ...formationMatchFormData,
+                            team_b_id: e.target.value,
+                          })
+                        }
+                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                      >
+                        <option value="">Select Registered Squad...</option>
+                        {formationRosters.map((r) => (
+                          <option key={r.team_id} value={r.team_id}>
+                            {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="e.g. Winner of Match 2 or Beta Squad"
+                        value={formationMatchFormData.team_b_placeholder}
+                        onChange={(e) =>
+                          setFormationMatchFormData({
+                            ...formationMatchFormData,
+                            team_b_placeholder: e.target.value,
+                          })
+                        }
+                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Match Order & Schedule */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-dim uppercase mb-1">Match Number in Round</label>
                   <input
                     type="number"
                     min="1"
-                    value={addMatchData.match_number}
+                    value={formationMatchFormData.match_number}
                     onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, match_number: Number(e.target.value) })
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        match_number: Number(e.target.value),
+                      })
                     }
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
                 </div>
-              </div>
-
-              {/* Team A Selection */}
-              <div className="border border-white/10 bg-void/50 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink uppercase">Team A</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAddMatchData({ ...addMatchData, team_a_mode: 'ROSTER' })
-                      }
-                      className={`px-2 py-0.5 text-[10px] uppercase ${
-                        addMatchData.team_a_mode === 'ROSTER'
-                          ? 'border border-cyan bg-cyan text-void font-bold'
-                          : 'text-dim hover:text-ink'
-                      }`}
-                    >
-                      Registered Team
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAddMatchData({ ...addMatchData, team_a_mode: 'PLACEHOLDER' })
-                      }
-                      className={`px-2 py-0.5 text-[10px] uppercase ${
-                        addMatchData.team_a_mode === 'PLACEHOLDER'
-                          ? 'border border-cyan bg-cyan text-void font-bold'
-                          : 'text-dim hover:text-ink'
-                      }`}
-                    >
-                      Placeholder
-                    </button>
-                  </div>
-                </div>
-
-                {addMatchData.team_a_mode === 'ROSTER' ? (
-                  <select
-                    value={addMatchData.team_a_id}
-                    onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, team_a_id: e.target.value })
-                    }
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  >
-                    <option value="">Select Registered Team...</option>
-                    {tournRosters.map((r) => (
-                      <option key={r.team_id} value={r.team_id}>
-                        {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
+                <div>
+                  <label className="block text-dim uppercase mb-1">Advancement Destination Slot</label>
                   <input
                     type="text"
-                    placeholder="e.g. Winner of Match 1 or Alpha Squad"
-                    value={addMatchData.team_a_placeholder}
+                    placeholder="e.g. Semifinals Match 1"
+                    value={formationMatchFormData.next_match_slot}
                     onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, team_a_placeholder: e.target.value })
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        next_match_slot: e.target.value,
+                      })
                     }
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
-                )}
-              </div>
-
-              {/* Team B Selection */}
-              <div className="border border-white/10 bg-void/50 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-ink uppercase">Team B</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAddMatchData({ ...addMatchData, team_b_mode: 'ROSTER' })
-                      }
-                      className={`px-2 py-0.5 text-[10px] uppercase ${
-                        addMatchData.team_b_mode === 'ROSTER'
-                          ? 'border border-cyan bg-cyan text-void font-bold'
-                          : 'text-dim hover:text-ink'
-                      }`}
-                    >
-                      Registered Team
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAddMatchData({ ...addMatchData, team_b_mode: 'PLACEHOLDER' })
-                      }
-                      className={`px-2 py-0.5 text-[10px] uppercase ${
-                        addMatchData.team_b_mode === 'PLACEHOLDER'
-                          ? 'border border-cyan bg-cyan text-void font-bold'
-                          : 'text-dim hover:text-ink'
-                      }`}
-                    >
-                      Placeholder
-                    </button>
-                  </div>
                 </div>
-
-                {addMatchData.team_b_mode === 'ROSTER' ? (
-                  <select
-                    value={addMatchData.team_b_id}
-                    onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, team_b_id: e.target.value })
-                    }
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  >
-                    <option value="">Select Registered Team...</option>
-                    {tournRosters.map((r) => (
-                      <option key={r.team_id} value={r.team_id}>
-                        {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="e.g. Winner of Match 2 or Beta Squad"
-                    value={addMatchData.team_b_placeholder}
-                    onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, team_b_placeholder: e.target.value })
-                    }
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                )}
               </div>
 
-              {/* Advancement Destination */}
-              <div>
-                <label className="block text-dim uppercase mb-1">
-                  Advancement Destination Slot (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Semifinals Match 1 or Grand Final"
-                  value={addMatchData.next_match_slot}
-                  onChange={(e) =>
-                    setAddMatchData({ ...addMatchData, next_match_slot: e.target.value })
-                  }
-                  className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                />
-                <p className="text-[10px] text-dim mt-0.5">
-                  Winning team will be automatically placed into this bracket slot upon match completion.
-                </p>
-              </div>
-
-              {/* Scheduled Time & Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-dim uppercase mb-1">Scheduled Date</label>
                   <input
                     type="date"
-                    value={addMatchData.scheduled_date}
+                    value={formationMatchFormData.scheduled_date}
                     onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, scheduled_date: e.target.value })
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        scheduled_date: e.target.value,
+                      })
                     }
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
@@ -1700,44 +2449,32 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   <label className="block text-dim uppercase mb-1">Scheduled Time</label>
                   <input
                     type="text"
-                    placeholder="e.g. 8:00 PM IST"
-                    value={addMatchData.scheduled_time}
+                    placeholder="e.g. 7:00 PM IST"
+                    value={formationMatchFormData.scheduled_time}
                     onChange={(e) =>
-                      setAddMatchData({ ...addMatchData, scheduled_time: e.target.value })
+                      setFormationMatchFormData({
+                        ...formationMatchFormData,
+                        scheduled_time: e.target.value,
+                      })
                     }
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
                 </div>
               </div>
 
-              {/* Optional Broadcast URL */}
-              <div>
-                <label className="block text-dim uppercase mb-1">YouTube Live Stream (Optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/live/..."
-                  value={addMatchData.youtube_live_url}
-                  onChange={(e) =>
-                    setAddMatchData({ ...addMatchData, youtube_live_url: e.target.value })
-                  }
-                  className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
-                  onClick={() => setIsAddMatchOpen(false)}
+                  onClick={() => setIsAddFormationMatchOpen(false)}
                   className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingAdd}
-                  className="border border-cyan bg-cyan px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+                  className="border border-cyan bg-cyan px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-cyan/90 cursor-pointer"
                 >
-                  {submittingAdd ? 'Saving...' : 'Save Match Formation'}
+                  Add Match to {formationMatchRound}
                 </button>
               </div>
             </form>
@@ -1745,13 +2482,13 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* MODAL: SINGLE MATCH ROSTER PUBLISH REVIEW */}
+      {/* ========================================================================= */}
+      {/* OPERATIONS MODALS (Single Publish, Batch Publish, Go Live, Score, Edit) */}
+      {/* ========================================================================= */}
+
+      {/* SINGLE ROSTER PUBLISH REVIEW MODAL */}
       {publishModalMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
-        >
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
           <div className="w-full max-w-lg border border-warn bg-graphite p-6 relative">
             <Brackets color="border-warn/60" />
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-warn/20 border border-warn/40 text-warn text-[10px] font-bold uppercase mb-2">
@@ -1765,7 +2502,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
             </p>
 
             <form onSubmit={handlePublishRosterSubmit} className="mt-4 space-y-4 font-mono text-xs">
-              {/* Matchup Summary Box */}
               <div className="border border-white/10 bg-void/60 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-display text-base font-black uppercase text-cyan">
@@ -1782,21 +2518,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 </div>
               </div>
 
-              {/* Publication Notice */}
-              <div className="border border-cyan/30 bg-cyan/[0.05] p-3 text-[11px] space-y-1 text-cyan">
-                <p className="font-bold">Publishing this roster will immediately:</p>
-                <ul className="list-disc pl-4 space-y-0.5 text-ink/80">
-                  <li>Make this match publicly visible in the Live Matches schedule</li>
-                  <li>Send real-time in-app alerts to both registered team captains</li>
-                  <li>Dispatch official branded notification emails via Brevo with community links</li>
-                </ul>
-              </div>
-
-              {/* Optional Custom Notes */}
               <div>
-                <label className="block text-dim uppercase mb-1">
-                  Optional Match Notes for Captains
-                </label>
+                <label className="block text-dim uppercase mb-1">Optional Match Notes for Captains</label>
                 <input
                   type="text"
                   placeholder="e.g. Please join lobby 15 minutes before match time"
@@ -1806,7 +2529,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 />
               </div>
 
-              {/* Notification Toggle */}
               <label className="flex items-center gap-2 cursor-pointer pt-1">
                 <input
                   type="checkbox"
@@ -1815,7 +2537,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   className="accent-cyan"
                 />
                 <span className="text-ink font-bold">
-                  Notify Team Captains (In-App Alert &amp; Brevo Email)
+                  Notify Team Captains (In-App Alert &amp; Official Email)
                 </span>
               </label>
 
@@ -1825,7 +2547,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   onClick={() => setPublishModalMatch(null)}
                   className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
                 >
-                  Back to Edit
+                  Back
                 </button>
                 <button
                   type="submit"
@@ -1840,13 +2562,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* MODAL: BATCH PUBLISH CONFIRMATION */}
+      {/* BATCH PUBLISH MODAL */}
       {isBatchPublishOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
-        >
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
           <div className="w-full max-w-lg border border-warn bg-graphite p-6 relative">
             <Brackets color="border-warn/60" />
             <h3 className="font-display text-2xl font-black uppercase text-ink">
@@ -1871,10 +2589,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 ))}
               </div>
 
-              <div className="border border-cyan/30 bg-cyan/[0.05] p-3 text-[11px] text-cyan">
-                Every team leader with registered email will receive an official match notification email with tournament details and community links.
-              </div>
-
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
@@ -1896,32 +2610,23 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* MODAL 2: GO LIVE */}
+      {/* GO LIVE MODAL */}
       {goLiveMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
-        >
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
           <div className="w-full max-w-md border border-live/60 bg-graphite p-6 relative">
             <Brackets color="border-live/60" />
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-live/20 border border-live/40 text-live text-[10px] font-bold uppercase mb-2">
               <span className="size-1.5 rounded-full bg-live animate-ping" />
               BROADCAST CONTROL
             </div>
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Mark Match Live
-            </h3>
+            <h3 className="font-display text-2xl font-black uppercase text-ink">Mark Match Live</h3>
             <p className="text-xs text-dim mt-1">
-              {goLiveMatch.tournament_title} · {goLiveMatch.team_a?.name || 'Team A'} VS{' '}
-              {goLiveMatch.team_b?.name || 'Team B'}
+              {goLiveMatch.tournament_title} · {goLiveMatch.team_a?.name || 'Team A'} VS {goLiveMatch.team_b?.name || 'Team B'}
             </p>
 
             <form onSubmit={handleGoLiveSubmit} className="mt-4 space-y-4 font-mono text-xs">
               <div>
-                <label className="block text-dim uppercase mb-1">
-                  YouTube Live Stream URL
-                </label>
+                <label className="block text-dim uppercase mb-1">YouTube Live Stream URL</label>
                 <input
                   type="url"
                   placeholder="https://www.youtube.com/watch?v=... or /live/..."
@@ -1930,9 +2635,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   required
                   className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-live"
                 />
-                <p className="text-[10px] text-dim mt-1">
-                  This broadcast link will stream live on the match arena and public tournament hubs.
-                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
@@ -1956,20 +2658,14 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* MODAL 3: SCORE & COMPLETE (WITH AUTOMATIC ADVANCEMENT) */}
+      {/* SCORE & COMPLETE MODAL (With winner auto-advancement) */}
       {scoreMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
-        >
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
           <div className="w-full max-w-md border border-white/20 bg-graphite p-6 relative">
             <Brackets color="border-ok/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Score &amp; Complete Match
-            </h3>
+            <h3 className="font-display text-2xl font-black uppercase text-ink">Score &amp; Complete Match</h3>
             <p className="text-xs text-dim mt-1">
-              Record official scores. Declaring a winner will automatically advance that team into the next round match slot in this bracket.
+              Record official scores. Declaring a winner will automatically advance that team into the configured next round match slot in this bracket.
             </p>
 
             <form onSubmit={handleScoreSubmit} className="mt-4 space-y-4 font-mono text-xs">
@@ -1983,9 +2679,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     min="0"
                     max="99"
                     value={scoreForm.score_a}
-                    onChange={(e) =>
-                      setScoreForm({ ...scoreForm, score_a: Number(e.target.value) })
-                    }
+                    onChange={(e) => setScoreForm({ ...scoreForm, score_a: Number(e.target.value) })}
                     className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
                   />
                 </div>
@@ -1998,9 +2692,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     min="0"
                     max="99"
                     value={scoreForm.score_b}
-                    onChange={(e) =>
-                      setScoreForm({ ...scoreForm, score_b: Number(e.target.value) })
-                    }
+                    onChange={(e) => setScoreForm({ ...scoreForm, score_b: Number(e.target.value) })}
                     className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
                   />
                 </div>
@@ -2010,9 +2702,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                 <label className="block text-dim uppercase mb-1">Declared Winner</label>
                 <select
                   value={scoreForm.winner_team_id}
-                  onChange={(e) =>
-                    setScoreForm({ ...scoreForm, winner_team_id: e.target.value })
-                  }
+                  onChange={(e) => setScoreForm({ ...scoreForm, winner_team_id: e.target.value })}
                   className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
                 >
                   <option value="">Auto-Determine from Highest Score</option>
@@ -2054,13 +2744,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
         </div>
       )}
 
-      {/* MODAL 4: EDIT MATCH DETAILS & LOBBY */}
+      {/* EDIT MATCH DETAILS & LOBBY MODAL */}
       {editMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto"
-        >
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto">
           <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative max-h-[90vh] overflow-y-auto">
             <Brackets color="border-cyan/50" />
             <h3 className="font-display text-2xl font-black uppercase text-ink">
@@ -2149,9 +2835,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                   type="url"
                   placeholder="https://youtube.com/live/..."
                   value={editForm.youtube_live_url}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, youtube_live_url: e.target.value })
-                  }
+                  onChange={(e) => setEditForm({ ...editForm, youtube_live_url: e.target.value })}
                   className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                 />
               </div>
@@ -2163,9 +2847,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     type="text"
                     placeholder="e.g. AMT-ROOM-01"
                     value={editForm.lobby_code}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, lobby_code: e.target.value })
-                    }
+                    onChange={(e) => setEditForm({ ...editForm, lobby_code: e.target.value })}
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-cyan"
                   />
                 </div>
@@ -2175,9 +2857,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     type="text"
                     placeholder="e.g. PASS99"
                     value={editForm.lobby_password}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, lobby_password: e.target.value })
-                    }
+                    onChange={(e) => setEditForm({ ...editForm, lobby_password: e.target.value })}
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-warn"
                   />
                 </div>
@@ -2192,9 +2872,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     type="number"
                     min="0"
                     value={editForm.score_a}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, score_a: Number(e.target.value) })
-                    }
+                    onChange={(e) => setEditForm({ ...editForm, score_a: Number(e.target.value) })}
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
                 </div>
@@ -2206,9 +2884,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated }: Props) {
                     type="number"
                     min="0"
                     value={editForm.score_b}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, score_b: Number(e.target.value) })
-                    }
+                    onChange={(e) => setEditForm({ ...editForm, score_b: Number(e.target.value) })}
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                   />
                 </div>

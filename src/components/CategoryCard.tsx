@@ -34,11 +34,11 @@ export default function CategoryCard({
     : [genre?.banner_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200']
 
   const logos = genre?.games
-    ? genre.games.map((g) => ({ title: g.title, logo: g.logo_url })).filter((g) => Boolean(g.logo))
+    ? genre.games.map((g) => ({ title: (g as any).name || g.title, logo: g.logo_url })).filter((g) => Boolean(g.logo))
     : []
 
   const gameTitles = genre?.games
-    ? genre.games.map((g) => g.title)
+    ? genre.games.map((g) => (g as any).name || g.title)
     : category?.games.map((g) => g.name) || []
 
   const rotationInterval = Math.max(2, (genre?.rotation_interval_seconds || 4)) * 1000

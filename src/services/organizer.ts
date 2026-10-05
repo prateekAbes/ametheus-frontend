@@ -37,6 +37,12 @@ export async function closeRegistrationOrganizer(id: string): Promise<any> {
   })
 }
 
+export async function reopenRegistrationOrganizer(id: string): Promise<any> {
+  return apiClient(`/organizer/tournaments/${id}/reopen-registration`, {
+    method: 'POST',
+  })
+}
+
 export async function generateBracketOrganizer(id: string): Promise<any> {
   return apiClient(`/organizer/tournaments/${id}/generate-bracket`, {
     method: 'POST',

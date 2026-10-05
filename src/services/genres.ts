@@ -75,3 +75,15 @@ export async function deleteGenre(genreId: string): Promise<{ status: string; me
     method: 'DELETE',
   })
 }
+
+export async function addGameToGenre(genreId: string, gameId: string): Promise<Genre> {
+  return apiClient<Genre>(`/admin/genres/${genreId}/games/${gameId}`, {
+    method: 'POST',
+  })
+}
+
+export async function removeGameFromGenre(genreId: string, gameId: string): Promise<Genre> {
+  return apiClient<Genre>(`/admin/genres/${genreId}/games/${gameId}`, {
+    method: 'DELETE',
+  })
+}

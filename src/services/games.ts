@@ -15,6 +15,8 @@ export interface Game {
   prize_pool_inr?: number
   play_url?: string
   banner_url: string
+  banner_tablet_url?: string
+  banner_mobile_url?: string
   logo_url: string
   description: string
   server_region: string
@@ -46,6 +48,8 @@ export interface NormalizedGame {
   prizePoolInr: number
   playUrl?: string
   bannerUrl: string
+  bannerTabletUrl?: string
+  bannerMobileUrl?: string
   logoUrl: string
   description: string
   serverRegion: string

@@ -64,6 +64,8 @@ import {
   createGenre,
   updateGenre,
   deleteGenre,
+  addGameToGenre,
+  removeGameFromGenre,
   Genre,
   GenreCreatePayload,
 } from '../services/genres'
@@ -79,6 +81,7 @@ import {
   deleteTournamentOrganizer,
   publishTournamentOrganizer,
   closeRegistrationOrganizer,
+  reopenRegistrationOrganizer,
   generateBracketOrganizer,
   cancelTournamentOrganizer,
 } from '../services/organizer'
@@ -141,7 +144,6 @@ function BannerImageUploader({
       const width = imgObj.naturalWidth
       const height = imgObj.naturalHeight
       const ratio = width / (height || 1)
-      const targetRatio = recommendedRatio === '1:1' ? 1.0 : 16 / 9
 
       if (recommendedRatio === '1:1') {
         if (Math.abs(ratio - 1.0) > 0.25) {
@@ -151,13 +153,30 @@ function BannerImageUploader({
         } else {
           setInfo(`✓ Verified: 1:1 square aspect ratio (${width}x${height}px)`)
         }
+      } else if (recommendedRatio === '4:3') {
+        if (Math.abs(ratio - 4 / 3) > 0.2) {
+          setWarning(
+            `⚠️ Non-standard tablet aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 4:3 (~1.33:1, e.g. ${recommendedRes}). Image will adapt cleanly.`
+          )
+        } else {
+          setInfo(`✓ Verified: 4:3 tablet aspect ratio (${width}x${height}px)`)
+        }
+      } else if (recommendedRatio === '9:16') {
+        if (Math.abs(ratio - 9 / 16) > 0.15) {
+          setWarning(
+            `⚠️ Non-standard vertical mobile aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 9:16 (~0.56:1, e.g. ${recommendedRes}).`
+          )
+        } else {
+          setInfo(`✓ Verified: 9:16 vertical mobile aspect ratio (${width}x${height}px)`)
+        }
       } else {
+        const targetRatio = 16 / 9
         if (Math.abs(ratio - targetRatio) > 0.18) {
           setWarning(
             `⚠️ Non-standard aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 16:9 (~1.78:1, e.g. ${recommendedRes}). Image will be fitted/cropped to 16:9.`
           )
         } else {
-          setInfo(`✓ Verified: 16:9 aspect ratio (${width}x${height}px)`)
+          setInfo(`✓ Verified: 16:9 widescreen aspect ratio (${width}x${height}px)`)
         }
 
         if (width < 1280 || height < 720) {
@@ -191,6 +210,14 @@ function BannerImageUploader({
   }
 
   const currentDisplay = previewSrc || (value ? resolveMediaUrl(value) : null)
+  const aspectClass =
+    recommendedRatio === '1:1'
+      ? 'aspect-square max-w-[120px]'
+      : recommendedRatio === '9:16'
+      ? 'aspect-[9/16] max-w-[120px]'
+      : recommendedRatio === '4:3'
+      ? 'aspect-[4/3] max-w-[200px]'
+      : 'aspect-[16/9] max-w-sm'
 
   return (
     <div className="space-y-1.5 mt-2">
@@ -237,7 +264,7 @@ function BannerImageUploader({
 
       {/* Card Aspect Ratio Preview */}
       {currentDisplay ? (
-        <div className={`relative ${recommendedRatio === '1:1' ? 'aspect-square max-w-[120px]' : 'aspect-[16/9] max-w-sm'} w-full overflow-hidden border border-white/20 bg-surface/50 mt-1`}>
+        <div className={`relative ${aspectClass} w-full overflow-hidden border border-white/20 bg-surface/50 mt-1`}>
           <img
             src={currentDisplay}
             alt="Preview"
@@ -260,8 +287,8 @@ function BannerImageUploader({
           </button>
         </div>
       ) : (
-        <div className={`flex ${recommendedRatio === '1:1' ? 'aspect-square max-w-[120px]' : 'aspect-[16/9] max-w-sm'} w-full items-center justify-center border border-dashed border-white/15 bg-surface/20 text-dim font-mono text-[10px] mt-1 text-center p-2`}>
-          No {recommendedRatio === '1:1' ? 'Logo' : 'Banner'} Set
+        <div className={`flex ${aspectClass} w-full items-center justify-center border border-dashed border-white/15 bg-surface/20 text-dim font-mono text-[10px] mt-1 text-center p-2`}>
+          No {recommendedRatio === '1:1' ? 'Logo' : `${recommendedRatio} Asset`} Set
         </div>
       )}
     </div>
@@ -360,6 +387,9 @@ export default function Admin() {
     max_team_size: 5,
     start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
     banner_url: '',
+    banner_tablet_url: '',
+    banner_mobile_url: '',
+    logo_url: '',
     whatsapp_group_url: '',
     description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
   })
@@ -384,6 +414,8 @@ export default function Admin() {
     prize_pool_inr: 50000,
     play_url: '',
     banner_url: '',
+    banner_tablet_url: '',
+    banner_mobile_url: '',
     logo_url: '',
     description: '',
     server_region: 'Mumbai, India',
@@ -409,6 +441,9 @@ export default function Admin() {
     is_active: true,
   })
   const [editingGenre, setEditingGenre] = useState<Genre | null>(null)
+  const [managingGenre, setManagingGenre] = useState<Genre | null>(null)
+  const [selectedGameToAdd, setSelectedGameToAdd] = useState('')
+  const [isAssigningGame, setIsAssigningGame] = useState(false)
 
   // PAGE MEDIA Interactive States
   const [editingMedia, setEditingMedia] = useState<PageMediaConfig | null>(null)
@@ -740,6 +775,16 @@ export default function Admin() {
     }
   }
 
+  const handleReopenRegTour = async (id: string) => {
+    try {
+      await reopenRegistrationOrganizer(id)
+      showToast('Registration reopened for tournament! Contenders can register.')
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to reopen registration')
+    }
+  }
+
   const handleGenerateBracketTour = async (id: string) => {
     try {
       await generateBracketOrganizer(id)
@@ -807,6 +852,9 @@ export default function Admin() {
         max_teams: Number(editingTour.max_teams),
         start_date: editingTour.start_date,
         banner_url: editingTour.banner_url,
+        banner_tablet_url: editingTour.banner_tablet_url,
+        banner_mobile_url: editingTour.banner_mobile_url,
+        logo_url: editingTour.logo_url,
         whatsapp_group_url: editingTour.whatsapp_group_url,
         description: editingTour.description,
       })
@@ -853,6 +901,8 @@ export default function Admin() {
         entry_fee_inr: Number(editingGame.entry_fee_inr || 0),
         prize_pool_inr: Number(editingGame.prize_pool_inr || 0),
         banner_url: editingGame.banner_url,
+        banner_tablet_url: editingGame.banner_tablet_url,
+        banner_mobile_url: editingGame.banner_mobile_url,
         logo_url: editingGame.logo_url,
         description: editingGame.description,
         server_region: editingGame.server_region,
@@ -957,6 +1007,36 @@ export default function Admin() {
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to toggle genre status')
+    }
+  }
+
+  const handleAddGameToGenreAction = async (genreId: string, gameId: string) => {
+    if (!gameId) return
+    setIsAssigningGame(true)
+    try {
+      const updated = await addGameToGenre(genreId, gameId)
+      showToast('Game assigned to genre category!')
+      setManagingGenre(updated)
+      setSelectedGameToAdd('')
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to add game to genre')
+    } finally {
+      setIsAssigningGame(false)
+    }
+  }
+
+  const handleRemoveGameFromGenreAction = async (genreId: string, gameId: string) => {
+    setIsAssigningGame(true)
+    try {
+      const updated = await removeGameFromGenre(genreId, gameId)
+      showToast('Game removed from genre category.')
+      setManagingGenre(updated)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove game from genre')
+    } finally {
+      setIsAssigningGame(false)
     }
   }
 
@@ -1262,12 +1342,20 @@ export default function Admin() {
                             </button>
                           )}
                           {t.status === 'REGISTRATION_CLOSED' && (
-                            <button
-                              onClick={() => handleGenerateBracketTour(t.id || t.slug)}
-                              className="border border-ok bg-ok/15 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30"
-                            >
-                              Generate Bracket
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleReopenRegTour(t.id || t.slug)}
+                                className="border border-cyan bg-cyan/15 px-2 py-1 font-mono text-[10px] uppercase text-cyan hover:bg-cyan/30"
+                              >
+                                Reopen Registration
+                              </button>
+                              <button
+                                onClick={() => handleGenerateBracketTour(t.id || t.slug)}
+                                className="border border-ok bg-ok/15 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30"
+                              >
+                                Generate Bracket
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => handleSetFeatured(isFeatured ? 'none' : t.id || t.slug)}
@@ -1583,7 +1671,16 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-3">
+                    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-3">
+                      <button
+                        onClick={() => {
+                          setManagingGenre(g)
+                          setSelectedGameToAdd('')
+                        }}
+                        className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 cursor-pointer"
+                      >
+                        Assign Games ({connectedGames.length})
+                      </button>
                       <button
                         onClick={() => setEditingGenre(g)}
                         className="border border-white/20 bg-surface px-3 py-1 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan"
@@ -2602,11 +2699,37 @@ export default function Admin() {
                 <label className="text-dim">Start Date & Time (UTC/Local)</label>
                 <input required type="datetime-local" value={newTour.start_date} onChange={(e) => setNewTour({ ...newTour, start_date: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
               </div>
-              <BannerImageUploader
-                label="Banner Image (16:9)"
-                value={newTour.banner_url}
-                onChange={(val) => setNewTour({ ...newTour, banner_url: val })}
-              />
+              <div className="space-y-3 border-t border-white/10 pt-3">
+                <div className="font-bold uppercase text-cyan text-[11px]">Responsive Tournament Media Assets</div>
+                <BannerImageUploader
+                  label="Desktop Banner (16:9 Widescreen)"
+                  recommendedRatio="16:9"
+                  recommendedRes="1920x1080"
+                  value={newTour.banner_url}
+                  onChange={(val) => setNewTour({ ...newTour, banner_url: val })}
+                />
+                <BannerImageUploader
+                  label="Tablet Banner (4:3 Medium)"
+                  recommendedRatio="4:3"
+                  recommendedRes="1600x1200"
+                  value={newTour.banner_tablet_url}
+                  onChange={(val) => setNewTour({ ...newTour, banner_tablet_url: val })}
+                />
+                <BannerImageUploader
+                  label="Mobile Story Banner (9:16 Vertical)"
+                  recommendedRatio="9:16"
+                  recommendedRes="1080x1920"
+                  value={newTour.banner_mobile_url}
+                  onChange={(val) => setNewTour({ ...newTour, banner_mobile_url: val })}
+                />
+                <BannerImageUploader
+                  label="Tournament Logo / Emblem (1:1 Square or SVG)"
+                  recommendedRatio="1:1"
+                  recommendedRes="512x512"
+                  value={newTour.logo_url}
+                  onChange={(val) => setNewTour({ ...newTour, logo_url: val })}
+                />
+              </div>
               <div>
                 <label className="text-dim">Official WhatsApp Group / Community Link</label>
                 <input
@@ -2660,11 +2783,37 @@ export default function Admin() {
                   <input required type="number" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                 </div>
               </div>
-              <BannerImageUploader
-                label="Banner Image (16:9)"
-                value={editingTour.banner_url || ''}
-                onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
-              />
+              <div className="space-y-3 border-t border-white/10 pt-3">
+                <div className="font-bold uppercase text-cyan text-[11px]">Responsive Tournament Media Assets</div>
+                <BannerImageUploader
+                  label="Desktop Banner (16:9 Widescreen)"
+                  recommendedRatio="16:9"
+                  recommendedRes="1920x1080"
+                  value={editingTour.banner_url || ''}
+                  onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
+                />
+                <BannerImageUploader
+                  label="Tablet Banner (4:3 Medium)"
+                  recommendedRatio="4:3"
+                  recommendedRes="1600x1200"
+                  value={editingTour.banner_tablet_url || ''}
+                  onChange={(val) => setEditingTour({ ...editingTour, banner_tablet_url: val })}
+                />
+                <BannerImageUploader
+                  label="Mobile Story Banner (9:16 Vertical)"
+                  recommendedRatio="9:16"
+                  recommendedRes="1080x1920"
+                  value={editingTour.banner_mobile_url || ''}
+                  onChange={(val) => setEditingTour({ ...editingTour, banner_mobile_url: val })}
+                />
+                <BannerImageUploader
+                  label="Tournament Logo / Emblem (1:1 Square or SVG)"
+                  recommendedRatio="1:1"
+                  recommendedRes="512x512"
+                  value={editingTour.logo_url || ''}
+                  onChange={(val) => setEditingTour({ ...editingTour, logo_url: val })}
+                />
+              </div>
               <div>
                 <label className="text-dim">Official WhatsApp Group / Community Link</label>
                 <input
@@ -2813,18 +2962,37 @@ export default function Admin() {
                 <label className="text-dim">Anti-Cheat System</label>
                 <input required placeholder="e.g. Easy Anti-Cheat" value={newGame.anti_cheat} onChange={(e) => setNewGame({ ...newGame, anti_cheat: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
               </div>
-              <BannerImageUploader
-                label="Game Banner Image (16:9)"
-                value={newGame.banner_url}
-                onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
-              />
-              <BannerImageUploader
-                label="Game Logo / Icon (1:1 SVG or PNG)"
-                recommendedRatio="1:1"
-                recommendedRes="512x512"
-                value={newGame.logo_url}
-                onChange={(val) => setNewGame({ ...newGame, logo_url: val })}
-              />
+              <div className="space-y-3 border-t border-white/10 pt-3">
+                <div className="font-bold uppercase text-cyan text-[11px]">Responsive Game Media Assets</div>
+                <BannerImageUploader
+                  label="Desktop Game Banner (16:9 Widescreen)"
+                  recommendedRatio="16:9"
+                  recommendedRes="1920x1080"
+                  value={newGame.banner_url}
+                  onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
+                />
+                <BannerImageUploader
+                  label="Tablet Game Banner (4:3 Medium)"
+                  recommendedRatio="4:3"
+                  recommendedRes="1600x1200"
+                  value={newGame.banner_tablet_url}
+                  onChange={(val) => setNewGame({ ...newGame, banner_tablet_url: val })}
+                />
+                <BannerImageUploader
+                  label="Mobile Game Banner (9:16 Vertical)"
+                  recommendedRatio="9:16"
+                  recommendedRes="1080x1920"
+                  value={newGame.banner_mobile_url}
+                  onChange={(val) => setNewGame({ ...newGame, banner_mobile_url: val })}
+                />
+                <BannerImageUploader
+                  label="Game Logo / Icon (1:1 Square or SVG)"
+                  recommendedRatio="1:1"
+                  recommendedRes="512x512"
+                  value={newGame.logo_url}
+                  onChange={(val) => setNewGame({ ...newGame, logo_url: val })}
+                />
+              </div>
               <div>
                 <label className="text-dim">Description</label>
                 <textarea rows={3} value={newGame.description} onChange={(e) => setNewGame({ ...newGame, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -2895,18 +3063,37 @@ export default function Admin() {
                 <label className="text-dim">Anti-Cheat</label>
                 <input required value={editingGame.anti_cheat} onChange={(e) => setEditingGame({ ...editingGame, anti_cheat: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
               </div>
-              <BannerImageUploader
-                label="Game Banner Image (16:9)"
-                value={editingGame.banner_url || ''}
-                onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
-              />
-              <BannerImageUploader
-                label="Game Logo / Icon (1:1 SVG or PNG)"
-                recommendedRatio="1:1"
-                recommendedRes="512x512"
-                value={editingGame.logo_url || ''}
-                onChange={(val) => setEditingGame((prev) => prev ? { ...prev, logo_url: val } : null)}
-              />
+              <div className="space-y-3 border-t border-white/10 pt-3">
+                <div className="font-bold uppercase text-cyan text-[11px]">Responsive Game Media Assets</div>
+                <BannerImageUploader
+                  label="Desktop Game Banner (16:9 Widescreen)"
+                  recommendedRatio="16:9"
+                  recommendedRes="1920x1080"
+                  value={editingGame.banner_url || ''}
+                  onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
+                />
+                <BannerImageUploader
+                  label="Tablet Game Banner (4:3 Medium)"
+                  recommendedRatio="4:3"
+                  recommendedRes="1600x1200"
+                  value={editingGame.banner_tablet_url || ''}
+                  onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_tablet_url: val } : null)}
+                />
+                <BannerImageUploader
+                  label="Mobile Game Banner (9:16 Vertical)"
+                  recommendedRatio="9:16"
+                  recommendedRes="1080x1920"
+                  value={editingGame.banner_mobile_url || ''}
+                  onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_mobile_url: val } : null)}
+                />
+                <BannerImageUploader
+                  label="Game Logo / Icon (1:1 Square or SVG)"
+                  recommendedRatio="1:1"
+                  recommendedRes="512x512"
+                  value={editingGame.logo_url || ''}
+                  onChange={(val) => setEditingGame((prev) => prev ? { ...prev, logo_url: val } : null)}
+                />
+              </div>
               <div>
                 <label className="text-dim">Description</label>
                 <textarea rows={3} value={editingGame.description || ''} onChange={(e) => setEditingGame({ ...editingGame, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -3216,6 +3403,140 @@ export default function Admin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE GENRE GAMES MODAL */}
+      {managingGenre && (
+        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-xl border border-white/20 bg-graphite p-6 my-8 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="font-display text-2xl font-black uppercase text-cyan">
+                  Assign Games: {managingGenre.name}
+                </h3>
+                <p className="font-mono text-xs text-dim">
+                  Manage member games aggregated under the "{managingGenre.name}" canonical genre.
+                </p>
+              </div>
+              <button
+                onClick={() => setManagingGenre(null)}
+                className="font-mono text-xs uppercase text-dim hover:text-ink cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Current Connected Games */}
+            <div className="mt-4 flex-1 overflow-y-auto space-y-3 pr-1">
+              <div className="flex items-center justify-between font-mono text-xs text-dim">
+                <span className="uppercase font-bold text-ink">Connected Games ({managingGenre.games?.length || 0})</span>
+                <span>Cycling in public genre cards</span>
+              </div>
+
+              {(!managingGenre.games || managingGenre.games.length === 0) ? (
+                <div className="border border-dashed border-white/15 p-6 text-center font-mono text-xs text-dim">
+                  No games currently assigned to this genre. Use the selector below to link games.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {managingGenre.games.map((g) => (
+                    <div
+                      key={g.id || g.slug}
+                      className="border border-white/10 bg-surface p-2.5 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {g.logo_url ? (
+                          <img
+                            src={resolveMediaUrl(g.logo_url)}
+                            alt=""
+                            className="size-7 object-contain bg-void p-0.5 border border-white/10 shrink-0"
+                          />
+                        ) : (
+                          <div className="size-7 bg-void border border-white/10 flex items-center justify-center font-mono text-[9px] text-dim shrink-0">
+                            🎮
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-display font-black uppercase text-ink text-sm truncate">
+                            {g.title}
+                          </div>
+                          <div className="font-mono text-[10px] text-dim">{g.slug}</div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          handleRemoveGameFromGenreAction(
+                            managingGenre.id || (managingGenre as any)._id,
+                            g.id
+                          )
+                        }
+                        disabled={isAssigningGame}
+                        className="border border-live/40 bg-live/10 px-2.5 py-1 font-mono text-[10px] uppercase text-live hover:bg-live/25 transition-colors cursor-pointer shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Assign New Game to Genre */}
+              <div className="pt-4 border-t border-white/10 space-y-2">
+                <label className="font-mono text-xs uppercase font-bold text-ink block">
+                  + Add Game Title to this Genre
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedGameToAdd}
+                    onChange={(e) => setSelectedGameToAdd(e.target.value)}
+                    className="flex-1 border border-white/15 bg-surface p-2 font-mono text-xs text-ink outline-none focus:border-cyan"
+                  >
+                    <option value="">-- Select Game to Add --</option>
+                    {games
+                      .filter(
+                        (gm) =>
+                          !managingGenre.games?.some(
+                            (connected) =>
+                              connected.id === gm.id ||
+                              connected.id === (gm as any)._id ||
+                              connected.slug === gm.slug
+                          )
+                      )
+                      .map((gm) => (
+                        <option key={gm.id || gm.slug} value={gm.id || (gm as any)._id || gm.slug}>
+                          {gm.name} ({gm.category || gm.tag})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!selectedGameToAdd || isAssigningGame}
+                    onClick={() =>
+                      handleAddGameToGenreAction(
+                        managingGenre.id || (managingGenre as any)._id,
+                        selectedGameToAdd
+                      )
+                    }
+                    className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 disabled:opacity-50 shrink-0 cursor-pointer"
+                  >
+                    {isAssigningGame ? 'Linking...' : '+ Link Game'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/10 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setManagingGenre(null)}
+                className="border border-white/20 px-4 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -113,6 +113,7 @@ export interface ApiMatch {
   next_match_id?: string
   next_match_slot?: string
   advancement_label?: string
+  team_ids?: string[]
   teams?: any[]
   tournament?: any
   team_a_details?: any
@@ -533,6 +534,66 @@ export async function publishAllRostersAdmin(
   const query = roundName && roundName !== 'ALL' ? `?round_name=${encodeURIComponent(roundName)}` : ''
   return apiClient(`/admin/tournaments/${tournamentId}/publish-all-rosters${query}`, {
     method: 'POST',
+  })
+}
+
+export async function createTournamentRoundAdmin(
+  tournamentId: string,
+  roundName: string
+): Promise<{ status: string; message: string; round_name: string; custom_rounds: string[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds`, {
+    method: 'POST',
+    body: JSON.stringify({ round_name: roundName }),
+  })
+}
+
+export async function deleteTournamentRoundAdmin(
+  tournamentId: string,
+  roundName: string
+): Promise<{ status: string; message: string; custom_rounds: string[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds/${encodeURIComponent(roundName)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function saveLiveMatchStructureAdmin(
+  tournamentId: string,
+  payload: {
+    match_format: string
+    series_format?: string
+    formation_status?: string
+    rounds?: Array<{ round_number?: number; round_name: string }>
+    matches: Array<{
+      id?: string
+      round_number?: number
+      match_number?: number
+      stage?: string
+      round_name?: string
+      match_type?: string
+      format?: string
+      series_format?: string
+      team_a_id?: string | null
+      team_b_id?: string | null
+      team_a_name?: string | null
+      team_b_name?: string | null
+      team_a_placeholder?: string | null
+      team_b_placeholder?: string | null
+      team_ids?: string[]
+      teams?: any[]
+      roster_status?: string
+      scheduled_date?: string | null
+      scheduled_time?: string | null
+      scheduled_at?: string | null
+      youtube_live_url?: string | null
+      next_match_id?: string | null
+      next_match_slot?: string | null
+      advancement_label?: string | null
+    }>
+  }
+): Promise<{ status: string; message: string; total_matches: number; bracket_rounds?: any[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/save-live-structure`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   })
 }
 

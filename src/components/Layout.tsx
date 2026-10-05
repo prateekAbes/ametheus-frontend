@@ -168,9 +168,9 @@ export function Footer() {
       <div className="mx-auto grid max-w-[1600px] gap-10 md:grid-cols-12 relative z-10">
         <div className="md:col-span-5"><Logo /><p className="mt-4 max-w-xs text-sm text-dim">India's gaming battleground. Many games, many tournaments, one arena.</p></div>
         {[
-          ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches', '/matches'], ['Teams', '/teams'], ['Contender Reviews', '/reviews']]],
-          ['You', [['Profile', '/profile'], ['Wallet', '/wallet'], ['Registrations', '/my/registrations'], ['Settings', '/settings']]],
-          ['M3S & Community', [['Discord Official', 'https://discord.gg/VzkfuK7We', true], ['Instagram (@official.ametheus)', 'https://www.instagram.com/official.ametheus', true], ['YouTube Channel', 'https://www.youtube.com/@official.ametheus.goodgame', true], ['Help Center', '/support']]],
+          ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
+          ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
+          ['Outlinks', [['Discord', 'https://discord.gg/VzkfuK7We', true], ['Instagram', 'https://www.instagram.com/official.ametheus', true], ['YouTube', 'https://www.youtube.com/@official.ametheus.goodgame', true]]],
         ].map(([h, links]) => (
           <div key={h as string} className="md:col-span-2">
             <Hud className="text-cyan">{h as string}</Hud>
@@ -207,12 +207,20 @@ export function Footer() {
       <div className="relative z-10 pointer-events-auto mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 border-t border-white/10 py-6">
         <Hud className="text-dim">© 2026 AMETHEUS Esports · India · All rights reserved.</Hud>
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs text-dim">
-          <Link to="/support" className="transition-colors hover:text-cyan">
-            Terms
+          <Link to="/about" className="transition-colors hover:text-cyan">
+            About
+          </Link>
+          <span className="text-white/20">·</span>
+          <Link to="/help" className="transition-colors hover:text-cyan">
+            Help
           </Link>
           <span className="text-white/20">·</span>
           <Link to="/support" className="transition-colors hover:text-cyan">
-            Privacy
+            Support
+          </Link>
+          <span className="text-white/20">·</span>
+          <Link to="/reviews" className="transition-colors hover:text-cyan font-bold text-ink">
+            ★ Reviews
           </Link>
           <span className="text-white/20">·</span>
           <Link to="/rules" className="transition-colors hover:text-cyan">
@@ -220,11 +228,7 @@ export function Footer() {
           </Link>
           <span className="text-white/20">·</span>
           <Link to="/support" className="transition-colors hover:text-cyan">
-            Help Center
-          </Link>
-          <span className="text-white/20">·</span>
-          <Link to="/reviews" className="transition-colors hover:text-cyan font-bold text-ink">
-            ★ Contender Reviews
+            Terms & Privacy
           </Link>
         </div>
       </div>

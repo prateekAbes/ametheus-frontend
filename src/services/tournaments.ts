@@ -36,6 +36,9 @@ export interface Tournament {
   end_date?: string
   registration_deadline?: string
   banner_url?: string
+  banner_tablet_url?: string
+  banner_mobile_url?: string
+  logo_url?: string
   prize_pool_inr: number
   entry_fee_inr: number
   rules?: string[] | any
@@ -50,6 +53,7 @@ export interface Tournament {
   stream_url?: string
   registration_status?: string
   whatsapp_group_url?: string
+  server_region?: string
 }
 
 export interface NormalizedTournament {
