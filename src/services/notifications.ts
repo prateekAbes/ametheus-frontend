@@ -13,7 +13,10 @@ export interface NotificationItem {
 }
 
 export async function getNotifications(): Promise<NotificationItem[]> {
-  return apiClient<NotificationItem[]>('/notifications')
+  const res = await apiClient<any>('/notifications')
+  if (Array.isArray(res)) return res
+  if (res && Array.isArray(res.items)) return res.items
+  return []
 }
 
 export async function markNotificationAsRead(id: string): Promise<any> {

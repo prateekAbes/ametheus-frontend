@@ -3,8 +3,7 @@
  */
 
 const rawBase =
-  (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
-  'https://ametheus.duckdns.org'
+  (import.meta.env.VITE_API_URL as string | undefined)?.trim() || ''
 
 export const API_BASE_URL = rawBase.replace(/\/+$/, '')
 
@@ -89,10 +88,11 @@ export async function apiClient<T>(
     cleanEndpoint.startsWith('/auth/') ||
     cleanEndpoint.startsWith('/wallet') ||
     cleanEndpoint.startsWith('/teams') ||
+    cleanEndpoint.startsWith('/notifications') ||
     cleanEndpoint === '/tournaments/my-registrations' ||
     cleanEndpoint.startsWith('/my/') ||
     cleanEndpoint.startsWith('/support/my-tickets') ||
-    (cleanEndpoint.startsWith('/tournaments/') && cleanEndpoint.includes('/register'))
+    (cleanEndpoint.startsWith('/tournaments/') && (cleanEndpoint.includes('/register') || cleanEndpoint.includes('/submit-upi-utr')))
 
   // Inject Bearer token if available
   if (!headers['Authorization'] && authTokenGetter) {

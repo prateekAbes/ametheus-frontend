@@ -92,13 +92,10 @@ export default function Home() {
   // Lead featured tournament calculation
   const leadTour = featuredTour || tournaments.find((t) => t.isFeatured) || tournaments[0]
 
-  // Upcoming tournaments: all active tournaments except leadTour (or all active tournaments if none other)
+  // Upcoming tournaments: all active tournaments so all 4 tournaments are accessible and cycle smoothly
   const eligibleUpcoming = useMemo(() => {
-    const list = activeTournaments.filter(
-      (t) => !leadTour || (t.id !== leadTour.id && t.slug !== leadTour.slug)
-    )
-    return list.length > 0 ? list : activeTournaments
-  }, [activeTournaments, leadTour])
+    return activeTournaments.length > 0 ? activeTournaments : tournaments
+  }, [activeTournaments, tournaments])
 
   // Visible max 4 games, dynamically rotated
   const activeGamesPool = useMemo(() => {
@@ -346,9 +343,7 @@ function Featured({
     tournaments[0]
 
   // The side tournaments should never repeat the lead tournament
-  const side = tournaments
-    .filter((t) => t.id !== lead.id && t.slug !== lead.slug)
-    .slice(0, 3)
+  const side = tournaments.filter((t) => t.id !== lead.id && t.slug !== lead.slug)
 
   const leadGame = gameBy(lead.gameId)
   const displayGameName = lead.gameName || leadGame.name || 'Esports'

@@ -801,7 +801,7 @@ export default function Organizer() {
             {/* Status Filter */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-dim uppercase mr-2">Filter Status:</span>
-              {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'SCHEDULED'].map((st) => (
+              {['ALL', 'NEW', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED'].map((st) => (
                 <button
                   key={st}
                   onClick={() => setMatchRequestFilter(st)}
@@ -817,7 +817,13 @@ export default function Organizer() {
             </div>
 
             {/* List */}
-            {matchRequests.filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter).length === 0 ? (
+            {matchRequests.filter(
+              (r) =>
+                matchRequestFilter === 'ALL' ||
+                r.status === matchRequestFilter ||
+                (matchRequestFilter === 'NEW' && r.status === 'PENDING') ||
+                (matchRequestFilter === 'UNDER_REVIEW' && r.status === 'IN_REVIEW')
+            ).length === 0 ? (
               <div className="border border-dashed border-white/15 p-16 text-center">
                 <p className="font-display text-2xl font-black uppercase text-dim">No Match Requests Found</p>
                 <p className="mt-2 text-xs text-dim">
@@ -837,7 +843,13 @@ export default function Organizer() {
             ) : (
               <div className="space-y-4">
                 {matchRequests
-                  .filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter)
+                  .filter(
+                    (r) =>
+                      matchRequestFilter === 'ALL' ||
+                      r.status === matchRequestFilter ||
+                      (matchRequestFilter === 'NEW' && r.status === 'PENDING') ||
+                      (matchRequestFilter === 'UNDER_REVIEW' && r.status === 'IN_REVIEW')
+                  )
                   .map((r) => {
                     const stColor =
                       r.status === 'APPROVED'

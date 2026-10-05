@@ -1602,30 +1602,53 @@ export default function Admin() {
 
             {/* Filter buttons */}
             <div className="flex flex-wrap gap-2">
-              {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'IN_REVIEW'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setMatchRequestFilter(st)}
-                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
-                    matchRequestFilter === st
-                      ? 'border-cyan bg-cyan text-void font-bold'
-                      : 'border-white/15 bg-surface text-dim hover:text-ink'
-                  }`}
-                >
-                  {st} ({st === 'ALL' ? matchRequests.length : matchRequests.filter((r) => r.status === st).length})
-                </button>
-              ))}
+              {['ALL', 'NEW', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED'].map((st) => {
+                const count =
+                  st === 'ALL'
+                    ? matchRequests.length
+                    : matchRequests.filter(
+                        (r) =>
+                          r.status === st ||
+                          (st === 'NEW' && r.status === 'PENDING') ||
+                          (st === 'UNDER_REVIEW' && r.status === 'IN_REVIEW')
+                      ).length
+                return (
+                  <button
+                    key={st}
+                    onClick={() => setMatchRequestFilter(st)}
+                    className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                      matchRequestFilter === st
+                        ? 'border-cyan bg-cyan text-void font-bold'
+                        : 'border-white/15 bg-surface text-dim hover:text-ink'
+                    }`}
+                  >
+                    {st} ({count})
+                  </button>
+                )
+              })}
             </div>
 
             {/* Request list */}
-            {matchRequests.filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter).length === 0 ? (
+            {matchRequests.filter(
+              (r) =>
+                matchRequestFilter === 'ALL' ||
+                r.status === matchRequestFilter ||
+                (matchRequestFilter === 'NEW' && r.status === 'PENDING') ||
+                (matchRequestFilter === 'UNDER_REVIEW' && r.status === 'IN_REVIEW')
+            ).length === 0 ? (
               <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
                 NO ORGANIZER MATCH REQUESTS IN THIS CATEGORY.
               </div>
             ) : (
               <div className="space-y-4">
                 {matchRequests
-                  .filter((r) => matchRequestFilter === 'ALL' || r.status === matchRequestFilter)
+                  .filter(
+                    (r) =>
+                      matchRequestFilter === 'ALL' ||
+                      r.status === matchRequestFilter ||
+                      (matchRequestFilter === 'NEW' && r.status === 'PENDING') ||
+                      (matchRequestFilter === 'UNDER_REVIEW' && r.status === 'IN_REVIEW')
+                  )
                   .map((req) => (
                     <Panel key={req.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-cyan">
                       <div className="space-y-2 font-mono text-xs flex-1">
@@ -5012,8 +5035,10 @@ export default function Admin() {
                     className="mt-1 w-full border border-cyan/40 bg-surface p-2.5 text-cyan font-bold outline-none uppercase"
                   >
                     <option value="APPROVED">APPROVE REQUEST</option>
+                    <option value="UNDER_REVIEW">SET UNDER REVIEW</option>
                     <option value="REJECTED">REJECT REQUEST</option>
-                    <option value="IN_REVIEW">SET IN REVIEW</option>
+                    <option value="CANCELLED">CANCEL REQUEST</option>
+                    <option value="RESOLVED">RESOLVE REQUEST</option>
                   </select>
                 </div>
 

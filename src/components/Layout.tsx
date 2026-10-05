@@ -76,7 +76,13 @@ function Nav() {
   useEffect(() => {
     if (isSignedIn) {
       getNotifications()
-        .then((items) => setUnreadCount(items.filter((n) => !n.is_read).length))
+        .then((items) => {
+          if (Array.isArray(items)) {
+            setUnreadCount(items.filter((n) => !n.is_read).length)
+          } else {
+            setUnreadCount(0)
+          }
+        })
         .catch(() => setUnreadCount(0))
     } else {
       setUnreadCount(0)

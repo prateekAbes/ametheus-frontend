@@ -48,9 +48,18 @@ export default function Teams() {
     setTimeout(() => setCopied(false), 1600)
   }
 
+  // Active roster
+  const mainMembers = activeTeam?.members?.filter((m) => m.role !== 'SUBSTITUTE') || []
+  const subMembers = activeTeam?.members?.filter((m) => m.role === 'SUBSTITUTE') || []
+  const isCaptain = Boolean(
+    activeTeam &&
+      profile &&
+      (activeTeam.captain_id === profile.id ||
+        (profile.clerk_user_id && activeTeam.captain_id === profile.clerk_user_id))
+  )
+
   const handleLeaveOrDelete = async () => {
     if (!activeTeam) return
-    const isCaptain = activeTeam.captain_id === profile?.id
     const confirmText = isCaptain
       ? `Are you sure you want to disband ${activeTeam.name}? This will delete the team for all members.`
       : `Are you sure you want to leave ${activeTeam.name}?`
@@ -102,11 +111,6 @@ export default function Teams() {
       setActionLoading(false)
     }
   }
-
-  // Active roster
-  const mainMembers = activeTeam?.members?.filter((m) => m.role !== 'SUBSTITUTE') || []
-  const subMembers = activeTeam?.members?.filter((m) => m.role === 'SUBSTITUTE') || []
-  const isCaptain = Boolean(activeTeam && profile && activeTeam.captain_id === profile.id)
 
   // Upcoming matches for active team
   const upcoming = MATCHES.filter(
@@ -234,7 +238,7 @@ export default function Teams() {
                   onClick={handleLeaveOrDelete}
                   className="border border-live/30 bg-live/5 px-4 py-4 font-mono text-xs font-bold uppercase tracking-wider text-live hover:bg-live/15 transition-colors disabled:opacity-40"
                 >
-                  {activeTeam.captain_id === profile?.id ? 'Disband Team' : 'Leave Team'}
+                  {isCaptain ? 'Disband Team' : 'Leave Team'}
                 </button>
               </div>
             </div>
@@ -262,8 +266,15 @@ export default function Teams() {
                     </div>
                   ) : (
                     mainMembers.map((p: any, idx: number) => {
-                      const isSelf = p.user_id === profile?.id
-                      const isMemberCaptain = p.role === 'CAPTAIN' || p.user_id === activeTeam.captain_id
+                      const isSelf = Boolean(
+                        profile &&
+                          (p.user_id === profile.id ||
+                            (profile.clerk_user_id && p.user_id === profile.clerk_user_id))
+                      )
+                      const isMemberCaptain =
+                        p.role === 'CAPTAIN' ||
+                        p.user_id === activeTeam.captain_id ||
+                        (Boolean(profile?.clerk_user_id) && activeTeam.captain_id === profile?.clerk_user_id && isSelf)
                       return (
                         <div
                           key={p.user_id || idx}
@@ -337,7 +348,11 @@ export default function Teams() {
                     <Hud className="mt-8 block">Substitutes ({subMembers.length}/{activeTeam.max_substitutes || 1})</Hud>
                     <div className="mt-3 divide-y divide-white/10 border border-dashed border-white/15 bg-surface/20">
                       {subMembers.map((p: any, idx: number) => {
-                        const isSelf = p.user_id === profile?.id
+                        const isSelf = Boolean(
+                          profile &&
+                            (p.user_id === profile.id ||
+                              (profile.clerk_user_id && p.user_id === profile.clerk_user_id))
+                        )
                         return (
                           <div key={p.user_id || idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 opacity-90">
                             <div className="flex items-center gap-4">
