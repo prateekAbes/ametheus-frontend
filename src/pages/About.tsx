@@ -189,7 +189,7 @@ export default function About() {
             <Hud className="text-cyan">05 — Community</Hud>
             <h2 className="mt-4 font-display text-[clamp(3rem,9vw,9rem)] font-black uppercase leading-[0.82]">Squads<br />become<br /><span className="text-cyan">family.</span></h2>
             <p className="mt-6 max-w-md text-lg text-ink/75">Scrims at 2am, Discord voice channels that never sleep, rivals who become teammates. The scoreboard resets. The bonds don't.</p>
-            <div className="mt-10 flex flex-wrap gap-4"><Cta to="/signup">Join the battleground</Cta><Cta ghost to="/tournaments">See tournaments</Cta></div>
+            <div className="mt-10 flex flex-wrap gap-4"><Cta to="/login">Join the battleground</Cta><Cta ghost to="/tournaments">See tournaments</Cta></div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {[...AVATARS, AVATARS[1]].map((a, i) => <img key={i} src={img(a, 500)} alt="" className={`aspect-[3/4] w-full object-cover grayscale transition hover:grayscale-0 ${i % 3 === 1 ? 'translate-y-8' : ''}`} />)}

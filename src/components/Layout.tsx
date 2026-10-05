@@ -210,14 +210,7 @@ function Nav() {
                     onClick={() => setDrawer(false)}
                     className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider"
                   >
-                    Log In
-                  </Link>
-                  <Link
-                    to="/signup"
-                    onClick={() => setDrawer(false)}
-                    className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider"
-                  >
-                    Sign Up
+                    Sign In
                   </Link>
                   <Link
                     to="/support"
