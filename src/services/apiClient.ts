@@ -4,7 +4,6 @@
 
 const rawBase =
   (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
-  (import.meta.env.NEXT_PUBLIC_API_URL as string | undefined)?.trim() ||
   'https://ametheus.duckdns.org'
 
 export const API_BASE_URL = rawBase.replace(/\/+$/, '')
@@ -32,7 +31,7 @@ export function resolveMediaUrl(url?: string | null): string {
 }
 
 export interface ApiErrorResponse {
-  detail?: string | { msg: string; type: string }[]
+  detail?: string | { msg: string; type: string; loc?: (string | number)[] }[]
   message?: string
   code?: string
 }
@@ -42,10 +41,14 @@ export class ApiError extends Error {
   data: ApiErrorResponse
 
   constructor(statusCode: number, data: ApiErrorResponse) {
-    const message =
-      typeof data.detail === 'string'
-        ? data.detail
-        : data.message || `API request failed with status ${statusCode}`
+    let message = ''
+    if (typeof data.detail === 'string') {
+      message = data.detail
+    } else if (Array.isArray(data.detail)) {
+      message = data.detail.map((d) => (d.loc ? `${d.loc.slice(-1)}: ${d.msg}` : d.msg)).join('; ')
+    } else {
+      message = data.message || `API request failed with status ${statusCode}`
+    }
     super(message)
     this.name = 'ApiError'
     this.statusCode = statusCode
@@ -88,6 +91,7 @@ export async function apiClient<T>(
     cleanEndpoint.startsWith('/teams') ||
     cleanEndpoint === '/tournaments/my-registrations' ||
     cleanEndpoint.startsWith('/my/') ||
+    cleanEndpoint.startsWith('/support/my-tickets') ||
     (cleanEndpoint.startsWith('/tournaments/') && cleanEndpoint.includes('/register'))
 
   // Inject Bearer token if available

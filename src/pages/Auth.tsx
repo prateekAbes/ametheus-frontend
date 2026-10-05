@@ -1,9 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { SignIn, SignUp } from '@clerk/clerk-react'
+import { SignIn, SignUp } from '@clerk/react'
 import { Hud, Particles } from '../components/ui'
 import { Logo } from '../components/Layout'
 import { GAMES, img } from '../lib/data'
+import { getGames, Game as ApiGame } from '../services/games'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 import { useAuthContext } from '../context/AuthContext'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
@@ -13,11 +16,22 @@ export default function Auth() {
   const navigate = useNavigate()
   const { isSignedIn } = useAuthContext()
 
+  const [apiGames, setApiGames] = useState<ApiGame[]>([])
+  useEffect(() => {
+    getGames()
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) setApiGames(res)
+      })
+      .catch(() => {})
+  }, [])
+
+  const gamesPool = apiGames.length > 0 ? apiGames : GAMES
+
   const [gi, setGi] = useState(0)
   useEffect(() => {
-    const t = setInterval(() => setGi((i) => (i + 1) % GAMES.length), 3200)
+    const t = setInterval(() => setGi((i) => (i + 1) % gamesPool.length), 3200)
     return () => clearInterval(t)
-  }, [])
+  }, [gamesPool.length])
 
   useEffect(() => {
     if (isSignedIn) {
@@ -25,7 +39,16 @@ export default function Auth() {
     }
   }, [isSignedIn, navigate])
 
-  const g = GAMES[gi]
+  const rawG = gamesPool[gi % gamesPool.length]
+  const g = {
+    name: (rawG as any).name || 'Ametheus',
+    short: (rawG as any).tag || (rawG as any).short || 'AMETHEUS',
+    genre: (rawG as any).category || (rawG as any).genre || 'Esports',
+    accent: (rawG as any).accent_color || (rawG as any).accentColor || (rawG as any).accent || '#3ef2ff',
+    bannerUrl: (rawG as any).banner_url || (rawG as any).bannerUrl || '',
+    line: (rawG as any).announcement_text || (rawG as any).announcementText || (rawG as any).line || 'The Gaming Battleground',
+    desc: (rawG as any).description || (rawG as any).desc || '',
+  }
   const isSignUp = pathname === '/signup'
 
   return (
@@ -38,11 +61,14 @@ export default function Auth() {
             className="pointer-events-none absolute inset-0 opacity-40"
           />
         </Suspense>
-        <img
-          src={img(g.photo, 1600)}
-          alt=""
-          className="kenburns absolute inset-0 h-full w-full object-cover opacity-25"
-        />
+        {g.bannerUrl && (
+          <DynamicImage
+            src={resolveMediaUrl(g.bannerUrl)}
+            alt=""
+            eager
+            className="kenburns absolute inset-0 h-full w-full object-cover opacity-25"
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{

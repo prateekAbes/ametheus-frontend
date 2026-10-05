@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { img, type CatalogGame, type HeroSlide, type Tx, inr } from '../lib/data'
 import { Hud, Badge, Cta, Media, Crest, Dot } from './ui'
 import { reducedMotion } from '../lib/motion'
+import DynamicImage from './DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 /* ---------- layout primitives ---------- */
 
@@ -69,22 +71,7 @@ export function FilterBar({ search, onSearch, filters = [], values = {}, onChang
   )
 }
 
-export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  useEffect(() => {
-    if (!open) return
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    addEventListener('keydown', k); return () => removeEventListener('keydown', k)
-  }, [open, onClose])
-  if (!open) return null
-  return (
-    <div role="dialog" aria-modal aria-label={title} className="fixed inset-0 z-[80] grid place-items-center bg-void/80 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="page-in w-full max-w-lg border border-white/15 bg-graphite p-6 md:p-8">
-        <div className="mb-6 flex items-start justify-between gap-4"><h2 className="font-display text-3xl font-black uppercase leading-none">{title}</h2><button onClick={onClose} aria-label="Close" className="font-mono text-xs text-dim hover:text-ink">✕</button></div>
-        {children}
-      </div>
-    </div>
-  )
-}
+export { Modal } from './Modal'
 
 /* ---------- cards ---------- */
 
@@ -93,9 +80,11 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
   const soon = g.status === 'soon'
   const body = (
     <>
-      {g.photo
-        ? <Media id={g.photo} w={feature ? 1400 : 800} alt={`${g.name} artwork`} className="absolute inset-0 h-full w-full object-cover opacity-50 grayscale-[50%] transition-[transform,opacity] duration-700 group-hover:scale-105 group-hover:opacity-75" />
-        : <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_14px,rgb(255_255_255/0.025)_14px_15px)]" />}
+      <DynamicImage
+        src={resolveMediaUrl(g.photo || (g as any).bannerUrl || (g as any).banner_url)}
+        alt={`${g.name} artwork`}
+        className="absolute inset-0 h-full w-full object-cover opacity-50 grayscale-[50%] transition-[transform,opacity] duration-700 group-hover:scale-105 group-hover:opacity-75"
+      />
       <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a 10%, transparent 70%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
       <span className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" style={{ background: g.accent }} />
       <div className="absolute left-5 top-5 right-5 flex items-center justify-between gap-3">
@@ -188,9 +177,15 @@ export function HeroSection({ slides, interval = 7000, aside }: { slides: HeroSl
       {/* media stack — all slides mounted, crossfaded with opacity only */}
       {slides.map((x, k) => (
         <div key={x.id} aria-hidden={k !== i} className={`absolute inset-0 transition-opacity duration-1000 ${k === i ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 110%, ${x.accent}55, transparent 55%)` }} />
-          <img src={img(x.photo, 1920)} srcSet={`${img(x.photo, 960)} 960w, ${img(x.photo, 1920)} 1920w`} sizes="100vw" alt="" loading={k === 0 ? 'eager' : 'lazy'} fetchPriority={k === 0 ? 'high' : 'low'} decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-          {x.video && k === i && <video className="absolute inset-0 h-full w-full object-cover opacity-30 motion-reduce:hidden" src={x.video} poster={img(x.photo, 1920)} autoPlay muted loop playsInline preload="none" />}
+          {x.photo && (
+            <DynamicImage
+              src={resolveMediaUrl(x.photo)}
+              alt=""
+              eager={k === 0}
+              className="absolute inset-0 h-full w-full object-cover opacity-25"
+            />
+          )}
+          {x.video && k === i && <video className="absolute inset-0 h-full w-full object-cover opacity-30 motion-reduce:hidden" src={x.video} autoPlay muted loop playsInline preload="none" />}
         </div>
       ))}
       {aside}

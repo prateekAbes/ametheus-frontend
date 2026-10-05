@@ -10,6 +10,7 @@ import {
 } from '../services/tournaments'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
+import { getPageMedia, PageMediaConfig } from '../services/admin'
 import {
   GAMES,
   CATALOG,
@@ -25,6 +26,9 @@ import {
 import { Hud, Dot, Badge, Cta, SectionHead, Container, TournamentCard, Brackets, Media } from '../components/ui'
 import { AdaptiveGrid, Collapse } from '../components/kit'
 import { gsap, isMobile, reducedMotion } from '../lib/motion'
+import DynamicImage from '../components/DynamicImage'
+import { TournamentCardSkeleton } from '../components/Skeleton'
+import { resolveMediaUrl } from '../services/apiClient'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
@@ -39,6 +43,7 @@ export default function Home() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([])
   const [featuredTour, setFeaturedTour] = useState<NormalizedTournament | null>(null)
   const [games, setGames] = useState<ApiGame[]>([])
+  const [homeMedia, setHomeMedia] = useState<PageMediaConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,12 +52,16 @@ export default function Home() {
       getTournaments().catch(() => []),
       getGames().catch(() => []),
       getFeaturedTournament().catch(() => null),
-    ]).then(([tList, gList, fTour]) => {
+      getPageMedia('home').catch(() => null),
+    ]).then(([tList, gList, fTour, hMedia]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
       if (fTour) {
         setFeaturedTour(normalizeTournament(fTour))
+      }
+      if (hMedia) {
+        setHomeMedia(hMedia)
       }
       setLoading(false)
     })
@@ -80,25 +89,18 @@ export default function Home() {
   const liveCount = tournaments.filter((t) => (t.status || '').toLowerCase() === 'live').length
   const gameCount = games.length > 0 ? games.length : CATALOG.length
 
-  // Lead featured tournament calculation (to exclude from upcoming list)
+  // Lead featured tournament calculation
   const leadTour = featuredTour || tournaments.find((t) => t.isFeatured) || tournaments[0]
 
-  // Upcoming tournaments: strictly exclude lead tournament and limit to max 4
+  // Upcoming tournaments: all active tournaments except leadTour (or all active tournaments if none other)
   const eligibleUpcoming = useMemo(() => {
-    return activeTournaments.filter(
+    const list = activeTournaments.filter(
       (t) => !leadTour || (t.id !== leadTour.id && t.slug !== leadTour.slug)
     )
+    return list.length > 0 ? list : activeTournaments
   }, [activeTournaments, leadTour])
 
-  // Visible max 4 tournaments, dynamically shuffled/rotated every 60s
-  const visibleTournaments = useMemo(() => {
-    if (eligibleUpcoming.length <= 4) return eligibleUpcoming
-    const offset = (shuffleTick * 4) % eligibleUpcoming.length
-    const rotated = [...eligibleUpcoming.slice(offset), ...eligibleUpcoming.slice(0, offset)]
-    return rotated.slice(0, 4)
-  }, [eligibleUpcoming, shuffleTick])
-
-  // Visible max 4 games, dynamically shuffled/rotated every 60s
+  // Visible max 4 games, dynamically rotated
   const activeGamesPool = useMemo(() => {
     return games.length > 0 ? games : (CATALOG.filter((g) => g.status === 'active') as any[])
   }, [games])
@@ -115,13 +117,15 @@ export default function Home() {
       <Hero
         activeCount={activeTournaments.length}
         gameCount={gameCount}
+        heroMediaUrl={homeMedia?.media_url}
+        games={games}
       />
       <Featured
         tournaments={tournaments}
         featuredTournament={featuredTour}
       />
       <ExploreGames games={visibleGames} totalCount={activeGamesPool.length} />
-      <Upcoming tournaments={visibleTournaments} />
+      <Upcoming tournaments={eligibleUpcoming} loading={loading} />
       <Why />
       <FinalCta liveCount={liveCount} />
     </>
@@ -131,14 +135,20 @@ export default function Home() {
 function Hero({
   activeCount,
   gameCount,
+  heroMediaUrl,
+  games = [],
 }: {
   activeCount: number
   gameCount: number
+  heroMediaUrl?: string
+  games?: ApiGame[]
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
   const coord = useRef<HTMLSpanElement>(null)
-  const shards = CATALOG.filter((g) => g.status === 'active' && g.photo).slice(0, SLOTS.length)
+  const shards = games
+    .filter((g) => g.banner_url || g.logo_url)
+    .slice(0, SLOTS.length)
   const scene = !reducedMotion()
 
   useEffect(() => {
@@ -197,13 +207,14 @@ function Hero({
     >
       <div data-h="bg" className="absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_115%,#8b5cff4d,transparent_55%),radial-gradient(ellipse_at_80%_-5%,#3ef2ff1a,transparent_45%)]" />
-        <img
-          src={img('1535391879778-3bae11d29a24', 1920)}
-          alt=""
-          fetchPriority="high"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.18] mix-blend-luminosity"
-        />
+        {heroMediaUrl && (
+          <DynamicImage
+            src={resolveMediaUrl(heroMediaUrl)}
+            alt=""
+            eager
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.18] mix-blend-luminosity"
+          />
+        )}
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-[55%]" />
       </div>
 
@@ -225,18 +236,18 @@ function Hero({
             transition: 'translate .6s cubic-bezier(.2,.7,.1,1)',
           }}
         >
-          <img
-            src={img(g.photo!, 700)}
+          <DynamicImage
+            src={resolveMediaUrl(g.banner_url || g.logo_url)}
             alt={`${g.name} world fragment`}
-            decoding="async"
+            eager
             className="h-full w-full object-cover opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0"
           />
           <div
             className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60"
-            style={{ background: `linear-gradient(180deg, transparent 35%, ${g.accent}66)` }}
+            style={{ background: `linear-gradient(180deg, transparent 35%, ${g.accent_color || '#3ef2ff'}66)` }}
           />
           <Hud className="absolute bottom-3 left-4 text-ink">
-            {g.short}{' '}
+            {g.tag || g.name}{' '}
             <span className="inline-block transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">
               ↗
             </span>
@@ -359,9 +370,10 @@ function Featured({
                 className="relative aspect-[4/3] overflow-hidden sm:aspect-[16/10]"
                 style={{ background: `linear-gradient(135deg, ${leadGame.accent}33, #0c0e15 60%)` }}
               >
-                <img
-                  src={img(lead.bannerUrl || leadGame.photo, 1600)}
+                <DynamicImage
+                  src={resolveMediaUrl(lead.bannerUrl)}
                   alt={`${lead.title} featured`}
+                  eager
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
                 />
                 <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}30, transparent 50%)` }} />
@@ -418,9 +430,9 @@ function Featured({
                     className="group grid grid-cols-[88px_1fr] gap-5 border-t border-white/10 py-5 transition-colors first:border-t-0 first:pt-0 sm:grid-cols-[132px_1fr]"
                   >
                     <div className="relative aspect-[4/5] overflow-hidden sm:aspect-[4/3] bg-surface">
-                      <img
-                        src={img(t.bannerUrl || g.photo, 400)}
-                        alt=""
+                      <DynamicImage
+                        src={resolveMediaUrl(t.bannerUrl)}
+                        alt={`${t.title} thumbnail`}
                         className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:scale-105 transition-transform"
                       />
                     </div>
@@ -458,11 +470,6 @@ function ExploreGames({ games, totalCount }: { games: ApiGame[]; totalCount?: nu
     <section className="relative py-24 md:py-36 overflow-hidden">
       {/* High-Resolution Cinematic Gaming / Esports Arena Backdrop with dark overlay, gradient, vignette */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2400&fit=crop&auto=format"
-          alt=""
-          className="size-full object-cover object-center opacity-[0.14] brightness-75 contrast-125"
-        />
         {/* Radial vignette overlay */}
         <div
           className="absolute inset-0"
@@ -501,9 +508,9 @@ function ExploreGames({ games, totalCount }: { games: ApiGame[]; totalCount?: nu
                 to={`/games/${g.slug}`}
                 className={`group relative min-h-[340px] overflow-hidden border border-white/10 bg-surface p-6 transition-all duration-500 md:col-span-6`}
               >
-                <img
-                  src={img(g.bannerUrl || gameBy(g.slug).photo, 1000)}
-                  alt=""
+                <DynamicImage
+                  src={resolveMediaUrl(g.bannerUrl)}
+                  alt={`${g.name} banner`}
                   className="absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-void via-void/40 to-transparent" />
@@ -528,9 +535,30 @@ function ExploreGames({ games, totalCount }: { games: ApiGame[]; totalCount?: nu
   )
 }
 
-function Upcoming({ tournaments }: { tournaments: NormalizedTournament[] }) {
-  if (!tournaments.length) return null
-  const list = tournaments.slice(0, 4).map((t): Partial<DesignTournament> & Pick<DesignTournament, 'id' | 'name'> => ({
+function Upcoming({
+  tournaments,
+  loading = false,
+}: {
+  tournaments: NormalizedTournament[]
+  loading?: boolean
+}) {
+  const [page, setPage] = useState(0)
+  const pageSize = 4
+  const total = tournaments.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  // Auto-advance sliding window every 8 seconds if more than 1 page
+  useEffect(() => {
+    if (totalPages <= 1) return
+    const interval = setInterval(() => {
+      setPage((prev) => (prev + 1) % totalPages)
+    }, 8000)
+    return () => clearInterval(interval)
+  }, [totalPages])
+
+  const startIndex = page * pageSize
+  const visible = tournaments.slice(startIndex, startIndex + pageSize)
+  const list = visible.map((t): Partial<DesignTournament> & Pick<DesignTournament, 'id' | 'name'> => ({
     id: t.slug || t.id,
     name: t.title,
     game: t.gameId,
@@ -542,26 +570,72 @@ function Upcoming({ tournaments }: { tournaments: NormalizedTournament[] }) {
     max: t.maxTeams,
     region: 'India',
     format: t.format,
+    bannerUrl: t.bannerUrl,
   }))
 
   return (
     <section className="relative py-24 md:py-32">
       <Container>
-        <SectionHead
-          className="in-view"
-          idx="03"
-          kicker="On the horizon"
-          title="Upcoming"
-          size="md"
-          right={<Hud>{list.length} events</Hud>}
-        />
-        <AdaptiveGrid count={list.length} className="mt-12">
-          {list.map((t) => (
-            <div key={t.id} className="in-view">
-              <TournamentCard t={t} />
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <SectionHead
+            className="in-view"
+            idx="03"
+            kicker="On the horizon"
+            title="Upcoming"
+            size="md"
+            right={<Hud>{total} events</Hud>}
+          />
+          {total > pageSize && (
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="font-mono text-xs text-dim mr-2">
+                {startIndex + 1}–{Math.min(startIndex + pageSize, total)} of {total}
+              </span>
+              <button
+                onClick={() => setPage((p) => (p - 1 + totalPages) % totalPages)}
+                className="border border-white/10 bg-surface px-3 py-1 font-mono text-xs text-dim hover:text-ink hover:border-cyan transition-colors cursor-pointer"
+                aria-label="Previous page"
+              >
+                ←
+              </button>
+              <button
+                onClick={() => setPage((p) => (p + 1) % totalPages)}
+                className="border border-white/10 bg-surface px-3 py-1 font-mono text-xs text-dim hover:text-ink hover:border-cyan transition-colors cursor-pointer"
+                aria-label="Next page"
+              >
+                →
+              </button>
             </div>
-          ))}
-        </AdaptiveGrid>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((n) => (
+              <TournamentCardSkeleton key={n} />
+            ))}
+          </div>
+        ) : total === 0 ? (
+          <div className="mt-12 border border-white/10 bg-surface/30 p-16 text-center">
+            <Hud className="text-cyan">No Upcoming Tournaments</Hud>
+            <p className="mt-2 font-mono text-sm text-dim">
+              No new tournaments are scheduled on the horizon right now. New brackets drop weekly.
+            </p>
+            <Link
+              to="/tournaments"
+              className="mt-6 inline-block border border-cyan/40 bg-cyan/10 px-5 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors"
+            >
+              Browse All Tournaments
+            </Link>
+          </div>
+        ) : (
+          <AdaptiveGrid count={list.length} className="mt-12">
+            {list.map((t) => (
+              <div key={t.id} className="in-view">
+                <TournamentCard t={t} />
+              </div>
+            ))}
+          </AdaptiveGrid>
+        )}
       </Container>
     </section>
   )

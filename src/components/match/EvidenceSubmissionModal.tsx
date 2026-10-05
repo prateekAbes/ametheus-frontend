@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { submitMatchResult } from '../../services/matches'
-import { Brackets, Hud } from '../ui'
+import { Brackets, Hud, Modal } from '../ui'
 
 interface Props {
   match: any | null
@@ -63,9 +63,13 @@ export function EvidenceSubmissionModal({ match, isOpen, onClose, onSuccess }: P
   const teamBName = match.b || match.team_b?.name || match.team2_name || 'Team B'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl border border-white/20 bg-graphite text-ink shadow-2xl flex flex-col">
-        <Brackets color="border-cyan/50" />
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      raw
+      maxWidth="max-w-xl"
+    >
+      <div className="relative w-full flex flex-col">
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 bg-surface/80 p-5">
@@ -238,6 +242,6 @@ export function EvidenceSubmissionModal({ match, isOpen, onClose, onSuccess }: P
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   )
 }

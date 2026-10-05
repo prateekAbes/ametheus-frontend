@@ -4,6 +4,8 @@ import { GameCategory } from '../lib/categories'
 import { type Genre } from '../services/genres'
 import { img } from '../lib/data'
 import { Hud } from './ui'
+import DynamicImage from './DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 export interface CategoryCardProps {
   category?: GameCategory
@@ -31,7 +33,7 @@ export default function CategoryCard({
 
   const images = rawImages.length > 0
     ? rawImages
-    : [genre?.banner_url || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200']
+    : (genre?.banner_url ? [genre.banner_url] : [])
 
   const logos = genre?.games
     ? genre.games.map((g) => ({ title: (g as any).name || g.title, logo: g.logo_url })).filter((g) => Boolean(g.logo))
@@ -62,20 +64,31 @@ export default function CategoryCard({
     <>
       {/* Rotating Background Image with smooth transition */}
       <div className="absolute inset-0 overflow-hidden bg-void">
-        {images.map((imgSrc, idx) => (
-          <img
-            key={`${imgSrc}-${idx}`}
-            src={img(imgSrc, 1200)}
+        {images.length > 0 ? (
+          images.map((imgSrc, idx) => (
+            <div
+              key={`${imgSrc}-${idx}`}
+              className={`absolute inset-0 size-full transition-all duration-1000 ease-in-out group-hover:scale-105 ${
+                idx === (activeImageIndex % images.length)
+                  ? 'opacity-60 brightness-90'
+                  : 'opacity-0 pointer-events-none'
+              }`}
+            >
+              <DynamicImage
+                src={resolveMediaUrl(imgSrc)}
+                alt={`${name} preview`}
+                eager={index < 2}
+                className="size-full object-cover object-center"
+              />
+            </div>
+          ))
+        ) : (
+          <DynamicImage
+            src={resolveMediaUrl(genre?.banner_url)}
             alt={`${name} preview`}
-            loading={index < 2 ? 'eager' : 'lazy'}
-            decoding="async"
-            className={`absolute inset-0 size-full object-cover object-center transition-all duration-1000 ease-in-out group-hover:scale-105 ${
-              idx === (activeImageIndex % images.length)
-                ? 'opacity-60 brightness-90'
-                : 'opacity-0 pointer-events-none'
-            }`}
+            className="absolute inset-0 size-full object-cover object-center opacity-60"
           />
-        ))}
+        )}
 
         {/* Dynamic Gradient Scrims */}
         <div
@@ -99,8 +112,8 @@ export default function CategoryCard({
         {/* Rotating Game Logo Badge if available */}
         {currentLogo?.logo && (
           <div className="flex items-center gap-2 rounded bg-void/80 px-2 py-1 border border-white/15 backdrop-blur-sm transition-all duration-500">
-            <img
-              src={currentLogo.logo}
+            <DynamicImage
+              src={resolveMediaUrl(currentLogo.logo)}
               alt={currentLogo.title}
               className="size-4 object-contain"
             />

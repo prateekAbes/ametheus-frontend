@@ -22,6 +22,7 @@ import {
 import { type Tournament } from '../../services/tournaments'
 import { resolveMediaUrl } from '../../services/apiClient'
 import { Panel, Hud, Badge, Brackets } from '../ui'
+import { Portal } from '../Modal'
 
 interface Props {
   tournaments: Tournament[]
@@ -2093,64 +2094,67 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
       {/* MODAL: ADD ROUND CONTAINER (Formation Workspace) */}
       {/* ========================================================================= */}
       {isAddRoundModalOpen && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
-          <div className="w-full max-w-sm border border-cyan/50 bg-graphite p-6 relative">
-            <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-xl font-black uppercase text-ink">Add New Round Container</h3>
-            <p className="text-xs text-dim mt-1">
-              Add a named round stage (e.g. Round 1, Quarter Finals, Group A) to this formation.
-            </p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleAddRoundToFormation(newRoundInputName)
-              }}
-              className="mt-4 space-y-4 font-mono text-xs"
-            >
-              <div>
-                <label className="block text-dim uppercase mb-1">Round Stage Name</label>
-                <input
-                  type="text"
-                  list="formation-stages-suggestions"
-                  required
-                  placeholder="e.g. Round 1 or Quarter Finals"
-                  value={newRoundInputName}
-                  onChange={(e) => setNewRoundInputName(e.target.value)}
-                  className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-                />
-                <datalist id="formation-stages-suggestions">
-                  {DEFAULT_STAGES.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </div>
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-sm border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-cyan/50" />
+              <h3 className="font-display text-xl font-black uppercase text-ink">Add New Round Container</h3>
+              <p className="text-xs text-dim mt-1">
+                Add a named round stage (e.g. Round 1, Quarter Finals, Group A) to this formation.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleAddRoundToFormation(newRoundInputName)
+                }}
+                className="mt-4 space-y-4 font-mono text-xs"
+              >
+                <div>
+                  <label className="block text-dim uppercase mb-1">Round Stage Name</label>
+                  <input
+                    type="text"
+                    list="formation-stages-suggestions"
+                    required
+                    placeholder="e.g. Round 1 or Quarter Finals"
+                    value={newRoundInputName}
+                    onChange={(e) => setNewRoundInputName(e.target.value)}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  />
+                  <datalist id="formation-stages-suggestions">
+                    {DEFAULT_STAGES.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsAddRoundModalOpen(false)}
-                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer"
-                >
-                  Create Container
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddRoundModalOpen(false)}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer"
+                  >
+                    Create Container
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: ADD MATCH TO SPECIFIC ROUND (Formation Workspace) */}
       {/* ========================================================================= */}
       {isAddFormationMatchOpen && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative max-h-[90vh] overflow-y-auto">
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-lg border border-white/20 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
             <Brackets color="border-cyan/50" />
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <h3 className="font-display text-xl font-black uppercase text-ink">
@@ -2488,7 +2492,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
             </form>
           </div>
         </div>
-      )}
+      </Portal>
+    )}
 
       {/* ========================================================================= */}
       {/* OPERATIONS MODALS (Single Publish, Batch Publish, Go Live, Score, Edit) */}
@@ -2496,427 +2501,437 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
       {/* SINGLE ROSTER PUBLISH REVIEW MODAL */}
       {publishModalMatch && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
-          <div className="w-full max-w-lg border border-warn bg-graphite p-6 relative">
-            <Brackets color="border-warn/60" />
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-warn/20 border border-warn/40 text-warn text-[10px] font-bold uppercase mb-2">
-              ⚠️ ROSTER REVIEW &amp; PUBLICATION
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-lg border border-warn bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-warn/60" />
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-warn/20 border border-warn/40 text-warn text-[10px] font-bold uppercase mb-2">
+                ⚠️ ROSTER REVIEW &amp; PUBLICATION
+              </div>
+              <h3 className="font-display text-2xl font-black uppercase text-ink">
+                Publish Match Roster
+              </h3>
+              <p className="text-xs text-dim mt-1">
+                Confirm lineup for {publishModalMatch.round_name || publishModalMatch.stage} · Match {publishModalMatch.match_number || 1}.
+              </p>
+
+              <form onSubmit={handlePublishRosterSubmit} className="mt-4 space-y-4 font-mono text-xs">
+                <div className="border border-white/10 bg-void/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-base font-black uppercase text-cyan">
+                      {publishModalMatch.team_a?.name || publishModalMatch.team_a_name || 'Team A'}
+                    </span>
+                    <span className="text-dim font-bold">VS</span>
+                    <span className="font-display text-base font-black uppercase text-cyan">
+                      {publishModalMatch.team_b?.name || publishModalMatch.team_b_name || 'Team B'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-dim flex flex-wrap gap-3 border-t border-white/10 pt-2">
+                    <span>Schedule: {publishModalMatch.scheduled_time || 'TBD'}</span>
+                    <span>Format: {publishModalMatch.series_format || publishModalMatch.format || 'BO1'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-dim uppercase mb-1">Optional Match Notes for Captains</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Please join lobby 15 minutes before match time"
+                    value={publishMatchNotes}
+                    onChange={(e) => setPublishMatchNotes(e.target.value)}
+                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={publishNotifyLeaders}
+                    onChange={(e) => setPublishNotifyLeaders(e.target.checked)}
+                    className="accent-cyan"
+                  />
+                  <span className="text-ink font-bold">
+                    Notify Team Captains (In-App Alert &amp; Official Email)
+                  </span>
+                </label>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setPublishModalMatch(null)}
+                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingPublish}
+                    className="border border-warn bg-warn px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-warn/90 transition-colors cursor-pointer"
+                  >
+                    {submittingPublish ? 'Publishing...' : 'Confirm & Publish Roster'}
+                  </button>
+                </div>
+              </form>
             </div>
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Publish Match Roster
-            </h3>
-            <p className="text-xs text-dim mt-1">
-              Confirm lineup for {publishModalMatch.round_name || publishModalMatch.stage} · Match {publishModalMatch.match_number || 1}.
-            </p>
-
-            <form onSubmit={handlePublishRosterSubmit} className="mt-4 space-y-4 font-mono text-xs">
-              <div className="border border-white/10 bg-void/60 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-display text-base font-black uppercase text-cyan">
-                    {publishModalMatch.team_a?.name || publishModalMatch.team_a_name || 'Team A'}
-                  </span>
-                  <span className="text-dim font-bold">VS</span>
-                  <span className="font-display text-base font-black uppercase text-cyan">
-                    {publishModalMatch.team_b?.name || publishModalMatch.team_b_name || 'Team B'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-dim flex flex-wrap gap-3 border-t border-white/10 pt-2">
-                  <span>Schedule: {publishModalMatch.scheduled_time || 'TBD'}</span>
-                  <span>Format: {publishModalMatch.series_format || publishModalMatch.format || 'BO1'}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-dim uppercase mb-1">Optional Match Notes for Captains</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Please join lobby 15 minutes before match time"
-                  value={publishMatchNotes}
-                  onChange={(e) => setPublishMatchNotes(e.target.value)}
-                  className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={publishNotifyLeaders}
-                  onChange={(e) => setPublishNotifyLeaders(e.target.checked)}
-                  className="accent-cyan"
-                />
-                <span className="text-ink font-bold">
-                  Notify Team Captains (In-App Alert &amp; Official Email)
-                </span>
-              </label>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setPublishModalMatch(null)}
-                  className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingPublish}
-                  className="border border-warn bg-warn px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-warn/90 transition-colors cursor-pointer"
-                >
-                  {submittingPublish ? 'Publishing...' : 'Confirm & Publish Roster'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* BATCH PUBLISH MODAL */}
       {isBatchPublishOpen && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
-          <div className="w-full max-w-lg border border-warn bg-graphite p-6 relative">
-            <Brackets color="border-warn/60" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Batch Publish Draft Rosters
-            </h3>
-            <p className="text-xs text-dim mt-1">
-              You are about to publish {draftMatchesInScope.length} draft match(es) for{' '}
-              {selectedRoundTab === 'ALL' ? 'all rounds' : selectedRoundTab}.
-            </p>
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-lg border border-warn bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-warn/60" />
+              <h3 className="font-display text-2xl font-black uppercase text-ink">
+                Batch Publish Draft Rosters
+              </h3>
+              <p className="text-xs text-dim mt-1">
+                You are about to publish {draftMatchesInScope.length} draft match(es) for{' '}
+                {selectedRoundTab === 'ALL' ? 'all rounds' : selectedRoundTab}.
+              </p>
 
-            <form onSubmit={handleBatchPublishSubmit} className="mt-4 space-y-4 font-mono text-xs">
-              <div className="max-h-[220px] overflow-y-auto space-y-2 border border-white/10 bg-void/60 p-3">
-                {draftMatchesInScope.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between text-[11px] border-b border-white/5 pb-1">
-                    <span className="text-cyan font-bold">
-                      {m.round_name || m.stage} · M{m.match_number || 1}
-                    </span>
-                    <span className="text-ink">
-                      {m.team_a?.name || m.team_a_name || 'Team A'} vs {m.team_b?.name || m.team_b_name || 'Team B'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <form onSubmit={handleBatchPublishSubmit} className="mt-4 space-y-4 font-mono text-xs">
+                <div className="max-h-[220px] overflow-y-auto space-y-2 border border-white/10 bg-void/60 p-3">
+                  {draftMatchesInScope.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between text-[11px] border-b border-white/5 pb-1">
+                      <span className="text-cyan font-bold">
+                        {m.round_name || m.stage} · M{m.match_number || 1}
+                      </span>
+                      <span className="text-ink">
+                        {m.team_a?.name || m.team_a_name || 'Team A'} vs {m.team_b?.name || m.team_b_name || 'Team B'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setIsBatchPublishOpen(false)}
-                  className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingBatchPublish}
-                  className="border border-warn bg-warn px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-warn/90 transition-colors cursor-pointer"
-                >
-                  {submittingBatchPublish ? 'Publishing All...' : 'Confirm & Publish All'}
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchPublishOpen(false)}
+                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingBatchPublish}
+                    className="border border-warn bg-warn px-5 py-2 font-display text-xs font-black uppercase text-void hover:bg-warn/90 transition-colors cursor-pointer"
+                  >
+                    {submittingBatchPublish ? 'Publishing All...' : 'Confirm & Publish All'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* GO LIVE MODAL */}
       {goLiveMatch && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md border border-live/60 bg-graphite p-6 relative">
-            <Brackets color="border-live/60" />
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-live/20 border border-live/40 text-live text-[10px] font-bold uppercase mb-2">
-              <span className="size-1.5 rounded-full bg-live animate-ping" />
-              BROADCAST CONTROL
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-live/60 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-live/60" />
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-live/20 border border-live/40 text-live text-[10px] font-bold uppercase mb-2">
+                <span className="size-1.5 rounded-full bg-live animate-ping" />
+                BROADCAST CONTROL
+              </div>
+              <h3 className="font-display text-2xl font-black uppercase text-ink">Mark Match Live</h3>
+              <p className="text-xs text-dim mt-1">
+                {goLiveMatch.tournament_title} · {goLiveMatch.team_a?.name || 'Team A'} VS {goLiveMatch.team_b?.name || 'Team B'}
+              </p>
+
+              <form onSubmit={handleGoLiveSubmit} className="mt-4 space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-dim uppercase mb-1">YouTube Live Stream URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=... or /live/..."
+                    value={goLiveUrl}
+                    onChange={(e) => setGoLiveUrl(e.target.value)}
+                    required
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-live"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setGoLiveMatch(null)}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingLive}
+                    className="border border-live bg-live px-4 py-1.5 uppercase text-xs font-bold text-white hover:bg-live/90 transition-colors cursor-pointer"
+                  >
+                    {submittingLive ? 'Broadcasting...' : '🔴 Start Broadcast'}
+                  </button>
+                </div>
+              </form>
             </div>
-            <h3 className="font-display text-2xl font-black uppercase text-ink">Mark Match Live</h3>
-            <p className="text-xs text-dim mt-1">
-              {goLiveMatch.tournament_title} · {goLiveMatch.team_a?.name || 'Team A'} VS {goLiveMatch.team_b?.name || 'Team B'}
-            </p>
-
-            <form onSubmit={handleGoLiveSubmit} className="mt-4 space-y-4 font-mono text-xs">
-              <div>
-                <label className="block text-dim uppercase mb-1">YouTube Live Stream URL</label>
-                <input
-                  type="url"
-                  placeholder="https://www.youtube.com/watch?v=... or /live/..."
-                  value={goLiveUrl}
-                  onChange={(e) => setGoLiveUrl(e.target.value)}
-                  required
-                  className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-live"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setGoLiveMatch(null)}
-                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingLive}
-                  className="border border-live bg-live px-4 py-1.5 uppercase text-xs font-bold text-white hover:bg-live/90 transition-colors cursor-pointer"
-                >
-                  {submittingLive ? 'Broadcasting...' : '🔴 Start Broadcast'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* SCORE & COMPLETE MODAL (With winner auto-advancement) */}
       {scoreMatch && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md border border-white/20 bg-graphite p-6 relative">
-            <Brackets color="border-ok/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">Score &amp; Complete Match</h3>
-            <p className="text-xs text-dim mt-1">
-              Record official scores. Declaring a winner will automatically advance that team into the configured next round match slot in this bracket.
-            </p>
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-white/20 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-ok/50" />
+              <h3 className="font-display text-2xl font-black uppercase text-ink">Score &amp; Complete Match</h3>
+              <p className="text-xs text-dim mt-1">
+                Record official scores. Declaring a winner will automatically advance that team into the configured next round match slot in this bracket.
+              </p>
 
-            <form onSubmit={handleScoreSubmit} className="mt-4 space-y-4 font-mono text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="border border-white/10 bg-void/50 p-3">
-                  <label className="block text-dim uppercase mb-1 truncate">
-                    {scoreMatch.team_a?.name || scoreMatch.team_a_name || 'Team A'} Score
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    value={scoreForm.score_a}
-                    onChange={(e) => setScoreForm({ ...scoreForm, score_a: Number(e.target.value) })}
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
-                  />
+              <form onSubmit={handleScoreSubmit} className="mt-4 space-y-4 font-mono text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="border border-white/10 bg-void/50 p-3">
+                    <label className="block text-dim uppercase mb-1 truncate">
+                      {scoreMatch.team_a?.name || scoreMatch.team_a_name || 'Team A'} Score
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="99"
+                      value={scoreForm.score_a}
+                      onChange={(e) => setScoreForm({ ...scoreForm, score_a: Number(e.target.value) })}
+                      className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
+                    />
+                  </div>
+                  <div className="border border-white/10 bg-void/50 p-3">
+                    <label className="block text-dim uppercase mb-1 truncate">
+                      {scoreMatch.team_b?.name || scoreMatch.team_b_name || 'Team B'} Score
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="99"
+                      value={scoreForm.score_b}
+                      onChange={(e) => setScoreForm({ ...scoreForm, score_b: Number(e.target.value) })}
+                      className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
+                    />
+                  </div>
                 </div>
-                <div className="border border-white/10 bg-void/50 p-3">
-                  <label className="block text-dim uppercase mb-1 truncate">
-                    {scoreMatch.team_b?.name || scoreMatch.team_b_name || 'Team B'} Score
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    value={scoreForm.score_b}
-                    onChange={(e) => setScoreForm({ ...scoreForm, score_b: Number(e.target.value) })}
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xl font-display font-black text-cyan outline-none"
-                  />
+
+                <div>
+                  <label className="block text-dim uppercase mb-1">Declared Winner</label>
+                  <select
+                    value={scoreForm.winner_team_id}
+                    onChange={(e) => setScoreForm({ ...scoreForm, winner_team_id: e.target.value })}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
+                  >
+                    <option value="">Auto-Determine from Highest Score</option>
+                    {(scoreMatch.team_a?.id || scoreMatch.team_a_id) && (
+                      <option value={scoreMatch.team_a?.id || scoreMatch.team_a_id}>
+                        {scoreMatch.team_a?.name || scoreMatch.team_a_name || 'Team A'}
+                      </option>
+                    )}
+                    {(scoreMatch.team_b?.id || scoreMatch.team_b_id) && (
+                      <option value={scoreMatch.team_b?.id || scoreMatch.team_b_id}>
+                        {scoreMatch.team_b?.name || scoreMatch.team_b_name || 'Team B'}
+                      </option>
+                    )}
+                  </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-dim uppercase mb-1">Declared Winner</label>
-                <select
-                  value={scoreForm.winner_team_id}
-                  onChange={(e) => setScoreForm({ ...scoreForm, winner_team_id: e.target.value })}
-                  className="w-full border border-white/20 bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-cyan"
-                >
-                  <option value="">Auto-Determine from Highest Score</option>
-                  {(scoreMatch.team_a?.id || scoreMatch.team_a_id) && (
-                    <option value={scoreMatch.team_a?.id || scoreMatch.team_a_id}>
-                      {scoreMatch.team_a?.name || scoreMatch.team_a_name || 'Team A'}
-                    </option>
-                  )}
-                  {(scoreMatch.team_b?.id || scoreMatch.team_b_id) && (
-                    <option value={scoreMatch.team_b?.id || scoreMatch.team_b_id}>
-                      {scoreMatch.team_b?.name || scoreMatch.team_b_name || 'Team B'}
-                    </option>
-                  )}
-                </select>
-              </div>
+                <div className="border border-ok/30 bg-ok/[0.05] p-2.5 text-[11px] text-ok">
+                  ⚡ Winner will be populated into the next round bracket match immediately upon submission.
+                </div>
 
-              <div className="border border-ok/30 bg-ok/[0.05] p-2.5 text-[11px] text-ok">
-                ⚡ Winner will be populated into the next round bracket match immediately upon submission.
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setScoreMatch(null)}
-                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingScore}
-                  className="border border-ok bg-ok px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-ok/90 transition-colors cursor-pointer"
-                >
-                  {submittingScore ? 'Saving...' : 'Confirm & Complete'}
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setScoreMatch(null)}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingScore}
+                    className="border border-ok bg-ok px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-ok/90 transition-colors cursor-pointer"
+                  >
+                    {submittingScore ? 'Saving...' : 'Confirm & Complete'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* EDIT MATCH DETAILS & LOBBY MODAL */}
       {editMatch && (
-        <div role="dialog" aria-modal className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative max-h-[90vh] overflow-y-auto">
-            <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Edit Match &amp; Lobby Credentials
-            </h3>
-            <p className="text-xs text-dim mt-1 font-mono">
-              {editMatch.tournament_title || 'Tournament'} · {editMatch.stage || 'Round'}
-            </p>
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-lg border border-white/20 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-cyan/50" />
+              <h3 className="font-display text-2xl font-black uppercase text-ink">
+                Edit Match &amp; Lobby Credentials
+              </h3>
+              <p className="text-xs text-dim mt-1 font-mono">
+                {editMatch.tournament_title || 'Tournament'} · {editMatch.stage || 'Round'}
+              </p>
 
-            <form onSubmit={handleEditSubmit} className="mt-4 space-y-3 font-mono text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleEditSubmit} className="mt-4 space-y-3 font-mono text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Status</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="SCHEDULED">SCHEDULED</option>
+                      <option value="CHECK_IN_OPEN">CHECK_IN_OPEN</option>
+                      <option value="LIVE">LIVE</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="DISPUTED">DISPUTED</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Roster Visibility</label>
+                    <select
+                      value={editForm.roster_status}
+                      onChange={(e) => setEditForm({ ...editForm, roster_status: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="DRAFT">DRAFT (Hidden from Public)</option>
+                      <option value="PUBLISHED">PUBLISHED (Public)</option>
+                      <option value="UPDATED">UPDATED (Rescheduled)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Round / Stage Name</label>
+                    <input
+                      type="text"
+                      value={editForm.round_name}
+                      onChange={(e) => setEditForm({ ...editForm, round_name: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Next Match Slot</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Semifinals Match 1"
+                      value={editForm.next_match_slot}
+                      onChange={(e) => setEditForm({ ...editForm, next_match_slot: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Scheduled Date</label>
+                    <input
+                      type="date"
+                      value={editForm.scheduled_date}
+                      onChange={(e) => setEditForm({ ...editForm, scheduled_date: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Scheduled Time</label>
+                    <input
+                      type="text"
+                      value={editForm.scheduled_time}
+                      onChange={(e) => setEditForm({ ...editForm, scheduled_time: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-dim uppercase mb-1">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  <label className="block text-dim uppercase mb-1">YouTube Live Stream URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://youtube.com/live/..."
+                    value={editForm.youtube_live_url}
+                    onChange={(e) => setEditForm({ ...editForm, youtube_live_url: e.target.value })}
                     className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Lobby Room Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AMT-ROOM-01"
+                      value={editForm.lobby_code}
+                      onChange={(e) => setEditForm({ ...editForm, lobby_code: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Lobby Password</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. PASS99"
+                      value={editForm.lobby_password}
+                      onChange={(e) => setEditForm({ ...editForm, lobby_password: e.target.value })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-warn"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                  <div>
+                    <label className="block text-dim uppercase mb-1">
+                      {editMatch.team_a?.name || editMatch.team_a_name || 'Team A'} Score
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.score_a}
+                      onChange={(e) => setEditForm({ ...editForm, score_a: Number(e.target.value) })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-dim uppercase mb-1">
+                      {editMatch.team_b?.name || editMatch.team_b_name || 'Team B'} Score
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.score_b}
+                      onChange={(e) => setEditForm({ ...editForm, score_b: Number(e.target.value) })}
+                      className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setEditMatch(null)}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
                   >
-                    <option value="SCHEDULED">SCHEDULED</option>
-                    <option value="CHECK_IN_OPEN">CHECK_IN_OPEN</option>
-                    <option value="LIVE">LIVE</option>
-                    <option value="COMPLETED">COMPLETED</option>
-                    <option value="DISPUTED">DISPUTED</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Roster Visibility</label>
-                  <select
-                    value={editForm.roster_status}
-                    onChange={(e) => setEditForm({ ...editForm, roster_status: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingEdit}
+                    className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
                   >
-                    <option value="DRAFT">DRAFT (Hidden from Public)</option>
-                    <option value="PUBLISHED">PUBLISHED (Public)</option>
-                    <option value="UPDATED">UPDATED (Rescheduled)</option>
-                  </select>
+                    {submittingEdit ? 'Saving...' : 'Save Changes'}
+                  </button>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Round / Stage Name</label>
-                  <input
-                    type="text"
-                    value={editForm.round_name}
-                    onChange={(e) => setEditForm({ ...editForm, round_name: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Next Match Slot</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Semifinals Match 1"
-                    value={editForm.next_match_slot}
-                    onChange={(e) => setEditForm({ ...editForm, next_match_slot: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Scheduled Date</label>
-                  <input
-                    type="date"
-                    value={editForm.scheduled_date}
-                    onChange={(e) => setEditForm({ ...editForm, scheduled_date: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Scheduled Time</label>
-                  <input
-                    type="text"
-                    value={editForm.scheduled_time}
-                    onChange={(e) => setEditForm({ ...editForm, scheduled_time: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-dim uppercase mb-1">YouTube Live Stream URL</label>
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/live/..."
-                  value={editForm.youtube_live_url}
-                  onChange={(e) => setEditForm({ ...editForm, youtube_live_url: e.target.value })}
-                  className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Lobby Room Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. AMT-ROOM-01"
-                    value={editForm.lobby_code}
-                    onChange={(e) => setEditForm({ ...editForm, lobby_code: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-cyan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Lobby Password</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. PASS99"
-                    value={editForm.lobby_password}
-                    onChange={(e) => setEditForm({ ...editForm, lobby_password: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-warn"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
-                <div>
-                  <label className="block text-dim uppercase mb-1">
-                    {editMatch.team_a?.name || editMatch.team_a_name || 'Team A'} Score
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editForm.score_a}
-                    onChange={(e) => setEditForm({ ...editForm, score_a: Number(e.target.value) })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">
-                    {editMatch.team_b?.name || editMatch.team_b_name || 'Team B'} Score
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editForm.score_b}
-                    onChange={(e) => setEditForm({ ...editForm, score_b: Number(e.target.value) })}
-                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setEditMatch(null)}
-                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingEdit}
-                  className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
-                >
-                  {submittingEdit ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   )

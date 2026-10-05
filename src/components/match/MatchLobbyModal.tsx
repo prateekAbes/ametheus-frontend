@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { captainCheckIn, getMatchJoinInfo, type MatchJoinInfo } from '../../services/matches'
-import { Brackets, Hud } from '../ui'
+import { Brackets, Hud, Modal } from '../ui'
 
 interface Props {
   match: any | null
@@ -57,9 +57,13 @@ export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Pr
   const isLive = statusStr === 'LIVE' || statusStr === 'IN_PROGRESS'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl border border-white/20 bg-graphite text-ink shadow-2xl flex flex-col max-h-[90vh]">
-        <Brackets color="border-cyan/50" />
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      raw
+      maxWidth="max-w-2xl"
+    >
+      <div className="relative w-full flex flex-col">
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 bg-surface/80 p-5">
@@ -299,6 +303,6 @@ export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Pr
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

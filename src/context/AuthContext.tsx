@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
-import { useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/react'
 import { setAuthTokenGetter, setAuthUserEmailGetter, resolveMediaUrl } from '../services/apiClient'
 import { syncUser, getCurrentUserProfile, UserProfile } from '../services/auth'
 

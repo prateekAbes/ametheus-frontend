@@ -380,6 +380,9 @@ export async function sendOfficialEmailAdmin(payload: {
   recipient_type: string
   subject: string
   message: string
+  team_ids?: string[]
+  user_ids?: string[]
+  custom_emails?: string[]
 }): Promise<any> {
   return apiClient('/admin/email/official/send', {
     method: 'POST',
@@ -406,6 +409,14 @@ export async function sendPersonalEmailAdmin(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export async function getOfficialEmailHistoryAdmin(): Promise<{ total: number; items: any[] }> {
+  try {
+    return await apiClient('/admin/email/official/history')
+  } catch {
+    return { total: 0, items: [] }
+  }
 }
 
 
@@ -471,4 +482,16 @@ export async function uploadMediaFile(file: File): Promise<{
 // Tournament Registered Rosters
 export async function getTournamentRegisteredRosters(tournamentId: string): Promise<any> {
   return apiClient(`/admin/tournaments/${tournamentId}/registered-rosters`)
+}
+
+export async function startLiveTournamentAdmin(id: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${id}/start-live`, {
+    method: 'POST',
+  })
+}
+
+export async function completeTournamentAdmin(id: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${id}/complete`, {
+    method: 'POST',
+  })
 }

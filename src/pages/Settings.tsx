@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
-import { useUser, useClerk } from '@clerk/clerk-react'
+import { useUser, useClerk } from '@clerk/react'
 import { Container, Cta, Field, Hud, Panel, Toggle, Badge } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
 import { updateUserProfile } from '../services/auth'
 import { resolveMediaUrl } from '../services/apiClient'
 import { uploadMediaFile } from '../services/admin'
+import DynamicImage from '../components/DynamicImage'
 import { AVATARS, img } from '../lib/data'
 
 const SECTIONS = ['Account', 'Preferences', 'Privacy', 'Security'] as const
@@ -350,8 +351,8 @@ export default function Settings() {
               <Panel className="p-6">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center">
                   <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-cyan/40 bg-surface">
-                    <img
-                      src={resolveMediaUrl(avatarUrl) || img(AVATARS[0])}
+                    <DynamicImage
+                      src={resolveMediaUrl(avatarUrl)}
                       alt="Avatar Preview"
                       className="size-full object-cover"
                     />

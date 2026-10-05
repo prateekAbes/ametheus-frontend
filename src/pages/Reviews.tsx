@@ -6,7 +6,9 @@ import {
   ReviewSummaryResponse,
 } from '../services/reviews'
 import { useAuthContext } from '../context/AuthContext'
-import { Container, Hud, Badge, SectionHead, Brackets, Panel } from '../components/ui'
+import { Container, Hud, Badge, SectionHead, Brackets, Panel, Modal } from '../components/ui'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 const REVIEW_CATEGORIES = [
   'ALL',
@@ -229,7 +231,7 @@ export default function Reviews() {
                 <div className="flex items-center gap-3">
                   <div className="size-9 rounded-full bg-surface border border-white/20 flex items-center justify-center font-display font-black text-cyan uppercase overflow-hidden">
                     {featured.avatar_url ? (
-                      <img src={featured.avatar_url} alt={featured.user_name} className="size-full object-cover" />
+                      <DynamicImage src={resolveMediaUrl(featured.avatar_url)} alt={featured.user_name} className="size-full object-cover" />
                     ) : (
                       featured.user_name.charAt(0)
                     )}
@@ -320,22 +322,14 @@ export default function Reviews() {
       </Container>
 
       {/* WRITE REVIEW MODAL */}
-      {isWriteModalOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
-        >
-          <div className="w-full max-w-lg border border-white/20 bg-graphite p-6 my-8 relative">
-            <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Write Platform Review
-            </h3>
-            <p className="text-xs text-dim mt-1">
-              Rate your experience with tournaments, matchmaking, and esports operations.
-            </p>
-
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4 font-mono text-xs">
+      <Modal
+        open={isWriteModalOpen}
+        onClose={() => setIsWriteModalOpen(false)}
+        title="Write Platform Review"
+        subtitle="Rate your experience with tournaments, matchmaking, and esports operations."
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs">
               {/* Star Rating Interactive Selector */}
               <div>
                 <label className="block text-dim uppercase mb-1.5">Rating (1 to 5 Stars)</label>
@@ -423,9 +417,7 @@ export default function Reviews() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, type FormEvent } from 'react'
-import { Badge, Container, Cta, Field, Hud, Panel, SectionHead, EmptyState, Brackets } from '../components/ui'
+import { Badge, Container, Cta, Field, Hud, Panel, SectionHead, EmptyState, Brackets, Modal } from '../components/ui'
 import {
   getSupportTickets,
   createSupportTicket,
@@ -408,16 +408,17 @@ export default function Support() {
 
       {/* CREATE TICKET MODAL */}
       {form && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/85 p-4 md:items-center backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
+        <Modal
+          open={Boolean(form)}
+          onClose={() => setForm(false)}
+          raw
+          maxWidth="max-w-2xl"
+          className="p-6 md:p-10"
         >
-          <Panel className="w-full max-w-2xl p-6 md:p-10 relative bg-graphite my-8">
-            <Brackets color="border-cyan/50" />
+          <div className="relative">
             <button
               onClick={() => setForm(false)}
-              className="absolute right-5 top-5 font-mono text-xs text-dim hover:text-ink"
+              className="absolute right-0 top-0 font-mono text-xs text-dim hover:text-ink cursor-pointer"
               aria-label="Close"
             >
               ESC ✕
@@ -549,8 +550,8 @@ export default function Support() {
                 </div>
               </form>
             )}
-          </Panel>
-        </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

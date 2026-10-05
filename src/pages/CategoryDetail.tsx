@@ -7,6 +7,8 @@ import { gameBy, img, inr, type Tournament as DesignTournament } from '../lib/da
 import { PageHero, Container, SectionHead, Hud, EmptyState, TournamentCard, Cta, Badge } from '../components/ui'
 import { AdaptiveGrid, GameCard } from '../components/kit'
 import CategoryCard from '../components/CategoryCard'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 export default function CategoryDetail() {
   const { slug } = useParams<{ slug: string }>()
@@ -173,8 +175,8 @@ export default function CategoryDetail() {
                     to={`/games/${g.slug}`}
                     className="group relative flex aspect-[16/10] flex-col justify-between overflow-hidden border border-white/10 bg-surface p-6 transition-all duration-500 hover:border-cyan/50"
                   >
-                    <img
-                      src={img(g.bannerUrl || fallback.photo, 1000)}
+                    <DynamicImage
+                      src={resolveMediaUrl(g.bannerUrl)}
                       alt={`${g.name} banner`}
                       className="absolute inset-0 size-full object-cover opacity-45 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-65"
                     />

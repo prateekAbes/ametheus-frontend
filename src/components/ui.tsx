@@ -2,6 +2,8 @@ import { useRef, type ReactNode, type PointerEvent, type InputHTMLAttributes } f
 import { Link } from 'react-router'
 import { motion } from 'framer-motion'
 import { gameBy, img, type Tournament, type Match, inr } from '../lib/data'
+import DynamicImage from './DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 /* HUD micro label */
 export function Hud({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -91,7 +93,16 @@ export function SectionHead({ idx, kicker, title, sub, right, className = '', si
 export function PageHero({ kicker, title, sub, photo, accent = '#3ef2ff', children, tall }: { kicker: string; title: ReactNode; sub?: ReactNode; photo?: string; accent?: string; children?: ReactNode; tall?: boolean }) {
   return (
     <section className={`relative overflow-hidden bg-void ${tall ? 'min-h-[86svh]' : 'min-h-[52svh]'} flex items-end`}>
-      {photo && <div className="absolute inset-0 overflow-hidden"><img data-speed="0.25" src={img(photo, 1800)} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-[120%] w-full -translate-y-[8%] object-cover opacity-40" /></div>}
+      {photo && (
+        <div className="absolute inset-0 overflow-hidden">
+          <DynamicImage
+            src={resolveMediaUrl(photo)}
+            alt=""
+            eager
+            className="absolute inset-0 h-[120%] w-full -translate-y-[8%] object-cover opacity-40"
+          />
+        </div>
+      )}
       <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 15% 100%, ${accent}33, transparent 55%)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-void/30" />
             <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-14 pt-36 md:px-10 md:pb-20">
@@ -155,7 +166,18 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
 }
 
 export function Avatar({ id, size = 40, className = '' }: { id: string; size?: number; className?: string }) {
-  return <img src={img(id, size * 3)} alt="" style={{ width: size, height: size }} className={`shrink-0 bg-surface object-cover [clip-path:polygon(0_0,100%_0,100%_78%,78%_100%,0_100%)] ${className}`} />
+  const url = resolveMediaUrl(id)
+  if (!url) {
+    return (
+      <span
+        style={{ width: size, height: size }}
+        className={`grid shrink-0 place-items-center bg-surface font-mono text-xs uppercase text-dim [clip-path:polygon(0_0,100%_0,100%_78%,78%_100%,0_100%)] ${className}`}
+      >
+        {id.slice(0, 2).toUpperCase()}
+      </span>
+    )
+  }
+  return <img src={url} alt="" style={{ width: size, height: size }} className={`shrink-0 bg-surface object-cover [clip-path:polygon(0_0,100%_0,100%_78%,78%_100%,0_100%)] ${className}`} />
 }
 
 /** Team crest generated from initials. */
@@ -195,8 +217,9 @@ export function Tilt({ children, className = '', max = 6 }: { children: ReactNod
 
 /** Reserved-ratio image: never shifts layout, lazy by default, falls back to a tinted plate. */
 export function Media({ id, w = 1000, alt = '', className = '', eager, sizes = '(min-width:1024px) 33vw, 100vw', ...rest }: { id?: string; w?: number; alt?: string; className?: string; eager?: boolean; sizes?: string; 'data-speed'?: string }) {
-  if (!id) return null
-  return <img {...rest} src={img(id, w)} srcSet={`${img(id, Math.round(w / 2))} ${Math.round(w / 2)}w, ${img(id, w)} ${w}w`} sizes={sizes} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" fetchPriority={eager ? 'high' : 'auto'} className={className} />
+  const url = resolveMediaUrl(id)
+  if (!url) return null
+  return <img {...rest} src={url} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" fetchPriority={eager ? 'high' : 'auto'} className={className} />
 }
 
 /**
@@ -216,7 +239,11 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
   const card = (
     <Link to={`/tournaments/${t.id}`} className={`group relative flex h-full flex-col overflow-hidden border border-white/10 bg-surface transition-colors duration-300 hover:border-white/25`}>
       <div className={`relative overflow-hidden bg-graphite ${wide ? 'aspect-[16/8]' : 'aspect-[16/9]'}`}>
-        <Media id={g?.photo} w={900} alt={`${g?.name ?? 'Tournament'} banner`} className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105" />
+        <DynamicImage
+          src={resolveMediaUrl((t as any).bannerUrl || (t as any).banner_url)}
+          alt={`${t.name} banner`}
+          className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
+        />
         <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
           {t.status && <Badge s={t.status} />}
@@ -310,38 +337,8 @@ export function Panel({ children, className = '' }: { children: ReactNode; class
   return <div className={`relative border border-white/10 bg-surface ${className}`}>{children}</div>
 }
 
-export function Modal({
-  title,
-  onClose,
-  children,
-  maxWidth = 'max-w-xl',
-}: {
-  title: string
-  onClose: () => void
-  children: ReactNode
-  maxWidth?: string
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-void/80 backdrop-blur-xs p-0 sm:items-center sm:p-6"
-      onClick={onClose}
-    >
-      <div
-        className={`page-in relative w-full ${maxWidth} border border-white/15 bg-graphite p-6 md:p-8 max-h-[90vh] overflow-y-auto`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Brackets color="border-cyan/50" />
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
-          <h3 className="font-display text-2xl font-black uppercase tracking-wider">{title}</h3>
-          <button aria-label="Close" onClick={onClose} className="text-dim hover:text-ink text-lg font-mono">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
+export { Modal, PortalModal, Portal } from './Modal'
+export type { ModalProps } from './Modal'
 
 export const SectionHeader = SectionHead
 export const StatusBadge = Badge

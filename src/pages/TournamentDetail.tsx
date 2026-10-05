@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router'
 import { QRCodeSVG } from 'qrcode.react'
 import { Container, Hud, Dot, Cta, Crest, Avatar, Media, Badge } from '../components/ui'
 import { Modal, useLoadMore, LoadMore } from '../components/kit'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 import {
   getTournamentBySlug,
   getTournamentMatches,
@@ -227,17 +229,45 @@ export default function TournamentDetail() {
     { name: 'Grand Final', date: tourData?.startDate ? new Date(tourData.startDate).toLocaleDateString('en-GB') : 'TBD', time: '21:30 IST' },
   ]
 
+  const renderedRules = useMemo(() => {
+    if (!tourData?.rules || tourData.rules.length === 0) {
+      return RULES
+    }
+    const first = tourData.rules[0] as any
+    if (typeof first === 'object' && first !== null && first.cat && Array.isArray(first.items)) {
+      return tourData.rules as unknown as { cat: string; items: [string, string][] }[]
+    }
+    const items: [string, string][] = tourData.rules.map((r: any, idx: number) => {
+      if (typeof r === 'string') {
+        const parts = r.split(/[:\.]\s+/)
+        if (parts.length > 1) {
+          return [parts[0].replace(/^\d+[\.\)]\s*/, '').trim() || `Rule ${idx + 1}`, parts.slice(1).join('. ').trim()]
+        }
+        return [`Rule 0${idx + 1}`, r.trim()]
+      }
+      if (typeof r === 'object' && r !== null) {
+        return [r.title || r.name || `Rule ${idx + 1}`, r.description || r.desc || r.text || '']
+      }
+      return [`Rule ${idx + 1}`, String(r)]
+    })
+    return [
+      {
+        cat: 'Official Regulations',
+        items,
+      },
+    ]
+  }, [tourData?.rules])
+
   return (
     <div className="bg-void text-ink pb-36" style={{ ['--acc' as string]: accent }}>
       {/* Hero */}
       <section className="relative isolate flex min-h-[100svh] items-end overflow-hidden bg-void md:min-h-[92svh]">
         <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 70% 20%, ${accent}30, transparent 60%)` }} />
         <div className="absolute inset-0">
-          <img
-            src={img(tourData?.bannerUrl || g.photo, 1920)}
+          <DynamicImage
+            src={resolveMediaUrl(tourData?.bannerUrl)}
             alt={`${title} banner`}
-            fetchPriority="high"
-            decoding="async"
+            eager
             className="h-full w-full object-cover object-[60%_30%] opacity-70"
           />
         </div>
@@ -325,17 +355,19 @@ export default function TournamentDetail() {
       {/* Rules */}
       <Block id="Rules" idx="01" kicker="Rulebook" title="The Rules" tone="graphite">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {RULES.map((cat) => (
-            <div key={cat.cat} className="border border-white/10 bg-void p-6">
-              <Hud className="text-cyan">{cat.cat}</Hud>
-              <ul className="mt-4 space-y-3 text-sm text-dim">
-                {cat.items.map(([title, desc]) => (
-                  <li key={title}>
-                    <strong className="text-ink block font-display text-base uppercase">{title}</strong>
-                    <span>{desc}</span>
-                  </li>
-                ))}
-              </ul>
+          {renderedRules.map((cat) => (
+            <div key={cat.cat} className="border border-white/10 bg-void p-6 flex flex-col justify-between">
+              <div>
+                <Hud className="text-cyan">{cat.cat}</Hud>
+                <ul className="mt-4 space-y-3 text-sm text-dim">
+                  {cat.items.map(([rtitle, desc]) => (
+                    <li key={rtitle}>
+                      <strong className="text-ink block font-display text-base uppercase">{rtitle}</strong>
+                      <span className="text-xs font-mono leading-relaxed">{desc}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ))}
         </div>
@@ -499,22 +531,12 @@ function RegistrationModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-void/85 p-4"
-      onClick={onClose}
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={step === 2 ? (utrSubmitted ? 'Registration Received' : 'Registration Confirmed') : 'Register for Tournament'}
+      maxWidth="max-w-lg"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg border border-white/20 bg-graphite p-6 md:p-8"
-      >
-        <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-          <h2 className="font-display text-3xl font-black uppercase">
-            {step === 2 ? 'Registration Received' : 'Register for Tournament'}
-          </h2>
-          <button onClick={onClose} className="text-dim hover:text-ink font-mono">✕</button>
-        </div>
 
         {step === 0 && (
           <div className="space-y-6">
@@ -679,7 +701,6 @@ function RegistrationModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }

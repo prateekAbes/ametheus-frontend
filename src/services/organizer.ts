@@ -54,3 +54,15 @@ export async function cancelTournamentOrganizer(id: string): Promise<any> {
     method: 'POST',
   })
 }
+
+export async function startLiveTournamentOrganizer(id: string): Promise<any> {
+  return apiClient(`/organizer/tournaments/${id}/start-live`, {
+    method: 'POST',
+  })
+}
+
+export async function completeTournamentOrganizer(id: string): Promise<any> {
+  return apiClient(`/organizer/tournaments/${id}/complete`, {
+    method: 'POST',
+  })
+}

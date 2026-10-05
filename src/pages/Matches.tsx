@@ -3,6 +3,9 @@ import { Link } from 'react-router'
 import { PageHero, Container, Tabs, Chips, EmptyState, Hud, Badge, Crest, Brackets } from '../components/ui'
 import { gameBy, img, tourBy, type Match } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
+import { getPageMedia, PageMediaConfig } from '../services/admin'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 import { useMatchTicker, type TickerEvent } from '../hooks/useMatchTicker'
 import { LiveTickerBar } from '../components/match/LiveTickerBar'
 import { MatchLobbyModal } from '../components/match/MatchLobbyModal'
@@ -52,20 +55,12 @@ function LiveFeature({
         background: `radial-gradient(ellipse at 30% 0%, ${g.accent}40, transparent 60%), linear-gradient(160deg, #12141d, #05060a)`,
       }}
     >
-      {media === 'loading' && <div className="skeleton absolute inset-0" />}
-      {media !== 'err' && (
-        <img
-          src={img(g.photo, 1600)}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setMedia('ok')}
-          onError={() => setMedia('err')}
-          className={`kenburns absolute inset-0 h-full w-full object-cover transition-opacity duration-700 group-hover:opacity-40 ${
-            media === 'ok' ? 'opacity-30' : 'opacity-0'
-          }`}
-        />
-      )}
+      <DynamicImage
+        src={resolveMediaUrl((m as any).bannerUrl || (m as any).banner_url)}
+        alt=""
+        eager
+        className="kenburns absolute inset-0 h-full w-full object-cover opacity-30 transition-opacity duration-700 group-hover:opacity-40"
+      />
       <div
         className="absolute inset-0"
         style={{
@@ -270,6 +265,7 @@ export default function Matches() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('LIVE')
   const [game, setGame] = useState<(typeof GAMES)[number]>('All Games')
   const [matches, setMatches] = useState<(Match & { tourName?: string; liveLink?: string; scheduledAt?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string })[]>([])
+  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // Modals state
@@ -291,6 +287,11 @@ export default function Matches() {
 
   useEffect(() => {
     fetchMatchesData()
+    getPageMedia('matches')
+      .then((pm) => {
+        if (pm) setPageMedia(pm)
+      })
+      .catch(() => {})
     const interval = setInterval(fetchMatchesData, 25000)
     return () => clearInterval(interval)
   }, [fetchMatchesData])
@@ -322,7 +323,7 @@ export default function Matches() {
         kicker={`◉ ${liveCount} matches live right now`}
         title="MATCHES"
         sub="Every round, every clutch, every scoreline — streamed and tracked in real time."
-        photo={gameBy('free-fire').photo}
+        photo={pageMedia?.media_url}
         accent="#ff3b4e"
       />
 

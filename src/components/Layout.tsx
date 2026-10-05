@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useOutlet, ScrollRestoration } from 'react-router'
+import { useClerk } from '@clerk/react'
 import { motion } from 'framer-motion'
 import { useGsapPage } from '../lib/motion'
 import { useAuthContext } from '../context/AuthContext'
@@ -58,6 +59,7 @@ function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const { isSignedIn } = useAuthContext()
+  const clerk = useClerk()
   useEffect(() => { setDrawer(false) }, [location.pathname])
 
   useEffect(() => {
@@ -132,90 +134,108 @@ function Nav() {
         </nav>
       </header>
 
-      {/* drawer */}
-      <div className={`fixed inset-0 z-[60] flex flex-col bg-void transition-opacity duration-300 xl:hidden ${drawer ? 'opacity-100 pointer-events-auto' : 'pointer-events-none opacity-0'}`}>
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5 md:px-10">
-          <Logo />
-          <button
-            onClick={() => setDrawer(false)}
-            className="flex items-center gap-2 border border-white/15 bg-surface/50 px-3 py-1.5 font-mono text-[11px] font-bold tracking-[0.2em] text-ink hover:border-cyan hover:text-cyan transition-colors"
-          >
-            CLOSE ✕
-          </button>
-        </div>
-        <div className="no-scrollbar flex-1 overflow-y-auto px-6 pb-32 pt-8">
-          <ul className="space-y-1">
-            {MAIN.map(([l, to], i) => (
-              <li
-                key={l}
-                style={{ transitionDelay: `${i * 35}ms` }}
-                className={`transition-all duration-300 ${drawer ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'}`}
-              >
-                <NavLink
-                  to={to}
-                  end={to === '/'}
-                  onClick={() => setDrawer(false)}
-                  className={({ isActive }) => `flex items-baseline gap-3 py-1.5 font-display text-[clamp(1.75rem,6.5vw,2.75rem)] font-black uppercase tracking-tight transition-colors ${isActive ? 'text-cyan' : 'text-ink/80 hover:text-cyan'}`}
-                >
-                  <span className="font-mono text-xs text-dim">0{i + 1}</span>
-                  {l}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-8 grid grid-cols-2 gap-px border border-white/10 bg-white/10">
-            {isSignedIn ? (
-              <>
-                {PROFILE.map(([l, to]) => (
-                  <Link
-                    key={l}
+      {/* Mobile Drawer Backdrop & Panel */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/80 backdrop-blur-md transition-opacity duration-300 xl:hidden ${
+          drawer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setDrawer(false)}
+      >
+        <div
+          className={`absolute inset-x-0 top-0 max-h-[92vh] flex flex-col bg-void border-b border-white/10 transition-transform duration-300 ease-out shadow-2xl ${
+            drawer ? 'translate-y-0' : '-translate-y-full'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5 md:px-10">
+            <Logo />
+            <button
+              onClick={() => setDrawer(false)}
+              className="flex items-center gap-2 border border-white/15 bg-surface/50 px-3 py-1.5 font-mono text-[11px] font-bold tracking-[0.2em] text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+            >
+              CLOSE ✕
+            </button>
+          </div>
+          <div className="no-scrollbar flex-1 overflow-y-auto px-6 pb-12 pt-6">
+            <ul className="space-y-1">
+              {MAIN.map(([l, to], i) => (
+                <li key={l}>
+                  <NavLink
                     to={to}
+                    end={to === '/'}
+                    onClick={() => setDrawer(false)}
+                    className={({ isActive }) =>
+                      `flex items-baseline gap-3 py-2 font-display text-[clamp(1.5rem,5.5vw,2.25rem)] font-black uppercase tracking-tight transition-colors ${
+                        isActive ? 'text-cyan' : 'text-ink/80 hover:text-cyan'
+                      }`
+                    }
+                  >
+                    <span className="font-mono text-xs text-dim">0{i + 1}</span>
+                    {l}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 grid grid-cols-2 gap-px border border-white/10 bg-white/10">
+              {isSignedIn ? (
+                <>
+                  {PROFILE.map(([l, to]) => (
+                    <Link
+                      key={l}
+                      to={to}
+                      onClick={() => setDrawer(false)}
+                      className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
+                    >
+                      {l}
+                    </Link>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDrawer(false)
+                      try {
+                        await clerk.signOut()
+                      } catch {}
+                      window.location.href = '/'
+                    }}
+                    className="bg-void px-4 py-3 text-sm text-live font-mono text-left cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    onClick={() => setDrawer(false)}
+                    className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    to="/signup"
+                    onClick={() => setDrawer(false)}
+                    className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider"
+                  >
+                    Sign Up
+                  </Link>
+                  <Link
+                    to="/support"
                     onClick={() => setDrawer(false)}
                     className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
                   >
-                    {l}
+                    Support
                   </Link>
-                ))}
-                <Link
-                  to="/login"
-                  onClick={() => setDrawer(false)}
-                  className="bg-void px-4 py-3 text-sm text-live font-mono"
-                >
-                  Logout
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  onClick={() => setDrawer(false)}
-                  className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider"
-                >
-                  Log In
-                </Link>
-                <Link
-                  to="/signup"
-                  onClick={() => setDrawer(false)}
-                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono uppercase tracking-wider"
-                >
-                  Sign Up
-                </Link>
-                <Link
-                  to="/support"
-                  onClick={() => setDrawer(false)}
-                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
-                >
-                  Support
-                </Link>
-                <Link
-                  to="/about"
-                  onClick={() => setDrawer(false)}
-                  className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
-                >
-                  About
-                </Link>
-              </>
-            )}
+                  <Link
+                    to="/about"
+                    onClick={() => setDrawer(false)}
+                    className="bg-void px-4 py-3 text-sm text-dim hover:text-ink font-mono"
+                  >
+                    About
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

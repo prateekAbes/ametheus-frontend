@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel } from '../components/ui'
+import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getMyOrganizedTournaments,
@@ -8,8 +8,11 @@ import {
   updateTournamentOrganizer,
   publishTournamentOrganizer,
   closeRegistrationOrganizer,
+  reopenRegistrationOrganizer,
   generateBracketOrganizer,
   cancelTournamentOrganizer,
+  startLiveTournamentOrganizer,
+  completeTournamentOrganizer,
 } from '../services/organizer'
 import { getGames, Game } from '../services/games'
 import {
@@ -243,6 +246,40 @@ export default function Organizer() {
     }
   }
 
+  const handleStartLive = async (id: string) => {
+    try {
+      await startLiveTournamentOrganizer(id)
+      setActionMsg('Tournament transitioned to LIVE state! Matches are active.')
+      setTimeout(() => setActionMsg(null), 4000)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to start tournament live')
+    }
+  }
+
+  const handleCompleteTournament = async (id: string) => {
+    if (!confirm('Mark this tournament as COMPLETED? All matches and results will be finalized.')) return
+    try {
+      await completeTournamentOrganizer(id)
+      setActionMsg('Tournament successfully marked as COMPLETED.')
+      setTimeout(() => setActionMsg(null), 4000)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete tournament')
+    }
+  }
+
+  const handleReopenReg = async (id: string) => {
+    try {
+      await reopenRegistrationOrganizer(id)
+      setActionMsg('Registration reopened for contenders.')
+      setTimeout(() => setActionMsg(null), 4000)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to reopen registration')
+    }
+  }
+
   const handleCancel = async (id: string) => {
     if (!confirm('Are you sure you want to cancel this tournament? This will refund registered teams.')) return
     try {
@@ -471,7 +508,17 @@ export default function Organizer() {
             <p className="mt-2 text-dim">Full platform operations: seed brackets, manage rosters, publish events, and arbitrate live matches.</p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={() => {
+                loadData()
+                setActionMsg('Refreshed tournaments and matches from database.')
+                setTimeout(() => setActionMsg(null), 3000)
+              }}
+              className="border border-white/20 bg-surface px-4 py-2 font-mono text-xs uppercase text-dim hover:text-ink hover:border-cyan transition-colors"
+            >
+              ↻ Refresh
+            </button>
             <Cta onClick={() => setIsCreateModalOpen(true)}>+ New Tournament</Cta>
           </div>
         </div>
@@ -616,6 +663,38 @@ export default function Organizer() {
                             className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
                           >
                             Lock Rosters
+                          </button>
+                        )}
+
+                        {t.status === 'REGISTRATION_CLOSED' && (
+                          <>
+                            <button
+                              onClick={() => handleGenBracket(t.id)}
+                              className="border border-cyan bg-cyan/15 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold"
+                            >
+                              ⚡ Gen Bracket & Start Live
+                            </button>
+                            <button
+                              onClick={() => handleStartLive(t.id)}
+                              className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                            >
+                              ▶ Start Live
+                            </button>
+                            <button
+                              onClick={() => handleReopenReg(t.id)}
+                              className="border border-white/20 bg-surface px-3 py-2 font-mono text-xs uppercase text-dim hover:text-ink hover:border-cyan transition-colors"
+                            >
+                              Reopen Reg
+                            </button>
+                          </>
+                        )}
+
+                        {t.status === 'LIVE' && (
+                          <button
+                            onClick={() => handleCompleteTournament(t.id)}
+                            className="border border-ok bg-ok/20 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors font-bold"
+                          >
+                            ✓ Complete Event
                           </button>
                         )}
 
@@ -974,16 +1053,17 @@ export default function Organizer() {
 
       {/* Creation Modal */}
       {isCreateModalOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm overflow-y-auto"
-          onClick={() => setIsCreateModalOpen(false)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl border border-white/20 bg-graphite p-6 md:p-8 my-8 max-h-[90vh] overflow-y-auto"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setIsCreateModalOpen(false)}
           >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-2xl border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
+            >
             <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
               <div>
                 <h2 className="font-display text-3xl font-black uppercase">Tournament Specification Wizard</h2>
@@ -1203,221 +1283,229 @@ export default function Organizer() {
             </form>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* Rosters Modal */}
       {viewingRostersTour && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setViewingRostersTour(null)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl border border-white/20 bg-graphite p-6 md:p-8 max-h-[85vh] overflow-y-auto"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setViewingRostersTour(null)}
           >
-            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-display text-2xl font-black uppercase text-ink">Registered Rosters</h3>
-                <p className="text-xs text-cyan font-mono">{viewingRostersTour.title}</p>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-2xl border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
+            >
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">Registered Rosters</h3>
+                  <p className="text-xs text-cyan font-mono">{viewingRostersTour.title}</p>
+                </div>
+                <button onClick={() => setViewingRostersTour(null)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
-              <button onClick={() => setViewingRostersTour(null)} className="text-dim hover:text-ink text-xl">✕</button>
-            </div>
 
-            {loadingRosters ? (
-              <div className="p-8 text-center font-mono text-xs text-cyan animate-pulse">
-                LOADING REGISTERED ROSTERS...
-              </div>
-            ) : rostersList.length === 0 ? (
-              <div className="p-8 text-center font-mono text-xs text-dim border border-dashed border-white/10">
-                NO TEAMS REGISTERED YET
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {rostersList.map((r, i) => (
-                  <div key={r.id || i} className="border border-white/10 bg-surface p-4 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-sm text-ink">{r.team_name || r.name || `Team ${i + 1}`}</p>
-                      <p className="font-mono text-xs text-dim">Captain: {r.captain_name || r.captain || 'Registered Captain'}</p>
+              {loadingRosters ? (
+                <div className="p-8 text-center font-mono text-xs text-cyan animate-pulse">
+                  LOADING REGISTERED ROSTERS...
+                </div>
+              ) : rostersList.length === 0 ? (
+                <div className="p-8 text-center font-mono text-xs text-dim border border-dashed border-white/10">
+                  NO TEAMS REGISTERED YET
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {rostersList.map((r, i) => (
+                    <div key={r.id || i} className="border border-white/10 bg-surface p-4 flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-sm text-ink">{r.team_name || r.name || `Team ${i + 1}`}</p>
+                        <p className="font-mono text-xs text-dim">Captain: {r.captain_name || r.captain || 'Registered Captain'}</p>
+                      </div>
+                      <span className="border border-ok/40 bg-ok/10 px-2.5 py-1 font-mono text-[10px] text-ok uppercase">
+                        Confirmed
+                      </span>
                     </div>
-                    <span className="border border-ok/40 bg-ok/10 px-2.5 py-1 font-mono text-[10px] text-ok uppercase">
-                      Confirmed
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Arbitration Score Modal */}
       {selectedMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedMatch(null)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setSelectedMatch(null)}
           >
-            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-display text-2xl font-black uppercase text-ink">Submit Match Score</h3>
-                <p className="text-xs text-dim">Arbitrate and certify official match results.</p>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
+            >
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">Submit Match Score</h3>
+                  <p className="text-xs text-dim">Arbitrate and certify official match results.</p>
+                </div>
+                <button onClick={() => setSelectedMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
-              <button onClick={() => setSelectedMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
+
+              <form onSubmit={handleSubmitScore} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-mono text-xs text-dim block truncate">{selectedMatch.team_a?.name || 'Team A'}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={scoreA}
+                      onChange={(e) => setScoreA(Number(e.target.value))}
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-mono text-xs text-dim block truncate text-right">{selectedMatch.team_b?.name || 'Team B'}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={scoreB}
+                      onChange={(e) => setScoreB(Number(e.target.value))}
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Hud>Winner Declaration</Hud>
+                  <select
+                    value={winnerTeamId}
+                    onChange={(e) => setWinnerTeamId(e.target.value)}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                  >
+                    <option value="">Auto-select by score</option>
+                    {selectedMatch.team_a?.id && <option value={selectedMatch.team_a.id}>{selectedMatch.team_a.name}</option>}
+                    {selectedMatch.team_b?.id && <option value={selectedMatch.team_b.id}>{selectedMatch.team_b.name}</option>}
+                  </select>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMatch(null)}
+                    className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingScore}
+                    className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                  >
+                    {isSubmittingScore ? 'Submitting...' : 'Certify Result'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleSubmitScore} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="font-mono text-xs text-dim block truncate">{selectedMatch.team_a?.name || 'Team A'}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scoreA}
-                    onChange={(e) => setScoreA(Number(e.target.value))}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
-                  />
-                </div>
-                <div>
-                  <label className="font-mono text-xs text-dim block truncate text-right">{selectedMatch.team_b?.name || 'Team B'}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scoreB}
-                    onChange={(e) => setScoreB(Number(e.target.value))}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Hud>Winner Declaration</Hud>
-                <select
-                  value={winnerTeamId}
-                  onChange={(e) => setWinnerTeamId(e.target.value)}
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                >
-                  <option value="">Auto-select by score</option>
-                  {selectedMatch.team_a?.id && <option value={selectedMatch.team_a.id}>{selectedMatch.team_a.name}</option>}
-                  {selectedMatch.team_b?.id && <option value={selectedMatch.team_b.id}>{selectedMatch.team_b.name}</option>}
-                </select>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMatch(null)}
-                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingScore}
-                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
-                >
-                  {isSubmittingScore ? 'Submitting...' : 'Certify Result'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Room & Stream Modal */}
       {selectedLobbyMatch && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedLobbyMatch(null)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setSelectedLobbyMatch(null)}
           >
-            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-display text-2xl font-black uppercase text-ink">Room & Stream Settings</h3>
-                <p className="text-xs text-dim">Set custom room code, password, and live stream URL.</p>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
+            >
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">Room & Stream Settings</h3>
+                  <p className="text-xs text-dim">Set custom room code, password, and live stream URL.</p>
+                </div>
+                <button onClick={() => setSelectedLobbyMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
-              <button onClick={() => setSelectedLobbyMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
+
+              <form onSubmit={handleSaveLobbyCredentials} className="space-y-4">
+                <div>
+                  <Hud>Lobby / Room Code</Hud>
+                  <input
+                    type="text"
+                    value={lobbyCode}
+                    onChange={(e) => setLobbyCode(e.target.value)}
+                    placeholder="e.g. AMT-ROOM-01"
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div>
+                  <Hud>Lobby Password</Hud>
+                  <input
+                    type="text"
+                    value={lobbyPassword}
+                    onChange={(e) => setLobbyPassword(e.target.value)}
+                    placeholder="e.g. PASS123"
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div>
+                  <Hud>Live Stream URL (YouTube Embed / Watch Link)</Hud>
+                  <input
+                    type="url"
+                    value={streamUrl}
+                    onChange={(e) => setStreamUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                  />
+                  <span className="mt-1 block text-[10px] text-dim">Stream will appear on the match details page and broadcast hubs.</span>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLobbyMatch(null)}
+                    className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingLobby}
+                    className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                  >
+                    {isSavingLobby ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleSaveLobbyCredentials} className="space-y-4">
-              <div>
-                <Hud>Lobby / Room Code</Hud>
-                <input
-                  type="text"
-                  value={lobbyCode}
-                  onChange={(e) => setLobbyCode(e.target.value)}
-                  placeholder="e.g. AMT-ROOM-01"
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                />
-              </div>
-
-              <div>
-                <Hud>Lobby Password</Hud>
-                <input
-                  type="text"
-                  value={lobbyPassword}
-                  onChange={(e) => setLobbyPassword(e.target.value)}
-                  placeholder="e.g. PASS123"
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                />
-              </div>
-
-              <div>
-                <Hud>Live Stream URL (YouTube Embed / Watch Link)</Hud>
-                <input
-                  type="url"
-                  value={streamUrl}
-                  onChange={(e) => setStreamUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                />
-                <span className="mt-1 block text-[10px] text-dim">Stream will appear on the match details page and broadcast hubs.</span>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setSelectedLobbyMatch(null)}
-                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingLobby}
-                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
-                >
-                  {isSavingLobby ? 'Saving...' : 'Save Settings'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Live Match Request Modal */}
       {isRequestModalOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setIsRequestModalOpen(false)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setIsRequestModalOpen(false)}
           >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-xl max-h-[min(90vh,calc(100svh-2rem))] flex flex-col border border-white/20 bg-graphite shadow-2xl overflow-hidden select-text"
+            >
             <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
               <div>
                 <h3 className="font-display text-2xl font-black uppercase text-ink">Request Live Match</h3>
@@ -1557,206 +1645,211 @@ export default function Organizer() {
             </form>
           </div>
         </div>
+      </Portal>
       )}
 
       {/* Email Admin / New Inquiry Modal */}
       {isNewEmailOpen && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setIsNewEmailOpen(false)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setIsNewEmailOpen(false)}
           >
-            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-              <div>
-                <h3 className="font-display text-2xl font-black uppercase text-ink">Email Admin</h3>
-                <p className="text-xs text-dim">Send an official inquiry or escalation to Super Admins.</p>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-xl max-h-[min(90vh,calc(100svh-2rem))] flex flex-col border border-white/20 bg-graphite shadow-2xl overflow-hidden select-text"
+            >
+              <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">Email Admin</h3>
+                  <p className="text-xs text-dim">Send an official inquiry or escalation to Super Admins.</p>
+                </div>
+                <button onClick={() => setIsNewEmailOpen(false)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
-              <button onClick={() => setIsNewEmailOpen(false)} className="text-dim hover:text-ink text-xl">✕</button>
+
+              <form onSubmit={handleSendEmail} className="overflow-y-auto p-6 space-y-4 flex-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Hud>Category</Hud>
+                    <select
+                      value={newEmailForm.category}
+                      onChange={(e) => setNewEmailForm({ ...newEmailForm, category: e.target.value })}
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                    >
+                      <option value="GENERAL">General Inquiries</option>
+                      <option value="TOURNAMENT_ISSUE">Tournament Issue</option>
+                      <option value="DISPUTE">Match Dispute</option>
+                      <option value="PRIZE_POOL">Prize Pool / Payout</option>
+                      <option value="TECHNICAL">Technical Issue</option>
+                      <option value="SPONSORSHIP">Sponsorship</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Hud>Urgency</Hud>
+                    <select
+                      value={newEmailForm.urgency}
+                      onChange={(e) => setNewEmailForm({ ...newEmailForm, urgency: e.target.value })}
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <Hud>Subject Line</Hud>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Requesting Bracket Reschedule for BGMI Qualifiers"
+                    value={newEmailForm.subject}
+                    onChange={(e) => setNewEmailForm({ ...newEmailForm, subject: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
+                </div>
+
+                <div>
+                  <Hud>Detailed Message</Hud>
+                  <textarea
+                    required
+                    rows={6}
+                    placeholder="Explain the context, tournament name, team identifiers, and specific resolution required..."
+                    value={newEmailForm.message}
+                    onChange={(e) => setNewEmailForm({ ...newEmailForm, message: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewEmailOpen(false)}
+                    className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingEmail}
+                    className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                  >
+                    {submittingEmail ? 'Sending...' : 'Send Inquiry to Admin'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleSendEmail} className="overflow-y-auto p-6 space-y-4 flex-1">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Hud>Category</Hud>
-                  <select
-                    value={newEmailForm.category}
-                    onChange={(e) => setNewEmailForm({ ...newEmailForm, category: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  >
-                    <option value="GENERAL">General Inquiries</option>
-                    <option value="TOURNAMENT_ISSUE">Tournament Issue</option>
-                    <option value="DISPUTE">Match Dispute</option>
-                    <option value="PRIZE_POOL">Prize Pool / Payout</option>
-                    <option value="TECHNICAL">Technical Issue</option>
-                    <option value="SPONSORSHIP">Sponsorship</option>
-                  </select>
-                </div>
-                <div>
-                  <Hud>Urgency</Hud>
-                  <select
-                    value={newEmailForm.urgency}
-                    onChange={(e) => setNewEmailForm({ ...newEmailForm, urgency: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="NORMAL">Normal</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <Hud>Subject Line</Hud>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Requesting Bracket Reschedule for BGMI Qualifiers"
-                  value={newEmailForm.subject}
-                  onChange={(e) => setNewEmailForm({ ...newEmailForm, subject: e.target.value })}
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                />
-              </div>
-
-              <div>
-                <Hud>Detailed Message</Hud>
-                <textarea
-                  required
-                  rows={6}
-                  placeholder="Explain the context, tournament name, team identifiers, and specific resolution required..."
-                  value={newEmailForm.message}
-                  onChange={(e) => setNewEmailForm({ ...newEmailForm, message: e.target.value })}
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-                />
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3 border-t border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsNewEmailOpen(false)}
-                  className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingEmail}
-                  className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
-                >
-                  {submittingEmail ? 'Sending...' : 'Send Inquiry to Admin'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* Active Email Thread Modal */}
       {activeThread && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-void/85 p-4 backdrop-blur-sm"
-          onClick={() => setActiveThread(null)}
-        >
+        <Portal lockScroll>
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl max-h-[90vh] flex flex-col border border-white/20 bg-graphite shadow-2xl"
+            role="dialog"
+            aria-modal
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            onClick={() => setActiveThread(null)}
           >
-            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-cyan/40 bg-cyan/10 text-cyan">
-                    {activeThread.status}
-                  </span>
-                  <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-white/10 text-dim">
-                    {activeThread.category}
-                  </span>
-                  <span className="font-mono text-[10px] text-warn uppercase">
-                    [{activeThread.urgency || 'NORMAL'}]
-                  </span>
-                </div>
-                <h3 className="font-display text-2xl font-black uppercase text-ink">{activeThread.subject}</h3>
-              </div>
-              <button onClick={() => setActiveThread(null)} className="text-dim hover:text-ink text-xl">✕</button>
-            </div>
-
-            {/* Conversation Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-void/40 border-y border-white/10">
-              {activeThread.messages.map((m, idx) => {
-                const isAdmin = m.sender_role === 'ADMIN'
-                return (
-                  <div
-                    key={idx}
-                    className={`p-4 border ${
-                      isAdmin
-                        ? 'border-cyan/40 bg-cyan/5 ml-4 md:ml-12'
-                        : 'border-white/15 bg-graphite mr-4 md:mr-12'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-mono text-[11px] font-bold uppercase px-2 py-0.5 ${
-                            isAdmin
-                              ? 'bg-cyan text-void'
-                              : 'bg-white/10 text-ink'
-                          }`}
-                        >
-                          {isAdmin ? '🛡️ Super Admin' : '👤 You'}
-                        </span>
-                        <span className="text-xs font-mono text-dim">{m.sender_name}</span>
-                      </div>
-                      <span className="font-mono text-[10px] text-dim">
-                        {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
-                      </span>
-                    </div>
-                    <p className="text-xs text-ink whitespace-pre-line leading-relaxed">{m.message}</p>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-2xl max-h-[min(90vh,calc(100svh-2rem))] flex flex-col border border-white/20 bg-graphite shadow-2xl overflow-hidden select-text"
+            >
+              <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-cyan/40 bg-cyan/10 text-cyan">
+                      {activeThread.status}
+                    </span>
+                    <span className="px-2 py-0.5 font-mono text-[10px] uppercase border border-white/10 text-dim">
+                      {activeThread.category}
+                    </span>
+                    <span className="font-mono text-[10px] text-warn uppercase">
+                      [{activeThread.urgency || 'NORMAL'}]
+                    </span>
                   </div>
-                )
-              })}
-            </div>
-
-            {/* Reply Composer */}
-            <form onSubmit={handleThreadReply} className="p-6 shrink-0 bg-graphite">
-              <Hud className="text-dim mb-1">Your Reply</Hud>
-              <textarea
-                rows={3}
-                required
-                placeholder="Type your reply to Super Admin..."
-                value={threadReplyText}
-                onChange={(e) => setThreadReplyText(e.target.value)}
-                className="w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-              />
-              <div className="mt-3 flex justify-between items-center">
-                <span className="text-[10px] font-mono text-dim">
-                  Status: <strong className="text-cyan">{activeThread.status}</strong>
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveThread(null)}
-                    className="px-4 py-1.5 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingReply || !threadReplyText.trim()}
-                    className="px-6 py-1.5 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs disabled:opacity-50"
-                  >
-                    {submittingReply ? 'Sending...' : 'Send Reply'}
-                  </button>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">{activeThread.subject}</h3>
                 </div>
+                <button onClick={() => setActiveThread(null)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
-            </form>
+
+              {/* Conversation Messages */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-void/40 border-y border-white/10">
+                {activeThread.messages.map((m, idx) => {
+                  const isAdmin = m.sender_role === 'ADMIN'
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-4 border ${
+                        isAdmin
+                          ? 'border-cyan/40 bg-cyan/5 ml-4 md:ml-12'
+                          : 'border-white/15 bg-graphite mr-4 md:mr-12'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-mono text-[11px] font-bold uppercase px-2 py-0.5 ${
+                              isAdmin
+                                ? 'bg-cyan text-void'
+                                : 'bg-white/10 text-ink'
+                            }`}
+                          >
+                            {isAdmin ? '🛡️ Super Admin' : '👤 You'}
+                          </span>
+                          <span className="text-xs font-mono text-dim">{m.sender_name}</span>
+                        </div>
+                        <span className="font-mono text-[10px] text-dim">
+                          {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink whitespace-pre-line leading-relaxed">{m.message}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Reply Composer */}
+              <form onSubmit={handleThreadReply} className="p-6 shrink-0 bg-graphite">
+                <Hud className="text-dim mb-1">Your Reply</Hud>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Type your reply to Super Admin..."
+                  value={threadReplyText}
+                  onChange={(e) => setThreadReplyText(e.target.value)}
+                  className="w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                />
+                <div className="mt-3 flex justify-between items-center">
+                  <span className="text-[10px] font-mono text-dim">
+                    Status: <strong className="text-cyan">{activeThread.status}</strong>
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveThread(null)}
+                      className="px-4 py-1.5 border border-white/20 text-dim hover:text-ink text-xs uppercase"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingReply || !threadReplyText.trim()}
+                      className="px-6 py-1.5 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs disabled:opacity-50"
+                    >
+                      {submittingReply ? 'Sending...' : 'Send Reply'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   )

@@ -20,6 +20,8 @@ export interface LeaderboardEntry {
   category: string
   rank: number
   created_at?: string
+  is_disbanded?: boolean
+  status?: string
 }
 
 export interface LeaderboardStats {

@@ -1,41 +1,32 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getGenres, type Genre } from '../services/genres'
-import { getTournaments, normalizeTournament } from '../services/tournaments'
-import { GAMES, CATALOG, gameBy, img } from '../lib/data'
-import { groupGamesByCategory } from '../lib/categories'
+import { getPageMedia, PageMediaConfig } from '../services/admin'
+import { GameCardSkeleton } from '../components/Skeleton'
+import { GAMES, CATALOG, gameBy } from '../lib/data'
 import { AdaptiveGrid, GameCard } from '../components/kit'
-import { Hud, Badge, PageHero, Container, SectionHead } from '../components/ui'
-import CategoryCard from '../components/CategoryCard'
+import { Hud, PageHero, Container, SectionHead } from '../components/ui'
 
 export default function Games() {
-  const [open, setOpen] = useState(0)
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL')
+  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let isMounted = true
-    getGames()
-      .then((res) => {
-        if (isMounted) {
-          setApiGames(res)
-          setLoading(false)
-        }
-      })
-      .catch(() => {
-        if (isMounted) setLoading(false)
-      })
-
-    getGenres()
-      .then((res) => {
-        if (isMounted && Array.isArray(res) && res.length > 0) {
-          setGenres(res)
-        }
-      })
-      .catch((err) => console.warn('Could not load genres:', err))
+    Promise.all([
+      getGames().catch(() => []),
+      getGenres().catch(() => []),
+      getPageMedia('games').catch(() => null),
+    ]).then(([res, genreRes, pMedia]) => {
+      if (!isMounted) return
+      if (Array.isArray(res)) setApiGames(res)
+      if (Array.isArray(genreRes)) setGenres(genreRes)
+      if (pMedia) setPageMedia(pMedia)
+      setLoading(false)
+    })
 
     return () => {
       isMounted = false
@@ -55,14 +46,14 @@ export default function Games() {
       size: norm.maxTeamSize || 4,
       platform: norm.platform || fallback.platform,
       accent: norm.accentColor || fallback.accent,
-      photo: norm.bannerUrl || fallback.photo,
+      photo: norm.bannerUrl || '',
       line: norm.announcementText || fallback.line,
       desc: norm.description || fallback.desc,
+      tournaments: 1,
+      status: 'active' as const,
       live: 1,
     }
   })
-
-  const categories = useMemo(() => groupGamesByCategory(apiGames), [apiGames])
 
   const filteredDisplayGames = useMemo(() => {
     if (selectedGenre === 'ALL') return displayGames
@@ -101,181 +92,100 @@ export default function Games() {
         kicker={`${String(displayGames.length).padStart(2, '0')} live worlds`}
         title={<>Explore<br />Games</>}
         sub="CHOOSE YOUR BATTLEGROUND. Master your mechanics, build a roster, and climb the competitive ladder."
-        photo={displayGames[0]?.photo || GAMES[1].photo}
+        photo={pageMedia?.media_url}
         accent="#8b5cff"
       />
 
-      <section className="py-16 md:py-24">
+      {/* Section 1: Browse by Genre (Filter/Navigation buttons only) & Playable Games Grid */}
+      <section className="py-16 md:py-24" id="games-catalog">
         <Container>
-          {/* Genre Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 mb-8">
-            <span className="font-mono text-xs text-dim uppercase mr-1">Filter by Genre:</span>
-            <button
-              onClick={() => setSelectedGenre('ALL')}
-              className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                selectedGenre === 'ALL'
-                  ? 'border border-cyan bg-cyan text-void font-bold'
-                  : 'border border-white/10 bg-surface text-dim hover:text-ink'
-              }`}
-            >
-              All Worlds ({displayGames.length})
-            </button>
-            {genres.map((gn) => (
+          <div className="mb-10">
+            <SectionHead
+              idx="01"
+              kicker="Browse by Genre"
+              title={<>Playable <span className="text-cyan">Disciplines</span></>}
+              sub="Select a competitive discipline to filter official tournament battlegrounds. Click any title to view brackets, rules, and squad rosters."
+            />
+
+            {/* Genre Filter Pills */}
+            <div className="mt-8 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-dim uppercase mr-2 tracking-wider">Genre:</span>
               <button
-                key={gn.slug}
-                onClick={() => setSelectedGenre(gn.slug === selectedGenre ? 'ALL' : gn.slug)}
-                className={`px-3 py-1 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  selectedGenre === gn.slug
-                    ? 'border border-cyan bg-cyan text-void font-bold'
-                    : 'border border-white/10 bg-surface text-dim hover:text-ink'
+                onClick={() => setSelectedGenre('ALL')}
+                className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                  selectedGenre === 'ALL'
+                    ? 'border border-cyan bg-cyan text-void font-bold shadow-[0_0_12px_rgba(62,242,255,0.3)]'
+                    : 'border border-white/10 bg-surface/60 text-dim hover:text-ink hover:border-white/25'
                 }`}
               >
-                <span>{gn.name}</span>
-                {gn.games && (
-                  <span className="text-[10px] opacity-75 font-mono">({gn.games.length})</span>
-                )}
+                All Worlds ({displayGames.length})
               </button>
-            ))}
+              {genres.map((gn) => {
+                const isSelected = selectedGenre === gn.slug
+                return (
+                  <button
+                    key={gn.slug}
+                    onClick={() => setSelectedGenre(isSelected ? 'ALL' : gn.slug)}
+                    className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'border border-cyan bg-cyan text-void font-bold shadow-[0_0_12px_rgba(62,242,255,0.3)]'
+                        : 'border border-white/10 bg-surface/60 text-dim hover:text-ink hover:border-white/25'
+                    }`}
+                  >
+                    <span>{gn.name}</span>
+                    {gn.games && gn.games.length > 0 && (
+                      <span className={`text-[10px] font-mono ${isSelected ? 'text-void/80' : 'text-dim'}`}>
+                        ({gn.games.length})
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
-          {filteredDisplayGames.length === 0 ? (
+          {loading ? (
+            <AdaptiveGrid count={4} min={280}>
+              {[1, 2, 3, 4].map((n) => (
+                <GameCardSkeleton key={n} />
+              ))}
+            </AdaptiveGrid>
+          ) : filteredDisplayGames.length === 0 ? (
             <div className="border border-white/10 bg-surface/30 p-16 text-center">
               <Hud className="text-cyan">No titles found</Hud>
               <p className="mt-2 font-mono text-sm text-dim">
-                No active games currently mapped to this genre filter.
+                No active games currently mapped to the selected genre filter.
               </p>
               <button
                 onClick={() => setSelectedGenre('ALL')}
-                className="mt-6 border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors"
+                className="mt-6 border border-cyan/40 bg-cyan/10 px-5 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
               >
                 Reset to All Worlds
               </button>
             </div>
-          ) : filteredDisplayGames.length > 5 ? (
-            <AdaptiveGrid count={filteredDisplayGames.length} min={260}>
+          ) : (
+            <AdaptiveGrid count={filteredDisplayGames.length} min={280}>
               {filteredDisplayGames.map((g, i) => (
-                <GameCard key={g.slug} g={{ ...g, status: 'active', tournaments: 1 }} i={i} />
+                <div key={g.slug} className="in-view">
+                  <GameCard g={g} i={i} />
+                </div>
               ))}
             </AdaptiveGrid>
-          ) : (
-            <div className="flex flex-col gap-3 lg:h-[680px] lg:flex-row">
-              {filteredDisplayGames.map((g, i) => {
-                const on = open === i
-                return (
-                  <Link
-                    key={g.slug}
-                    to={`/games/${g.slug}`}
-                    onMouseEnter={() => setOpen(i)}
-                    onFocus={() => setOpen(i)}
-                    className={`group relative min-h-[380px] overflow-hidden border border-white/10 transition-[flex-grow,border-color] duration-700 ease-[cubic-bezier(.2,.7,.1,1)] lg:min-h-0 ${
-                      on ? 'lg:flex-[4]' : 'lg:flex-[1]'
-                    }`}
-                    style={{ borderColor: on ? g.accent + '88' : undefined }}
-                  >
-                    <img
-                      src={img(g.photo, 1400)}
-                      loading={i < 2 ? 'eager' : 'lazy'}
-                      decoding="async"
-                      alt={`${g.name} artwork`}
-                      className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
-                        on ? 'scale-105 opacity-75' : 'opacity-40 grayscale'
-                      }`}
-                    />
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: `linear-gradient(to top, #05060a 10%, transparent 70%), radial-gradient(ellipse at 0% 100%, ${g.accent}66, transparent 60%)`,
-                      }}
-                    />
-                    <div className="absolute left-5 top-5 flex items-center gap-3">
-                      <Hud className="text-ink">0{i + 1}</Hud>
-                      <Badge s="active" label="Active" />
-                    </div>
-                    <span
-                      className={`absolute bottom-8 left-5 hidden origin-bottom-left font-display text-4xl font-black uppercase transition-opacity duration-300 [writing-mode:vertical-rl] rotate-180 lg:block ${
-                        on ? 'opacity-0' : 'opacity-100'
-                      }`}
-                    >
-                      {g.short}
-                    </span>
-                    <div
-                      className={`absolute inset-x-0 bottom-0 p-6 transition-all duration-500 md:p-10 ${
-                        on ? 'opacity-100' : 'lg:translate-y-6 lg:opacity-0'
-                      }`}
-                    >
-                      <Hud className="block">
-                        {g.genre} · {g.platform} · {g.squad}
-                      </Hud>
-                      <h2 className="mt-3 font-display text-6xl font-black uppercase leading-[0.82] md:text-8xl xl:text-9xl">
-                        {g.short}
-                      </h2>
-                      <p className="mt-4 max-w-md text-ink/75">{g.line}</p>
-                      <div className="mt-8 flex flex-wrap items-end gap-10">
-                        <div>
-                          <Hud>Squad Format</Hud>
-                          <p className="font-display text-3xl font-black uppercase" style={{ color: g.accent }}>
-                            {g.squad}
-                          </p>
-                        </div>
-                        <div>
-                          <Hud>Platform</Hud>
-                          <p className="font-display text-3xl font-black uppercase">{g.platform}</p>
-                        </div>
-                        <span
-                          className="ml-auto inline-flex items-center gap-2 font-display text-lg font-extrabold uppercase tracking-[0.08em] transition-all group-hover:gap-4"
-                          style={{ color: g.accent }}
-                        >
-                          Enter world →
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
           )}
         </Container>
       </section>
 
-      {/* Dynamic Genre Architecture with rotating image & logo cards */}
-      <section className="border-t border-white/10 bg-graphite/30 py-16 md:py-24" id="genres-section">
+      {/* Section 2: Locked Worlds / Coming Soon */}
+      <section className="in-view border-t border-white/10 bg-graphite/40 py-20 pb-32 md:pb-40">
         <Container>
           <SectionHead
             idx="02"
-            kicker="Competitive Genres"
-            title={<>Browse by <span className="outline-text">Genre</span></>}
-            sub="Explore specialized formats, from tactical shooters to battle royale survival arenas with rotating contender game titles."
-          />
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {genres.length > 0
-              ? genres.map((gen, idx) => (
-                  <CategoryCard
-                    key={gen.slug}
-                    genre={gen}
-                    index={idx}
-                    onSelectGenre={(s) => {
-                      setSelectedGenre(s === selectedGenre ? 'ALL' : s)
-                      window.scrollTo({ top: 400, behavior: 'smooth' })
-                    }}
-                  />
-                ))
-              : categories.map((cat, idx) => (
-                  <CategoryCard key={cat.slug} category={cat} index={idx} />
-                ))}
-          </div>
-        </Container>
-      </section>
-
-      <section className="in-view pb-32 pt-10 md:pb-40">
-        <Container>
-          <SectionHead
-            idx="//"
             kicker="Locked worlds"
             title={<span className="outline-text">Coming soon</span>}
             size="md"
-            sub="New battlegrounds unlocking soon. Follow the discord to get notified when registrations open."
+            sub="New esports battlegrounds unlocking soon. Follow the community discord to get notified when registrations open."
           />
-          <AdaptiveGrid count={CATALOG.filter((g) => g.status === 'soon').length} min={220} className="mt-12">
+          <AdaptiveGrid count={CATALOG.filter((g) => g.status === 'soon').length} min={240} className="mt-12">
             {CATALOG.filter((g) => g.status === 'soon').map((g, i) => (
               <div key={g.slug} className="in-view">
                 <GameCard g={g} i={i} />

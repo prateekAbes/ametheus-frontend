@@ -115,7 +115,7 @@ export function groupGamesByCategory(
             maxSubstitutes: 1,
             entryFeeInr: 0,
             prizePoolInr: 0,
-            bannerUrl: cg.photo || fallback.photo,
+            bannerUrl: cg.photo || fallback.photo || '',
             logoUrl: '',
             description: '',
             serverRegion: 'India',

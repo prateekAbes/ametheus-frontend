@@ -4,6 +4,8 @@ import { Container, Cta, Hud, SectionHead, Particles } from '../components/ui'
 import { AVATARS, GAMES, COMING, img, gameBy } from '../lib/data'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getPublicPlatformStats, PublicPlatformStats } from '../services/admin'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
@@ -57,7 +59,7 @@ export default function About() {
             name: norm.name,
             genre: norm.category || fallback.genre,
             accent: norm.accentColor || fallback.accent,
-            photo: norm.bannerUrl || fallback.photo,
+            photo: norm.bannerUrl || '',
             line: norm.announcementText || fallback.line,
           }
         })
@@ -136,8 +138,8 @@ export default function About() {
                   i % 2 ? 'lg:mt-16' : ''
                 }`}
               >
-                <img
-                  src={img(g.photo, 900)}
+                <DynamicImage
+                  src={resolveMediaUrl(g.photo)}
                   alt={g.name}
                   className="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110"
                 />

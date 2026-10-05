@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { Container, Hud, Badge, Crest, Avatar, Panel, Brackets, SectionHead } from '../components/ui'
+import { Container, Hud, Badge, Crest, Avatar, Panel, Brackets, SectionHead, Modal } from '../components/ui'
 import { gameBy, img } from '../lib/data'
+import DynamicImage from '../components/DynamicImage'
+import { resolveMediaUrl } from '../services/apiClient'
 import {
   getMatchById,
   captainCheckIn,
@@ -236,19 +238,12 @@ export default function MatchDetail() {
     <>
       {/* 1. BROADCAST HERO / TOURNAMENT INFO (Section 30) */}
       <section className="relative overflow-hidden bg-void pt-28">
-        {t.banner_url ? (
-          <img
-            src={t.banner_url}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-20 filter blur-xs"
-          />
-        ) : (
-          <img
-            src={img(g.photo, 2000)}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-25"
-          />
-        )}
+        <DynamicImage
+          src={resolveMediaUrl(t.banner_url || (t as any).bannerUrl)}
+          alt=""
+          eager
+          className="absolute inset-0 h-full w-full object-cover opacity-20 filter blur-xs"
+        />
         <div
           className="absolute inset-0"
           style={{
@@ -314,7 +309,7 @@ export default function MatchDetail() {
                 }`}
               >
                 {teamA.logo_url ? (
-                  <img src={teamA.logo_url} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
+                  <DynamicImage src={resolveMediaUrl(teamA.logo_url)} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
                 ) : (
                   <Crest name={teamA.name} size={90} color={g.accent} />
                 )}
@@ -355,7 +350,7 @@ export default function MatchDetail() {
                 }`}
               >
                 {teamB.logo_url ? (
-                  <img src={teamB.logo_url} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
+                  <DynamicImage src={resolveMediaUrl(teamB.logo_url)} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
                 ) : (
                   <Crest name={teamB.name} size={90} color={g.accent} />
                 )}
@@ -699,7 +694,7 @@ export default function MatchDetail() {
             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
               <div className="flex items-center gap-3">
                 {teamA.logo_url ? (
-                  <img src={teamA.logo_url} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+                  <DynamicImage src={resolveMediaUrl(teamA.logo_url)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
                 ) : (
                   <Crest name={teamA.name} size={48} color={g.accent} />
                 )}
@@ -748,7 +743,7 @@ export default function MatchDetail() {
             <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
               <div className="flex items-center gap-3">
                 {teamB.logo_url ? (
-                  <img src={teamB.logo_url} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+                  <DynamicImage src={resolveMediaUrl(teamB.logo_url)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
                 ) : (
                   <Crest name={teamB.name} size={48} color={g.accent} />
                 )}
@@ -795,115 +790,113 @@ export default function MatchDetail() {
       </Container>
 
       {/* RESULT MODAL */}
-      {showResultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4 font-mono">
-          <Panel className="relative w-full max-w-md p-6 border-cyan/40">
-            <Brackets color="border-cyan/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-ink">Submit Match Score</h3>
-            <p className="mt-1 text-xs text-dim">Report verified match scorecard for administrative audit.</p>
-            <form onSubmit={handleResultSubmit} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-dim uppercase">{teamA.name} Score</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scoreA}
-                    onChange={(e) => setScoreA(parseInt(e.target.value) || 0)}
-                    className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
-                  />
-                </div>
-                <div>
-                  <label className="text-dim uppercase">{teamB.name} Score</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scoreB}
-                    onChange={(e) => setScoreB(parseInt(e.target.value) || 0)}
-                    className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-dim uppercase">Proof Screenshot / Evidence URL</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={evidenceUrl}
-                  onChange={(e) => setEvidenceUrl(e.target.value)}
-                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowResultModal(false)}
-                  className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingResult}
-                  className="border border-cyan bg-cyan/20 px-6 py-2 uppercase font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
-                >
-                  {submittingResult ? 'Submitting...' : 'Submit Result'}
-                </button>
-              </div>
-            </form>
-          </Panel>
-        </div>
-      )}
+      <Modal
+        open={showResultModal}
+        onClose={() => setShowResultModal(false)}
+        title="Submit Match Score"
+        subtitle="Report verified match scorecard for administrative audit."
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleResultSubmit} className="space-y-4 font-mono text-xs">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-dim uppercase">{teamA.name} Score</label>
+              <input
+                type="number"
+                min="0"
+                value={scoreA}
+                onChange={(e) => setScoreA(parseInt(e.target.value) || 0)}
+                className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
+              />
+            </div>
+            <div>
+              <label className="text-dim uppercase">{teamB.name} Score</label>
+              <input
+                type="number"
+                min="0"
+                value={scoreB}
+                onChange={(e) => setScoreB(parseInt(e.target.value) || 0)}
+                className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-dim uppercase">Proof Screenshot / Evidence URL</label>
+            <input
+              type="url"
+              placeholder="https://..."
+              value={evidenceUrl}
+              onChange={(e) => setEvidenceUrl(e.target.value)}
+              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowResultModal(false)}
+              className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submittingResult}
+              className="border border-cyan bg-cyan/20 px-6 py-2 uppercase font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
+            >
+              {submittingResult ? 'Submitting...' : 'Submit Result'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* DISPUTE MODAL */}
-      {showDisputeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 p-4 font-mono">
-          <Panel className="relative w-full max-w-md p-6 border-live/40">
-            <Brackets color="border-live/50" />
-            <h3 className="font-display text-2xl font-black uppercase text-live">File Match Dispute</h3>
-            <p className="mt-1 text-xs text-dim">Freeze match outcome for official arbiter investigation.</p>
-            <form onSubmit={handleDisputeSubmit} className="mt-4 space-y-4 text-xs">
-              <div>
-                <label className="text-dim uppercase">Dispute Description / Grounds</label>
-                <textarea
-                  rows={4}
-                  required
-                  value={disputeReason}
-                  onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Detail rule infractions, no-shows, or server anomalies..."
-                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-                />
-              </div>
-              <div>
-                <label className="text-dim uppercase">Evidence Link (optional)</label>
-                <input
-                  type="url"
-                  value={disputeEvidence}
-                  onChange={(e) => setDisputeEvidence(e.target.value)}
-                  placeholder="https://..."
-                  className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDisputeModal(false)}
-                  className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingDispute}
-                  className="border border-live bg-live/20 px-6 py-2 uppercase font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
-                >
-                  {submittingDispute ? 'Filing...' : 'Submit Dispute'}
-                </button>
-              </div>
-            </form>
-          </Panel>
-        </div>
-      )}
+      <Modal
+        open={showDisputeModal}
+        onClose={() => setShowDisputeModal(false)}
+        title="File Match Dispute"
+        subtitle="Freeze match outcome for official arbiter investigation."
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleDisputeSubmit} className="space-y-4 font-mono text-xs">
+          <div>
+            <label className="text-dim uppercase">Dispute Description / Grounds</label>
+            <textarea
+              rows={4}
+              required
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              placeholder="Detail rule infractions, no-shows, or server anomalies..."
+              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
+            />
+          </div>
+          <div>
+            <label className="text-dim uppercase">Evidence Link (optional)</label>
+            <input
+              type="url"
+              value={disputeEvidence}
+              onChange={(e) => setDisputeEvidence(e.target.value)}
+              placeholder="https://..."
+              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowDisputeModal(false)}
+              className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submittingDispute}
+              className="border border-live bg-live/20 px-6 py-2 uppercase font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
+            >
+              {submittingDispute ? 'Filing...' : 'Submit Dispute'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   )
 }

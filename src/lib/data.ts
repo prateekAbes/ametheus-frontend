@@ -1,15 +1,15 @@
 export const img = (id?: string, w = 1600) => {
   if (!id) return ''
   if (id.startsWith('http://') || id.startsWith('https://') || id.startsWith('/') || id.startsWith('data:')) return id
-  return `https://images.unsplash.com/photo-${id}?w=${w}&q=80&fit=crop&auto=format`
+  return ''
 }
 
-export type Game = { slug: string; short: string; name: string; genre: string; squad: string; size: number; platform: string; accent: string; photo: string; line: string; desc: string; live: number }
+export type Game = { slug: string; short: string; name: string; genre: string; squad: string; size: number; platform: string; accent: string; photo?: string; line: string; desc: string; live: number }
 export const GAMES: Game[] = [
-  { slug: 'bgmi', short: 'BGMI', name: 'BGMI', genre: 'Battle Royale', squad: '4 Player Squad', size: 4, platform: 'Mobile', accent: '#ffb547', photo: '1778495351325-ca6cd20d21c7', line: 'Drop. Loot. Last squad standing.', desc: "India's most played battle royale. 64 squads, one shrinking zone, and a points system that rewards both placement and aggression.", live: 14 },
-  { slug: 'valorant', short: 'VALORANT', name: 'Valorant', genre: 'Tactical FPS', squad: '5 Player Team', size: 5, platform: 'PC', accent: '#ff4655', photo: '1672872476232-da16b45c9001', line: 'Precision is the only currency.', desc: 'Five-versus-five tactical shooter. Agents, abilities and first-to-13 rounds decided by aim, utility and nerve.', live: 9 },
-  { slug: 'free-fire', short: 'FREE FIRE', name: 'Free Fire', genre: 'Battle Royale', squad: '4 Player Squad', size: 4, platform: 'Mobile', accent: '#ff7a1a', photo: '1720097842823-3d671c5ed27b', line: 'Ten minutes. Fifty survivors. One flame.', desc: 'Fast, frantic ten-minute battle royale built for mobile. Short rounds, character skills, relentless pace.', live: 11 },
-  { slug: 'codm', short: 'CODM', name: 'COD Mobile', genre: 'FPS', squad: '5 Player Team', size: 5, platform: 'Mobile', accent: '#2fe6b0', photo: '1616594418225-8721ec37fa82', line: 'Tactical. Relentless. In your pocket.', desc: 'Call of Duty on mobile. Hardpoint, Search & Destroy and Control in a best-of-five ranked format.', live: 7 },
+  { slug: 'bgmi', short: 'BGMI', name: 'BGMI', genre: 'Battle Royale', squad: '4 Player Squad', size: 4, platform: 'Mobile', accent: '#ffb547', photo: '', line: 'Drop. Loot. Last squad standing.', desc: "India's most played battle royale. 64 squads, one shrinking zone, and a points system that rewards both placement and aggression.", live: 14 },
+  { slug: 'valorant', short: 'VALORANT', name: 'Valorant', genre: 'Tactical FPS', squad: '5 Player Team', size: 5, platform: 'PC', accent: '#ff4655', photo: '', line: 'Precision is the only currency.', desc: 'Five-versus-five tactical shooter. Agents, abilities and first-to-13 rounds decided by aim, utility and nerve.', live: 9 },
+  { slug: 'free-fire', short: 'FREE FIRE', name: 'Free Fire', genre: 'Battle Royale', squad: '4 Player Squad', size: 4, platform: 'Mobile', accent: '#ff7a1a', photo: '', line: 'Ten minutes. Fifty survivors. One flame.', desc: 'Fast, frantic ten-minute battle royale built for mobile. Short rounds, character skills, relentless pace.', live: 11 },
+  { slug: 'codm', short: 'CODM', name: 'COD Mobile', genre: 'FPS', squad: '5 Player Team', size: 5, platform: 'Mobile', accent: '#2fe6b0', photo: '', line: 'Tactical. Relentless. In your pocket.', desc: 'Call of Duty on mobile. Hardpoint, Search & Destroy and Control in a best-of-five ranked format.', live: 7 },
 ]
 export const COMING = ['CS2', 'Rocket League', 'Chess', 'Clash Royale', 'Brawl Stars', 'League of Legends', 'Smash Karts', 'Mini Militia']
 export const gameBy = (key?: string) => {
@@ -28,7 +28,7 @@ export const gameBy = (key?: string) => {
 }
 
 export type TStatus = 'open' | 'upcoming' | 'live' | 'completed' | 'cancelled'
-export type Tournament = { id: string; game: string; name: string; prize: number; entry: number; status: TStatus; date: string; teams: number; max: number; region: string; format: string; isRegistered?: boolean }
+export type Tournament = { id: string; game: string; name: string; prize: number; entry: number; status: TStatus; date: string; teams: number; max: number; region: string; format: string; isRegistered?: boolean; banner_url?: string; bannerUrl?: string; logo_url?: string; logoUrl?: string }
 export const TOURNAMENTS: Tournament[] = [
   { id: 'bgmi-monsoon-cup', game: 'bgmi', name: 'Monsoon Cup S2', prize: 50000, entry: 100, status: 'open', date: '12 Oct 2026', teams: 48, max: 64, region: 'India', format: '6 Maps · TPP' },
   { id: 'val-ascent-series', game: 'valorant', name: 'Ascent Series', prize: 75000, entry: 250, status: 'open', date: '18 Oct 2026', teams: 22, max: 32, region: 'India / South Asia', format: 'Single Elim · BO3' },
@@ -107,17 +107,17 @@ export const CATALOG: CatalogGame[] = [
 ]
 
 /** Hero campaigns. Each slide may carry an image, a looping video (with poster), and its own copy/CTAs. */
-export type HeroSlide = { id: string; kicker: string; title: string; tagline: string; sub: string; photo: string; video?: string; accent: string; cta: [string, string]; cta2?: [string, string]; games?: string[] }
+export type HeroSlide = { id: string; kicker: string; title: string; tagline: string; sub: string; photo?: string; video?: string; accent: string; cta: [string, string]; cta2?: [string, string]; games?: string[] }
 export const HERO_SLIDES: HeroSlide[] = [
-  { id: 'platform', kicker: 'System online · Welcome to Ametheus', title: 'AMETHEUS', tagline: "India's Gaming Battleground", sub: 'A premium esports platform where players discover games, build teams, enter tournaments, and compete.', photo: '1535391879778-3bae11d29a24', accent: '#8b5cff', cta: ['Explore Tournaments', '/tournaments'], cta2: ['Explore Games', '/games'], games: ['bgmi', 'valorant', 'free-fire', 'codm'] },
-  { id: 'national', kicker: 'Campaign · Registrations open', title: 'NATIONALS', tagline: 'BGMI Championship Series', sub: '256 squads. ₹2,00,000 prize pool. The biggest BGMI event on Ametheus this season.', photo: '1778495351325-ca6cd20d21c7', accent: '#ffb547', cta: ['Register Your Squad', '/tournaments/bgmi-national-series'], cta2: ['View BGMI', '/games/bgmi'], games: ['bgmi'] },
-  { id: 'ascent', kicker: 'Valorant · Single elimination', title: 'ASCENT', tagline: 'Ascent Series · ₹75,000', sub: 'Thirty-two teams, best-of-three, one champion. Five-stack required.', photo: '1672872476232-da16b45c9001', accent: '#ff4655', cta: ['Enter Ascent', '/tournaments/val-ascent-series'], cta2: ['All tournaments', '/tournaments'], games: ['valorant'] },
+  { id: 'platform', kicker: 'System online · Welcome to Ametheus', title: 'AMETHEUS', tagline: "India's Gaming Battleground", sub: 'A premium esports platform where players discover games, build teams, enter tournaments, and compete.', photo: '', accent: '#8b5cff', cta: ['Explore Tournaments', '/tournaments'], cta2: ['Explore Games', '/games'], games: ['bgmi', 'valorant', 'free-fire', 'codm'] },
+  { id: 'national', kicker: 'Campaign · Registrations open', title: 'NATIONALS', tagline: 'BGMI Championship Series', sub: '256 squads. ₹2,00,000 prize pool. The biggest BGMI event on Ametheus this season.', photo: '', accent: '#ffb547', cta: ['Register Your Squad', '/tournaments/bgmi-national-series'], cta2: ['View BGMI', '/games/bgmi'], games: ['bgmi'] },
+  { id: 'ascent', kicker: 'Valorant · Single elimination', title: 'ASCENT', tagline: 'Ascent Series · ₹75,000', sub: 'Thirty-two teams, best-of-three, one champion. Five-stack required.', photo: '', accent: '#ff4655', cta: ['Enter Ascent', '/tournaments/val-ascent-series'], cta2: ['All tournaments', '/tournaments'], games: ['valorant'] },
 ]
 
 export type Announcement = { id: string; tag: string; title: string; body: string; date: string; to: string; photo?: string }
 export const ANNOUNCEMENTS: Announcement[] = [
   { id: 'a1', tag: 'Platform', title: 'Instant UPI withdrawals are live', body: 'Winnings now land in your bank in under two minutes.', date: '29 Sep', to: '/wallet' },
-  { id: 'a2', tag: 'BGMI', title: 'Nationals qualifier format announced', body: 'Four online stages leading to a 16-squad grand final.', date: '27 Sep', to: '/tournaments/bgmi-national-series', photo: '1778495351325-ca6cd20d21c7' },
+  { id: 'a2', tag: 'BGMI', title: 'Nationals qualifier format announced', body: 'Four online stages leading to a 16-squad grand final.', date: '27 Sep', to: '/tournaments/bgmi-national-series', photo: '' },
   { id: 'a3', tag: 'Coming soon', title: 'CS2 and Chess unlock in November', body: 'Pre-register your team to get first access to opening cups.', date: '22 Sep', to: '/games' },
 ]
 

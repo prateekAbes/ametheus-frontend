@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { QRCodeSVG } from 'qrcode.react'
-import { Container, Hud, Cta, Badge, Panel, Brackets } from '../components/ui'
+import { Container, Hud, Cta, Badge, Panel, Brackets, Modal } from '../components/ui'
 import { inr } from '../lib/data'
 import {
   getWalletSummary,
@@ -15,36 +15,7 @@ import {
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
 
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-void/80 p-0 sm:items-center sm:p-6"
-      onClick={onClose}
-    >
-      <div
-        className="page-in relative w-full max-w-md border border-white/15 bg-graphite p-6 md:p-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Brackets color="border-cyan/50" />
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-3xl font-black uppercase">{title}</h3>
-          <button aria-label="Close" onClick={onClose} className="text-dim hover:text-ink">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
+// Uses universal PortalModal via ui.tsx
 
 export default function Wallet() {
   const { isSignedIn } = useAuthContext()

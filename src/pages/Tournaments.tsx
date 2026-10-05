@@ -8,6 +8,8 @@ import {
   NormalizedTournament,
 } from '../services/tournaments'
 import { getGames, Game } from '../services/games'
+import { getPageMedia, PageMediaConfig } from '../services/admin'
+import { TournamentCardSkeleton } from '../components/Skeleton'
 import { gameBy, inr, type Tournament as DesignTournament } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 
@@ -31,16 +33,19 @@ export default function Tournaments() {
   const [selectedGame, setSelectedGame] = useState<string>('All Games')
   const [selectedStatus, setSelectedStatus] = useState<string>('All')
   const [search, setSearch] = useState('')
+  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
 
   useEffect(() => {
     let isMounted = true
     Promise.all([
       getTournaments().catch(() => []),
       getGames().catch(() => []),
-    ]).then(([tList, gList]) => {
+      getPageMedia('tournaments').catch(() => null),
+    ]).then(([tList, gList, pMedia]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
+      if (pMedia) setPageMedia(pMedia)
       setLoading(false)
     })
     return () => {
@@ -124,6 +129,7 @@ export default function Tournaments() {
         max: nt.maxTeams,
         region: 'India',
         format: nt.format,
+        bannerUrl: nt.bannerUrl,
         isRegistered: registeredIds.has(nt.id) || registeredIds.has(nt.slug) || !!nt.isRegistered,
       })
     )
@@ -137,7 +143,7 @@ export default function Tournaments() {
         kicker="◇ Compete · Win · Repeat"
         title="TOURNAMENTS"
         sub="High-stakes competitive esports events with automated brackets and verified prize pools."
-        photo={gameBy('valorant').photo}
+        photo={pageMedia?.media_url}
         accent="#8b5cff"
       />
 
@@ -169,10 +175,7 @@ export default function Tournaments() {
         {loading ? (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div
-                key={n}
-                className="aspect-[16/11] border border-white/10 bg-surface/40 animate-pulse"
-              />
+              <TournamentCardSkeleton key={n} />
             ))}
           </div>
         ) : list.length === 0 ? (
