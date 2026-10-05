@@ -5,8 +5,6 @@ import { Hud, Particles } from '../components/ui'
 import { Logo } from '../components/Layout'
 import { GAMES } from '../lib/data'
 import { getGames, Game as ApiGame } from '../services/games'
-import DynamicImage from '../components/DynamicImage'
-import { resolveMediaUrl } from '../services/apiClient'
 import { useAuthContext } from '../context/AuthContext'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
@@ -53,21 +51,64 @@ export default function Auth() {
     short: (rawG as any).tag || (rawG as any).short || 'AMETHEUS',
     genre: (rawG as any).category || (rawG as any).genre || 'Esports',
     accent: (rawG as any).accent_color || (rawG as any).accentColor || (rawG as any).accent || '#3ef2ff',
-    bannerUrl: (rawG as any).banner_url || (rawG as any).bannerUrl || '',
     line: (rawG as any).announcement_text || (rawG as any).announcementText || (rawG as any).line || 'The Gaming Battleground',
     desc: (rawG as any).description || (rawG as any).desc || '',
   }
 
   return (
-    <div className="relative grid min-h-screen lg:grid-cols-[1fr_1.15fr] bg-void">
-      {/* LEFT: AUTHENTICATION (BLACK / DARK AREA) */}
-      <div className="relative z-10 flex min-h-screen flex-col justify-between border-r border-white/5 bg-void px-6 py-10 lg:px-14 lg:py-12">
-        {/* Top Header: Logo + Secured by Clerk indicator */}
-        <div className="flex items-center justify-between">
+    <div className="relative grid min-h-screen lg:grid-cols-[1.1fr_1fr] bg-void">
+      {/* LEFT: AMETHEUS DYNAMIC ANIMATION (CLEAN BACKGROUND, NO IMAGES) */}
+      <div className="relative hidden overflow-hidden bg-void lg:block border-r border-white/10">
+        <Suspense fallback={null}>
+          <Scene3D
+            accent={g.accent}
+            className="pointer-events-none absolute inset-0 opacity-40"
+          />
+        </Suspense>
+        <div
+          className="absolute inset-0 transition-[background] duration-1000"
+          style={{
+            background: `radial-gradient(circle at 30% 30%, ${g.accent}40, transparent 65%), linear-gradient(to top, #05060a 10%, #05060a99 50%, #05060a66)`,
+          }}
+        />
+        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-40" />
+        <Particles n={24} />
+
+        <div className="relative flex h-full flex-col justify-between p-12 lg:p-16">
           <Link to="/" aria-label="Ametheus Home">
             <Logo />
           </Link>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[11px] text-dim shadow-inner">
+
+          <div>
+            <span
+              className="font-display text-sm font-black uppercase tracking-[0.2em] transition-colors duration-500"
+              style={{ color: g.accent }}
+            >
+              {g.short} · {g.genre}
+            </span>
+            <p className="mt-3 font-display text-5xl font-black uppercase leading-[0.85] text-white">
+              {g.line}
+            </p>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-dim">{g.desc}</p>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-white/10 pt-6">
+            <Hud className="text-cyan">◆ AMETHEUS COMPETITIVE PLATFORM</Hud>
+            <span className="font-mono text-xs text-dim">VERIFIED ESPORTS</span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT: CLERK SIGN-IN */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-between bg-void px-6 py-10 lg:px-14 lg:py-12">
+        {/* Top Header */}
+        <div className="flex items-center justify-between">
+          <div className="lg:hidden">
+            <Link to="/" aria-label="Ametheus Home">
+              <Logo />
+            </Link>
+          </div>
+          <div className="ml-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-mono text-[11px] text-dim shadow-inner">
             <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
             <span className="tracking-wider uppercase">Secured by Clerk</span>
           </div>
@@ -110,56 +151,6 @@ export default function Auth() {
         <div className="flex items-center justify-between border-t border-white/5 pt-6 font-mono text-[10px] uppercase tracking-widest text-dim">
           <span>AMETHEUS BATTLEGROUND</span>
           <span className="text-cyan">AUTHENTICATION GATEWAY</span>
-        </div>
-      </div>
-
-      {/* RIGHT: AMETHEUS DYNAMIC VISUAL */}
-      <div className="relative hidden overflow-hidden bg-void lg:block">
-        <Suspense fallback={null}>
-          <Scene3D
-            accent={g.accent}
-            className="pointer-events-none absolute inset-0 opacity-40"
-          />
-        </Suspense>
-        {g.bannerUrl && (
-          <DynamicImage
-            src={resolveMediaUrl(g.bannerUrl)}
-            alt=""
-            eager
-            className="kenburns absolute inset-0 h-full w-full object-cover opacity-25"
-          />
-        )}
-        <div
-          className="absolute inset-0 transition-[background] duration-1000"
-          style={{
-            background: `radial-gradient(circle at 70% 30%, ${g.accent}40, transparent 65%), linear-gradient(to top, #05060a 10%, #05060a99 50%, #05060a66)`,
-          }}
-        />
-        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-40" />
-        <Particles n={24} />
-
-        <div className="relative flex h-full flex-col justify-between p-12 lg:p-16">
-          <div className="flex justify-end">
-            <Hud className="text-cyan font-mono text-xs">◆ ONLINE NETWORK · VERIFIED</Hud>
-          </div>
-
-          <div>
-            <span
-              className="font-display text-sm font-black uppercase tracking-[0.2em] transition-colors duration-500"
-              style={{ color: g.accent }}
-            >
-              {g.short} · {g.genre}
-            </span>
-            <p className="mt-3 font-display text-5xl font-black uppercase leading-[0.85] text-white">
-              {g.line}
-            </p>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-dim">{g.desc}</p>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-white/10 pt-6">
-            <Hud className="text-cyan">◆ AMETHEUS COMPETITIVE PLATFORM</Hud>
-            <span className="font-mono text-xs text-dim">VERIFIED ESPORTS</span>
-          </div>
         </div>
       </div>
     </div>
