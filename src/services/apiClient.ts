@@ -1,11 +1,20 @@
 /**
- * AMETHEUS Centralized API Client & Base Fetcher (Greenfield Rebuild)
+ * AMETHEUS Centralized API Client & Base Fetcher
  */
 
-const rawBase =
-  (import.meta.env.VITE_API_URL as string | undefined)?.trim() || ''
+function resolveApiBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
+  let base = envUrl || 'https://api.ametheus.games'
+  // Remove trailing slashes
+  base = base.replace(/\/+$/, '')
+  // If base already contains trailing /api/v1, strip it so we don't end up with /api/v1/api/v1
+  if (base.endsWith('/api/v1')) {
+    base = base.slice(0, -'/api/v1'.length).replace(/\/+$/, '')
+  }
+  return base || 'https://api.ametheus.games'
+}
 
-export const API_BASE_URL = rawBase.replace(/\/+$/, '')
+export const API_BASE_URL = resolveApiBaseUrl()
 
 /**
  * Resolves a media URL against the API_BASE_URL if it is a relative path.
@@ -58,7 +67,7 @@ export class ApiError extends Error {
 let authTokenGetter: ((options?: { skipCache?: boolean }) => Promise<string | null>) | null = null
 let authUserEmailGetter: (() => string | null) | null = null
 
-export function setAuthTokenGetter(getter: (options?: { skipCache?: boolean }) => Promise<string | null>) {
+export function setAuthTokenGetter(getter: ((options?: { skipCache?: boolean }) => Promise<string | null>) | null) {
   authTokenGetter = getter
 }
 
@@ -66,11 +75,51 @@ export function setAuthUserEmailGetter(getter: (() => string | null) | null) {
   authUserEmailGetter = getter
 }
 
+function isProtectedEndpoint(endpoint: string, method: string = 'GET'): boolean {
+  const ep = endpoint.toLowerCase()
+  const m = method.toUpperCase()
+
+  if (
+    ep.startsWith('/admin') ||
+    ep.startsWith('/organizer') ||
+    ep.startsWith('/auth/me') ||
+    ep.startsWith('/auth/sync') ||
+    ep.startsWith('/auth/profile') ||
+    ep.startsWith('/wallet') ||
+    ep.startsWith('/payments') ||
+    ep.startsWith('/teams') ||
+    ep.startsWith('/notifications') ||
+    ep.startsWith('/my/') ||
+    ep.includes('/my-registrations') ||
+    ep.includes('/my-tickets') ||
+    ep.includes('/register') ||
+    ep.includes('/submit-upi-utr') ||
+    ep.includes('/check-in') ||
+    ep.includes('/submit-result') ||
+    ep.includes('/dispute')
+  ) {
+    return true
+  }
+
+  // Non-GET actions on support or reviews require authentication
+  if (m !== 'GET' && (ep.startsWith('/support/tickets') || ep.startsWith('/reviews'))) {
+    return true
+  }
+
+  return false
+}
+
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit & { _isRetry?: boolean } = {}
 ): Promise<T> {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  let cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  if (cleanEndpoint.startsWith('/api/v1/')) {
+    cleanEndpoint = cleanEndpoint.slice('/api/v1'.length)
+  } else if (cleanEndpoint === '/api/v1') {
+    cleanEndpoint = ''
+  }
+
   const url = `${API_BASE_URL}/api/v1${cleanEndpoint}`
 
   const headers: Record<string, string> = {
@@ -82,24 +131,16 @@ export async function apiClient<T>(
     delete headers['Content-Type']
   }
 
-  const isProtected =
-    cleanEndpoint.startsWith('/admin') ||
-    cleanEndpoint.startsWith('/organizer') ||
-    cleanEndpoint.startsWith('/auth/') ||
-    cleanEndpoint.startsWith('/wallet') ||
-    cleanEndpoint.startsWith('/teams') ||
-    cleanEndpoint.startsWith('/notifications') ||
-    cleanEndpoint === '/tournaments/my-registrations' ||
-    cleanEndpoint.startsWith('/my/') ||
-    cleanEndpoint.startsWith('/support/my-tickets') ||
-    (cleanEndpoint.startsWith('/tournaments/') && (cleanEndpoint.includes('/register') || cleanEndpoint.includes('/submit-upi-utr')))
+  const method = (options.method || 'GET').toUpperCase()
+  const isProtected = isProtectedEndpoint(cleanEndpoint, method)
 
-  // Inject Bearer token if available
+  // Inject Bearer token if not already explicitly provided
   if (!headers['Authorization'] && authTokenGetter) {
     try {
       let token = await authTokenGetter()
       if (!token && isProtected) {
-        await new Promise((res) => setTimeout(res, 200))
+        // Short backoff to allow Clerk session resolution on first mount
+        await new Promise((res) => setTimeout(res, 250))
         token = await authTokenGetter()
       }
       if (token) {
@@ -140,17 +181,18 @@ export async function apiClient<T>(
     try {
       const freshToken = await authTokenGetter({ skipCache: true })
       const currentToken = headers['Authorization']
-        ? headers['Authorization'].replace(/^Bearer\s+/i, '')
+        ? headers['Authorization'].replace(/^Bearer\s+/i, '').trim()
         : null
       if (freshToken && freshToken !== currentToken) {
         headers['Authorization'] = `Bearer ${freshToken}`
-        response = await fetch(url, {
-          ...fetchOptions,
+        return await apiClient<T>(endpoint, {
+          ...options,
+          _isRetry: true,
           headers,
         })
       }
     } catch {
-      // Ignore retry failure and proceed to error handling
+      // Fall through to error handler
     }
   }
 

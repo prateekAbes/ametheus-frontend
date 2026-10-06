@@ -23,15 +23,26 @@ export interface UserSyncPayload {
   avatar_url?: string
 }
 
-export async function syncUser(payload: UserSyncPayload): Promise<UserProfile> {
+export async function syncUser(payload: UserSyncPayload, token?: string | null): Promise<UserProfile> {
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
   return apiClient<UserProfile>('/auth/sync', {
     method: 'POST',
+    headers,
     body: JSON.stringify(payload),
   })
 }
 
-export async function getCurrentUserProfile(): Promise<UserProfile> {
-  return apiClient<UserProfile>('/auth/me')
+export async function getCurrentUserProfile(token?: string | null): Promise<UserProfile> {
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return apiClient<UserProfile>('/auth/me', {
+    headers,
+  })
 }
 
 export interface UserProfileUpdatePayload {
@@ -42,9 +53,15 @@ export interface UserProfileUpdatePayload {
   avatar_url?: string
 }
 
-export async function updateUserProfile(payload: UserProfileUpdatePayload): Promise<UserProfile> {
+export async function updateUserProfile(payload: UserProfileUpdatePayload, token?: string | null): Promise<UserProfile> {
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
   return apiClient<UserProfile>('/auth/profile', {
     method: 'PUT',
+    headers,
     body: JSON.stringify(payload),
   })
 }
+

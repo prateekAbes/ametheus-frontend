@@ -68,7 +68,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Centralized token getter for API requests
+  const isSyncingRef = React.useRef(false)
+  const syncedUserIdRef = React.useRef<string | null>(null)
+
+  // Register getters synchronously on every render so child components that make API
+  // calls on mount have immediate access to tokens without waiting for parent useEffect
+  setAuthTokenGetter(async (options?: { skipCache?: boolean }) => {
+    if (!clerkSignedIn) return null
+    try {
+      return await getToken(options)
+    } catch {
+      return null
+    }
+  })
+
+  if (user?.primaryEmailAddress?.emailAddress) {
+    setAuthUserEmailGetter(() => user.primaryEmailAddress?.emailAddress || null)
+  } else {
+    setAuthUserEmailGetter(null)
+  }
+
+  // Also maintain useEffect registrations for reactive updates
   useEffect(() => {
     setAuthTokenGetter(async (options?: { skipCache?: boolean }) => {
       if (!clerkSignedIn) return null
@@ -80,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [clerkSignedIn, getToken])
 
-  // Centralized user email getter for API requests
   useEffect(() => {
     if (user?.primaryEmailAddress?.emailAddress) {
       setAuthUserEmailGetter(() => user.primaryEmailAddress?.emailAddress || null)
@@ -89,153 +108,182 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.primaryEmailAddress?.emailAddress])
 
-  const loadProfile = useCallback(async () => {
-    // Wait until Clerk auth state is fully resolved
-    if (!isAuthLoaded || !isUserLoaded) return
+  const loadProfile = useCallback(
+    async (forceSync = false) => {
+      // Wait until Clerk auth state is fully resolved
+      if (!isAuthLoaded || !isUserLoaded) return
 
-    // 1. Not signed in with Clerk: check for dev/test mock or clear
-    if (!clerkSignedIn || !user) {
-      try {
-        const devMock = localStorage.getItem('ametheus_dev_mock_user')
-        if (devMock) {
-          const parsed = JSON.parse(devMock)
-          if (parsed && (parsed.role || parsed.email)) {
-            const normalized = normalizeRole(parsed.role, parsed.email)
-            parsed.role = normalized
-            setProfile(parsed)
-            setIsLoading(false)
-            return
+      // 1. Not signed in with Clerk: check for dev/test mock or clear
+      if (!clerkSignedIn || !user) {
+        syncedUserIdRef.current = null
+        isSyncingRef.current = false
+        try {
+          const devMock = localStorage.getItem('ametheus_dev_mock_user')
+          if (devMock) {
+            const parsed = JSON.parse(devMock)
+            if (parsed && (parsed.role || parsed.email)) {
+              const normalized = normalizeRole(parsed.role, parsed.email)
+              parsed.role = normalized
+              setProfile(parsed)
+              setIsLoading(false)
+              return
+            }
           }
-        }
-      } catch {}
+        } catch {}
 
-      setProfile(null)
-      setIsLoading(false)
-      return
-    }
-
-    const storageKey = `ametheus_user_profile_${user.id}`
-    const userEmail =
-      user.primaryEmailAddress?.emailAddress || `${user.id}@ametheus.gg`
-    const username =
-      user.username || user.firstName?.toLowerCase() || user.id.slice(0, 10)
-    const displayName = user.fullName || username
-    const avatarUrl = user.imageUrl
-
-    // Metadata-indicated role (if set on Clerk user)
-    const metadataRole =
-      (user.publicMetadata as any)?.role ||
-      (user.unsafeMetadata as any)?.role ||
-      undefined
-
-    // 2. Initial warm cache read (optimistic display while verifying authoritatively)
-    try {
-      const cached = localStorage.getItem(storageKey)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (
-          parsed &&
-          (parsed.id === user.id ||
-            parsed.clerk_user_id === user.id ||
-            parsed.email?.toLowerCase() === userEmail.toLowerCase())
-        ) {
-          parsed.role = normalizeRole(parsed.role || metadataRole, userEmail)
-          setProfile(parsed)
-        }
+        setProfile(null)
+        setIsLoading(false)
+        return
       }
-    } catch {
-      // Ignore cache read failures
-    }
 
-    // Helper to prioritize elevated roles
-    const pickHigherRole = (r1: CanonicalRole, r2: CanonicalRole): CanonicalRole => {
-      if (r1 === 'SUPER_ADMIN' || r2 === 'SUPER_ADMIN') return 'SUPER_ADMIN'
-      if (r1 === 'ORGANIZER' || r2 === 'ORGANIZER') return 'ORGANIZER'
-      return 'PLAYER'
-    }
+      // If already synced this specific user and not forcing, skip duplicate network call
+      if (syncedUserIdRef.current === user.id && !forceSync && profile) {
+        setIsLoading(false)
+        return
+      }
 
-    // 3. Authoritative sync with backend MongoDB
-    try {
-      const token = await getToken()
-      if (token) {
-        const synced = await syncUser({
-          clerk_user_id: user.id,
-          email: userEmail,
-          username,
-          display_name: displayName,
-          avatar_url: avatarUrl,
+      // If a sync is already in-flight and not forcing, skip duplicate call
+      if (isSyncingRef.current && !forceSync) {
+        return
+      }
+
+      isSyncingRef.current = true
+
+      try {
+        const storageKey = `ametheus_user_profile_${user.id}`
+        const userEmail =
+          user.primaryEmailAddress?.emailAddress ||
+          user.emailAddresses?.[0]?.emailAddress ||
+          `${user.id}@ametheus.gg`
+        const username =
+          user.username || user.firstName?.toLowerCase() || user.id.slice(0, 10)
+        const displayName = user.fullName || username
+        const avatarUrl = user.imageUrl
+
+        // Metadata-indicated role (if set on Clerk user)
+        const metadataRole =
+          (user.publicMetadata as any)?.role ||
+          (user.unsafeMetadata as any)?.role ||
+          undefined
+
+        // 2. Initial warm cache read (optimistic display while verifying authoritatively)
+        try {
+          const cached = localStorage.getItem(storageKey)
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            if (
+              parsed &&
+              (parsed.id === user.id ||
+                parsed.clerk_user_id === user.id ||
+                parsed.email?.toLowerCase() === userEmail.toLowerCase())
+            ) {
+              parsed.role = normalizeRole(parsed.role || metadataRole, userEmail)
+              setProfile(parsed)
+            }
+          }
+        } catch {
+          // Ignore cache read failures
+        }
+
+        // Helper to prioritize elevated roles
+        const pickHigherRole = (r1: CanonicalRole, r2: CanonicalRole): CanonicalRole => {
+          if (r1 === 'SUPER_ADMIN' || r2 === 'SUPER_ADMIN') return 'SUPER_ADMIN'
+          if (r1 === 'ORGANIZER' || r2 === 'ORGANIZER') return 'ORGANIZER'
+          return 'PLAYER'
+        }
+
+        // 3. Authoritative sync with backend MongoDB
+        try {
+          const token = await getToken()
+          if (token) {
+            const synced = await syncUser(
+              {
+                clerk_user_id: user.id,
+                email: userEmail,
+                username,
+                display_name: displayName,
+                avatar_url: avatarUrl,
+              },
+              token
+            )
+
+            if (synced && synced.id) {
+              const metaCanonical = normalizeRole(metadataRole, userEmail)
+              const backendCanonical = normalizeRole(synced.role, userEmail)
+              const canonical = pickHigherRole(metaCanonical, backendCanonical)
+              const cleanEmail =
+                user.primaryEmailAddress?.emailAddress ||
+                (synced.email && !synced.email.endsWith('@ametheus.gg') ? synced.email : userEmail)
+              const finalProfile: UserProfile = {
+                ...synced,
+                email: cleanEmail,
+                avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : avatarUrl,
+                role: canonical as any,
+              }
+              syncedUserIdRef.current = user.id
+              setProfile(finalProfile)
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(finalProfile))
+              } catch {}
+              return
+            }
+          }
+        } catch (syncErr) {
+          // Fallback: try fetching /auth/me with explicit token
+          try {
+            const token = await getToken()
+            const me = await getCurrentUserProfile(token)
+            if (me && me.id) {
+              const metaCanonical = normalizeRole(metadataRole, userEmail)
+              const backendCanonical = normalizeRole(me.role, userEmail)
+              const canonical = pickHigherRole(metaCanonical, backendCanonical)
+              const cleanEmail =
+                user.primaryEmailAddress?.emailAddress ||
+                (me.email && !me.email.endsWith('@ametheus.gg') ? me.email : userEmail)
+              const finalProfile: UserProfile = {
+                ...me,
+                email: cleanEmail,
+                avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : avatarUrl,
+                role: canonical as any,
+              }
+              syncedUserIdRef.current = user.id
+              setProfile(finalProfile)
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(finalProfile))
+              } catch {}
+              return
+            }
+          } catch {}
+        }
+
+        // 4. Offline / network fallback: construct authoritative fallback profile
+        const fallbackCanonical = normalizeRole(metadataRole, userEmail)
+        setProfile((prev) => {
+          const base: UserProfile = prev || {
+            id: user.id,
+            clerk_user_id: user.id,
+            email: userEmail,
+            username,
+            display_name: displayName,
+            avatar_url: avatarUrl,
+            role: fallbackCanonical as any,
+            inr_balance: '0.00',
+            inr_balance_paise: 0,
+            inr_reserved_paise: 0,
+          }
+          return {
+            ...base,
+            role: fallbackCanonical as any,
+          }
         })
-
-        if (synced && synced.id) {
-          const metaCanonical = normalizeRole(metadataRole, userEmail)
-          const backendCanonical = normalizeRole(synced.role, userEmail)
-          const canonical = pickHigherRole(metaCanonical, backendCanonical)
-          const cleanEmail =
-            (user.primaryEmailAddress?.emailAddress) ||
-            (synced.email && !synced.email.endsWith('@ametheus.gg') ? synced.email : userEmail)
-          const finalProfile: UserProfile = {
-            ...synced,
-            email: cleanEmail,
-            avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : avatarUrl,
-            role: canonical as any,
-          }
-          setProfile(finalProfile)
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(finalProfile))
-          } catch {}
-          setIsLoading(false)
-          return
-        }
+        syncedUserIdRef.current = user.id
+      } finally {
+        isSyncingRef.current = false
+        setIsLoading(false)
       }
-    } catch (syncErr) {
-      // Fallback: try fetching /auth/me
-      try {
-        const me = await getCurrentUserProfile()
-        if (me && me.id) {
-          const metaCanonical = normalizeRole(metadataRole, userEmail)
-          const backendCanonical = normalizeRole(me.role, userEmail)
-          const canonical = pickHigherRole(metaCanonical, backendCanonical)
-          const cleanEmail =
-            (user.primaryEmailAddress?.emailAddress) ||
-            (me.email && !me.email.endsWith('@ametheus.gg') ? me.email : userEmail)
-          const finalProfile: UserProfile = {
-            ...me,
-            email: cleanEmail,
-            avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : avatarUrl,
-            role: canonical as any,
-          }
-          setProfile(finalProfile)
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(finalProfile))
-          } catch {}
-          setIsLoading(false)
-          return
-        }
-      } catch {}
-    }
-
-    // 4. Offline / network fallback: construct authoritative fallback profile
-    const fallbackCanonical = normalizeRole(metadataRole, userEmail)
-    setProfile((prev) => {
-      const base: UserProfile = prev || {
-        id: user.id,
-        clerk_user_id: user.id,
-        email: userEmail,
-        username,
-        display_name: displayName,
-        avatar_url: avatarUrl,
-        role: fallbackCanonical as any,
-        inr_balance: '0.00',
-        inr_balance_paise: 0,
-        inr_reserved_paise: 0,
-      }
-      return {
-        ...base,
-        role: fallbackCanonical as any,
-      }
-    })
-    setIsLoading(false)
-  }, [isAuthLoaded, isUserLoaded, clerkSignedIn, user, getToken])
+    },
+    [isAuthLoaded, isUserLoaded, clerkSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getToken]
+  )
 
   useEffect(() => {
     loadProfile()
@@ -243,7 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleProfileUpdate = () => {
-      loadProfile()
+      loadProfile(true)
     }
     window.addEventListener('ametheus:profile_updated', handleProfileUpdate)
     return () => {
@@ -252,8 +300,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile])
 
   const refreshProfile = useCallback(async () => {
-    await loadProfile()
+    await loadProfile(true)
   }, [loadProfile])
+
 
   const effectiveRole: CanonicalRole = useMemo(() => {
     if (!profile) return 'PLAYER'
