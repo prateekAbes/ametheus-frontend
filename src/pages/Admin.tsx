@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { LiveMatchesManager } from '../components/admin/LiveMatchesManager'
+import { AdminScrollBoard } from '../components/admin/AdminScrollBoard'
+import { AdminOverviewLeaderboard } from '../components/admin/AdminOverviewLeaderboard'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getAdminStats,
@@ -352,6 +354,20 @@ export default function Admin() {
   const [featuredTour, setFeaturedTour] = useState<Tournament | null>(null)
   const [selectedFeaturedId, setSelectedFeaturedId] = useState<string>('')
   const [isSavingFeatured, setIsSavingFeatured] = useState(false)
+  const tabNavRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = tabNavRef.current
+    if (!el) return
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY !== 0 && !e.shiftKey) {
+        e.preventDefault()
+        el.scrollLeft += e.deltaY
+      }
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
 
   // Additional Datasets
   const [upiAccounts, setUpiAccounts] = useState<UpiAccount[]>([])
@@ -1331,7 +1347,7 @@ export default function Admin() {
         )}
 
         {/* Tab Navigation */}
-        <div className="no-scrollbar mt-8 flex gap-1 overflow-x-auto border-b border-white/10 pb-px">
+        <div ref={tabNavRef} className="no-scrollbar mt-8 flex gap-1 overflow-x-auto border-b border-white/10 pb-px">
           {TABS.map((t) => (
             <button
               key={t}
@@ -1349,25 +1365,28 @@ export default function Admin() {
 
         {/* TAB 1: OVERVIEW */}
         {tab === 'OVERVIEW' && (
-          <div className="mt-8 space-y-8">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Panel className="p-5">
-                <Hud className="text-dim">TOTAL USERS</Hud>
-                <p className="mt-2 font-display text-4xl font-black">{stats?.total_users ?? users.length}</p>
-              </Panel>
-              <Panel className="p-5">
-                <Hud className="text-cyan">ACTIVE TOURNAMENTS</Hud>
-                <p className="mt-2 font-display text-4xl font-black text-cyan">{stats?.active_tournaments ?? tournaments.length}</p>
-              </Panel>
-              <Panel className="p-5">
-                <Hud className="text-warn">PENDING PAYMENTS</Hud>
-                <p className="mt-2 font-display text-4xl font-black text-warn">{payments.length}</p>
-              </Panel>
-              <Panel className="p-5">
-                <Hud className="text-ok">AMETHEUS VAULT</Hud>
-                <p className="mt-2 font-display text-4xl font-black text-ok">{inr(stats?.platform_escrow_vault ?? 0)}</p>
-              </Panel>
-            </div>
+          <div className="mt-8 space-y-10">
+            {/* 1. Database-Driven Horizontal Scroll Board */}
+            <AdminScrollBoard
+              stats={stats}
+              loading={loading}
+              tournamentsCount={tournaments.length}
+              activeTournamentsCount={
+                tournaments.filter((t) =>
+                  ['ACTIVE', 'LIVE', 'REGISTRATION_OPEN', 'IN_PROGRESS'].includes((t.status || '').toUpperCase())
+                ).length
+              }
+              gamesCount={games.length}
+              genresCount={genres.length}
+              usersCount={users.length}
+              paymentsCount={payments.length}
+              payoutsCount={payouts.length}
+              ticketsCount={
+                tickets.filter((t) => !['RESOLVED', 'CLOSED'].includes((t.status || '').toUpperCase())).length
+              }
+              matchesCount={adminMatches.length}
+              onNavigateTab={(targetTab) => setTab(targetTab as any)}
+            />
 
             {/* Quick Actions Grid */}
             <div className="grid gap-4 md:grid-cols-3">
@@ -1406,6 +1425,9 @@ export default function Admin() {
                 </div>
               </Panel>
             </div>
+
+            {/* 2. Database-Driven Leaderboard & Standings */}
+            <AdminOverviewLeaderboard onNavigateTab={(targetTab) => setTab(targetTab as any)} />
           </div>
         )}
 

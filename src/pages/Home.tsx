@@ -8,7 +8,7 @@ import {
   normalizeTournament,
   NormalizedTournament,
 } from '../services/tournaments'
-import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
+import { getGames, Game as ApiGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
 import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
@@ -92,18 +92,6 @@ export default function Home() {
     return activeTournaments.length > 0 ? activeTournaments : tournaments
   }, [activeTournaments, tournaments])
 
-  // Visible max 4 games, dynamically rotated
-  const activeGamesPool = useMemo(() => {
-    return games.length > 0 ? games : (CATALOG.filter((g) => g.status === 'active') as any[])
-  }, [games])
-
-  const visibleGames = useMemo(() => {
-    if (activeGamesPool.length <= 4) return activeGamesPool
-    const offset = (shuffleTick * 4) % activeGamesPool.length
-    const rotated = [...activeGamesPool.slice(offset), ...activeGamesPool.slice(0, offset)]
-    return rotated.slice(0, 4)
-  }, [activeGamesPool, shuffleTick])
-
   return (
     <>
       <Hero
@@ -115,7 +103,6 @@ export default function Home() {
         tournaments={tournaments}
         featuredTournament={featuredTour}
       />
-      <ExploreGames games={visibleGames} totalCount={activeGamesPool.length} />
       <Upcoming tournaments={eligibleUpcoming} loading={loading} />
       <Why />
       <FinalCta liveCount={liveCount} />
@@ -443,76 +430,6 @@ function Featured({
   )
 }
 
-function ExploreGames({ games, totalCount }: { games: ApiGame[]; totalCount?: number }) {
-  const displayGames = games.slice(0, 4)
-  return (
-    <section className="relative py-24 md:py-36 overflow-hidden">
-      {/* High-Resolution Cinematic Gaming / Esports Arena Backdrop with dark overlay, gradient, vignette */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        {/* Radial vignette overlay */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: 'radial-gradient(circle at 50% 40%, transparent 20%, #05060a 82%)',
-          }}
-        />
-        {/* Top and bottom gradient fade into platform dark background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#05060a] via-transparent to-[#05060a]" />
-        {/* Subtle cyber grid pattern for authentic esports aesthetics */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
-      </div>
-
-      <Container>
-        <SectionHead
-          className="in-view"
-          idx="02"
-          kicker="Battlegrounds"
-          title={<>Explore<br />Games</>}
-          sub={`${totalCount || displayGames.length} live competitive titles. Each with dedicated ladders, formats, and squad sizes.`}
-          right={<Cta ghost small to="/games">All games</Cta>}
-        />
-        <div className="mt-14 grid gap-4 md:grid-cols-12">
-          {displayGames.map((rawG, k) => {
-            const g = normalizeGame(rawG as any)
-            return (
-              <Link
-                key={g.slug}
-                to={`/games/${g.slug}`}
-                className={`group relative min-h-[340px] overflow-hidden border border-white/10 bg-surface p-6 transition-all duration-500 md:col-span-6`}
-              >
-                <DynamicImage
-                  src={resolveMediaUrl(g.bannerUrl)}
-                  alt={`${g.name} banner`}
-                  className="absolute inset-0 h-full w-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-void via-void/40 to-transparent" />
-                <div className="relative flex h-full flex-col justify-between">
-                  <div className="flex justify-between items-start">
-                    <span className="font-mono text-xs text-dim">0{k + 1}</span>
-                    <Badge s="active" />
-                  </div>
-                  <div>
-                    <h3 className="font-display text-5xl font-black uppercase text-ink">{g.name}</h3>
-                    <Hud className="mt-2 block">
-                      <span className="text-cyan">{g.category}</span> · {g.platform}
-                    </Hud>
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </Container>
-    </section>
-  )
-}
 
 function Upcoming({
   tournaments,
@@ -558,7 +475,7 @@ function Upcoming({
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <SectionHead
             className="in-view"
-            idx="03"
+            idx="02"
             kicker="On the horizon"
             title="Upcoming"
             size="md"
@@ -632,7 +549,7 @@ function Why() {
   return (
     <section className="relative overflow-hidden bg-graphite py-24 md:py-36">
       <Container>
-        <SectionHead idx="04" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
+        <SectionHead idx="03" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
         <ol className="mt-16">
           {WHY.map(([t, b], i) => (
             <li key={t} className={`group grid items-baseline gap-4 border-t border-white/10 py-8 md:grid-cols-12 md:py-10 ${i % 2 ? 'md:pl-[12%]' : ''}`}>

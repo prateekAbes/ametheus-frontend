@@ -21,7 +21,19 @@ export interface LeaderboardEntry {
   rank: number
   created_at?: string
   is_disbanded?: boolean
+  is_disqualified?: boolean
   status?: string
+}
+
+export interface LeaderboardDisqualification {
+  id: string
+  entity_id: string
+  entity_name: string
+  entity_tag?: string
+  reason: string
+  notes?: string
+  disqualified_by?: string
+  disqualified_at?: string
 }
 
 export interface LeaderboardStats {
@@ -49,6 +61,7 @@ export async function getLeaderboardEntries(params?: {
   search?: string
   limit?: number
   skip?: number
+  include_disqualified?: boolean
 }): Promise<LeaderboardEntry[]> {
   const q = new URLSearchParams()
   if (params?.category) q.set('category', params.category)
@@ -56,9 +69,14 @@ export async function getLeaderboardEntries(params?: {
   if (params?.search) q.set('search', params.search)
   if (params?.limit) q.set('limit', String(params.limit))
   if (params?.skip) q.set('skip', String(params.skip))
+  if (params?.include_disqualified) q.set('include_disqualified', 'true')
 
   const qs = q.toString()
   return apiClient<LeaderboardEntry[]>(`/leaderboard${qs ? `?${qs}` : ''}`)
+}
+
+export async function getLeaderboardDisqualifications(): Promise<LeaderboardDisqualification[]> {
+  return apiClient<LeaderboardDisqualification[]>('/leaderboard/disqualifications')
 }
 
 export async function getLeaderboardStats(): Promise<LeaderboardStats> {

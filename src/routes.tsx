@@ -45,6 +45,8 @@ export const router = createBrowserRouter([
       { path: 'games', Component: Games },
       { path: 'games/category/:slug', Component: CategoryDetail },
       { path: 'games/:slug', Component: GameDetail },
+      { path: 'joiners', Component: Games },
+      { path: 'joiners/category/:slug', Component: CategoryDetail },
       { path: 'tournaments', Component: Tournaments },
       { path: 'tournaments/:id', Component: TournamentDetail },
       { path: 'matches', Component: Matches },

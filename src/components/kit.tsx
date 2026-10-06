@@ -78,11 +78,12 @@ export { Modal } from './Modal'
 /** Game card — works for active and locked worlds, with or without artwork. `feature` = larger type. */
 export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; feature?: boolean }) {
   const soon = g.status === 'soon'
+  const title = g.name || g.short
   const body = (
     <>
       <DynamicImage
         src={resolveMediaUrl(g.photo || (g as any).bannerUrl || (g as any).banner_url)}
-        alt={`${g.name} artwork`}
+        alt={`${title} artwork`}
         className="absolute inset-0 h-full w-full object-cover opacity-50 grayscale-[50%] transition-[transform,opacity] duration-700 group-hover:scale-105 group-hover:opacity-75"
       />
       <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a 10%, transparent 70%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
@@ -93,10 +94,9 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
       </div>
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 md:p-6">
         <div className="min-w-0">
-          <h3 className={`text-balance break-words font-display font-black uppercase leading-[0.85] ${soon ? 'text-white/50 group-hover:text-ink' : ''} ${feature ? 'text-6xl md:text-8xl' : g.short.length > 12 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}>{g.short}</h3>
+          <h3 className={`text-balance break-words font-display font-black uppercase leading-[0.85] ${soon ? 'text-white/50 group-hover:text-ink' : ''} ${feature ? 'text-6xl md:text-8xl' : title.length > 14 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}>{title}</h3>
           <Hud className="mt-2 block">{g.platform}</Hud>
         </div>
-        {!soon && g.tournaments > 0 && <div className="shrink-0 text-right"><p className="font-display text-3xl font-black" style={{ color: g.accent }}>{g.tournaments}</p><Hud>Events</Hud></div>}
       </div>
     </>
   )
