@@ -82,3 +82,35 @@ html { background: #05060a; scrollbar-gutter: stable; }
 .acct-sweep { animation: acct-sweep 11s ease-in-out infinite; }
 .acct-ring { animation: acct-ring .5s cubic-bezier(.2,.7,.1,1) both; }
 @media (prefers-reduced-motion: reduce) { .acct-drift, .acct-sweep, .acct-ring { animation: none } }
+
+/* Leaderboard Podium Dynamic Animations */
+@keyframes podium-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes crown-sway {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50% { transform: rotate(2deg) translateY(-3px); }
+}
+@keyframes medal-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+@keyframes gold-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.15); }
+  50% { box-shadow: 0 0 35px rgba(251, 191, 36, 0.35); }
+}
+@keyframes silver-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(203, 213, 225, 0.12); }
+  50% { box-shadow: 0 0 28px rgba(203, 213, 225, 0.25); }
+}
+@keyframes bronze-glow {
+  0%, 100% { box-shadow: 0 0 14px rgba(217, 119, 6, 0.12); }
+  50% { box-shadow: 0 0 25px rgba(217, 119, 6, 0.25); }
+}
+.animate-podium-float { animation: podium-float 4s ease-in-out infinite; }
+.animate-crown-sway { animation: crown-sway 3.2s ease-in-out infinite; }
+.animate-medal-breathe { animation: medal-breathe 3.2s ease-in-out infinite; }
+.animate-gold-glow { animation: gold-glow 3.2s ease-in-out infinite; }
+.animate-silver-glow { animation: silver-glow 3.2s ease-in-out infinite; }
+.animate-bronze-glow { animation: bronze-glow 3.2s ease-in-out infinite; }

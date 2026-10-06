@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getGenres, type Genre } from '../services/genres'
 import { resolveMediaUrl } from '../services/apiClient'
@@ -27,11 +27,33 @@ function getGenreAccent(genre: Genre, index: number): string {
 }
 
 export default function Games() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialGenre = searchParams.get('genre') || 'ALL'
+
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
-  const [selectedGenre, setSelectedGenre] = useState<string>('ALL')
+  const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre)
   const [activeGenreIndex, setActiveGenreIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [cyclingTick, setCyclingTick] = useState(0)
+
+  // Sync selectedGenre if URL searchParams changes
+  useEffect(() => {
+    const gParam = searchParams.get('genre')
+    if (gParam) {
+      setSelectedGenre(gParam)
+    } else {
+      setSelectedGenre('ALL')
+    }
+  }, [searchParams])
+
+  // Periodic cycling tick for dynamic genre background images (every 3.5s)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCyclingTick((prev) => prev + 1)
+    }, 3500)
+    return () => clearInterval(timer)
+  }, [])
 
   // Fetch games and genres directly from backend database
   useEffect(() => {
@@ -99,6 +121,37 @@ export default function Games() {
       })
   }, [apiGames])
 
+  // Map of active games for each genre (strictly excluding Coming Soon games)
+  const genreActiveGamesMap = useMemo(() => {
+    const map = new Map<string, typeof activeGamesCatalog>()
+
+    genres.forEach((gn) => {
+      const genreGameSlugs = new Set((gn.games || []).map((g) => (g.slug || '').toLowerCase()))
+      const genreGameTitles = new Set((gn.games || []).map((g) => (g.title || '').toLowerCase()))
+      const targetSlug = (gn.slug || '').toLowerCase()
+      const targetName = (gn.name || '').toLowerCase()
+      const targetId = (gn.id || (gn as any)._id || '').toLowerCase()
+
+      const matches = activeGamesCatalog.filter((g) => {
+        const gSlug = (g.slug || '').toLowerCase()
+        const gName = (g.name || '').toLowerCase()
+        const gGenre = (g.genre || '').toLowerCase()
+        const gGenreId = (g.genreId || '').toLowerCase()
+
+        if (targetId && gGenreId === targetId) return true
+        if (genreGameSlugs.has(gSlug) || genreGameTitles.has(gName)) return true
+        if (targetSlug && (gGenre === targetSlug || gGenre.includes(targetSlug) || targetSlug.includes(gGenre))) return true
+        if (targetName && (gGenre === targetName || gGenre.includes(targetName) || targetName.includes(gGenre))) return true
+        return false
+      })
+
+      const key = gn.slug || gn.id || gn.name
+      map.set(key, matches)
+    })
+
+    return map
+  }, [genres, activeGamesCatalog])
+
   // Selected Genre Object
   const selectedGenreObj = useMemo(() => {
     if (selectedGenre === 'ALL') return null
@@ -112,28 +165,12 @@ export default function Games() {
     )
   }, [genres, selectedGenre])
 
-  // Strictly matching games for selected genre without any fallback or backfill
+  // Strictly matching active games for selected genre without any fallback or backfill
   const matchingGenreGames = useMemo(() => {
     if (!selectedGenreObj) return []
-
-    const genreGameSlugs = new Set((selectedGenreObj.games || []).map((g) => (g.slug || '').toLowerCase()))
-    const genreGameTitles = new Set((selectedGenreObj.games || []).map((g) => (g.title || '').toLowerCase()))
-    const targetSlug = (selectedGenreObj.slug || '').toLowerCase()
-    const targetName = (selectedGenreObj.name || '').toLowerCase()
-
-    return activeGamesCatalog.filter((g) => {
-      const gSlug = (g.slug || '').toLowerCase()
-      const gName = (g.name || '').toLowerCase()
-      const gGenre = (g.genre || '').toLowerCase()
-      const gGenreId = (g.genreId || '').toLowerCase()
-
-      if (selectedGenreObj.id && gGenreId === selectedGenreObj.id.toLowerCase()) return true
-      if (genreGameSlugs.has(gSlug) || genreGameTitles.has(gName)) return true
-      if (targetSlug && (gGenre === targetSlug || gGenre.includes(targetSlug) || targetSlug.includes(gGenre))) return true
-      if (targetName && (gGenre === targetName || gGenre.includes(targetName) || targetName.includes(gGenre))) return true
-      return false
-    })
-  }, [activeGamesCatalog, selectedGenreObj])
+    const key = selectedGenreObj.slug || selectedGenreObj.id || selectedGenreObj.name
+    return genreActiveGamesMap.get(key) || []
+  }, [selectedGenreObj, genreActiveGamesMap])
 
   return (
     <>
@@ -147,26 +184,31 @@ export default function Games() {
 
       {/* DEDICATED SUB-PAGE / SUB-PANEL: Rendered when a genre is selected */}
       {selectedGenre !== 'ALL' && selectedGenreObj ? (
-        <section className="py-16 md:py-24 min-h-[60vh]" id="genre-subpanel">
+        <section className="py-16 md:py-24 min-h-[60vh]" id="genre-subpage">
           <Container>
             {/* Navigation & Header */}
-            <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-6 border-b border-white/10 pb-6">
+            <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6 border-b border-white/10 pb-6">
               <div>
                 <button
-                  onClick={() => setSelectedGenre('ALL')}
+                  onClick={() => {
+                    setSelectedGenre('ALL')
+                    searchParams.delete('genre')
+                    setSearchParams(searchParams)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
                   className="mb-4 inline-flex items-center gap-2 border border-white/20 bg-surface/60 px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
                 >
                   <span>←</span>
-                  <span>Back to Joiners / All Games</span>
+                  <span>Back to All Games</span>
                 </button>
                 <div className="flex items-center gap-3">
-                  <Hud className="text-cyan font-bold">DISCIPLINE SUB-CATALOG</Hud>
+                  <Hud className="text-cyan font-bold">ACTIVE COMPETITIVE DISCIPLINE</Hud>
                   <span className="font-mono text-xs text-dim">·</span>
                   <span className="font-mono text-xs text-dim uppercase">
-                    {matchingGenreGames.length} {matchingGenreGames.length === 1 ? 'Game' : 'Games'}
+                    {matchingGenreGames.length} {matchingGenreGames.length === 1 ? 'Active Game' : 'Active Games'}
                   </span>
                 </div>
-                <h1 className="mt-2 font-display text-5xl md:text-7xl font-black uppercase leading-tight text-ink">
+                <h1 className="mt-2 font-display text-4xl sm:text-6xl lg:text-7xl font-black uppercase leading-tight text-ink">
                   {selectedGenreObj.name} <span className="text-cyan">Games</span>
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm md:text-base text-ink/70">
@@ -175,46 +217,56 @@ export default function Games() {
               </div>
 
               <button
-                onClick={() => setSelectedGenre('ALL')}
+                onClick={() => {
+                  setSelectedGenre('ALL')
+                  searchParams.delete('genre')
+                  setSearchParams(searchParams)
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
                 className="shrink-0 font-mono text-xs uppercase text-dim hover:text-white underline cursor-pointer"
               >
                 Clear Filter (Show All {activeGamesCatalog.length} Games)
               </button>
             </div>
 
-            {/* Games Grid or Strict Empty State */}
+            {/* NORMAL-SIZED Game Cards Grid or Strict Empty State */}
             {loading ? (
-              <AdaptiveGrid count={4} min={280}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                 {[1, 2, 3, 4].map((n) => (
                   <GameCardSkeleton key={n} />
                 ))}
-              </AdaptiveGrid>
+              </div>
             ) : matchingGenreGames.length === 0 ? (
-              <div className="border border-white/10 bg-surface/30 p-16 text-center">
-                <Hud className="text-cyan text-sm">No games available in this genre yet.</Hud>
-                <p className="mt-2 font-mono text-sm text-dim max-w-md mx-auto">
+              <div className="border border-white/10 bg-surface/30 p-16 text-center max-w-2xl mx-auto">
+                <Hud className="text-cyan text-sm">No active games available in this genre yet.</Hud>
+                <p className="mt-2 font-mono text-sm text-dim">
                   There are currently no active competitive titles registered under the {selectedGenreObj.name} discipline.
                 </p>
                 <button
-                  onClick={() => setSelectedGenre('ALL')}
+                  onClick={() => {
+                    setSelectedGenre('ALL')
+                    searchParams.delete('genre')
+                    setSearchParams(searchParams)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
                   className="mt-6 border border-cyan/40 bg-cyan/10 px-5 py-2.5 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
                 >
-                  ← Back to Joiners
+                  ← Back to All Games
                 </button>
               </div>
             ) : (
-              <AdaptiveGrid count={matchingGenreGames.length} min={280}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                 {matchingGenreGames.map((g, i) => (
-                  <div key={g.slug} className="in-view">
+                  <div key={g.slug} className="in-view w-full">
                     <GameCard g={g} i={i} />
                   </div>
                 ))}
-              </AdaptiveGrid>
+              </div>
             )}
           </Container>
         </section>
       ) : (
-        /* MAIN JOINERS DISCOVERY VIEW: Disciplines Accordion + Active Games + Coming Soon */
+        /* MAIN GAMES FRONT PAGE VIEW: Disciplines Accordion + Active Games + Coming Soon */
         <>
           {/* Canonical Disciplines / Genres Accordion Hub */}
           {genres.length > 0 && (
@@ -234,7 +286,15 @@ export default function Games() {
                   {genres.map((gn, i) => {
                     const isFocused = activeGenreIndex === i
                     const accent = getGenreAccent(gn, i)
-                    const connectedGames = gn.games || []
+                    const activeGamesForGenre = genreActiveGamesMap.get(gn.slug || gn.id || gn.name) || []
+
+                    // Extract actual configured media for active games in this genre
+                    const activeGameImages: { title: string; image: string }[] = activeGamesForGenre
+                      .filter((g) => Boolean(g.photo && g.photo.trim()))
+                      .map((g) => ({
+                        title: g.name,
+                        image: resolveMediaUrl(g.photo),
+                      }))
 
                     return (
                       <div
@@ -249,8 +309,32 @@ export default function Games() {
                         }`}
                         style={{ borderColor: isFocused ? accent + 'aa' : undefined }}
                       >
-                        {/* Background Media */}
-                        {gn.banner_url ? (
+                        {/* Background Media: Dynamic cycling through active games belonging to this genre */}
+                        {activeGameImages.length > 0 ? (
+                          <div className="absolute inset-0 overflow-hidden">
+                            {activeGameImages.map((item, imgIdx) => {
+                              const isCur =
+                                activeGameImages.length === 1 ||
+                                imgIdx === (cyclingTick % activeGameImages.length)
+                              return (
+                                <div
+                                  key={item.title + imgIdx}
+                                  className={`absolute inset-0 transition-opacity duration-1000 ${
+                                    isCur ? 'opacity-100' : 'opacity-0'
+                                  }`}
+                                >
+                                  <DynamicImage
+                                    src={item.image}
+                                    alt={`${item.title} - ${gn.name}`}
+                                    className={`h-full w-full object-cover transition-all duration-700 ${
+                                      isFocused ? 'opacity-40 scale-105' : 'opacity-20 grayscale group-hover:opacity-35'
+                                    }`}
+                                  />
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : gn.banner_url ? (
                           <DynamicImage
                             src={resolveMediaUrl(gn.banner_url)}
                             alt={gn.name}
@@ -280,9 +364,25 @@ export default function Games() {
                           <div className="flex items-center gap-2">
                             <Hud className="text-ink font-bold">0{i + 1}</Hud>
                             <span className="font-mono text-[10px] uppercase tracking-wider text-dim">
-                              {connectedGames.length} {connectedGames.length === 1 ? 'Title' : 'Titles'}
+                              {activeGamesForGenre.length} {activeGamesForGenre.length === 1 ? 'Active Game' : 'Active Games'}
                             </span>
                           </div>
+
+                          {/* Image cycling indicator dots strictly matching active game count */}
+                          {activeGameImages.length > 1 && (
+                            <div className="flex items-center gap-1 bg-void/60 px-2 py-0.5 border border-white/10 backdrop-blur-sm">
+                              {activeGameImages.map((_, dotIdx) => (
+                                <span
+                                  key={dotIdx}
+                                  className={`h-1 rounded-full transition-all duration-500 ${
+                                    dotIdx === (cyclingTick % activeGameImages.length)
+                                      ? 'w-3 bg-cyan'
+                                      : 'w-1 bg-white/30'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Collapsed Vertical Title (Visible on lg when NOT focused) */}
@@ -301,7 +401,7 @@ export default function Games() {
                           }`}
                         >
                           <Hud className="block text-cyan uppercase tracking-widest text-xs">
-                            Canonical Discipline · {connectedGames.length} Registered Titles
+                            Canonical Discipline · {activeGamesForGenre.length} Active Competitive {activeGamesForGenre.length === 1 ? 'Title' : 'Titles'}
                           </Hud>
                           <h2 className="mt-2 font-display text-5xl md:text-7xl xl:text-8xl font-black uppercase leading-[0.85] text-ink">
                             {gn.name}
@@ -310,16 +410,16 @@ export default function Games() {
                             {gn.description || 'Official competitive esports category and tournament battlegrounds.'}
                           </p>
 
-                          {/* Connected Games badges */}
-                          {connectedGames.length > 0 && (
+                          {/* Connected Active Games badges */}
+                          {activeGamesForGenre.length > 0 && (
                             <div className="mt-5 flex flex-wrap items-center gap-2">
-                              <span className="font-mono text-[11px] text-dim uppercase tracking-wider">Registered:</span>
-                              {connectedGames.map((cg) => (
+                              <span className="font-mono text-[11px] text-dim uppercase tracking-wider">Active Games:</span>
+                              {activeGamesForGenre.map((cg) => (
                                 <span
-                                  key={cg.slug || cg.id}
+                                  key={cg.slug}
                                   className="border border-white/15 bg-void/70 px-2.5 py-1 font-mono text-xs text-ink/90 backdrop-blur-sm"
                                 >
-                                  {cg.title}
+                                  {cg.name}
                                 </span>
                               ))}
                             </div>
@@ -331,6 +431,9 @@ export default function Games() {
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedGenre(gn.slug)
+                                searchParams.set('genre', gn.slug)
+                                setSearchParams(searchParams)
+                                window.scrollTo({ top: 0, behavior: 'smooth' })
                               }}
                               className="px-5 py-2.5 font-mono text-xs uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-2 border border-cyan bg-cyan text-void hover:brightness-110 shadow-[0_0_16px_rgba(62,242,255,0.4)]"
                             >
