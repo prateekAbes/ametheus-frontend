@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { gameBy, img, type Tournament, type Match, inr } from '../lib/data'
 import DynamicImage from './DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
+import EsportsHeroVisual, { HeroVisualVariant } from './EsportsHeroVisual'
 
 /* HUD micro label */
 export function Hud({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -89,25 +90,48 @@ export function SectionHead({ idx, kicker, title, sub, right, className = '', si
   )
 }
 
-/** Cinematic page header used by every inner page. */
-export function PageHero({ kicker, title, sub, photo, accent = '#3ef2ff', children, tall }: { kicker: string; title: ReactNode; sub?: ReactNode; photo?: string; accent?: string; children?: ReactNode; tall?: boolean }) {
+/** Cinematic page header used by inner pages with procedural esports visual backgrounds. */
+export function PageHero({
+  kicker,
+  title,
+  sub,
+  photo,
+  accent = '#3ef2ff',
+  variant = 'default',
+  children,
+  tall,
+}: {
+  kicker: string
+  title: ReactNode
+  sub?: ReactNode
+  photo?: string
+  accent?: string
+  variant?: HeroVisualVariant
+  children?: ReactNode
+  tall?: boolean
+}) {
   return (
     <section className={`relative overflow-hidden bg-void ${tall ? 'min-h-[86svh]' : 'min-h-[52svh]'} flex items-end`}>
+      <EsportsHeroVisual variant={variant} accent={accent} />
       {photo && (
         <div className="absolute inset-0 overflow-hidden">
           <DynamicImage
             src={resolveMediaUrl(photo)}
             alt=""
             eager
-            className="absolute inset-0 h-[120%] w-full -translate-y-[8%] object-cover opacity-40"
+            className="absolute inset-0 h-[120%] w-full -translate-y-[8%] object-cover opacity-20 mix-blend-luminosity"
           />
         </div>
       )}
-      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 15% 100%, ${accent}33, transparent 55%)` }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-void via-void/60 to-void/30" />
-            <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-14 pt-36 md:px-10 md:pb-20">
-        <div className="mb-6 flex items-center gap-4"><span className="h-px w-12" style={{ background: accent }} /><Hud className="text-ink">{kicker}</Hud></div>
-        <h1 className={`${typeof title === 'string' ? 'reveal-chars' : 'reveal'} font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] text-balance break-words`}>{title}</h1>
+      <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
+      <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-14 pt-36 md:px-10 md:pb-20">
+        <div className="mb-6 flex items-center gap-4">
+          <span className="h-px w-12" style={{ background: accent }} />
+          <Hud className="text-ink">{kicker}</Hud>
+        </div>
+        <h1 className={`${typeof title === 'string' ? 'reveal-chars' : 'reveal'} font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] text-balance break-words`}>
+          {title}
+        </h1>
         {sub && <p className="mt-6 max-w-xl text-lg text-ink/75">{sub}</p>}
         {children && <div className="mt-10">{children}</div>}
       </div>

@@ -8,7 +8,6 @@ import {
   NormalizedTournament,
 } from '../services/tournaments'
 import { getGames, Game } from '../services/games'
-import { getPageMedia, PageMediaConfig } from '../services/admin'
 import { TournamentCardSkeleton } from '../components/Skeleton'
 import { gameBy, inr, type Tournament as DesignTournament } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
@@ -33,19 +32,16 @@ export default function Tournaments() {
   const [selectedGame, setSelectedGame] = useState<string>('All Games')
   const [selectedStatus, setSelectedStatus] = useState<string>('All')
   const [search, setSearch] = useState('')
-  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
 
   useEffect(() => {
     let isMounted = true
     Promise.all([
       getTournaments().catch(() => []),
       getGames().catch(() => []),
-      getPageMedia('tournaments').catch(() => null),
-    ]).then(([tList, gList, pMedia]) => {
+    ]).then(([tList, gList]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
-      if (pMedia) setPageMedia(pMedia)
       setLoading(false)
     })
     return () => {
@@ -143,8 +139,8 @@ export default function Tournaments() {
         kicker="◇ Compete · Win · Repeat"
         title="TOURNAMENTS"
         sub="High-stakes competitive esports events with automated brackets and verified prize pools."
-        photo={pageMedia?.media_url}
-        accent="#8b5cff"
+        variant="tournaments"
+        accent="#3ef2ff"
       />
 
       {/* Filter Bar */}

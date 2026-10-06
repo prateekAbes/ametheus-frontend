@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getGenres, type Genre } from '../services/genres'
-import { getPageMedia, PageMediaConfig } from '../services/admin'
 import { GameCardSkeleton } from '../components/Skeleton'
 import { GAMES, CATALOG, gameBy } from '../lib/data'
 import { AdaptiveGrid, GameCard } from '../components/kit'
@@ -11,7 +10,6 @@ export default function Games() {
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL')
-  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,12 +17,10 @@ export default function Games() {
     Promise.all([
       getGames().catch(() => []),
       getGenres().catch(() => []),
-      getPageMedia('games').catch(() => null),
-    ]).then(([res, genreRes, pMedia]) => {
+    ]).then(([res, genreRes]) => {
       if (!isMounted) return
       if (Array.isArray(res)) setApiGames(res)
       if (Array.isArray(genreRes)) setGenres(genreRes)
-      if (pMedia) setPageMedia(pMedia)
       setLoading(false)
     })
 
@@ -92,7 +88,7 @@ export default function Games() {
         kicker={`${String(displayGames.length).padStart(2, '0')} live worlds`}
         title={<>Explore<br />Games</>}
         sub="CHOOSE YOUR BATTLEGROUND. Master your mechanics, build a roster, and climb the competitive ladder."
-        photo={pageMedia?.media_url}
+        variant="games"
         accent="#8b5cff"
       />
 

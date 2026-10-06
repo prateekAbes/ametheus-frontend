@@ -104,15 +104,13 @@ export default function CategoryDetail() {
     )
   }
 
-  const heroPhoto = currentCategory.images[0] || '1542751371-adc38448a05e'
-
   return (
     <>
       <PageHero
         kicker={`Category · ${currentCategory.games.length} titles`}
         title={currentCategory.name}
         sub={currentCategory.description}
-        photo={heroPhoto}
+        variant="category"
         accent={currentCategory.accent}
       >
         <div className="flex flex-wrap items-center gap-3">

@@ -10,7 +10,7 @@ import {
 } from '../services/tournaments'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
-import { getPageMedia, PageMediaConfig } from '../services/admin'
+import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
   GAMES,
   CATALOG,
@@ -43,7 +43,6 @@ export default function Home() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([])
   const [featuredTour, setFeaturedTour] = useState<NormalizedTournament | null>(null)
   const [games, setGames] = useState<ApiGame[]>([])
-  const [homeMedia, setHomeMedia] = useState<PageMediaConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,16 +51,12 @@ export default function Home() {
       getTournaments().catch(() => []),
       getGames().catch(() => []),
       getFeaturedTournament().catch(() => null),
-      getPageMedia('home').catch(() => null),
-    ]).then(([tList, gList, fTour, hMedia]) => {
+    ]).then(([tList, gList, fTour]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
       if (fTour) {
         setFeaturedTour(normalizeTournament(fTour))
-      }
-      if (hMedia) {
-        setHomeMedia(hMedia)
       }
       setLoading(false)
     })
@@ -114,7 +109,6 @@ export default function Home() {
       <Hero
         activeCount={activeTournaments.length}
         gameCount={gameCount}
-        heroMediaUrl={homeMedia?.media_url}
         games={games}
       />
       <Featured
@@ -132,12 +126,10 @@ export default function Home() {
 function Hero({
   activeCount,
   gameCount,
-  heroMediaUrl,
   games = [],
 }: {
   activeCount: number
   gameCount: number
-  heroMediaUrl?: string
   games?: ApiGame[]
 }) {
   const { isSignedIn } = useAuthContext()
@@ -203,15 +195,7 @@ function Hero({
       className="relative isolate h-[100svh] min-h-[720px] overflow-hidden bg-void [--px:0] [--py:0]"
     >
       <div data-h="bg" className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_115%,#8b5cff4d,transparent_55%),radial-gradient(ellipse_at_80%_-5%,#3ef2ff1a,transparent_45%)]" />
-        {heroMediaUrl && (
-          <DynamicImage
-            src={resolveMediaUrl(heroMediaUrl)}
-            alt=""
-            eager
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.18] mix-blend-luminosity"
-          />
-        )}
+        <EsportsHeroVisual variant="home" />
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-[55%]" />
       </div>
 

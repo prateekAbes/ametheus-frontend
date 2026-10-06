@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 import { PageHero, Container, Tabs, Chips, EmptyState, Hud, Badge, Crest, Brackets } from '../components/ui'
 import { gameBy, img, tourBy, type Match } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
-import { getPageMedia, PageMediaConfig } from '../services/admin'
 import DynamicImage from '../components/DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
 import { useMatchTicker, type TickerEvent } from '../hooks/useMatchTicker'
@@ -265,7 +264,6 @@ export default function Matches() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('LIVE')
   const [game, setGame] = useState<(typeof GAMES)[number]>('All Games')
   const [matches, setMatches] = useState<(Match & { tourName?: string; liveLink?: string; scheduledAt?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string })[]>([])
-  const [pageMedia, setPageMedia] = useState<PageMediaConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // Modals state
@@ -287,11 +285,6 @@ export default function Matches() {
 
   useEffect(() => {
     fetchMatchesData()
-    getPageMedia('matches')
-      .then((pm) => {
-        if (pm) setPageMedia(pm)
-      })
-      .catch(() => {})
     const interval = setInterval(fetchMatchesData, 25000)
     return () => clearInterval(interval)
   }, [fetchMatchesData])
@@ -323,7 +316,7 @@ export default function Matches() {
         kicker={`◉ ${liveCount} matches live right now`}
         title="MATCHES"
         sub="Every round, every clutch, every scoreline — streamed and tracked in real time."
-        photo={pageMedia?.media_url}
+        variant="matches"
         accent="#ff3b4e"
       />
 

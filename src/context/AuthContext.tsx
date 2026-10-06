@@ -113,24 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Wait until Clerk auth state is fully resolved
       if (!isAuthLoaded || !isUserLoaded) return
 
-      // 1. Not signed in with Clerk: check for dev/test mock or clear
+      // 1. Not signed in with Clerk: clear profile
       if (!clerkSignedIn || !user) {
         syncedUserIdRef.current = null
         isSyncingRef.current = false
-        try {
-          const devMock = localStorage.getItem('ametheus_dev_mock_user')
-          if (devMock) {
-            const parsed = JSON.parse(devMock)
-            if (parsed && (parsed.role || parsed.email)) {
-              const normalized = normalizeRole(parsed.role, parsed.email)
-              parsed.role = normalized
-              setProfile(parsed)
-              setIsLoading(false)
-              return
-            }
-          }
-        } catch {}
-
         setProfile(null)
         setIsLoading(false)
         return

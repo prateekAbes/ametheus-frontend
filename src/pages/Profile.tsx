@@ -4,6 +4,7 @@ import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, 
 import { GAMES, gameBy, inr, AVATARS, img } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
+import DynamicImage from '../components/DynamicImage'
 import { getMyTeams, type Team } from '../services/teams'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
@@ -119,9 +120,10 @@ export default function Profile() {
         <Container className="relative grid items-end gap-10 pb-16 md:grid-cols-[minmax(260px,380px)_1fr]">
           <div className="relative border border-white/15 bg-surface p-3">
             <Brackets color="border-cyan/70" />
-            <img
+            <DynamicImage
               src={avatarDisplay}
               alt={username}
+              eager
               className="aspect-[4/5] w-full object-cover"
             />
             <div className="flex items-center justify-between p-3">

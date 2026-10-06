@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef, type FormEvent } from 'react'
 import { Badge, Container, Cta, Field, Hud, Panel, SectionHead, EmptyState, Brackets, Modal } from '../components/ui'
+import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
   getSupportTickets,
   createSupportTicket,
@@ -211,7 +212,7 @@ export default function Support() {
 
   const handleSubmitTicket = async (e: FormEvent) => {
     e.preventDefault()
-    if (!message.trim()) return
+    if (!message.trim() || isSubmitting) return
 
     setIsSubmitting(true)
     try {
@@ -239,6 +240,7 @@ export default function Support() {
   return (
     <div className="bg-void">
       <section className="relative overflow-hidden pb-20 pt-36">
+        <EsportsHeroVisual variant="support" />
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-50" />
         <Container className="relative">
           <div className="mb-6 flex items-center gap-4">

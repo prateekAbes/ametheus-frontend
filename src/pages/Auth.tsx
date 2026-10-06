@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { SignIn } from '@clerk/react'
+import { SignIn, SignUp } from '@clerk/react'
 import { Hud, Particles } from '../components/ui'
 import { Logo } from '../components/Layout'
 import { GAMES } from '../lib/data'
@@ -10,9 +10,10 @@ import { useAuthContext } from '../context/AuthContext'
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
 export default function Auth() {
-  const { pathname } = useLocation()
+  const location = useLocation()
   const navigate = useNavigate()
   const { isSignedIn } = useAuthContext()
+  const pathname = location.pathname
 
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
   useEffect(() => {
@@ -31,19 +32,13 @@ export default function Auth() {
     return () => clearInterval(t)
   }, [gamesPool.length])
 
-  // Redirect to home if signed in
+  // Redirect to requested page or home if already signed in
+  const destination = (location.state as any)?.from?.pathname || '/'
   useEffect(() => {
     if (isSignedIn) {
-      navigate('/', { replace: true })
+      navigate(destination, { replace: true })
     }
-  }, [isSignedIn, navigate])
-
-  // Redirect /signup to /login (single auth action: Sign In only)
-  useEffect(() => {
-    if (pathname === '/signup') {
-      navigate('/login', { replace: true })
-    }
-  }, [pathname, navigate])
+  }, [isSignedIn, navigate, destination])
 
   const rawG = gamesPool[gi % gamesPool.length]
   const g = {
@@ -114,36 +109,66 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Center: Clerk SignIn Component */}
+        {/* Center: Clerk Authentication Component */}
         <div className="my-auto flex flex-col items-center justify-center py-8">
           <div className="w-full max-w-md">
-            <SignIn
-              routing="path"
-              path="/login"
-              fallbackRedirectUrl="/"
-              signUpUrl={undefined}
-              appearance={{
-                elements: {
-                  rootBox: 'w-full',
-                  card: 'bg-[#0e111a] border border-white/15 shadow-2xl text-white rounded-none',
-                  headerTitle: 'font-display font-black text-2xl uppercase tracking-wider text-white',
-                  headerSubtitle: 'text-xs text-[#8c94a8]',
-                  socialButtonsBlockButton:
-                    'bg-[#161a26] border border-white/10 text-white hover:bg-white/10 font-mono text-xs uppercase',
-                  dividerLine: 'bg-white/10',
-                  dividerText: 'text-xs text-[#8c94a8]',
-                  formFieldLabel: 'font-mono text-xs uppercase tracking-wider text-[#8c94a8]',
-                  formFieldInput:
-                    'bg-[#06080e] border border-white/20 text-white focus:border-cyan text-sm',
-                  formButtonPrimary:
-                    'bg-cyan hover:bg-[#34d1dd] text-black font-display font-black uppercase tracking-wider text-sm py-2.5 shadow-md',
-                  footerAction: 'hidden',
-                  footerActionLink: 'hidden',
-                  footerActionText: 'hidden',
-                  footer: 'hidden',
-                },
-              }}
-            />
+            {pathname === '/signup' ? (
+              <SignUp
+                routing="path"
+                path="/signup"
+                signInUrl="/login"
+                fallbackRedirectUrl={destination}
+                appearance={{
+                  elements: {
+                    rootBox: 'w-full',
+                    card: 'bg-[#0e111a] border border-white/15 shadow-2xl text-white rounded-none',
+                    headerTitle: 'font-display font-black text-2xl uppercase tracking-wider text-white',
+                    headerSubtitle: 'text-xs text-[#8c94a8]',
+                    socialButtonsBlockButton:
+                      'bg-[#161a26] border border-white/10 text-white hover:bg-white/10 font-mono text-xs uppercase',
+                    dividerLine: 'bg-white/10',
+                    dividerText: 'text-xs text-[#8c94a8]',
+                    formFieldLabel: 'font-mono text-xs uppercase tracking-wider text-[#8c94a8]',
+                    formFieldInput:
+                      'bg-[#06080e] border border-white/20 text-white focus:border-cyan text-sm',
+                    formButtonPrimary:
+                      'bg-cyan hover:bg-[#34d1dd] text-black font-display font-black uppercase tracking-wider text-sm py-2.5 shadow-md',
+                    footerAction: 'text-xs text-[#8c94a8]',
+                    footerActionLink: 'text-cyan hover:underline font-mono text-xs uppercase',
+                    footerActionText: 'text-xs text-[#8c94a8]',
+                    footer: 'border-t border-white/10 bg-transparent',
+                  },
+                }}
+              />
+            ) : (
+              <SignIn
+                routing="path"
+                path="/login"
+                signUpUrl="/signup"
+                fallbackRedirectUrl={destination}
+                appearance={{
+                  elements: {
+                    rootBox: 'w-full',
+                    card: 'bg-[#0e111a] border border-white/15 shadow-2xl text-white rounded-none',
+                    headerTitle: 'font-display font-black text-2xl uppercase tracking-wider text-white',
+                    headerSubtitle: 'text-xs text-[#8c94a8]',
+                    socialButtonsBlockButton:
+                      'bg-[#161a26] border border-white/10 text-white hover:bg-white/10 font-mono text-xs uppercase',
+                    dividerLine: 'bg-white/10',
+                    dividerText: 'text-xs text-[#8c94a8]',
+                    formFieldLabel: 'font-mono text-xs uppercase tracking-wider text-[#8c94a8]',
+                    formFieldInput:
+                      'bg-[#06080e] border border-white/20 text-white focus:border-cyan text-sm',
+                    formButtonPrimary:
+                      'bg-cyan hover:bg-[#34d1dd] text-black font-display font-black uppercase tracking-wider text-sm py-2.5 shadow-md',
+                    footerAction: 'text-xs text-[#8c94a8]',
+                    footerActionLink: 'text-cyan hover:underline font-mono text-xs uppercase',
+                    footerActionText: 'text-xs text-[#8c94a8]',
+                    footer: 'border-t border-white/10 bg-transparent',
+                  },
+                }}
+              />
+            )}
           </div>
         </div>
 

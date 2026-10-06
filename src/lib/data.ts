@@ -1,7 +1,7 @@
-export const img = (id?: string, w = 1600) => {
+export const img = (id?: string, w = 800) => {
   if (!id) return ''
   if (id.startsWith('http://') || id.startsWith('https://') || id.startsWith('/') || id.startsWith('data:')) return id
-  return ''
+  return `https://images.unsplash.com/photo-${id}?w=${w}&q=75&fit=crop&auto=format`
 }
 
 export type Game = { slug: string; short: string; name: string; genre: string; squad: string; size: number; platform: string; accent: string; photo?: string; line: string; desc: string; live: number }

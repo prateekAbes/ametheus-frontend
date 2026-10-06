@@ -76,6 +76,7 @@ export default function Reviews() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting) return
     if (reviewText.trim().length < 10) {
       alert('Review must be at least 10 characters long.')
       return
@@ -123,10 +124,6 @@ export default function Reviews() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => {
-                if (!isSignedIn) {
-                  alert('Please sign in to submit a verified player review.')
-                  return
-                }
                 setDisplayName(profile?.display_name || profile?.username || authDisplayName || '')
                 setIsWriteModalOpen(true)
               }}

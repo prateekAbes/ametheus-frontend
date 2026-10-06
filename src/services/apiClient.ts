@@ -30,6 +30,10 @@ export function resolveMediaUrl(url?: string | null): string {
     trimmed.startsWith('data:') ||
     trimmed.startsWith('blob:')
   ) {
+    if (trimmed.includes('images.unsplash.com') && !trimmed.includes('w=')) {
+      const sep = trimmed.includes('?') ? '&' : '?'
+      return `${trimmed}${sep}auto=format&fit=crop&q=75&w=800`
+    }
     return trimmed
   }
   if (trimmed.startsWith('/')) {
@@ -101,11 +105,6 @@ function isProtectedEndpoint(endpoint: string, method: string = 'GET'): boolean 
     return true
   }
 
-  // Non-GET actions on support or reviews require authentication
-  if (m !== 'GET' && (ep.startsWith('/support/tickets') || ep.startsWith('/reviews'))) {
-    return true
-  }
-
   return false
 }
 
@@ -171,10 +170,18 @@ export async function apiClient<T>(
 
   const { _isRetry, ...fetchOptions } = options
 
-  let response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  })
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+    })
+  } catch (netErr: any) {
+    const errorMsg = netErr?.message || 'Network connection failed'
+    throw new ApiError(0, {
+      message: `Unable to connect to Ametheus server (${API_BASE_URL}). Please verify your connection or try again. Details: ${errorMsg}`,
+    })
+  }
 
   // If unauthorized and we haven't retried yet, request a fresh token
   if (response.status === 401 && authTokenGetter && !_isRetry) {

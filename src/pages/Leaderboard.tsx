@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Container, Hud, Stat } from '../components/ui'
+import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
   getLeaderboardEntries,
   getLeaderboardStats,
@@ -84,8 +85,9 @@ export default function Leaderboard() {
   const top3 = entries.slice(0, 3)
 
   return (
-    <div className="min-h-screen bg-void pb-28 pt-32 text-ink">
-      <Container>
+    <div className="relative min-h-screen bg-void pb-28 pt-32 text-ink overflow-hidden">
+      <EsportsHeroVisual variant="leaderboard" />
+      <Container className="relative">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-8">
           <div>
