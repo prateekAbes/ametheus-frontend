@@ -33,21 +33,55 @@ export interface AuditLog {
   action: string
   target: string
   details?: string
-  created_at: string
+  timestamp?: string
+  created_at?: string
+  ip_address?: string
+  prev_hash?: string
+  record_hash?: string
+  is_archived?: boolean
+  archived_at?: string
+  archived_by?: string
+  archive_reason?: string
 }
 
 export interface PendingPayment {
   id: string
   _id?: string
   user_id: string
+  user_name?: string
+  username?: string
+  user_username?: string
   user_email?: string
   tournament_id?: string
   amount_inr: number
+  amount_paise?: number
   utr: string
   sender_upi_id?: string
-  payment_status: string
+  payment_method?: string
+  payment_type?: string
+  status: string
+  payment_status?: string
+  is_archived?: boolean
+  archived_at?: string
+  archived_by?: string
+  archive_reason?: string
+  verified_at?: string
+  verified_by?: string
+  approved_by?: string
+  audited_by?: string
+  rejection_reason?: string
+  notes?: string
+  payment_account_id?: string
+  payment_account_code?: string
+  upi_id?: string
+  payee_name?: string
+  qr_url?: string
+  screenshot_url?: string
+  proof_url?: string
   created_at: string
+  updated_at?: string
 }
+
 
 export interface PayoutRecord {
   id: string
@@ -174,8 +208,39 @@ export async function getUserWalletSummary(userId: string): Promise<any> {
 }
 
 // Audit Logs
-export async function getAuditLogs(limit: number = 100): Promise<AuditLog[]> {
-  return apiClient<AuditLog[]>(`/admin/audit-logs?limit=${limit}`)
+export interface AuditLogQuery {
+  limit?: number
+  skip?: number
+  search?: string
+  action?: string
+  operator?: string
+  date_range?: string
+  is_archived?: boolean
+}
+
+export async function getAuditLogs(params?: AuditLogQuery | number): Promise<AuditLog[]> {
+  if (typeof params === 'number') {
+    return apiClient<AuditLog[]>(`/admin/audit-logs?limit=${params}`)
+  }
+  const q = new URLSearchParams()
+  if (params?.limit) q.append('limit', String(params.limit))
+  if (params?.skip) q.append('skip', String(params.skip))
+  if (params?.search) q.append('search', params.search)
+  if (params?.action && params.action !== 'ALL') q.append('action', params.action)
+  if (params?.operator) q.append('operator', params.operator)
+  if (params?.date_range && params.date_range !== 'ALL') q.append('date_range', params.date_range)
+  if (params?.is_archived) q.append('is_archived', 'true')
+  return apiClient<AuditLog[]>(`/admin/audit-logs?${q.toString()}`)
+}
+
+export async function getAuditLogsCount(params?: AuditLogQuery): Promise<{ total: number }> {
+  const q = new URLSearchParams()
+  if (params?.search) q.append('search', params.search)
+  if (params?.action && params.action !== 'ALL') q.append('action', params.action)
+  if (params?.operator) q.append('operator', params.operator)
+  if (params?.date_range && params.date_range !== 'ALL') q.append('date_range', params.date_range)
+  if (params?.is_archived) q.append('is_archived', 'true')
+  return apiClient<{ total: number }>(`/admin/audit-logs/count?${q.toString()}`)
 }
 
 // Payments & UTR Verifications
@@ -183,9 +248,11 @@ export async function getPendingPayments(): Promise<PendingPayment[]> {
   return apiClient<PendingPayment[]>('/admin/payments?status_filter=PENDING')
 }
 
-export async function getAdminPayments(statusFilter?: string): Promise<PendingPayment[]> {
-  const q = statusFilter && statusFilter !== 'ALL' ? `?status_filter=${statusFilter}` : ''
-  return apiClient<PendingPayment[]>(`/admin/payments${q}`)
+export async function getAdminPayments(statusFilter?: string, isArchived: boolean = false): Promise<PendingPayment[]> {
+  const params = new URLSearchParams()
+  if (statusFilter && statusFilter !== 'ALL') params.append('status_filter', statusFilter)
+  if (isArchived) params.append('is_archived', 'true')
+  return apiClient<PendingPayment[]>(`/admin/payments?${params.toString()}`)
 }
 
 export async function approvePayment(paymentId: string): Promise<any> {
@@ -198,6 +265,18 @@ export async function rejectPayment(paymentId: string, notes?: string): Promise<
   return apiClient(`/admin/payments/${paymentId}/reject`, {
     method: 'POST',
     body: JSON.stringify({ notes, rejection_reason: notes }),
+  })
+}
+
+export async function archivePayment(paymentId: string): Promise<any> {
+  return apiClient(`/admin/payments/${paymentId}/archive`, {
+    method: 'POST',
+  })
+}
+
+export async function unarchivePayment(paymentId: string): Promise<any> {
+  return apiClient(`/admin/payments/${paymentId}/unarchive`, {
+    method: 'POST',
   })
 }
 
@@ -219,11 +298,66 @@ export async function createUpiAccount(payload: {
   })
 }
 
+export async function deleteUpiAccount(id: string): Promise<any> {
+  return apiClient(`/admin/upi-accounts/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function toggleUpiAccountStatus(id: string): Promise<any> {
   return apiClient(`/admin/upi-accounts/${id}/toggle-status`, {
     method: 'POST',
   })
 }
+
+// Notification CMS
+export interface PlatformNotificationItem {
+  id: string
+  user_id?: string
+  type: string
+  category?: string
+  title: string
+  message: string
+  is_read: boolean
+  link?: string
+  is_archived?: boolean
+  archived_at?: string
+  archived_by?: string
+  created_at: string
+}
+
+export async function getAdminPlatformNotifications(params?: {
+  search?: string
+  notification_type?: string
+  category?: string
+  is_archived?: boolean
+  limit?: number
+  skip?: number
+}): Promise<{ items: PlatformNotificationItem[]; total: number }> {
+  const q = new URLSearchParams()
+  if (params?.search) q.append('search', params.search)
+  if (params?.notification_type && params.notification_type !== 'ALL') q.append('notification_type', params.notification_type)
+  if (params?.category && params.category !== 'ALL') q.append('category', params.category)
+  if (params?.is_archived) q.append('is_archived', 'true')
+  if (params?.limit) q.append('limit', String(params.limit))
+  if (params?.skip) q.append('skip', String(params.skip))
+  return apiClient<{ items: PlatformNotificationItem[]; total: number }>(`/admin/notifications?${q.toString()}`)
+}
+
+export async function sendAdminPlatformNotification(payload: {
+  user_ids: string[]
+  title: string
+  message: string
+  notification_type?: string
+  category?: string
+  link?: string
+}): Promise<any> {
+  return apiClient('/admin/notifications/send', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 
 export async function uploadUpiAccountQr(accountId: string, file: File): Promise<{
   status: string

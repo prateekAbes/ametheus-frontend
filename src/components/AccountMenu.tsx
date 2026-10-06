@@ -46,15 +46,6 @@ function useAccent(pathname: string) {
 
 type Box = { x: number; y: number; w: number; h: number; k: number }
 
-const SHAPES = [
-  '14px 20px 16px 12px / 12px 16px 20px 14px',
-  '20px 13px 18px 15px / 16px 12px 14px 19px',
-  '13px 18px 12px 21px / 18px 14px 16px 12px',
-  '18px 15px 20px 13px / 13px 19px 12px 17px',
-]
-const PAD_X = 10,
-  PAD_Y = 6
-
 type Row = {
   key: keyof typeof I
   to: string
@@ -270,10 +261,10 @@ export default function AccountMenu() {
     const idx = target === 'out' ? -1 : rows.findIndex((r) => r.key === target)
 
     const nextBox: Box = {
-      x: x - PAD_X,
-      y: y - PAD_Y,
-      w: w + PAD_X * 2,
-      h: h + PAD_Y * 2,
+      x,
+      y,
+      w,
+      h,
       k: idx,
     }
 
@@ -499,26 +490,25 @@ export default function AccountMenu() {
           >
             <span
               aria-hidden
-              className={`pointer-events-none absolute left-0 top-0 overflow-hidden border transition-[transform,width,height,border-radius,opacity] duration-[380ms] ease-[cubic-bezier(.25,1.25,.4,1)] ${
+              className={`pointer-events-none absolute left-0 top-0 overflow-hidden border transition-[transform,width,height,opacity] duration-[240ms] ease-out ${
                 box ? 'opacity-100' : 'opacity-0'
               }`}
               style={{
                 transform: `translate3d(${box?.x ?? 0}px, ${box?.y ?? 0}px, 0)`,
                 width: box?.w ?? 0,
                 height: box?.h ?? 0,
-                borderRadius: SHAPES[box ? (((box.k % SHAPES.length) + SHAPES.length) % SHAPES.length) : 0],
-                borderColor: box?.k === -1 ? 'rgb(255 59 78 / .18)' : `${acc}26`,
+                borderRadius: '0px',
+                borderLeftWidth: '3px',
+                borderLeftColor: box?.k === -1 ? '#ff3b4e' : acc,
+                borderColor: box?.k === -1 ? 'rgb(255 59 78 / .35)' : `${acc}33`,
                 background:
                   box?.k === -1
-                    ? 'rgb(255 59 78 / .07)'
-                    : `linear-gradient(100deg, ${acc}1f, ${acc}0d)`,
+                    ? 'rgb(255 59 78 / .1)'
+                    : `linear-gradient(90deg, ${acc}22, ${acc}0a)`,
               }}
             >
               <span
-                className="absolute inset-y-0 w-2/3 bg-gradient-to-r from-transparent via-white/[0.05] to-transparent transition-transform duration-700 ease-out"
-                style={{
-                  transform: `translateX(${(box?.k ?? 0) % 2 ? 60 : -10}%)`,
-                }}
+                className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/[0.05] to-transparent pointer-events-none"
               />
             </span>
 
@@ -530,20 +520,18 @@ export default function AccountMenu() {
                 <Link
                   key={r.key}
                   to={r.to}
+                  ref={(el) => {
+                    groups.current[r.key] = el
+                  }}
                   role="menuitem"
                   onMouseEnter={() => setHover(r.key)}
                   onFocus={() => setHover(r.key)}
-                  className={`group relative flex items-center gap-3 px-3 py-2 outline-none ${
+                  className={`group relative flex w-full items-center justify-between px-3.5 py-2.5 outline-none cursor-pointer ${
                     gap ? 'mt-1.5' : ''
                   } ${reveal}`}
                   style={item(i + 2)}
                 >
-                  <span
-                    ref={(el) => {
-                      groups.current[r.key] = el
-                    }}
-                    className="flex min-w-0 items-center gap-3"
-                  >
+                  <span className="flex min-w-0 items-center gap-3">
                     <span
                       className={`grid size-5 shrink-0 place-items-center transition-[transform,color,opacity] duration-300 ease-out ${
                         MOTION[r.key]
@@ -565,16 +553,16 @@ export default function AccountMenu() {
                     </span>
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-[13px] font-medium leading-tight transition-colors duration-300 ${
-                          lit ? 'text-ink' : 'text-ink/75'
+                        className={`block truncate text-[13px] font-medium leading-tight transition-colors duration-200 ${
+                          lit ? 'text-ink font-semibold' : 'text-ink/80'
                         }`}
                       >
                         {r.label}
                       </span>
                       {r.hint && (
                         <span
-                          className={`block truncate text-[11px] leading-tight transition-colors duration-300 ${
-                            lit ? 'text-ink/55' : 'text-dim'
+                          className={`block truncate text-[11px] leading-tight transition-colors duration-200 ${
+                            lit ? 'text-ink/65' : 'text-dim'
                           }`}
                         >
                           {r.hint}
@@ -582,7 +570,7 @@ export default function AccountMenu() {
                       )}
                     </span>
                   </span>
-                  <span className="ml-auto shrink-0">{r.trail}</span>
+                  <span className="ml-auto shrink-0 pl-2">{r.trail}</span>
                 </Link>
               )
             })}
@@ -592,23 +580,23 @@ export default function AccountMenu() {
             {isSignedIn && (
               <button
                 type="button"
+                ref={(el) => {
+                  groups.current.out = el
+                }}
                 onClick={handleSignOut}
                 role="menuitem"
                 onMouseEnter={() => setHover('out')}
                 onFocus={() => setHover('out')}
-                className={`group relative flex w-full items-center px-3 py-2 text-[13px] outline-none cursor-pointer ${reveal}`}
+                className={`group relative flex w-full items-center px-3.5 py-2.5 text-[13px] outline-none cursor-pointer ${reveal}`}
                 style={item(rows.length + 2)}
               >
                 <span
-                  ref={(el) => {
-                    groups.current.out = el
-                  }}
-                  className={`flex items-center gap-3 transition-colors duration-300 ${
-                    hover === 'out' ? 'text-live/85' : 'text-dim'
+                  className={`flex items-center gap-3 transition-colors duration-200 ${
+                    hover === 'out' ? 'text-live font-medium' : 'text-dim'
                   }`}
                 >
                   <span
-                    className={`grid size-5 place-items-center transition-transform duration-300 ${MOTION.out}`}
+                    className={`grid size-5 place-items-center transition-transform duration-200 ${MOTION.out}`}
                   >
                     <svg
                       width="16"

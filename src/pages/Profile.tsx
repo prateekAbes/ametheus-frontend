@@ -9,12 +9,7 @@ import { getMyTeams, type Team } from '../services/teams'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 
-const RANKS: Record<string, [string, number]> = {
-  bgmi: ['Conqueror', 212],
-  valorant: ['Immortal II', 88],
-  'free-fire': ['Grandmaster', 140],
-  codm: ['Legendary', 64],
-}
+import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../services/support'
 
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
@@ -23,6 +18,7 @@ export default function Profile() {
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
   const [matches, setMatches] = useState<any[]>([])
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('ALL')
 
@@ -37,7 +33,8 @@ export default function Profile() {
       getMyTeams(),
       getMyRegistrations(),
       getMatches(),
-    ]).then(([teamsRes, regsRes, matchRes]) => {
+      getSupportTickets(),
+    ]).then(([teamsRes, regsRes, matchRes, tixRes]) => {
       let teamNames: string[] = []
       if (teamsRes.status === 'fulfilled' && Array.isArray(teamsRes.value)) {
         setTeams(teamsRes.value)
@@ -59,6 +56,10 @@ export default function Profile() {
           )
         )
         setMatches(userMatches)
+      }
+
+      if (tixRes.status === 'fulfilled' && Array.isArray(tixRes.value)) {
+        setTickets(tixRes.value)
       }
       setIsLoadingFeed(false)
     })
@@ -112,30 +113,54 @@ export default function Profile() {
 
   const completedMatches = matches.filter((m) => m.status === 'completed' || m.score)
 
+  // Past Tournaments participated in by user
+  const pastTournaments = useMemo(() => {
+    return registrations.filter((r) => {
+      const s = (r.tournament_status || '').toUpperCase()
+      return s === 'COMPLETED' || s === 'FINISHED' || s === 'CONCLUDED' || s === 'ARCHIVED'
+    })
+  }, [registrations])
+
+  // Open support tickets for user
+  const openTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      const val = formatTicketStatus(t.status).value
+      return val === 'OPEN' || val === 'IN_PROGRESS' || val === 'WAITING_FOR_USER'
+    })
+  }, [tickets])
+
+
   return (
     <div className="bg-void pb-28">
       <section className="relative overflow-hidden pt-32">
         <div className="absolute inset-0 bg-gradient-to-t from-void via-void/80 to-void/40" />
         <Particles n={20} />
-        <Container className="relative grid items-end gap-10 pb-16 md:grid-cols-[minmax(260px,380px)_1fr]">
-          <div className="relative border border-white/15 bg-surface p-3">
+        <Container className="relative grid items-end gap-10 pb-14 md:grid-cols-[minmax(260px,360px)_1fr]">
+          <div className="relative border border-white/20 bg-graphite/80 p-3.5 shadow-2xl backdrop-blur-md">
             <Brackets color="border-cyan/70" />
-            <DynamicImage
-              src={avatarDisplay}
-              alt={username}
-              eager
-              className="aspect-[4/5] w-full object-cover"
-            />
-            <div className="flex items-center justify-between p-3">
-              <Hud>Player Card</Hud>
+            <div className="relative overflow-hidden bg-void/60 border border-white/10">
+              <DynamicImage
+                src={avatarDisplay}
+                alt={username}
+                eager
+                className="aspect-[4/5] w-full object-cover transition-transform duration-500 hover:scale-105"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void/80 via-transparent to-transparent" />
+            </div>
+            <div className="mt-3 flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
+                <Hud>Player Card</Hud>
+              </div>
               <Badge
                 s={role === 'SUPER_ADMIN' ? 'live' : role === 'ORGANIZER' ? 'active' : 'default'}
-                label={role}
+                label={role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : role}
               />
             </div>
           </div>
-          <div>
-            <div className="flex items-center gap-3">
+
+          <div className="flex flex-col justify-end">
+            <div className="flex flex-wrap items-center gap-2.5 mb-2">
               <Hud className="text-cyan">◇ Esports identity</Hud>
               <span
                 className={`font-mono text-[9px] uppercase tracking-[0.16em] px-2 py-0.5 border ${
@@ -149,32 +174,40 @@ export default function Profile() {
                 {role === 'SUPER_ADMIN' ? 'ROOT CONTENDER' : role}
               </span>
             </div>
-            <h1 className="reveal mt-1 font-display text-[clamp(4.5rem,15vw,13rem)] font-black uppercase leading-[0.8]">
+            <h1 className="reveal font-display text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white leading-none">
               {username}
             </h1>
-            <div className="mt-8 grid grid-cols-2 gap-6 border-t border-white/10 pt-6 sm:grid-cols-4">
-              {[
-                ['Email', email],
-                ['Account Role', role],
-                ['Wallet Balance', inr(balanceInr)],
-                ['Active Teams', String(teams.length)],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <Hud>{k}</Hud>
-                  <p className="mt-1 font-display text-lg font-black uppercase truncate">{v}</p>
-                </div>
-              ))}
+
+            {/* Key Information Micro-Panels */}
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
+                <Hud>Email</Hud>
+                <p className="mt-1 font-mono text-xs font-semibold text-ink truncate" title={email}>{email}</p>
+              </div>
+              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
+                <Hud>Account Role</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-ink truncate">{role}</p>
+              </div>
+              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
+                <Hud>Ametheus Vault</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-cyan truncate">{inr(balanceInr)}</p>
+              </div>
+              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
+                <Hud>Active Teams</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-ink truncate">{teams.length} Squads</p>
+              </div>
             </div>
-            <div className="mt-6 flex gap-3">
+
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 to="/settings"
-                className="border border-white/20 bg-surface px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors"
+                className="border border-white/20 bg-surface/80 px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan hover:bg-cyan/10 transition-all"
               >
                 Edit Profile
               </Link>
               <Link
                 to="/wallet"
-                className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
+                className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-all"
               >
                 Manage Wallet
               </Link>
@@ -184,80 +217,168 @@ export default function Profile() {
       </section>
 
       <Container>
-        <div className="grid grid-cols-2 gap-px border border-white/10 bg-white/10 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            ['Registered Teams', String(teams.length)],
-            ['Wallet Funds', inr(balanceInr)],
-            ['Registered Events', String(registrations.length)],
-            ['Regional Division', 'India (IN)'],
-          ].map(([k, v], i) => (
-            <div key={k} className="bg-void p-6 md:p-8">
+            ['Registered Teams', String(teams.length), 'Active Squads'],
+            ['Ametheus Vault', inr(balanceInr), 'Paise Balance'],
+            ['Registered Events', String(registrations.length), 'Tournaments'],
+            ['Regional Division', 'India (IN)', 'Official Server'],
+          ].map(([k, v, sub], i) => (
+            <div
+              key={k}
+              className="relative overflow-hidden border border-white/15 bg-gradient-to-b from-surface/70 to-surface/30 p-5 md:p-6 shadow-md transition-all hover:border-white/30 group"
+            >
+              <div className="h-0.5 w-6 bg-cyan/60 group-hover:w-full transition-all duration-300 mb-3" />
               <Hud>{k}</Hud>
               <p
-                className={`mt-2 font-display text-[clamp(2.5rem,5vw,4.5rem)] font-black leading-none ${
-                  i === 1 ? 'text-cyan' : ''
+                className={`mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-none ${
+                  i === 1 ? 'text-cyan' : 'text-white'
                 }`}
               >
                 {v}
               </p>
+              <span className="mt-2 block font-mono text-[10px] uppercase text-dim tracking-wider">
+                {sub}
+              </span>
             </div>
           ))}
         </div>
 
         <div className="mt-16 grid gap-12 lg:grid-cols-2">
-          {/* LEFT: Game Roster & Teams */}
-          <div>
-            <Hud className="text-cyan">◇ Games & Competitions</Hud>
-            <div className="mt-4 space-y-2">
-              {GAMES.map((g) => (
-                <div
-                  key={g.slug}
-                  className="flex items-center gap-4 border border-white/10 p-4"
-                  style={{ borderLeft: `3px solid ${g.accent}` }}
-                >
-                  <span
-                    className="w-28 font-display text-lg font-black tracking-[0.1em]"
-                    style={{ color: g.accent }}
-                  >
-                    {g.short}
-                  </span>
-                  <span className="flex-1 font-display text-xl font-black uppercase">
-                    {RANKS[g.slug]?.[0] || 'Ranked'}
-                  </span>
-                  <Hud>{g.squad}</Hud>
-                </div>
-              ))}
+          {/* LEFT: Past Tournaments & My Teams */}
+          <div className="space-y-12">
+            {/* PAST TOURNAMENTS (Career Participation & Results) */}
+            <div>
+              <div className="flex items-center justify-between">
+                <Hud className="text-cyan">◇ Past Tournaments</Hud>
+                <span className="font-mono text-[10px] uppercase text-dim tracking-wider">
+                  {pastTournaments.length} Concluded
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {pastTournaments.length === 0 ? (
+                  <div className="border border-white/10 bg-surface/30 p-6 text-center">
+                    <p className="font-mono text-xs uppercase tracking-wider text-dim">
+                      No concluded tournaments yet
+                    </p>
+                    <p className="mt-1 text-xs text-dim">
+                      Your historical placements, prize distribution, and final match standings appear here once official platform tournaments conclude.
+                    </p>
+                    <div className="mt-4">
+                      <Link
+                        to="/tournaments"
+                        className="inline-block border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
+                      >
+                        Browse Tournaments
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  pastTournaments.map((pt) => {
+                    const g = gameBy(pt.game_slug || 'valorant')
+                    const formattedDate = pt.starts_at
+                      ? new Date(pt.starts_at).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : 'Concluded'
+
+                    return (
+                      <div
+                        key={pt.registration_id}
+                        className="border border-white/10 bg-surface/40 p-4 transition-all hover:border-cyan/40"
+                        style={{ borderLeft: `3px solid ${g.accent}` }}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="font-display text-xs font-black tracking-wider uppercase"
+                              style={{ color: g.accent }}
+                            >
+                              {g.short}
+                            </span>
+                            <span className="text-white/20">·</span>
+                            <Hud>{formattedDate}</Hud>
+                          </div>
+                          <Badge s="completed" label="CONCLUDED" />
+                        </div>
+                        <h4 className="mt-2 font-display text-xl font-black uppercase text-white">
+                          {pt.tournament_title}
+                        </h4>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-dim border-t border-white/5 pt-2">
+                          <span>
+                            Squad:{' '}
+                            <strong className="text-ink">
+                              {pt.team_name ? `${pt.team_name} [${pt.team_tag || 'TEAM'}]` : 'Solo Contender'}
+                            </strong>
+                          </span>
+                          <span className="text-cyan font-bold">
+                            Prize: {inr(pt.prize_pool_inr)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
             </div>
 
-            <Hud className="mt-12 block text-cyan">◇ Your Rosters</Hud>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {teams.length === 0 ? (
-                <div className="col-span-2 border border-white/10 p-6 text-center text-dim text-sm">
-                  No active teams.{' '}
-                  <Link to="/teams/create" className="text-cyan hover:underline">
-                    Create a team
-                  </Link>{' '}
-                  or{' '}
-                  <Link to="/teams/join" className="text-violet hover:underline">
-                    join one
-                  </Link>
-                  .
-                </div>
-              ) : (
-                teams.map((team) => (
+            {/* MY TEAMS */}
+            <div>
+              <div className="flex items-center justify-between">
+                <Hud className="text-cyan">◇ My Teams</Hud>
+                <div className="flex items-center gap-2">
                   <Link
-                    key={team.id || (team as any)._id}
-                    to="/teams"
-                    className="flex items-center gap-4 border border-white/10 p-4 hover:border-white/30"
+                    to="/teams/create"
+                    className="font-mono text-[10px] uppercase tracking-wider text-cyan hover:underline"
                   >
-                    <Crest name={team.name} size={44} />
-                    <div>
-                      <p className="font-display text-xl font-black uppercase">{team.name}</p>
-                      <Hud>[{team.tag}] · {team.members?.length || 1} members</Hud>
-                    </div>
+                    + Create Team
                   </Link>
-                ))
-              )}
+                  <span className="text-white/20">·</span>
+                  <Link
+                    to="/teams/join"
+                    className="font-mono text-[10px] uppercase tracking-wider text-violet hover:underline"
+                  >
+                    Join Team
+                  </Link>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {teams.length === 0 ? (
+                  <div className="col-span-2 border border-white/10 bg-surface/30 p-6 text-center text-dim text-sm">
+                    No active team memberships.{' '}
+                    <Link to="/teams/create" className="text-cyan hover:underline">
+                      Create a team
+                    </Link>{' '}
+                    or{' '}
+                    <Link to="/teams/join" className="text-violet hover:underline">
+                      join one with an invite code
+                    </Link>
+                    .
+                  </div>
+                ) : (
+                  teams.map((team) => (
+                    <Link
+                      key={team.id || (team as any)._id}
+                      to="/teams"
+                      className="group flex items-center gap-4 border border-white/10 bg-surface/40 p-4 transition-all hover:border-cyan/40 hover:bg-surface/70"
+                    >
+                      <Crest name={team.name} size={44} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-display text-lg font-black uppercase text-white group-hover:text-cyan transition-colors truncate">
+                          {team.name}
+                        </p>
+                        <Hud className="mt-0.5 block truncate">
+                          [{team.tag}] · {team.members?.length || 1} members
+                        </Hud>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -396,6 +517,110 @@ export default function Profile() {
                 </ol>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* MY OPEN TICKETS */}
+        <div className="mt-16">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Hud className="text-cyan">◇ My Open Tickets</Hud>
+              <span className="border border-white/20 bg-surface/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink">
+                {openTickets.length} Active
+              </span>
+            </div>
+            <Link
+              to="/support"
+              className="font-mono text-xs text-cyan hover:underline uppercase tracking-wider"
+            >
+              Support Helpdesk →
+            </Link>
+          </div>
+
+          <div className="mt-4">
+            {openTickets.length === 0 ? (
+              <div className="border border-white/10 bg-surface/30 p-8 text-center">
+                <p className="font-mono text-xs text-dim uppercase tracking-wider">
+                  No open support tickets
+                </p>
+                <p className="mt-1 text-sm text-dim">
+                  All payment reconciliations, bracket disputes, and account queries are resolved.
+                </p>
+                <div className="mt-4">
+                  <Link
+                    to="/support"
+                    className="inline-block border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
+                  >
+                    Open New Support Ticket
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {openTickets.map((t) => {
+                  const statusInfo = formatTicketStatus(t.status)
+                  const isWaitingUser = statusInfo.value === 'WAITING_FOR_USER'
+                  const tId = t.ticket_id || t.id.slice(0, 8)
+                  const createdDate = t.created_at
+                    ? new Date(t.created_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : 'Recent'
+                  const lastActivity = t.last_message_at
+                    ? new Date(t.last_message_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : createdDate
+
+                  return (
+                    <Link
+                      key={t.id}
+                      to="/support"
+                      className="group border border-white/10 bg-surface/40 p-5 transition-all hover:border-cyan/40 hover:bg-surface/70 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-bold text-cyan">
+                            #{tId}
+                          </span>
+                          <span
+                            className={`border px-2 py-0.5 font-mono text-[9px] uppercase font-bold tracking-wider ${statusInfo.badgeClass}`}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
+
+                        <h4 className="mt-3 font-display text-lg font-black uppercase text-white group-hover:text-cyan transition-colors truncate">
+                          {t.subject || t.category || 'Support Inquiry'}
+                        </h4>
+
+                        <div className="mt-2">
+                          <span
+                            className={`inline-block border px-2 py-0.5 font-mono text-[10px] uppercase font-bold tracking-wider ${
+                              isWaitingUser
+                                ? 'border-warn/60 bg-warn/15 text-warn'
+                                : 'border-cyan/40 bg-cyan/10 text-cyan'
+                            }`}
+                          >
+                            {isWaitingUser ? 'Waiting for Your Response' : 'Waiting for Support'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 border-t border-white/5 pt-3 flex items-center justify-between font-mono text-[10px] text-dim">
+                        <span>Created: {createdDate}</span>
+                        <span>Activity: {lastActivity}</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 

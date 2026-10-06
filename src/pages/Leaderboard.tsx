@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Container, Hud } from '../components/ui'
 import EsportsHeroVisual from '../components/EsportsHeroVisual'
+import { ChampionshipCrown, PodiumMedalBadge } from '../components/ChampionshipCrown'
 import {
   getLeaderboardEntries,
   getLeaderboardStats,
@@ -131,50 +132,55 @@ export default function Leaderboard() {
 
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32 text-ink overflow-hidden">
+      {/* Retained atmospheric esports hero background */}
       <EsportsHeroVisual variant="leaderboard" />
+
       <Container className="relative">
-        {/* Header */}
+        {/* Header — Sophisticated Reddish / Crimson Esports Accent */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-8">
           <div>
             <div className="flex items-center gap-3">
-              <span className="size-2 rounded-full bg-cyan animate-pulse" />
-              <Hud className="text-cyan font-bold">OFFICIAL ELO RANKINGS &amp; STANDINGS</Hud>
+              <span className="size-2 rounded-full bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-pulse" />
+              <Hud className="text-rose-400 font-bold tracking-widest">OFFICIAL ELO RANKINGS &amp; STANDINGS</Hud>
             </div>
             <h1 className="mt-2 font-display text-4xl sm:text-6xl font-black uppercase tracking-tight text-ink">
-              Platform <span className="text-cyan">Leaderboard</span>
+              Platform{' '}
+              <span className="bg-gradient-to-r from-rose-500 via-rose-400 to-amber-300 bg-clip-text text-transparent">
+                Leaderboard
+              </span>
             </h1>
-            <p className="mt-2 text-sm text-dim max-w-2xl font-mono">
+            <p className="mt-2 text-sm text-dim max-w-2xl font-mono leading-relaxed">
               Verified contender ratings, match win percentages, and sanctioned tournament earnings across India&apos;s competitive esports battlegrounds.
             </p>
           </div>
           <div className="flex gap-3">
             <Link
               to="/tournaments"
-              className="border border-white/15 bg-surface px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+              className="border border-white/15 bg-surface/80 px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-ink hover:border-rose-500 hover:text-rose-400 hover:shadow-[0_0_15px_rgba(244,63,94,0.25)] transition-all cursor-pointer"
             >
               Compete in Circuit →
             </Link>
           </div>
         </div>
 
-        {/* COMPACT Secondary Overview Stats Ribbon (Subordinate to 1st/2nd/3rd) */}
+        {/* Decluttered Secondary Overview Stats Ribbon */}
         {stats && (
-          <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-6 border border-white/10 bg-surface/40 px-4 py-2.5 backdrop-blur-sm">
-            <div className="flex items-center gap-2 border-r border-white/10 pr-4 sm:pr-6 last:border-0">
+          <div className="mt-6 flex flex-wrap items-center gap-4 sm:gap-8 border border-white/10 border-l-2 border-l-rose-500 bg-surface/40 px-5 py-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
               <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Awarded Prizes:</span>
-              <span className="font-mono text-xs font-bold text-cyan">{stats.total_awarded_prizes || '₹0'}</span>
+              <span className="font-mono text-xs font-bold text-ink">{stats.total_awarded_prizes || '₹0'}</span>
             </div>
-            <div className="flex items-center gap-2 border-r border-white/10 pr-4 sm:pr-6 last:border-0">
+            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
               <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Active Contenders:</span>
               <span className="font-mono text-xs font-bold text-ink">{stats.active_contenders || '0'}</span>
             </div>
-            <div className="flex items-center gap-2 border-r border-white/10 pr-4 sm:pr-6 last:border-0">
+            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
               <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Verified Squads:</span>
               <span className="font-mono text-xs font-bold text-ink">{stats.verified_squads || '0'}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Top Squad:</span>
-              <span className="font-mono text-xs font-bold text-amber-400">
+              <span className="font-mono text-xs font-bold text-rose-300">
                 {stats.top_team_name ? `${stats.top_team_name} · ` : ''}{stats.top_team_earnings || '₹0'}
               </span>
             </div>
@@ -184,13 +190,14 @@ export default function Leaderboard() {
         {/* 1. Game Discipline Filter Bar */}
         <div className="mt-8">
           <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-xs text-dim uppercase tracking-wider">
+            <span className="font-mono text-xs text-dim uppercase tracking-wider flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-rose-500/80" />
               Filter by Discipline:
             </span>
             {selectedGame !== 'all' && (
               <button
                 onClick={() => handleSelectGame('all')}
-                className="font-mono text-[11px] text-cyan hover:underline cursor-pointer"
+                className="font-mono text-[11px] text-rose-400 hover:underline cursor-pointer"
               >
                 Reset to All Titles
               </button>
@@ -199,9 +206,9 @@ export default function Leaderboard() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => handleSelectGame('all')}
-              className={`px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
+              className={`px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer ${
                 selectedGame === 'all'
-                  ? 'border-cyan bg-cyan text-void shadow-[0_0_12px_rgba(62,242,255,0.3)]'
+                  ? 'border-rose-500 bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.35)]'
                   : 'border-white/10 bg-surface/60 text-dim hover:border-white/30 hover:text-ink'
               }`}
             >
@@ -213,9 +220,9 @@ export default function Leaderboard() {
                 <button
                   key={g.slug}
                   onClick={() => handleSelectGame(g.slug)}
-                  className={`px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
+                  className={`px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer ${
                     isSelected
-                      ? 'border-cyan bg-cyan text-void shadow-[0_0_12px_rgba(62,242,255,0.3)]'
+                      ? 'border-rose-500 bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.35)]'
                       : 'border-white/10 bg-surface/60 text-dim hover:border-white/30 hover:text-ink'
                   }`}
                 >
@@ -226,7 +233,7 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* 2. Ranking Criteria Category, Limit Tabs & Search Bar */}
+        {/* 2. Ranking Criteria Metric, Limit Tabs & Search Bar */}
         <div className="mt-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-t border-white/10 pt-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-dim uppercase mr-2 tracking-wider">Metric:</span>
@@ -237,7 +244,7 @@ export default function Leaderboard() {
                     onClick={() => setSelectedCategory(cat.slug)}
                     className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
                       selectedCategory === cat.slug
-                        ? 'border-cyan bg-cyan/15 text-cyan'
+                        ? 'border-rose-500/80 bg-rose-500/15 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
                         : 'border-white/10 bg-surface/40 text-dim hover:border-white/30 hover:text-ink'
                     }`}
                   >
@@ -255,7 +262,7 @@ export default function Leaderboard() {
                     onClick={() => setSelectedCategory(slug)}
                     className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
                       selectedCategory === slug
-                        ? 'border-cyan bg-cyan/15 text-cyan'
+                        ? 'border-rose-500/80 bg-rose-500/15 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
                         : 'border-white/10 bg-surface/40 text-dim hover:border-white/30 hover:text-ink'
                     }`}
                   >
@@ -271,9 +278,9 @@ export default function Leaderboard() {
                 <button
                   key={opt}
                   onClick={() => setSelectedLimit(opt)}
-                  className={`px-2.5 py-1 font-mono text-xs uppercase transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 font-mono text-xs uppercase transition-all cursor-pointer ${
                     selectedLimit === opt
-                      ? 'bg-cyan text-void font-bold shadow-[0_0_10px_rgba(62,242,255,0.4)]'
+                      ? 'bg-rose-500 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.35)]'
                       : 'text-dim hover:text-ink'
                   }`}
                 >
@@ -288,11 +295,11 @@ export default function Leaderboard() {
                 placeholder="Search squad or tag..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-surface border border-white/10 px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim/50 focus:border-cyan focus:outline-none w-44 sm:w-56"
+                className="bg-surface border border-white/10 px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim/50 focus:border-rose-500 focus:outline-none w-44 sm:w-56 transition-colors"
               />
               <button
                 type="submit"
-                className="bg-cyan/10 border border-cyan/30 text-cyan hover:bg-cyan/20 px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                className="bg-rose-500/10 border border-rose-500/40 text-rose-400 hover:bg-rose-500/20 px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
               >
                 Filter
               </button>
@@ -302,13 +309,14 @@ export default function Leaderboard() {
 
         {/* 3. Standings Output */}
         {loading ? (
-          <div className="mt-12 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <div className="mt-14 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="border border-white/10 bg-surface/40 p-6 min-h-[260px] animate-pulse">
-                  <div className="h-4 w-24 bg-white/10 rounded mb-4" />
-                  <div className="h-8 w-44 bg-white/10 rounded mb-2" />
-                  <div className="h-4 w-28 bg-white/10 rounded mb-6" />
+                <div key={n} className="border border-white/10 bg-surface/40 p-6 min-h-[340px] animate-pulse">
+                  <div className="h-10 w-16 bg-white/10 mx-auto rounded mb-4" />
+                  <div className="size-20 bg-white/10 rounded-full mx-auto mb-4" />
+                  <div className="h-6 w-32 bg-white/10 mx-auto rounded mb-2" />
+                  <div className="h-4 w-24 bg-white/10 mx-auto rounded mb-6" />
                   <div className="h-16 w-full bg-white/10 rounded" />
                 </div>
               ))}
@@ -316,8 +324,8 @@ export default function Leaderboard() {
             <div className="h-64 border border-white/10 bg-surface/20 animate-pulse" />
           </div>
         ) : entries.length === 0 ? (
-          <div className="mt-12 border border-white/10 bg-surface/30 p-16 text-center">
-            <Hud className="text-cyan">No Ranked Contenders</Hud>
+          <div className="mt-14 border border-white/10 bg-surface/30 p-16 text-center">
+            <Hud className="text-rose-400">No Ranked Contenders</Hud>
             <p className="mt-2 font-mono text-dim text-sm max-w-md mx-auto">
               {searchQuery
                 ? `No contenders matched the search query "${searchQuery}".`
@@ -326,82 +334,91 @@ export default function Leaderboard() {
             {selectedGame !== 'all' && (
               <button
                 onClick={() => handleSelectGame('all')}
-                className="mt-6 border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
+                className="mt-6 border border-rose-500/40 bg-rose-500/10 px-4 py-2 font-mono text-xs uppercase font-bold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
               >
                 View All Disciplines
               </button>
             )}
           </div>
         ) : (
-          <div className="mt-12 space-y-12">
+          <div className="mt-14 space-y-16">
             {/* DYNAMIC TOP THREE PODIUM (1st Gold, 2nd Silver, 3rd Bronze) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              {/* 2nd Place: Silver (Left on desktop) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end pt-8 overflow-visible">
+              {/* 2nd Place: Silver Runner-Up (Left on desktop) */}
               {top2 && (
-                <div className="order-2 md:order-1 border-2 border-slate-300/60 bg-gradient-to-b from-slate-400/15 via-surface/90 to-surface p-6 relative transition-all duration-300 hover:border-slate-200 animate-silver-glow">
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <span className="inline-flex items-center gap-1.5 rounded border border-slate-300/80 bg-slate-300/20 px-2.5 py-1 font-mono text-xs font-black text-slate-100 shadow-[0_0_10px_rgba(203,213,225,0.25)]">
-                      <span className="animate-medal-breathe inline-block">🥈</span>
-                      <span>02 · SILVER RUNNER-UP</span>
-                    </span>
-                    {isEntryDisqualified(top2) && (
+                <div className="order-2 md:order-1 relative border border-slate-300/40 bg-gradient-to-b from-slate-300/10 via-surface/90 to-surface/95 p-6 pt-10 shadow-[0_0_20px_rgba(203,213,225,0.08),0_15px_30px_rgba(0,0,0,0.5)] animate-silver-glow transition-all duration-300 hover:border-slate-200">
+                  {/* Disqualification Status */}
+                  {isEntryDisqualified(top2) && (
+                    <div className="absolute top-3 left-3 z-30">
                       <span className="border border-live/80 bg-live/20 text-live px-2 py-0.5 font-mono text-[9px] uppercase font-bold animate-pulse">
                         DISQUALIFIED
                       </span>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Crown perched directly above the contender avatar */}
+                  <div className="relative -mb-4 z-20 flex justify-center">
+                    <ChampionshipCrown rank={2} size="md" />
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* Avatar & Medal Badge */}
+                  <div className="relative z-10 flex flex-col items-center">
                     {top2.logo_url ? (
-                      <div className="size-12 shrink-0 overflow-hidden border border-white/15 bg-surface">
+                      <div className="size-16 sm:size-18 shrink-0 overflow-hidden border-2 border-slate-300 bg-surface shadow-[0_0_15px_rgba(203,213,225,0.25)]">
                         <DynamicImage
                           src={resolveMediaUrl(top2.logo_url)}
                           alt={top2.name}
-                          className="size-12 object-cover"
+                          className="size-16 sm:size-18 object-cover"
                         />
                       </div>
                     ) : (
-                      <div className="flex size-12 shrink-0 items-center justify-center border border-slate-300/40 bg-surface font-display text-xl font-black text-slate-200">
+                      <div className="flex size-16 sm:size-18 shrink-0 items-center justify-center border-2 border-slate-300 bg-surface font-display text-2xl font-black text-slate-100 shadow-[0_0_15px_rgba(203,213,225,0.25)]">
                         {top2.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-display text-2xl font-black uppercase text-ink truncate leading-tight">
-                        {top2.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-mono text-xs text-slate-300 font-bold">[{top2.tag}]</span>
-                        <span className="text-[10px] text-dim font-mono truncate">
-                          {top2.game_name || top2.game_slug || 'Esports'}
-                        </span>
-                      </div>
+                    <div className="mt-3">
+                      <PodiumMedalBadge rank={2} />
                     </div>
                   </div>
 
-                  {top2.captain && (
-                    <p className="mt-2 text-[11px] text-dim font-mono">
-                      Captain: <span className="text-ink">{top2.captain}</span>
-                    </p>
-                  )}
+                  {/* Contender Identity */}
+                  <div className="mt-4 text-center">
+                    <h3 className="font-display text-2xl sm:text-3xl font-black uppercase text-ink truncate leading-tight tracking-tight">
+                      {top2.name}
+                    </h3>
+                    <div className="flex items-center justify-center gap-2 mt-1 font-mono text-xs">
+                      <span className="text-slate-300 font-bold">[{top2.tag}]</span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-dim truncate">
+                        {top2.game_name || top2.game_slug || 'Esports'}
+                      </span>
+                    </div>
+                    {top2.captain && (
+                      <p className="mt-1 text-[11px] text-dim font-mono">
+                        Captain: <span className="text-ink font-bold">{top2.captain}</span>
+                      </p>
+                    )}
+                  </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/10 pt-3 font-mono text-xs">
+                  {/* Performance Metrics */}
+                  <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-3.5 font-mono text-xs">
                     <div>
-                      <span className="text-dim text-[10px] block">Elo Rating</span>
-                      <p className="font-bold text-slate-200 text-lg">{top2.rating}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Elo Rating</span>
+                      <p className="font-bold text-slate-100 text-xl mt-0.5">{top2.rating}</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Win Rate</span>
-                      <p className="font-bold text-ink text-lg">{top2.win_rate}%</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Win Rate</span>
+                      <p className="font-bold text-ink text-xl mt-0.5">{top2.win_rate}%</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Record</span>
-                      <p className="font-bold text-ink">
-                        <span className="text-ok">{top2.wins}W</span> - <span className="text-warn">{top2.losses}L</span>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Record</span>
+                      <p className="font-bold text-ink mt-0.5">
+                        <span className="text-ok font-bold">{top2.wins}W</span> - <span className="text-rose-400 font-bold">{top2.losses}L</span>
                       </p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Prize Won</span>
-                      <p className="font-bold text-amber-400">{inr(Number(top2.earnings || 0))}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Prize Won</span>
+                      <p className="font-bold text-slate-200 text-base mt-0.5">{inr(Number(top2.earnings || 0))}</p>
                     </div>
                   </div>
                 </div>
@@ -409,141 +426,165 @@ export default function Leaderboard() {
 
               {/* 1st Place: Gold Champion (Center, elevated on desktop) */}
               {top1 && (
-                <div className="order-1 md:order-2 border-2 border-amber-400/90 bg-gradient-to-b from-amber-500/20 via-surface/95 to-surface p-7 relative md:-translate-y-4 shadow-xl shadow-amber-400/10 animate-gold-glow animate-podium-float z-10 transition-all duration-300 hover:border-amber-300">
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <span className="inline-flex items-center gap-1.5 rounded border border-amber-400/90 bg-amber-400/25 px-3 py-1 font-mono text-xs font-black text-amber-200 shadow-[0_0_14px_rgba(251,191,36,0.35)]">
-                      <span className="animate-crown-sway inline-block text-base">👑</span>
-                      <span>01 · GOLD CHAMPION</span>
-                    </span>
-                    {isEntryDisqualified(top1) && (
+                <div className="order-1 md:order-2 relative border border-amber-400/80 bg-gradient-to-b from-amber-500/15 via-surface/90 to-surface/95 p-7 pt-12 md:-translate-y-6 md:scale-[1.02] shadow-[0_0_35px_rgba(251,191,36,0.14),0_0_50px_rgba(225,29,72,0.1),0_25px_50px_rgba(0,0,0,0.7)] animate-gold-glow animate-podium-float z-10 transition-all duration-300 hover:border-amber-300">
+                  {/* Subtle decorative crimson corner ticks */}
+                  <div className="absolute top-0 right-0 size-8 overflow-hidden pointer-events-none">
+                    <div className="absolute top-0 right-0 w-12 h-1 bg-gradient-to-l from-rose-500 to-transparent" />
+                    <div className="absolute top-0 right-0 w-1 h-12 bg-gradient-to-b from-rose-500 to-transparent" />
+                  </div>
+
+                  {/* Disqualification Status */}
+                  {isEntryDisqualified(top1) && (
+                    <div className="absolute top-3 left-3 z-30">
                       <span className="border border-live/80 bg-live/20 text-live px-2 py-0.5 font-mono text-[9px] uppercase font-bold animate-pulse">
                         DISQUALIFIED
                       </span>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Noticeably Larger Champion Crown perched directly above winner's avatar */}
+                  <div className="relative -mb-5 z-20 flex justify-center">
+                    <ChampionshipCrown rank={1} size="lg" />
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  {/* Winner Avatar & Medal Badge */}
+                  <div className="relative z-10 flex flex-col items-center">
                     {top1.logo_url ? (
-                      <div className="size-16 shrink-0 overflow-hidden border-2 border-amber-400/50 bg-surface shadow-[0_0_12px_rgba(251,191,36,0.2)]">
+                      <div className="size-20 sm:size-24 shrink-0 overflow-hidden border-2 border-amber-400 bg-surface shadow-[0_0_20px_rgba(251,191,36,0.35)]">
                         <DynamicImage
                           src={resolveMediaUrl(top1.logo_url)}
                           alt={top1.name}
-                          className="size-16 object-cover"
+                          className="size-20 sm:size-24 object-cover"
                         />
                       </div>
                     ) : (
-                      <div className="flex size-16 shrink-0 items-center justify-center border-2 border-amber-400/50 bg-surface font-display text-3xl font-black text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.2)]">
+                      <div className="flex size-20 sm:size-24 shrink-0 items-center justify-center border-2 border-amber-400 bg-surface font-display text-3xl sm:text-4xl font-black text-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.35)]">
                         {top1.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-display text-3xl font-black uppercase text-ink truncate leading-tight">
-                        {top1.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-mono text-sm text-amber-300 font-bold">[{top1.tag}]</span>
-                        <span className="text-xs text-dim font-mono truncate">
-                          {top1.game_name || top1.game_slug || 'Premier Esports'}
-                        </span>
-                      </div>
+                    <div className="mt-3">
+                      <PodiumMedalBadge rank={1} />
                     </div>
                   </div>
 
-                  {top1.captain && (
-                    <p className="mt-3 text-xs text-dim font-mono">
-                      Captain: <span className="text-ink font-bold">{top1.captain}</span>
-                    </p>
-                  )}
+                  {/* Contender Identity */}
+                  <div className="mt-4 text-center">
+                    <h3 className="font-display text-3xl sm:text-4xl font-black uppercase text-ink truncate leading-tight tracking-tight">
+                      {top1.name}
+                    </h3>
+                    <div className="flex items-center justify-center gap-2 mt-1 font-mono text-xs">
+                      <span className="text-amber-300 font-bold">[{top1.tag}]</span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-dim truncate">
+                        {top1.game_name || top1.game_slug || 'Premier Esports'}
+                      </span>
+                    </div>
+                    {top1.captain && (
+                      <p className="mt-1 text-xs text-dim font-mono">
+                        Captain: <span className="text-ink font-bold">{top1.captain}</span>
+                      </p>
+                    )}
+                  </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3 border-t border-amber-400/25 pt-4 font-mono text-xs">
+                  {/* Champion Performance Metrics */}
+                  <div className="mt-6 grid grid-cols-2 gap-4 border-t border-amber-400/25 pt-4 font-mono text-xs">
                     <div>
-                      <span className="text-dim text-[10px] block">Elo Rating</span>
-                      <p className="font-bold text-amber-300 text-2xl">{top1.rating}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Elo Rating</span>
+                      <p className="font-bold text-amber-300 text-2xl mt-0.5">{top1.rating}</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Win Rate</span>
-                      <p className="font-bold text-ink text-2xl">{top1.win_rate}%</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Win Rate</span>
+                      <p className="font-bold text-ink text-2xl mt-0.5">{top1.win_rate}%</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Record</span>
-                      <p className="font-bold text-ink">
-                        <span className="text-ok font-bold">{top1.wins}W</span> - <span className="text-warn font-bold">{top1.losses}L</span>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Record</span>
+                      <p className="font-bold text-ink mt-0.5">
+                        <span className="text-ok font-bold">{top1.wins}W</span> - <span className="text-rose-400 font-bold">{top1.losses}L</span>
                       </p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Total Earnings</span>
-                      <p className="font-bold text-amber-300 text-lg">{inr(Number(top1.earnings || 0))}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Total Earnings</span>
+                      <p className="font-bold text-amber-300 text-lg mt-0.5">{inr(Number(top1.earnings || 0))}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 3rd Place: Bronze (Right on desktop) */}
+              {/* 3rd Place: Bronze 3rd Place (Right on desktop) */}
               {top3 && (
-                <div className="order-3 border-2 border-amber-700/60 bg-gradient-to-b from-amber-800/15 via-surface/90 to-surface p-6 relative transition-all duration-300 hover:border-amber-600 animate-bronze-glow">
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <span className="inline-flex items-center gap-1.5 rounded border border-amber-700/80 bg-amber-700/20 px-2.5 py-1 font-mono text-xs font-black text-amber-400 shadow-[0_0_10px_rgba(217,119,6,0.25)]">
-                      <span className="animate-medal-breathe inline-block">🥉</span>
-                      <span>03 · BRONZE 3RD PLACE</span>
-                    </span>
-                    {isEntryDisqualified(top3) && (
+                <div className="order-3 relative border border-amber-700/50 bg-gradient-to-b from-amber-800/10 via-surface/90 to-surface/95 p-6 pt-10 shadow-[0_0_20px_rgba(217,119,6,0.08),0_15px_30px_rgba(0,0,0,0.5)] animate-bronze-glow transition-all duration-300 hover:border-amber-600">
+                  {/* Disqualification Status */}
+                  {isEntryDisqualified(top3) && (
+                    <div className="absolute top-3 left-3 z-30">
                       <span className="border border-live/80 bg-live/20 text-live px-2 py-0.5 font-mono text-[9px] uppercase font-bold animate-pulse">
                         DISQUALIFIED
                       </span>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Crown perched directly above avatar */}
+                  <div className="relative -mb-4 z-20 flex justify-center">
+                    <ChampionshipCrown rank={3} size="md" />
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* Avatar & Medal Badge */}
+                  <div className="relative z-10 flex flex-col items-center">
                     {top3.logo_url ? (
-                      <div className="size-12 shrink-0 overflow-hidden border border-white/15 bg-surface">
+                      <div className="size-16 sm:size-18 shrink-0 overflow-hidden border-2 border-amber-700 bg-surface shadow-[0_0_15px_rgba(217,119,6,0.25)]">
                         <DynamicImage
                           src={resolveMediaUrl(top3.logo_url)}
                           alt={top3.name}
-                          className="size-12 object-cover"
+                          className="size-16 sm:size-18 object-cover"
                         />
                       </div>
                     ) : (
-                      <div className="flex size-12 shrink-0 items-center justify-center border border-amber-700/40 bg-surface font-display text-xl font-black text-amber-500">
+                      <div className="flex size-16 sm:size-18 shrink-0 items-center justify-center border-2 border-amber-700 bg-surface font-display text-2xl font-black text-amber-400 shadow-[0_0_15px_rgba(217,119,6,0.25)]">
                         {top3.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-display text-2xl font-black uppercase text-ink truncate leading-tight">
-                        {top3.name}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-mono text-xs text-amber-500 font-bold">[{top3.tag}]</span>
-                        <span className="text-[10px] text-dim font-mono truncate">
-                          {top3.game_name || top3.game_slug || 'Esports'}
-                        </span>
-                      </div>
+                    <div className="mt-3">
+                      <PodiumMedalBadge rank={3} />
                     </div>
                   </div>
 
-                  {top3.captain && (
-                    <p className="mt-2 text-[11px] text-dim font-mono">
-                      Captain: <span className="text-ink">{top3.captain}</span>
-                    </p>
-                  )}
+                  {/* Contender Identity */}
+                  <div className="mt-4 text-center">
+                    <h3 className="font-display text-2xl sm:text-3xl font-black uppercase text-ink truncate leading-tight tracking-tight">
+                      {top3.name}
+                    </h3>
+                    <div className="flex items-center justify-center gap-2 mt-1 font-mono text-xs">
+                      <span className="text-amber-400 font-bold">[{top3.tag}]</span>
+                      <span className="text-white/20">·</span>
+                      <span className="text-dim truncate">
+                        {top3.game_name || top3.game_slug || 'Esports'}
+                      </span>
+                    </div>
+                    {top3.captain && (
+                      <p className="mt-1 text-[11px] text-dim font-mono">
+                        Captain: <span className="text-ink font-bold">{top3.captain}</span>
+                      </p>
+                    )}
+                  </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/10 pt-3 font-mono text-xs">
+                  {/* Performance Metrics */}
+                  <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-3.5 font-mono text-xs">
                     <div>
-                      <span className="text-dim text-[10px] block">Elo Rating</span>
-                      <p className="font-bold text-cyan text-lg">{top3.rating}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Elo Rating</span>
+                      <p className="font-bold text-amber-400 text-xl mt-0.5">{top3.rating}</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Win Rate</span>
-                      <p className="font-bold text-ink text-lg">{top3.win_rate}%</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Win Rate</span>
+                      <p className="font-bold text-ink text-xl mt-0.5">{top3.win_rate}%</p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Record</span>
-                      <p className="font-bold text-ink">
-                        <span className="text-ok">{top3.wins}W</span> - <span className="text-warn">{top3.losses}L</span>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Record</span>
+                      <p className="font-bold text-ink mt-0.5">
+                        <span className="text-ok font-bold">{top3.wins}W</span> - <span className="text-rose-400 font-bold">{top3.losses}L</span>
                       </p>
                     </div>
                     <div>
-                      <span className="text-dim text-[10px] block">Prize Won</span>
-                      <p className="font-bold text-amber-400">{inr(Number(top3.earnings || 0))}</p>
+                      <span className="text-dim text-[10px] uppercase tracking-wider block">Prize Won</span>
+                      <p className="font-bold text-amber-300 text-base mt-0.5">{inr(Number(top3.earnings || 0))}</p>
                     </div>
                   </div>
                 </div>
@@ -552,12 +593,15 @@ export default function Leaderboard() {
 
             {/* REST OF RANKINGS: Clean, compact standings table for rank 4 to selected limit */}
             {remainingEntries.length > 0 && (
-              <div className="border border-white/10 bg-surface/20 overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/10 px-5 py-3 bg-surface/60">
-                  <span className="font-mono text-xs uppercase tracking-wider text-ink font-bold">
-                    Standings Ladder (Rank #4 to #{entries.length})
-                  </span>
-                  <span className="font-mono text-[10px] text-dim uppercase">
+              <div className="border border-white/10 bg-surface/20 overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between border-b border-white/10 px-6 py-3.5 bg-surface/70">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-1.5 h-4 bg-rose-500 rounded-full" />
+                    <span className="font-mono text-xs uppercase tracking-wider text-ink font-bold">
+                      Standings Ladder (Rank #4 to #{entries.length})
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-dim uppercase tracking-wider">
                     Showing Top {selectedLimit}
                   </span>
                 </div>
@@ -590,21 +634,21 @@ export default function Leaderboard() {
                               isDq ? 'bg-live/5' : isDisbanded ? 'bg-amber-950/[0.04]' : ''
                             }`}
                           >
-                            <td className="py-3 px-4 font-bold text-dim">
+                            <td className="py-3.5 px-4 font-bold text-dim">
                               #{String(rankNumber).padStart(2, '0')}
                             </td>
-                            <td className="py-3 px-4">
+                            <td className="py-3.5 px-4">
                               <div className="flex items-center gap-2.5">
                                 {entry.logo_url ? (
-                                  <div className="size-6 shrink-0 overflow-hidden border border-white/10 bg-surface">
+                                  <div className="size-7 shrink-0 overflow-hidden border border-white/10 bg-surface">
                                     <DynamicImage
                                       src={resolveMediaUrl(entry.logo_url)}
                                       alt={entry.name}
-                                      className="size-6 object-cover"
+                                      className="size-7 object-cover"
                                     />
                                   </div>
                                 ) : (
-                                  <div className="flex size-6 shrink-0 items-center justify-center border border-white/10 bg-surface text-[10px] font-bold text-cyan">
+                                  <div className="flex size-7 shrink-0 items-center justify-center border border-white/10 bg-surface text-[10px] font-bold text-rose-400">
                                     {entry.name.charAt(0).toUpperCase()}
                                   </div>
                                 )}
@@ -625,10 +669,10 @@ export default function Leaderboard() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-dim">
+                            <td className="py-3.5 px-4 text-dim">
                               {entry.game_name || entry.game_slug || 'Esports'}
                             </td>
-                            <td className="py-3 px-4">
+                            <td className="py-3.5 px-4">
                               {isDq ? (
                                 <span className="inline-flex items-center gap-1 border border-live/80 bg-live/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-live animate-pulse">
                                   DISQUALIFIED
@@ -643,17 +687,17 @@ export default function Leaderboard() {
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-4 text-center font-bold text-cyan">
+                            <td className="py-3.5 px-4 text-center font-bold text-rose-300">
                               {entry.rating}
                             </td>
-                            <td className="py-3 px-4 text-center font-bold text-ink">
+                            <td className="py-3.5 px-4 text-center font-bold text-ink">
                               {entry.win_rate}%
                             </td>
-                            <td className="py-3 px-4 text-center text-dim">
+                            <td className="py-3.5 px-4 text-center text-dim">
                               <span className="text-ok font-bold">{entry.wins}W</span> -{' '}
-                              <span className="text-live font-bold">{entry.losses}L</span>
+                              <span className="text-rose-400 font-bold">{entry.losses}L</span>
                             </td>
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3.5 px-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 {entry.form && entry.form.length > 0 ? (
                                   entry.form.map((f, fIdx) => (
@@ -662,7 +706,7 @@ export default function Leaderboard() {
                                       className={`inline-block size-4 text-[9px] font-black leading-4 rounded text-center ${
                                         f === 'W'
                                           ? 'bg-ok/20 text-ok border border-ok/40'
-                                          : 'bg-live/20 text-live border border-live/40'
+                                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                                       }`}
                                     >
                                       {f}
@@ -673,7 +717,7 @@ export default function Leaderboard() {
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-right font-bold text-amber-400">
+                            <td className="py-3.5 px-4 text-right font-bold text-ink">
                               {inr(Number(entry.earnings || 0))}
                             </td>
                           </tr>

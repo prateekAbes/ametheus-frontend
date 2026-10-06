@@ -5,19 +5,70 @@ import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  clearNotification,
+  clearAllNotifications,
   type NotificationItem,
 } from '../services/notifications'
 import { useAuthContext } from '../context/AuthContext'
 
-const C = ['All', 'Tournament', 'Match', 'Registration', 'Wallet', 'Team', 'System'] as const
+const C = ['All', 'System', 'Team', 'Wallet', 'Registration', 'Batches'] as const
 type Cat = Exclude<(typeof C)[number], 'All'>
 const GLYPH: Record<Cat, string> = {
-  Tournament: '♛',
-  Match: '⚔',
-  Registration: '✎',
-  Wallet: '₹',
-  Team: '⬡',
   System: '◇',
+  Team: '⬡',
+  Wallet: '₹',
+  Registration: '✎',
+  Batches: '☰',
+}
+
+export function getCanonicalCategory(n: NotificationItem): Cat {
+  const cat = (n.category || '').toUpperCase()
+  if (cat === 'WALLET') return 'Wallet'
+  if (cat === 'REGISTRATION') return 'Registration'
+  if (cat === 'TEAM') return 'Team'
+  if (cat === 'BATCHES' || cat === 'BATCH') return 'Batches'
+  if (cat === 'SYSTEM') return 'System'
+
+  // Heuristic fallbacks for legacy records
+  const type = (n.type || '').toUpperCase()
+  const title = (n.title || '').toUpperCase()
+
+  if (
+    type.includes('WALLET') ||
+    type.includes('PAYMENT') ||
+    type.includes('PAYOUT') ||
+    type.includes('WITHDRAW') ||
+    title.includes('PAYMENT') ||
+    title.includes('WALLET') ||
+    title.includes('WITHDRAWAL') ||
+    title.includes('DEPOSIT')
+  ) {
+    return 'Wallet'
+  }
+
+  if (
+    type.includes('REGISTR') ||
+    title.includes('REGISTER') ||
+    title.includes('REGISTRATION')
+  ) {
+    return 'Registration'
+  }
+
+  if (
+    type.includes('TEAM') ||
+    type.includes('ROSTER') ||
+    type.includes('SQUAD') ||
+    title.includes('TEAM') ||
+    title.includes('ROSTER')
+  ) {
+    return 'Team'
+  }
+
+  if (type.includes('BATCH') || title.includes('BATCH')) {
+    return 'Batches'
+  }
+
+  return 'System'
 }
 
 export default function Notifications() {
@@ -58,10 +109,29 @@ export default function Notifications() {
     } catch {}
   }
 
+  const handleClearOne = async (id: string) => {
+    // Instantly remove from active frontend view while preserving DB record
+    setItems((prev) => prev.filter((n) => n.id !== id && n._id !== id))
+    try {
+      await clearNotification(id)
+    } catch (err) {
+      console.warn('Could not clear notification:', err)
+    }
+  }
+
+  const handleClearAll = async () => {
+    // Instantly remove from active frontend view while preserving DB record
+    setItems([])
+    try {
+      await clearAllNotifications()
+    } catch (err) {
+      console.warn('Could not clear all notifications:', err)
+    }
+  }
+
   const list = items.filter((n) => {
     if (cat === 'All') return true
-    const t = (n.type || '').toUpperCase()
-    return t.includes(cat.toUpperCase())
+    return getCanonicalCategory(n) === cat
   })
   const unreadCount = items.filter((n) => !n.is_read).length
 
@@ -70,18 +140,29 @@ export default function Notifications() {
       <Container className="max-w-5xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <Hud className="text-cyan">◇ {unreadCount} unread</Hud>
+            <Hud className="text-cyan">◇ {unreadCount} unread · {items.length} total</Hud>
             <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,7rem)] font-black uppercase leading-[0.85]">
               Notifications
             </h1>
           </div>
-          <button
-            disabled={!unreadCount}
-            onClick={handleMarkAll}
-            className="self-start font-mono text-[11px] uppercase tracking-[0.2em] text-cyan hover:text-ink disabled:text-dim md:self-auto"
-          >
-            Mark all read
-          </button>
+          <div className="flex flex-wrap items-center gap-4 self-start md:self-auto">
+            <button
+              disabled={!unreadCount}
+              onClick={handleMarkAll}
+              className="font-mono text-[11px] uppercase tracking-[0.2em] text-cyan hover:text-ink disabled:text-dim transition-colors"
+            >
+              Mark all read
+            </button>
+            <span className="text-white/20">·</span>
+            <button
+              disabled={items.length === 0}
+              onClick={handleClearAll}
+              className="font-mono text-[11px] uppercase tracking-[0.2em] text-dim hover:text-warn disabled:text-dim/40 transition-colors"
+              title="Clear all notifications from view (stored safely in backend)"
+            >
+              Clear all
+            </button>
+          </div>
         </div>
 
         <div className="mt-10">
@@ -98,26 +179,39 @@ export default function Notifications() {
             <EmptyState
               code="0"
               title="All quiet"
-              body="No notifications in this category."
+              body={
+                cat === 'Batches'
+                  ? 'No batch notifications found.'
+                  : cat === 'All'
+                  ? 'You have no notifications right now.'
+                  : `No notifications in ${cat.toLowerCase()} category.`
+              }
               cta="Browse Tournaments"
               to="/tournaments"
             />
           ) : (
             <div className="divide-y divide-white/5 border border-white/10">
               {list.map((n) => {
-                const glyph = GLYPH[n.type as Cat] || '◇'
+                const cardCat = getCanonicalCategory(n)
+                const glyph = GLYPH[cardCat] || '◇'
+                const rawTitle = n.title || ''
+                const isGenericResponse = rawTitle.trim().toLowerCase() === 'response'
+                const displayTitle = isGenericResponse ? 'Admin Response' : rawTitle
+                const displayLabel = n.label || (isGenericResponse ? 'Admin Response' : undefined)
                 return (
                   <NotificationCard
                     key={n.id}
                     glyph={glyph}
-                    title={n.title}
+                    title={displayTitle}
                     body={n.message}
-                    meta={`${n.type || 'SYSTEM'} · ${new Date(n.created_at).toLocaleDateString(
+                    label={displayLabel}
+                    meta={`${cardCat.toUpperCase()} · ${new Date(n.created_at).toLocaleDateString(
                       'en-IN',
                       { day: '2-digit', month: 'short' }
                     )}`}
                     unread={!n.is_read}
                     onClick={() => handleMarkOne(n.id)}
+                    onClear={() => handleClearOne(n.id)}
                   />
                 )
               })}

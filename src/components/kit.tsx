@@ -117,19 +117,90 @@ export function TeamCard({ name, game, members, max, role, accent = '#3ef2ff', t
   )
 }
 
-export function NotificationCard({ glyph, title, body, meta, unread, onClick }: { glyph: string; title: string; body?: string; meta?: string; unread?: boolean; onClick?: () => void }) {
+export function NotificationCard({
+  glyph,
+  title,
+  body,
+  meta,
+  label,
+  unread,
+  onClick,
+  onClear,
+}: {
+  glyph: string
+  title: string
+  body?: string
+  meta?: string
+  label?: string
+  unread?: boolean
+  onClick?: () => void
+  onClear?: () => void
+}) {
+  const isGenericResponse = title.trim().toLowerCase() === 'response'
+  const displayTitle = isGenericResponse ? 'Admin Response' : title
+  const displayLabel = label || (isGenericResponse ? 'Admin Response' : undefined)
+
   return (
-    <button onClick={onClick} className={`relative flex w-full items-start gap-4 p-4 text-left transition-colors hover:bg-white/[0.03] md:p-5 ${unread ? 'bg-cyan/[0.03]' : ''}`}>
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.()
+        }
+      }}
+      className={`group relative flex w-full cursor-pointer items-start gap-4 p-4 text-left transition-colors hover:bg-white/[0.03] md:p-5 ${
+        unread ? 'bg-cyan/[0.03]' : ''
+      }`}
+    >
       {unread && <span className="absolute inset-y-0 left-0 w-[3px] bg-cyan" />}
-      <span className={`grid size-11 shrink-0 place-items-center border text-lg ${unread ? 'border-cyan/40 text-cyan' : 'border-white/10 text-dim'}`}>{glyph}</span>
+      <span
+        className={`grid size-11 shrink-0 place-items-center border text-lg ${
+          unread ? 'border-cyan/40 text-cyan' : 'border-white/10 text-dim'
+        }`}
+      >
+        {glyph}
+      </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2"><p className={`font-display text-lg font-black uppercase ${unread ? '' : 'text-ink/70'}`}>{title}</p>{unread && <Dot c="bg-cyan" />}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={`font-display text-lg font-black uppercase ${unread ? '' : 'text-ink/70'}`}>
+            {displayTitle}
+          </p>
+          {displayLabel && displayLabel !== displayTitle && (
+            <span
+              className={`border px-1.5 py-0.5 font-mono text-[9px] uppercase font-bold tracking-wider ${
+                displayLabel === 'Admin Response'
+                  ? 'border-cyan/50 bg-cyan/15 text-cyan'
+                  : 'border-white/20 bg-white/5 text-dim'
+              }`}
+            >
+              {displayLabel}
+            </span>
+          )}
+          {unread && <Dot c="bg-cyan" />}
+        </div>
         {body && <p className="mt-0.5 text-sm text-dim">{body}</p>}
         {meta && <Hud className="mt-2 block">{meta}</Hud>}
       </div>
-    </button>
+      {onClear && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onClear()
+          }}
+          className="shrink-0 border border-white/10 bg-surface/50 px-2.5 py-1 font-mono text-[10px] uppercase text-dim transition-all hover:border-warn hover:bg-warn/10 hover:text-warn"
+          title="Clear from active list (preserved in history)"
+        >
+          Clear
+        </button>
+      )}
+    </div>
   )
 }
+
 
 const TX_ICON: Record<Tx['type'], string> = { 'Wallet Deposit': '↓', 'Tournament Entry': '⚔', Winnings: '♛', Withdrawal: '↑', Refund: '↺' }
 export function TransactionCard({ tx: t }: { tx: Tx }) {

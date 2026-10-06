@@ -114,3 +114,22 @@ html { background: #05060a; scrollbar-gutter: stable; }
 .animate-gold-glow { animation: gold-glow 3.2s ease-in-out infinite; }
 .animate-silver-glow { animation: silver-glow 3.2s ease-in-out infinite; }
 .animate-bronze-glow { animation: bronze-glow 3.2s ease-in-out infinite; }
+
+/* Champion Crown Prestigious Motion Animations */
+@keyframes champion-crown {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(-1.5deg); }
+  50% { transform: translateY(-8px) rotate(0deg); }
+  75% { transform: translateY(-5px) rotate(1.5deg); }
+}
+@keyframes runnerup-crown {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(0deg); }
+}
+@keyframes bronze-crown {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(0deg); }
+}
+.animate-champion-crown { animation: champion-crown 4.5s ease-in-out infinite; }
+.animate-runnerup-crown { animation: runnerup-crown 4.2s ease-in-out infinite; }
+.animate-bronze-crown { animation: bronze-crown 4.2s ease-in-out infinite; }

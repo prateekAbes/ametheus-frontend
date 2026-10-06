@@ -14,6 +14,7 @@ import {
   rejectPayment,
   getAdminUpiAccounts,
   createUpiAccount,
+  deleteUpiAccount,
   toggleUpiAccountStatus,
   uploadUpiAccountQr,
   getAdminPayouts,
@@ -40,6 +41,11 @@ import {
   getDisputes,
   resolveDispute,
   getAuditLogs,
+  getAuditLogsCount,
+  archivePayment,
+  unarchivePayment,
+  getAdminPlatformNotifications,
+  sendAdminPlatformNotification,
   createGame,
   updateGame,
   deleteGame,
@@ -56,6 +62,7 @@ import {
   EmailSystemStatus,
   PageMediaConfig,
   AuditLog,
+  PlatformNotificationItem,
 } from '../services/admin'
 import { getGames, Game } from '../services/games'
 import {
@@ -317,6 +324,26 @@ function BannerImageUploader({
   )
 }
 
+export function formatAuditTimestamp(raw?: string | null): string {
+  if (!raw || raw === 'None' || raw === 'null' || raw === 'undefined' || raw.trim() === '') {
+    return 'Timestamp unavailable'
+  }
+  try {
+    const d = new Date(raw)
+    if (isNaN(d.getTime())) return 'Timestamp unavailable'
+    return d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
+  } catch {
+    return 'Timestamp unavailable'
+  }
+}
+
 const TABS = [
   'OVERVIEW',
   'TOURNAMENTS',
@@ -335,6 +362,7 @@ const TABS = [
   'SUPPORT TICKETS',
   'RULES & REGULATIONS',
   'EMAIL COMMUNICATIONS',
+  'NOTIFICATION CMS',
   'DISPUTES & QUEUE',
   'AUDIT LOGS',
   'SMTP RELAY DIAGNOSTICS',
@@ -366,9 +394,34 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
-  // Payment Rejection Modal
+  // Payment Rejection & Archive Modal
   const [rejectPaymentId, setRejectPaymentId] = useState<string | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
+  const [paymentViewMode, setPaymentViewMode] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE')
+  const [archivedPayments, setArchivedPayments] = useState<PendingPayment[]>([])
+  const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PendingPayment | null>(null)
+
+  // Audit Logs Filtering & Pagination
+  const [auditAction, setAuditAction] = useState<string>('ALL')
+  const [auditSearch, setAuditSearch] = useState<string>('')
+  const [auditDateRange, setAuditDateRange] = useState<string>('ALL')
+  const [auditPage, setAuditPage] = useState<number>(1)
+  const [auditLimit] = useState<number>(25)
+  const [auditTotal, setAuditTotal] = useState<number>(0)
+  const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false)
+
+  // Notification CMS
+  const [platformNotifications, setPlatformNotifications] = useState<PlatformNotificationItem[]>([])
+  const [platformNotifTotal, setPlatformNotifTotal] = useState<number>(0)
+  const [platformNotifFilterType, setPlatformNotifFilterType] = useState<string>('ALL')
+  const [platformNotifSearch, setPlatformNotifSearch] = useState<string>('')
+  const [isDispatchingNotif, setIsDispatchingNotif] = useState<boolean>(false)
+  const [newNotifAudience, setNewNotifAudience] = useState<'ALL_USERS' | 'SELECTED_USERS'>('ALL_USERS')
+  const [newNotifUserIds, setNewNotifUserIds] = useState<string>('')
+  const [newNotifType, setNewNotifType] = useState<string>('SYSTEM')
+  const [newNotifTitle, setNewNotifTitle] = useState<string>('')
+  const [newNotifMessage, setNewNotifMessage] = useState<string>('')
+  const [newNotifLink, setNewNotifLink] = useState<string>('')
 
   // UPI Modal & QR States
   const [isNewUpiOpen, setIsNewUpiOpen] = useState(false)
@@ -391,7 +444,14 @@ export default function Admin() {
   const [testEmailTo, setTestEmailTo] = useState('admin@ametheus.gg')
   const [isSendingTestMail, setIsSendingTestMail] = useState(false)
   const [isOfficialMailOpen, setIsOfficialMailOpen] = useState(false)
-  const [officialMail, setOfficialMail] = useState({ recipient_type: 'ALL_USERS', subject: '', message: '' })
+  const [officialMail, setOfficialMail] = useState({
+    recipient_type: 'ALL_USERS',
+    subject: '',
+    message: '',
+    custom_emails: '',
+    user_ids: '',
+    team_ids: '',
+  })
 
   // Regulations Modal
   const [isNewRegOpen, setIsNewRegOpen] = useState(false)
@@ -671,12 +731,40 @@ export default function Admin() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, u, p, g, l, tList, fTour, upiList, payList, tixList, regList, eStat, mList, dispList, mAll, genreList, revList, sUsers, mReqs, orgEmails, teams, offHist] = await Promise.all([
+      const [
+        s,
+        u,
+        p,
+        pArch,
+        g,
+        l,
+        lCount,
+        tList,
+        fTour,
+        upiList,
+        payList,
+        tixList,
+        regList,
+        eStat,
+        mList,
+        dispList,
+        mAll,
+        genreList,
+        revList,
+        sUsers,
+        mReqs,
+        orgEmails,
+        teams,
+        offHist,
+        notifs,
+      ] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
         getPendingPayments().catch(() => []),
+        getAdminPayments(undefined, true).catch(() => []),
         getGames().catch(() => []),
-        getAuditLogs().catch(() => []),
+        getAuditLogs({ limit: auditLimit, skip: 0 }).catch(() => []),
+        getAuditLogsCount().catch(() => ({ total: 0 })),
         getTournaments().catch(() => []),
         getFeaturedTournament().catch(() => null),
         getAdminUpiAccounts().catch(() => []),
@@ -694,13 +782,18 @@ export default function Admin() {
         getAdminOrganizerEmails().catch(() => []),
         apiClient<any[]>('/teams').catch(() => []),
         getOfficialEmailHistoryAdmin().catch(() => ({ total: 0, items: [] })),
+        getAdminPlatformNotifications({ limit: 50, skip: 0 }).catch(() => ({ items: [], total: 0 })),
       ])
 
       if (s) setStats(s)
       setUsers(u)
       setPayments(p)
+      setArchivedPayments(pArch)
       setGames(g)
       setLogs(l)
+      setAuditTotal(lCount?.total || l.length)
+      setPlatformNotifications(notifs?.items || [])
+      setPlatformNotifTotal(notifs?.total || 0)
       setTournaments(tList)
       setFeaturedTour(fTour)
       setUpiAccounts(upiList)
@@ -777,6 +870,117 @@ export default function Admin() {
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to reject payment')
+    }
+  }
+
+  const handleArchivePayment = async (id: string) => {
+    try {
+      await archivePayment(id)
+      showToast('Payment record archived.')
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to archive payment')
+    }
+  }
+
+  const handleUnarchivePayment = async (id: string) => {
+    try {
+      await unarchivePayment(id)
+      showToast('Payment record restored from archive.')
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to unarchive payment')
+    }
+  }
+
+  const handleDeleteUpi = async (id: string, code: string) => {
+    if (!window.confirm(`Permanently delete UPI account "${code}"? Historical payments using this account will retain their snapshotted data, but no new checkouts can use this account.`)) {
+      return
+    }
+    try {
+      await deleteUpiAccount(id)
+      showToast(`UPI Account ${code} permanently deleted.`)
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete UPI account')
+    }
+  }
+
+  const fetchAuditLogs = async (newPage: number = auditPage) => {
+    setIsLoadingLogs(true)
+    try {
+      const skip = (newPage - 1) * auditLimit
+      const [fetchedLogs, countRes] = await Promise.all([
+        getAuditLogs({
+          limit: auditLimit,
+          skip,
+          search: auditSearch.trim() || undefined,
+          action: auditAction !== 'ALL' ? auditAction : undefined,
+          date_range: auditDateRange !== 'ALL' ? auditDateRange : undefined,
+        }),
+        getAuditLogsCount({
+          search: auditSearch.trim() || undefined,
+          action: auditAction !== 'ALL' ? auditAction : undefined,
+          date_range: auditDateRange !== 'ALL' ? auditDateRange : undefined,
+        }),
+      ])
+      setLogs(fetchedLogs)
+      setAuditTotal(countRes.total)
+      setAuditPage(newPage)
+    } catch (err: any) {
+      console.warn('Failed to fetch filtered audit logs:', err)
+    } finally {
+      setIsLoadingLogs(false)
+    }
+  }
+
+  const fetchPlatformNotifications = async () => {
+    try {
+      const res = await getAdminPlatformNotifications({
+        limit: 50,
+        skip: 0,
+        search: platformNotifSearch.trim() || undefined,
+        notification_type: platformNotifFilterType !== 'ALL' ? platformNotifFilterType : undefined,
+      })
+      setPlatformNotifications(res.items || [])
+      setPlatformNotifTotal(res.total || 0)
+    } catch (err) {
+      console.warn('Failed to fetch platform notifications:', err)
+    }
+  }
+
+  const handleSendPlatformNotification = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newNotifTitle.trim() || !newNotifMessage.trim()) return
+    setIsDispatchingNotif(true)
+    try {
+      let targetUserIds: string[] = []
+      if (newNotifAudience === 'SELECTED_USERS') {
+        targetUserIds = newNotifUserIds.split(',').map((s) => s.trim()).filter(Boolean)
+        if (targetUserIds.length === 0) {
+          alert('Please specify at least one recipient user ID.')
+          setIsDispatchingNotif(false)
+          return
+        }
+      }
+      await sendAdminPlatformNotification({
+        user_ids: targetUserIds,
+        title: newNotifTitle.trim(),
+        message: newNotifMessage.trim(),
+        notification_type: newNotifType,
+        category: newNotifType,
+        link: newNotifLink.trim() || undefined,
+      })
+      showToast('Platform notification dispatched successfully!')
+      setNewNotifTitle('')
+      setNewNotifMessage('')
+      setNewNotifLink('')
+      setNewNotifUserIds('')
+      fetchPlatformNotifications()
+    } catch (err: any) {
+      alert(err.message || 'Failed to dispatch notification')
+    } finally {
+      setIsDispatchingNotif(false)
     }
   }
 
@@ -915,10 +1119,24 @@ export default function Admin() {
   const handleSendOfficialMail = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await sendOfficialEmailAdmin(officialMail)
-      showToast('Official platform notification email sent to users!')
+      const payload: any = {
+        recipient_type: officialMail.recipient_type,
+        subject: officialMail.subject.trim(),
+        message: officialMail.message.trim(),
+      }
+      if (officialMail.recipient_type === 'CUSTOM_EMAILS' && officialMail.custom_emails) {
+        payload.custom_emails = officialMail.custom_emails.split(',').map((s) => s.trim()).filter(Boolean)
+      }
+      if (officialMail.recipient_type === 'SELECTED_USERS' && officialMail.user_ids) {
+        payload.user_ids = officialMail.user_ids.split(',').map((s) => s.trim()).filter(Boolean)
+      }
+      if (officialMail.recipient_type === 'SELECTED_TEAMS' && officialMail.team_ids) {
+        payload.team_ids = officialMail.team_ids.split(',').map((s) => s.trim()).filter(Boolean)
+      }
+      await sendOfficialEmailAdmin(payload)
+      showToast('Official platform notification email dispatched successfully!')
       setIsOfficialMailOpen(false)
-      setOfficialMail({ recipient_type: 'ALL_USERS', subject: '', message: '' })
+      setOfficialMail({ recipient_type: 'ALL_USERS', subject: '', message: '', custom_emails: '', user_ids: '', team_ids: '' })
     } catch (err: any) {
       alert(err.message || 'Failed to send official mail')
     }
@@ -2599,39 +2817,127 @@ export default function Admin() {
               <Hud className="text-warn">{payments.length} AWAITING APPROVAL</Hud>
             </div>
 
-            {payments.length === 0 ? (
-              <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
-                NO PENDING PAYMENTS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {payments.map((p) => (
-                  <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-warn">
-                    <div className="space-y-1 font-mono text-xs">
-                      <div className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</div>
-                      <div className="text-dim">User: {p.user_email || p.user_id}</div>
-                      <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
-                      <div className="text-dim">UTR Reference: <span className="text-cyan font-bold">{p.utr}</span></div>
-                      <div className="text-dim">Sender VPA: {p.sender_upi_id || 'Not Specified'}</div>
-                    </div>
+            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+              <button
+                type="button"
+                onClick={() => setPaymentViewMode('ACTIVE')}
+                className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+                  paymentViewMode === 'ACTIVE'
+                    ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                    : 'text-dim hover:text-ink'
+                }`}
+              >
+                Active Pending ({payments.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentViewMode('ARCHIVED')}
+                className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+                  paymentViewMode === 'ARCHIVED'
+                    ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                    : 'text-dim hover:text-ink'
+                }`}
+              >
+                Archived Records ({archivedPayments.length})
+              </button>
+            </div>
 
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleApprovePayment(p.id)}
-                        className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors"
-                      >
-                        Approve & Credit
-                      </button>
-                      <button
-                        onClick={() => setRejectPaymentId(p.id)}
-                        className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </Panel>
-                ))}
-              </div>
+            {paymentViewMode === 'ACTIVE' ? (
+              payments.length === 0 ? (
+                <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                  NO PENDING PAYMENTS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {payments.map((p) => (
+                    <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-warn">
+                      <div className="space-y-1 font-mono text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 border border-warn text-warn">{p.status}</span>
+                        </div>
+                        <div className="text-dim">User: {p.user_email || p.user_id}</div>
+                        <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
+                        <div className="text-dim">UTR Reference: <span className="text-cyan font-bold">{p.utr}</span></div>
+                        <div className="text-dim">Sender VPA: {p.sender_upi_id || 'Not Specified'}</div>
+                        <div className="text-[10px] text-dim">Initiated: {formatAuditTimestamp(p.created_at)}</div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPaymentDetail(p)}
+                          className="border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApprovePayment(p.id)}
+                          className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors"
+                        >
+                          Approve & Credit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRejectPaymentId(p.id)}
+                          className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleArchivePayment(p.id)}
+                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase text-dim hover:text-warn hover:border-warn transition-colors"
+                        >
+                          Archive
+                        </button>
+                      </div>
+                    </Panel>
+                  ))}
+                </div>
+              )
+            ) : (
+              archivedPayments.length === 0 ? (
+                <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                  NO ARCHIVED PAYMENTS FOUND.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {archivedPayments.map((p) => (
+                    <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-white/20">
+                      <div className="space-y-1 font-mono text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 border border-white/30 text-dim">ARCHIVED</span>
+                          <span className="text-[10px] px-1.5 py-0.5 border border-white/15 text-dim">{p.status}</span>
+                        </div>
+                        <div className="text-dim">User: {p.user_email || p.user_id}</div>
+                        <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
+                        <div className="text-dim">UTR Reference: <span className="text-cyan font-bold">{p.utr}</span></div>
+                        <div className="text-[10px] text-dim">Archived: {formatAuditTimestamp(p.archived_at || p.updated_at)}</div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPaymentDetail(p)}
+                          className="border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUnarchivePayment(p.id)}
+                          className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
+                        >
+                          Unarchive / Restore
+                        </button>
+                      </div>
+                    </Panel>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}
@@ -2706,12 +3012,20 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-white/10 flex justify-end">
+                  <div className="pt-2 border-t border-white/10 flex justify-end gap-2">
                     <button
+                      type="button"
                       onClick={() => handleToggleUpi(a.id)}
-                      className="border border-white/20 px-3 py-1 text-dim hover:text-ink hover:border-cyan"
+                      className="border border-white/20 px-3 py-1 text-dim hover:text-ink hover:border-cyan transition-colors"
                     >
                       Toggle Active State
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUpi(a.id, a.code)}
+                      className="border border-live/40 bg-live/10 px-3 py-1 text-live hover:bg-live/20 transition-colors"
+                    >
+                      Delete
                     </button>
                   </div>
                 </Panel>
@@ -3639,6 +3953,186 @@ export default function Admin() {
           </div>
         )}
 
+        {/* TAB: NOTIFICATION CMS */}
+        {tab === 'NOTIFICATION CMS' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Platform Notification CMS</h2>
+                <p className="text-xs text-dim">Dispatch targeted or platform-wide user notifications and monitor in-app delivery history.</p>
+              </div>
+              <Hud className="text-cyan">{platformNotifTotal} DISPATCHED</Hud>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Compose & Dispatch Panel */}
+              <Panel className="p-6 space-y-4 font-mono text-xs border-cyan/30">
+                <div className="border-b border-white/10 pb-3">
+                  <h3 className="font-display text-xl font-bold uppercase text-ink">Compose In-App Notification</h3>
+                  <p className="text-[11px] text-dim mt-0.5">Dispatches real-time bell notifications to player platform accounts.</p>
+                </div>
+
+                <form onSubmit={handleSendPlatformNotification} className="space-y-3">
+                  <div>
+                    <label className="block text-dim text-[10px] uppercase mb-1">Target Audience</label>
+                    <select
+                      value={newNotifAudience}
+                      onChange={(e) => setNewNotifAudience(e.target.value as any)}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                    >
+                      <option value="ALL_USERS">All Platform Users (Broadcast)</option>
+                      <option value="SELECTED_USERS">Specific User IDs</option>
+                    </select>
+                  </div>
+
+                  {newNotifAudience === 'SELECTED_USERS' && (
+                    <div>
+                      <label className="block text-dim text-[10px] uppercase mb-1">Target User IDs (comma-separated)</label>
+                      <input
+                        required
+                        placeholder="user_123, user_456, ..."
+                        value={newNotifUserIds}
+                        onChange={(e) => setNewNotifUserIds(e.target.value)}
+                        className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-dim text-[10px] uppercase mb-1">Notification Category</label>
+                    <select
+                      value={newNotifType}
+                      onChange={(e) => setNewNotifType(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                    >
+                      <option value="SYSTEM">System Announcement</option>
+                      <option value="TEAM">Team & Squad</option>
+                      <option value="WALLET">Wallet & Payment</option>
+                      <option value="REGISTRATION">Registration</option>
+                      <option value="BATCHES">Batches & Broadcast</option>
+                      <option value="TOURNAMENT">Tournament Alert</option>
+                      <option value="MATCH">Match Schedule</option>
+                      <option value="SUPPORT">Customer Support</option>
+                      <option value="GENERAL">General Notice</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-dim text-[10px] uppercase mb-1">Headline / Title</label>
+                    <input
+                      required
+                      placeholder="e.g. Ascent Championship Bracket Revealed"
+                      value={newNotifTitle}
+                      onChange={(e) => setNewNotifTitle(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-dim text-[10px] uppercase mb-1">Call-to-Action Link (Optional)</label>
+                    <input
+                      placeholder="/tournaments or /games or /profile"
+                      value={newNotifLink}
+                      onChange={(e) => setNewNotifLink(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-dim text-[10px] uppercase mb-1">Notification Message</label>
+                    <textarea
+                      rows={4}
+                      required
+                      placeholder="Compose notification text..."
+                      value={newNotifMessage}
+                      onChange={(e) => setNewNotifMessage(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isDispatchingNotif}
+                    className="w-full border border-cyan bg-cyan px-4 py-2.5 uppercase text-void font-bold hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {isDispatchingNotif ? 'Dispatching...' : 'Dispatch Notification'}
+                  </button>
+                </form>
+              </Panel>
+
+              {/* Notification History Feed */}
+              <div className="lg:col-span-2 space-y-4">
+                <Panel className="p-6 font-mono text-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <h3 className="font-display text-xl font-bold uppercase text-ink">Dispatched Notifications History</h3>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={platformNotifFilterType}
+                        onChange={(e) => {
+                          setPlatformNotifFilterType(e.target.value)
+                        }}
+                        className="border border-white/15 bg-surface p-1.5 text-ink outline-none text-[11px]"
+                      >
+                        <option value="ALL">All Categories</option>
+                        <option value="SYSTEM">System</option>
+                        <option value="TEAM">Team</option>
+                        <option value="WALLET">Wallet</option>
+                        <option value="REGISTRATION">Registration</option>
+                        <option value="BATCHES">Batches</option>
+                        <option value="TOURNAMENT">Tournament</option>
+                        <option value="MATCH">Match</option>
+                        <option value="SUPPORT">Support</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={fetchPlatformNotifications}
+                        className="border border-white/20 px-2.5 py-1.5 text-[11px] uppercase hover:text-cyan hover:border-cyan transition-colors"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {platformNotifications.length === 0 ? (
+                    <div className="border border-dashed border-white/15 p-8 text-center text-dim">
+                      NO PLATFORM NOTIFICATIONS RECORDED YET.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                      {platformNotifications
+                        .filter((n) => {
+                          if (platformNotifFilterType === 'ALL') return true
+                          const nCat = (n.category || n.type || '').toUpperCase()
+                          if (platformNotifFilterType === 'WALLET') return nCat === 'WALLET' || nCat === 'PAYMENT'
+                          if (platformNotifFilterType === 'BATCHES') return nCat === 'BATCHES' || nCat === 'BATCH'
+                          return nCat === platformNotifFilterType
+                        })
+                        .map((n) => (
+                          <div key={n.id} className="p-3 bg-surface/60 border border-white/10 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="border border-cyan/40 bg-cyan/10 px-1.5 py-0.5 text-[10px] text-cyan font-bold">
+                                  {n.category || n.type}
+                                </span>
+                                <span className="font-bold text-ink">{n.title}</span>
+                              </div>
+                              <span className="text-[10px] text-dim">{formatAuditTimestamp(n.created_at)}</span>
+                            </div>
+                            <p className="text-dim text-[11px] leading-relaxed">{n.message}</p>
+                            <div className="flex items-center justify-between text-[10px] text-dim pt-1 border-t border-white/5">
+                              <span>Recipient: {n.user_id ? `User #${n.user_id.slice(0, 8)}` : 'Broadcast (All Users)'}</span>
+                              {n.link && <span className="text-cyan">Link: {n.link}</span>}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </Panel>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB: DISPUTES & QUEUE */}
         {tab === 'DISPUTES & QUEUE' && (
           <div className="mt-8 space-y-6">
@@ -3686,11 +4180,99 @@ export default function Admin() {
         {/* TAB: AUDIT LOGS */}
         {tab === 'AUDIT LOGS' && (
           <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="font-display text-3xl font-black uppercase">System Audit Trails</h2>
-              <Hud className="text-dim">{logs.length} RECORDS</Hud>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">System Audit Trails</h2>
+                <p className="text-xs text-dim">Immutable operational logs tracking administrative and financial mutations.</p>
+              </div>
+              <Hud className="text-dim">{auditTotal} TOTAL RECORDS</Hud>
             </div>
 
+            {/* Filter & Search Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-graphite p-4 border border-white/15 font-mono text-xs">
+              <div>
+                <label className="block text-dim text-[10px] uppercase mb-1">Search Keywords / Target / Operator</label>
+                <input
+                  type="text"
+                  placeholder="Filter logs..."
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') fetchAuditLogs(1)
+                  }}
+                  className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-dim text-[10px] uppercase mb-1">Filter by Action</label>
+                <select
+                  value={auditAction}
+                  onChange={(e) => {
+                    setAuditAction(e.target.value)
+                  }}
+                  className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                >
+                  <option value="ALL">All Actions</option>
+                  <option value="ROLE">Role / Permissions</option>
+                  <option value="PAYMENT">Payments & UTR</option>
+                  <option value="TOURNAMENT">Tournaments</option>
+                  <option value="UPI">UPI Accounts</option>
+                  <option value="NOTIFICATION">Notifications</option>
+                  <option value="EMAIL">Email Dispatch</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-dim text-[10px] uppercase mb-1">Time Horizon</label>
+                <select
+                  value={auditDateRange}
+                  onChange={(e) => {
+                    setAuditDateRange(e.target.value)
+                  }}
+                  className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
+                >
+                  <option value="ALL">All Time</option>
+                  <option value="TODAY">Today</option>
+                  <option value="YESTERDAY">Yesterday</option>
+                  <option value="7_DAYS">Last 7 Days</option>
+                  <option value="30_DAYS">Last 30 Days</option>
+                </select>
+              </div>
+
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchAuditLogs(1)}
+                  disabled={isLoadingLogs}
+                  className="flex-1 border border-cyan bg-cyan/20 p-2 text-cyan uppercase font-bold hover:bg-cyan/30 disabled:opacity-50 transition-colors"
+                >
+                  {isLoadingLogs ? 'Filtering...' : 'Apply Filters'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditSearch('')
+                    setAuditAction('ALL')
+                    setAuditDateRange('ALL')
+                    setIsLoadingLogs(true)
+                    getAuditLogs({ limit: auditLimit, skip: 0 })
+                      .then((data) => {
+                        setLogs(data)
+                        setAuditPage(1)
+                      })
+                      .finally(() => setIsLoadingLogs(false))
+                    getAuditLogsCount().then((r) => setAuditTotal(r.total))
+                  }}
+                  className="border border-white/20 p-2 text-dim uppercase hover:text-ink transition-colors"
+                  title="Reset Filters"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Audit Logs Table */}
             <div className="overflow-x-auto border border-white/15 bg-graphite">
               <table className="w-full text-left font-mono text-xs">
                 <thead>
@@ -3698,20 +4280,70 @@ export default function Admin() {
                     <th className="p-4">OPERATOR</th>
                     <th className="p-4">ACTION</th>
                     <th className="p-4">TARGET</th>
+                    <th className="p-4">DETAILS</th>
                     <th className="p-4">TIMESTAMP</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {logs.map((l) => (
-                    <tr key={l.id}>
-                      <td className="p-4 font-bold text-ink">{l.operator}</td>
-                      <td className="p-4 text-cyan">{l.action}</td>
-                      <td className="p-4 text-dim">{l.target}</td>
-                      <td className="p-4 text-dim">{new Date(l.created_at).toLocaleString()}</td>
+                  {logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-dim font-mono">
+                        {isLoadingLogs ? 'Loading audit records...' : 'No audit records match the current filter criteria.'}
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    logs.map((l) => (
+                      <tr key={l.id} className="hover:bg-white/[0.02]">
+                        <td className="p-4 font-bold text-ink">{l.operator}</td>
+                        <td className="p-4 text-cyan">{l.action}</td>
+                        <td className="p-4 text-dim">{l.target}</td>
+                        <td className="p-4 text-dim max-w-xs truncate">
+                          {l.details ? (
+                            typeof l.details === 'object' ? (
+                              <span title={JSON.stringify(l.details, null, 2)} className="cursor-help text-ink/70">
+                                {Object.entries(l.details)
+                                  .map(([k, v]) => `${k}: ${v}`)
+                                  .join(', ')}
+                              </span>
+                            ) : (
+                              String(l.details)
+                            )
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="p-4 text-dim whitespace-nowrap">{formatAuditTimestamp(l.created_at || l.timestamp)}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between border-t border-white/10 pt-4 font-mono text-xs text-dim">
+              <div>
+                Showing page {auditPage} of {Math.max(1, Math.ceil(auditTotal / auditLimit))} ({auditTotal} total records)
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={auditPage <= 1 || isLoadingLogs}
+                  onClick={() => fetchAuditLogs(auditPage - 1)}
+                  className="border border-white/20 px-3 py-1.5 uppercase hover:text-ink hover:border-cyan disabled:opacity-40 transition-colors"
+                >
+                  ← Previous
+                </button>
+                <span className="px-2 font-bold text-ink">{auditPage}</span>
+                <button
+                  type="button"
+                  disabled={auditPage >= Math.ceil(auditTotal / auditLimit) || isLoadingLogs}
+                  onClick={() => fetchAuditLogs(auditPage + 1)}
+                  className="border border-white/20 px-3 py-1.5 uppercase hover:text-ink hover:border-cyan disabled:opacity-40 transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3835,6 +4467,139 @@ export default function Admin() {
       </Container>
 
       {/* MODALS */}
+
+      {/* Comprehensive Payment Record Modal */}
+      {selectedPaymentDetail && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-2xl max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-white/20 bg-graphite p-6 shadow-2xl select-text font-mono text-xs">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-cyan">Payment Record Audit</h3>
+                  <p className="text-[11px] text-dim mt-0.5">ID: {selectedPaymentDetail.id}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentDetail(null)}
+                  className="border border-white/20 px-2.5 py-1 text-dim hover:text-ink uppercase cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2 p-3 bg-surface/50 border border-white/10">
+                  <div className="text-dim uppercase text-[10px] font-bold tracking-wider">Transaction Data</div>
+                  <div>Amount: <span className="text-ok font-bold text-sm">{inr(selectedPaymentDetail.amount_inr)}</span></div>
+                  <div>Status: <span className={`font-bold ${selectedPaymentDetail.status === 'APPROVED' ? 'text-ok' : selectedPaymentDetail.status === 'REJECTED' ? 'text-live' : 'text-warn'}`}>{selectedPaymentDetail.status}</span></div>
+                  <div>Payment Type: <span className="text-ink">{selectedPaymentDetail.payment_type || 'TOURNAMENT_ENTRY'}</span></div>
+                  <div>UTR Reference: <span className="text-cyan font-bold break-all">{selectedPaymentDetail.utr}</span></div>
+                  <div>Customer UPI / VPA: <span className="text-ink break-all">{selectedPaymentDetail.sender_upi_id || 'Not Specified'}</span></div>
+                  <div>Archived: <span className={selectedPaymentDetail.is_archived ? 'text-warn font-bold' : 'text-dim'}>{selectedPaymentDetail.is_archived ? 'YES' : 'NO'}</span></div>
+                </div>
+
+                <div className="space-y-2 p-3 bg-surface/50 border border-white/10">
+                  <div className="text-dim uppercase text-[10px] font-bold tracking-wider">User & Audit Metadata</div>
+                  <div>User ID: <span className="text-ink break-all">{selectedPaymentDetail.user_id}</span></div>
+                  <div>User Email: <span className="text-ink break-all">{selectedPaymentDetail.user_email || 'N/A'}</span></div>
+                  <div>Username: <span className="text-ink">{selectedPaymentDetail.user_username || selectedPaymentDetail.username || selectedPaymentDetail.user_name || 'N/A'}</span></div>
+                  <div>Processed By: <span className="text-dim">{selectedPaymentDetail.approved_by || selectedPaymentDetail.audited_by || selectedPaymentDetail.verified_by || 'Pending verification'}</span></div>
+                  <div>Created At: <span className="text-dim">{formatAuditTimestamp(selectedPaymentDetail.created_at)}</span></div>
+                  <div>Updated At: <span className="text-dim">{formatAuditTimestamp(selectedPaymentDetail.updated_at)}</span></div>
+                  {selectedPaymentDetail.archived_at && (
+                    <div>Archived At: <span className="text-warn">{formatAuditTimestamp(selectedPaymentDetail.archived_at)}</span></div>
+                  )}
+                </div>
+              </div>
+
+              {/* Snapshotted UPI & Payee info */}
+              <div className="mt-4 p-3 bg-surface/50 border border-white/10 space-y-2">
+                <div className="text-dim uppercase text-[10px] font-bold tracking-wider">Snapshotted Account at Checkout</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>Account Code: <span className="text-ink font-bold">{selectedPaymentDetail.payment_account_code || 'N/A'}</span></div>
+                  <div>Receiving UPI: <span className="text-cyan font-bold break-all">{selectedPaymentDetail.upi_id || 'N/A'}</span></div>
+                  <div>Payee Name: <span className="text-ink">{selectedPaymentDetail.payee_name || 'N/A'}</span></div>
+                </div>
+                {selectedPaymentDetail.qr_url && (
+                  <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-4">
+                    <span className="text-[10px] text-dim">Snapshotted QR Image:</span>
+                    <img
+                      src={resolveMediaUrl(selectedPaymentDetail.qr_url)}
+                      alt="Snapshotted QR"
+                      className="size-20 object-contain bg-white p-1 rounded border border-white/10"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Proof Screenshot */}
+              {(selectedPaymentDetail.proof_url || selectedPaymentDetail.screenshot_url) && (
+                <div className="mt-4 p-3 bg-surface/50 border border-white/10 space-y-2">
+                  <div className="text-dim uppercase text-[10px] font-bold tracking-wider">Player Deposit Proof Screenshot</div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <a
+                      href={resolveMediaUrl(selectedPaymentDetail.proof_url || selectedPaymentDetail.screenshot_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block max-h-48 overflow-hidden rounded border border-white/20 hover:opacity-90"
+                    >
+                      <img
+                        src={resolveMediaUrl(selectedPaymentDetail.proof_url || selectedPaymentDetail.screenshot_url)}
+                        alt="Deposit proof screenshot"
+                        className="max-h-48 object-contain"
+                      />
+                    </a>
+                    <span className="text-[10px] text-dim">Click image to inspect full-resolution document in new tab.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Rejection / Admin Notes */}
+              {(selectedPaymentDetail.rejection_reason || selectedPaymentDetail.notes) && (
+                <div className="mt-4 p-3 bg-surface/50 border border-live/30 space-y-1">
+                  <div className="text-live uppercase text-[10px] font-bold tracking-wider">Rejection / Audit Notes</div>
+                  <p className="text-ink text-[11px]">{selectedPaymentDetail.rejection_reason || selectedPaymentDetail.notes}</p>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end gap-2 border-t border-white/10 pt-4">
+                {selectedPaymentDetail.status === 'PENDING' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleApprovePayment(selectedPaymentDetail.id)
+                        setSelectedPaymentDetail(null)
+                      }}
+                      className="border border-ok bg-ok px-4 py-2 font-mono text-xs uppercase text-void font-bold cursor-pointer"
+                    >
+                      Approve & Credit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = selectedPaymentDetail.id
+                        setSelectedPaymentDetail(null)
+                        setRejectPaymentId(id)
+                      }}
+                      className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentDetail(null)}
+                  className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
 
       {/* Reject Payment Modal */}
       {rejectPaymentId && (
@@ -3968,10 +4733,59 @@ export default function Admin() {
             <div className="relative w-full max-w-lg max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-white/20 bg-graphite p-6 shadow-2xl select-text">
               <h3 className="font-display text-2xl font-black uppercase text-ink">Dispatch Official Platform Email</h3>
               <form onSubmit={handleSendOfficialMail} className="mt-4 space-y-3 font-mono text-xs">
-                <select value={officialMail.recipient_type} onChange={(e) => setOfficialMail({ ...officialMail, recipient_type: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none">
-                  <option value="ALL_USERS">All Platform Users</option>
-                  <option value="ORGANIZERS">Registered Organizers Only</option>
-                </select>
+                <div>
+                  <label className="block text-dim uppercase text-[10px] tracking-wider mb-1">Target Audience</label>
+                  <select
+                    value={officialMail.recipient_type}
+                    onChange={(e) => setOfficialMail({ ...officialMail, recipient_type: e.target.value })}
+                    className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                  >
+                    <option value="ALL_USERS">All Users</option>
+                    <option value="ALL_ORGANIZERS">All Organizers</option>
+                    <option value="SELECTED_USERS">Selected Users</option>
+                    <option value="SELECTED_TEAMS">Selected Teams</option>
+                    <option value="CUSTOM_EMAILS">Custom Audience</option>
+                  </select>
+                </div>
+
+                {officialMail.recipient_type === 'CUSTOM_EMAILS' && (
+                  <div>
+                    <label className="block text-dim uppercase text-[10px] tracking-wider mb-1">Direct Email Addresses</label>
+                    <input
+                      required
+                      placeholder="Comma-separated emails (e.g. org1@mail.com, org2@mail.com)"
+                      value={officialMail.custom_emails}
+                      onChange={(e) => setOfficialMail({ ...officialMail, custom_emails: e.target.value })}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                )}
+
+                {officialMail.recipient_type === 'SELECTED_USERS' && (
+                  <div>
+                    <label className="block text-dim uppercase text-[10px] tracking-wider mb-1">Target User IDs</label>
+                    <input
+                      required
+                      placeholder="Comma-separated user IDs (e.g. user_123, user_456)"
+                      value={officialMail.user_ids}
+                      onChange={(e) => setOfficialMail({ ...officialMail, user_ids: e.target.value })}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                )}
+
+                {officialMail.recipient_type === 'SELECTED_TEAMS' && (
+                  <div>
+                    <label className="block text-dim uppercase text-[10px] tracking-wider mb-1">Target Team IDs</label>
+                    <input
+                      required
+                      placeholder="Comma-separated team IDs (e.g. team_abc, team_xyz)"
+                      value={officialMail.team_ids}
+                      onChange={(e) => setOfficialMail({ ...officialMail, team_ids: e.target.value })}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+                )}
                 <input required placeholder="Subject Line" value={officialMail.subject} onChange={(e) => setOfficialMail({ ...officialMail, subject: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                 <textarea rows={4} required placeholder="Email message content..." value={officialMail.message} onChange={(e) => setOfficialMail({ ...officialMail, message: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                 <div className="pt-2 flex justify-end gap-2">
