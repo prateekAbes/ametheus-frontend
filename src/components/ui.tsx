@@ -26,7 +26,9 @@ export function Brackets({ color = 'border-white/30' }: { color?: string }) {
 }
 
 const STATUS: Record<string, [string, string, string]> = {
-  open: ['Registration Open', 'bg-ok', 'text-ok'],
+  registration_open: ['Registration Open', 'bg-ok', 'text-ok'],
+  'registration open': ['Registration Open', 'bg-ok', 'text-ok'],
+  open: ['Open', 'bg-cyan', 'text-cyan'],
   upcoming: ['Upcoming', 'bg-cyan', 'text-cyan'],
   live: ['Live', 'bg-live', 'text-live'],
   completed: ['Completed', 'bg-dim', 'text-dim'],
@@ -35,7 +37,10 @@ const STATUS: Record<string, [string, string, string]> = {
   success: ['Success', 'bg-ok', 'text-ok'],
   pending: ['Pending', 'bg-warn', 'text-warn'],
   failed: ['Failed', 'bg-live', 'text-live'],
-  'in progress': ['In Progress', 'bg-cyan', 'text-cyan'],
+  'in progress': ['In Progress', 'bg-amber-400', 'text-amber-400'],
+  'in_progress': ['In Progress', 'bg-amber-400', 'text-amber-400'],
+  'waiting for user': ['Waiting for User', 'bg-warn', 'text-warn'],
+  'waiting_for_user': ['Waiting for User', 'bg-warn', 'text-warn'],
   resolved: ['Resolved', 'bg-ok', 'text-ok'],
   closed: ['Closed', 'bg-dim', 'text-dim'],
   confirmed: ['Confirmed', 'bg-ok', 'text-ok'],
@@ -270,7 +275,16 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
         />
         <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
-          {t.status && <Badge s={t.status} />}
+          {t.status && (
+            <Badge
+              s={t.status}
+              label={
+                t.status?.toLowerCase() === 'open' || t.status?.toUpperCase() === 'REGISTRATION_OPEN'
+                  ? 'Registration Open'
+                  : undefined
+              }
+            />
+          )}
           {(t as any).isRegistered && <Badge s="confirmed" label="REGISTERED" />}
         </div>
         {g && <span className="absolute right-4 top-3 font-display text-sm font-black tracking-[0.15em]" style={{ color: accent }}>{g.short}</span>}

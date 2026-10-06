@@ -4,6 +4,7 @@ import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
   getSupportTickets,
   createSupportTicket,
+  formatTicketStatus,
   type SupportTicket,
 } from '../services/support'
 import { useAuthContext } from '../context/AuthContext'
@@ -400,7 +401,14 @@ export default function Support() {
                       {t.subject || t.description?.slice(0, 45) || 'Support Inquiry'}
                     </p>
                   </div>
-                  <Badge s={(t.status.toLowerCase() as any) || 'open'} />
+                  <span
+                    className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider font-bold ${
+                      formatTicketStatus(t.status).badgeClass
+                    }`}
+                  >
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {formatTicketStatus(t.status).label}
+                  </span>
                 </li>
               ))
             )}

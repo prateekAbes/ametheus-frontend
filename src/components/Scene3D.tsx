@@ -23,7 +23,7 @@ function usePointer() {
 }
 
 /** Amethyst crystal — a distorting icosahedron with a wireframe shell. */
-function Crystal({ accent }: { accent: string }) {
+function Crystal({ accent, shellOpacity = 0.18 }: { accent: string; shellOpacity?: number }) {
   const g = useRef<THREE.Group>(null)
   const shell = useRef<THREE.Mesh>(null)
   useFrame((s, dt) => {
@@ -44,7 +44,7 @@ function Crystal({ accent }: { accent: string }) {
         </mesh>
         <mesh ref={shell} scale={1.65}>
           <icosahedronGeometry args={[1, 1]} />
-          <meshBasicMaterial color={accent} wireframe transparent opacity={0.18} />
+          <meshBasicMaterial color={accent} wireframe transparent opacity={shellOpacity} />
         </mesh>
         {[2.4, 3.1].map((r, i) => (
           <mesh key={r} rotation={[Math.PI / 2.3 + i * 0.5, i * 0.6, 0]}>
@@ -112,7 +112,22 @@ function Rig() {
  * Interactive WebGL backdrop over a static gradient fallback.
  * Renders only while on-screen (frameloop pauses off-screen), skipped entirely for reduced motion.
  */
-export default function Scene3D({ crystal = true, accent = '#8b5cff', particles = 1400, className = '' }: { crystal?: boolean; accent?: string; particles?: number; className?: string }) {
+export default function Scene3D({
+  crystal = true,
+  accent = '#8b5cff',
+  particles = 1400,
+  className = '',
+  shellOpacity,
+  opacity,
+}: {
+  crystal?: boolean
+  accent?: string
+  particles?: number
+  className?: string
+  shellOpacity?: number
+  opacity?: number
+}) {
+  const resolvedShellOpacity = shellOpacity ?? opacity ?? 0.18
   usePointer()
   const box = useRef<HTMLDivElement>(null)
   const [on, setOn] = useState(false)
@@ -132,7 +147,7 @@ export default function Scene3D({ crystal = true, accent = '#8b5cff', particles 
           <pointLight position={[4, 3, 4]} intensity={60} color="#3ef2ff" />
           <pointLight position={[-4, -2, 3]} intensity={50} color="#ff3dbb" />
           <Field count={mobile ? 400 : particles} />
-          {crystal && <Crystal accent={accent} />}
+          {crystal && <Crystal accent={accent} shellOpacity={resolvedShellOpacity} />}
           <Rig />
         </Canvas>
       )}

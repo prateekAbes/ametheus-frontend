@@ -31,6 +31,8 @@ export interface Game {
   hero_media_enabled?: boolean
   gallery?: Array<{ id: string; url: string; caption?: string; order?: number }>
   teams_count?: number
+  genre_id?: string
+  genre_name?: string
 }
 
 export interface NormalizedGame {
@@ -64,6 +66,8 @@ export interface NormalizedGame {
   heroMediaEnabled: boolean
   gallery: Array<{ id: string; url: string; caption?: string; order?: number }>
   teamsCount?: number
+  genreId?: string
+  genreName?: string
 }
 
 export function normalizeGame(game: Game): NormalizedGame {
@@ -72,6 +76,8 @@ export function normalizeGame(game: Game): NormalizedGame {
     slug: game.slug,
     name: game.name,
     category: game.category,
+    genreId: game.genre_id,
+    genreName: game.genre_name,
     platform: game.platform,
     tag: game.tag,
     isTeamGame: game.is_team_game,

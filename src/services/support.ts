@@ -8,6 +8,34 @@ export interface SupportTicketMessage {
   created_at: string
 }
 
+export type SupportTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_USER' | 'RESOLVED' | 'CLOSED'
+
+export const SUPPORT_TICKET_STATUS_OPTIONS: { value: SupportTicketStatus; label: string; badgeClass: string }[] = [
+  { value: 'OPEN', label: 'Open', badgeClass: 'border-cyan text-cyan bg-cyan/10' },
+  { value: 'IN_PROGRESS', label: 'In Progress', badgeClass: 'border-amber-400 text-amber-400 bg-amber-400/10' },
+  { value: 'WAITING_FOR_USER', label: 'Waiting for User', badgeClass: 'border-warn text-warn bg-warn/10' },
+  { value: 'RESOLVED', label: 'Resolved', badgeClass: 'border-ok text-ok bg-ok/10' },
+  { value: 'CLOSED', label: 'Closed', badgeClass: 'border-dim text-dim bg-white/5' },
+]
+
+export function formatTicketStatus(status?: string): { label: string; badgeClass: string; value: SupportTicketStatus } {
+  const norm = (status || 'OPEN').toUpperCase().replace(/\s+/g, '_')
+  if (norm === 'IN_PROGRESS' || norm === 'INPROGRESS' || norm === 'WAITING_FOR_ADMIN' || norm === 'ON_HOLD') {
+    return { label: 'In Progress', badgeClass: 'border-amber-400 text-amber-400 bg-amber-400/10', value: 'IN_PROGRESS' }
+  }
+  if (norm === 'WAITING_FOR_USER' || norm === 'WAITINGFORUSER') {
+    return { label: 'Waiting for User', badgeClass: 'border-warn text-warn bg-warn/10', value: 'WAITING_FOR_USER' }
+  }
+  if (norm === 'RESOLVED') {
+    return { label: 'Resolved', badgeClass: 'border-ok text-ok bg-ok/10', value: 'RESOLVED' }
+  }
+  if (norm === 'CLOSED' || norm === 'ARCHIVED') {
+    return { label: 'Closed', badgeClass: 'border-dim text-dim bg-white/5', value: 'CLOSED' }
+  }
+  // Default to Open (guarantees tournament/legacy statuses never leak)
+  return { label: 'Open', badgeClass: 'border-cyan text-cyan bg-cyan/10', value: 'OPEN' }
+}
+
 export interface SupportTicket {
   id: string
   _id?: string
@@ -19,7 +47,7 @@ export interface SupportTicket {
   payment_type?: string
   description?: string
   message?: string
-  status: 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_USER' | 'RESOLVED' | 'CLOSED' | string
+  status: SupportTicketStatus | string
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | string
   user_id?: string
   created_at: string

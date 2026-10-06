@@ -75,16 +75,28 @@ export interface UpiAccount {
   qr_url?: string
 }
 
+export {
+  type SupportTicketStatus,
+  SUPPORT_TICKET_STATUS_OPTIONS,
+  formatTicketStatus,
+} from './support'
+import type { SupportTicketStatus } from './support'
+
 export interface SupportTicket {
   id: string
   ticket_id: string
   name: string
   email: string
   category: string
+  payment_type?: string
   description: string
-  status: 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_USER' | 'RESOLVED' | 'CLOSED'
+  status: SupportTicketStatus | string
+  is_archived?: boolean
+  archived_at?: string
+  messages?: any[]
   internal_notes?: string
   created_at: string
+  updated_at?: string
 }
 
 export interface GameRegulation {

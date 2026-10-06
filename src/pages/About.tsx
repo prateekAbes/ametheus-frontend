@@ -91,7 +91,7 @@ export default function About() {
       <section className="relative flex min-h-[100svh] items-end overflow-hidden">
         <img src={img(ARENA, 2200)} alt="" className="kenburns absolute inset-0 h-full w-full object-cover opacity-45" />
         <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-void/20" />
-        <Suspense fallback={null}><Scene3D accent="#8b5cff" /></Suspense>
+        <Suspense fallback={null}><Scene3D accent="#8b5cff" shellOpacity={0.35} /></Suspense>
         <Container className="relative pb-16 pt-40">
           <Hud className="text-cyan">Established in Ghaziabad · 2026</Hud>
           <h1 className="reveal mt-6 font-display text-[clamp(4.5rem,19vw,20rem)] font-black uppercase leading-[0.78]">Ametheus</h1>

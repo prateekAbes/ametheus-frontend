@@ -50,6 +50,8 @@ import {
   PayoutRecord,
   UpiAccount,
   SupportTicket,
+  formatTicketStatus,
+  SUPPORT_TICKET_STATUS_OPTIONS,
   GameRegulation,
   EmailSystemStatus,
   PageMediaConfig,
@@ -445,6 +447,8 @@ export default function Admin() {
     match_protocol: 'Official Competitive Ruleset',
     accent_color: '#3ef2ff',
     status: 'ACTIVE',
+    genre_id: '',
+    genre_name: '',
   })
   const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false)
@@ -571,6 +575,7 @@ export default function Admin() {
   const [loadingSupportUsers, setLoadingSupportUsers] = useState(false)
   const [supportSearchTerm, setSupportSearchTerm] = useState('')
   const [supportShowArchived, setSupportShowArchived] = useState(false)
+  const [supportViewMode, setSupportViewMode] = useState<'ALL_TICKETS' | 'USER_GROUPS'>('ALL_TICKETS')
   const [expandedSupportUserId, setExpandedSupportUserId] = useState<string | null>(null)
   const [activeTicketThread, setActiveTicketThread] = useState<any | null>(null)
   const [ticketReplyText, setTicketReplyText] = useState('')
@@ -795,6 +800,24 @@ export default function Admin() {
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to update ticket')
+    }
+  }
+
+  const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
+    try {
+      await updateSupportTicket(ticketId, { status: newStatus })
+      const statusLabel = formatTicketStatus(newStatus).label
+      showToast(`Ticket status updated to ${statusLabel}`)
+      setTickets((prev) =>
+        prev.map((t) => (t.ticket_id === ticketId || t.id === ticketId ? { ...t, status: newStatus } : t))
+      )
+      if (activeTicketThread && (activeTicketThread.id === ticketId || activeTicketThread.ticket_id === ticketId)) {
+        setActiveTicketThread((prev: any) => (prev ? { ...prev, status: newStatus } : null))
+      }
+      const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+      setSupportUsers(res)
+    } catch (err: any) {
+      alert(err.message || 'Failed to update ticket status')
     }
   }
 
@@ -1031,6 +1054,8 @@ export default function Admin() {
     try {
       await createGame({
         ...newGame,
+        genre_id: newGame.genre_id || undefined,
+        genre_name: newGame.genre_name || undefined,
         min_team_size: Number(newGame.min_team_size),
         max_team_size: Number(newGame.max_team_size),
         max_substitutes: Number(newGame.max_substitutes),
@@ -1052,6 +1077,8 @@ export default function Admin() {
       await updateGame(editingGame.id || editingGame.slug, {
         name: editingGame.name,
         category: editingGame.category,
+        genre_id: (editingGame as any).genre_id ?? '',
+        genre_name: (editingGame as any).genre_name,
         platform: editingGame.platform,
         tag: editingGame.tag,
         is_team_game: editingGame.is_team_game,
@@ -1337,8 +1364,8 @@ export default function Admin() {
                 <p className="mt-2 font-display text-4xl font-black text-warn">{payments.length}</p>
               </Panel>
               <Panel className="p-5">
-                <Hud className="text-ok">ESCROW VAULT</Hud>
-                <p className="mt-2 font-display text-4xl font-black text-ok">{inr(stats?.platform_escrow_vault ?? 50000)}</p>
+                <Hud className="text-ok">AMETHEUS VAULT</Hud>
+                <p className="mt-2 font-display text-4xl font-black text-ok">{inr(stats?.platform_escrow_vault ?? 0)}</p>
               </Panel>
             </div>
 
@@ -2712,23 +2739,43 @@ export default function Admin() {
         )}
 
         {/* TAB 7: SUPPORT TICKETS */}
-        {tab === 'SUPPORT TICKETS' && (
+        {tab === 'SUPPORT TICKETS' && (() => {
+          const filteredTickets = tickets.filter((t) => {
+            if (supportShowArchived && !t.is_archived) return false
+            if (!supportShowArchived && t.is_archived) return false
+            if (!supportSearchTerm) return true
+            const term = supportSearchTerm.toLowerCase()
+            return (
+              (t.ticket_id || t.id || '').toLowerCase().includes(term) ||
+              (t.name || '').toLowerCase().includes(term) ||
+              (t.email || '').toLowerCase().includes(term) ||
+              (t.category || '').toLowerCase().includes(term) ||
+              (t.payment_type || '').toLowerCase().includes(term) ||
+              (t.description || '').toLowerCase().includes(term)
+            )
+          })
+
+          return (
           <div className="mt-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-cyan animate-pulse" />
-                  <Hud className="text-cyan">USER-CENTRIC HELPDESK WORKSPACE</Hud>
+                  <Hud className="text-cyan">HELPDESK & SUPPORT TICKETS OPERATIONS</Hud>
                 </div>
-                <h2 className="mt-1 font-display text-3xl font-black uppercase">Users with Support Tickets</h2>
-                <p className="text-xs text-dim">1st-level organization grouped by user. Inspect inquiry threads, dispatch email replies, and archive closed cases.</p>
+                <h2 className="mt-1 font-display text-3xl font-black uppercase">Support Tickets Desk</h2>
+                <p className="text-xs text-dim">Inspect inquiry threads, review category issues, dispatch email replies, and archive closed cases.</p>
               </div>
               <div className="flex items-center gap-3">
-                <Hud className="text-dim">{supportUsers.length} CONTENDERS WITH TICKETS</Hud>
+                <Hud className="text-dim">{filteredTickets.length} TICKETS FOUND</Hud>
                 <button
                   onClick={async () => {
-                    const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
+                    const [res, tixRes] = await Promise.all([
+                      getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => []),
+                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
+                    ])
                     setSupportUsers(res)
+                    setTickets(tixRes)
                   }}
                   className="border border-white/15 bg-surface px-3 py-1 font-mono text-xs uppercase hover:border-cyan text-ink"
                 >
@@ -2737,43 +2784,78 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Filter and Search Bar */}
+            {/* View Mode Switcher and Filter Bar */}
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* View Mode Buttons */}
+                <div className="flex border border-white/10 bg-surface/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSupportViewMode('ALL_TICKETS')}
+                    className={`px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                      supportViewMode === 'ALL_TICKETS'
+                        ? 'bg-cyan text-void font-bold shadow'
+                        : 'text-dim hover:text-ink'
+                    }`}
+                  >
+                    All Tickets Table ({filteredTickets.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSupportViewMode('USER_GROUPS')}
+                    className={`px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                      supportViewMode === 'USER_GROUPS'
+                        ? 'bg-cyan text-void font-bold shadow'
+                        : 'text-dim hover:text-ink'
+                    }`}
+                  >
+                    Grouped by Contender ({supportUsers.length})
+                  </button>
+                </div>
+
+                {/* Status Filter */}
                 <button
                   onClick={async () => {
                     setSupportShowArchived(false)
-                    const res = await getUsersWithSupportTickets(supportSearchTerm, false).catch(() => [])
+                    const [res, tixRes] = await Promise.all([
+                      getUsersWithSupportTickets(supportSearchTerm, false).catch(() => []),
+                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
+                    ])
                     setSupportUsers(res)
+                    setTickets(tixRes)
                   }}
-                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                  className={`border px-3 py-1 font-mono text-xs uppercase transition-colors ${
                     !supportShowArchived
                       ? 'border-cyan bg-cyan text-void font-bold'
                       : 'border-white/15 bg-surface text-dim hover:text-ink'
                   }`}
                 >
-                  Active Inquiries ({supportUsers.reduce((acc, u) => acc + (u.open_tickets || 0), 0)} Open)
+                  Active Tickets ({tickets.filter((t) => !t.is_archived).length})
                 </button>
                 <button
                   onClick={async () => {
                     setSupportShowArchived(true)
-                    const res = await getUsersWithSupportTickets(supportSearchTerm, true).catch(() => [])
+                    const [res, tixRes] = await Promise.all([
+                      getUsersWithSupportTickets(supportSearchTerm, true).catch(() => []),
+                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
+                    ])
                     setSupportUsers(res)
+                    setTickets(tixRes)
                   }}
-                  className={`border px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
+                  className={`border px-3 py-1 font-mono text-xs uppercase transition-colors ${
                     supportShowArchived
                       ? 'border-cyan bg-cyan text-void font-bold'
                       : 'border-white/15 bg-surface text-dim hover:text-ink'
                   }`}
                 >
-                  Archived Tickets
+                  Archived Tickets ({tickets.filter((t) => t.is_archived).length})
                 </button>
               </div>
 
               <div className="w-full md:w-80">
                 <input
                   type="text"
-                  placeholder="Search user, email, ticket ID..."
+                  placeholder="Search user, email, ticket ID, category..."
                   value={supportSearchTerm}
                   onChange={async (e) => {
                     const q = e.target.value
@@ -2786,13 +2868,135 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* User-Centric List */}
-            {supportUsers.length === 0 ? (
-              <div className="border border-dashed border-white/15 p-16 text-center font-mono text-xs text-dim">
-                NO USERS WITH SUPPORT TICKETS FOUND MATCHING CRITERIA.
+            {/* TABULAR VIEW OF ALL TICKETS */}
+            {supportViewMode === 'ALL_TICKETS' && (
+              <div className="overflow-x-auto border border-white/10 bg-surface/40">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead className="border-b border-white/10 bg-white/[0.02] text-dim uppercase text-[11px]">
+                    <tr>
+                      <th className="p-3">Ticket ID</th>
+                      <th className="p-3">User</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3">Payment Type</th>
+                      <th className="p-3">Description</th>
+                      <th className="p-3">Submitted</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {filteredTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="p-12 text-center text-dim font-mono text-xs">
+                          NO SUPPORT TICKETS FOUND MATCHING CRITERIA.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTickets.map((t) => {
+                        const tid = t.ticket_id || t.id
+                        const isArchived = t.is_archived || t.status === 'ARCHIVED'
+                        return (
+                          <tr key={tid} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="p-3 font-bold text-cyan">[{tid}]</td>
+                            <td className="p-3 text-ink font-semibold">{t.name || 'Contender'}</td>
+                            <td className="p-3 text-dim">{t.email || '—'}</td>
+                            <td className="p-3">
+                              <span className="border border-white/20 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase text-ink">
+                                {t.category}
+                              </span>
+                            </td>
+                            <td className="p-3 text-dim">
+                              {t.payment_type && t.payment_type !== 'NOT_APPLICABLE' ? (
+                                <span className="text-amber-400 font-semibold">{t.payment_type}</span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="p-3 max-w-xs truncate text-ink/80" title={t.description}>
+                              {t.description}
+                            </td>
+                            <td className="p-3 text-dim whitespace-nowrap">
+                              {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td className="p-3 whitespace-nowrap">
+                              <select
+                                value={formatTicketStatus(t.status).value}
+                                onChange={(e) => handleUpdateTicketStatus(tid, e.target.value)}
+                                className={`px-2.5 py-1 border text-[10px] font-bold uppercase rounded-none bg-graphite outline-none cursor-pointer transition-colors ${
+                                  formatTicketStatus(t.status).badgeClass
+                                }`}
+                                title="Change ticket status"
+                              >
+                                {SUPPORT_TICKET_STATUS_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value} className="bg-graphite text-ink">
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap space-x-1">
+                              <button
+                                onClick={() => {
+                                  setActiveTicketThread(t)
+                                  setTicketReplyText('')
+                                  setTicketNextStatus('WAITING_FOR_USER')
+                                }}
+                                className="border border-cyan bg-cyan/15 px-2.5 py-1 text-[11px] text-cyan hover:bg-cyan/30 uppercase"
+                              >
+                                Thread
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await retrySupportTicketEmail(tid)
+                                    showToast(`Confirmation email resent for ticket ${tid}`)
+                                  } catch (err: any) {
+                                    alert(err.message || 'Retry email failed')
+                                  }
+                                }}
+                                className="border border-white/10 px-2 py-1 text-[11px] text-dim hover:text-ink uppercase"
+                                title="Retry Brevo email delivery"
+                              >
+                                Resend Email
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await toggleArchiveSupportTicket(tid)
+                                    showToast('Ticket archive status toggled.')
+                                    const [res, tixRes] = await Promise.all([
+                                      getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => []),
+                                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
+                                    ])
+                                    setSupportUsers(res)
+                                    setTickets(tixRes)
+                                  } catch (err: any) {
+                                    alert(err.message || 'Archive toggle failed')
+                                  }
+                                }}
+                                className="border border-white/10 px-2 py-1 text-[11px] text-dim hover:text-ink uppercase"
+                              >
+                                {isArchived ? 'Unarchive' : 'Archive'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            ) : (
-              <div className="space-y-4">
+            )}
+
+            {/* User-Centric List */}
+            {supportViewMode === 'USER_GROUPS' && (
+              supportUsers.length === 0 ? (
+                <div className="border border-dashed border-white/15 p-16 text-center font-mono text-xs text-dim">
+                  NO USERS WITH SUPPORT TICKETS FOUND MATCHING CRITERIA.
+                </div>
+              ) : (
+                <div className="space-y-4">
                 {supportUsers.map((u) => {
                   const isExpanded = expandedSupportUserId === u._id
                   return (
@@ -2844,15 +3048,20 @@ export default function Admin() {
                                       <span className="border border-white/20 px-2 py-0.5 text-[10px] uppercase text-dim">
                                         {t.category}
                                       </span>
-                                      <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
-                                        t.status === 'RESOLVED' || t.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
-                                        t.status === 'WAITING_FOR_ADMIN' || t.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
-                                        t.status === 'WAITING_FOR_USER' ? 'border-amber-400 text-amber-400 bg-amber-400/10' :
-                                        t.status === 'ARCHIVED' ? 'border-dim text-dim bg-white/5' :
-                                        'border-cyan text-cyan bg-cyan/10'
-                                      }`}>
-                                        {t.status}
-                                      </span>
+                                      <select
+                                        value={formatTicketStatus(t.status).value}
+                                        onChange={(e) => handleUpdateTicketStatus(t.id || t.ticket_id, e.target.value)}
+                                        className={`px-2 py-0.5 border text-[10px] font-bold uppercase bg-graphite outline-none cursor-pointer ${
+                                          formatTicketStatus(t.status).badgeClass
+                                        }`}
+                                        title="Change ticket status"
+                                      >
+                                        {SUPPORT_TICKET_STATUS_OPTIONS.map((opt) => (
+                                          <option key={opt.value} value={opt.value} className="bg-graphite text-ink">
+                                            {opt.label}
+                                          </option>
+                                        ))}
+                                      </select>
                                       <span className="text-dim text-[11px]">{new Date(t.created_at).toLocaleDateString()}</span>
                                       {msgCount > 0 && (
                                         <span className="text-cyan/80 text-[11px]">({msgCount} messages)</span>
@@ -2901,9 +3110,10 @@ export default function Admin() {
                   )
                 })}
               </div>
-            )}
+            ))}
           </div>
-        )}
+        )
+      })()}
 
         {/* TAB 8: RULES & REGULATIONS */}
         {tab === 'RULES & REGULATIONS' && (
@@ -3678,12 +3888,12 @@ export default function Admin() {
               <h3 className="font-display text-2xl font-black uppercase text-ink">Manage Ticket {selectedTicket.ticket_id}</h3>
               <p className="text-xs text-dim mt-1 font-mono">{selectedTicket.name} ({selectedTicket.email})</p>
               <div className="mt-4 space-y-3 font-mono text-xs">
-                <select value={ticketStatusVal} onChange={(e) => setTicketStatusVal(e.target.value)} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none">
-                  <option value="OPEN">OPEN</option>
-                  <option value="IN_PROGRESS">IN_PROGRESS</option>
-                  <option value="WAITING_FOR_USER">WAITING_FOR_USER</option>
-                  <option value="RESOLVED">RESOLVED</option>
-                  <option value="CLOSED">CLOSED</option>
+                <select value={ticketStatusVal} onChange={(e) => setTicketStatusVal(e.target.value)} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none cursor-pointer uppercase">
+                  {SUPPORT_TICKET_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
                 <textarea rows={3} value={ticketNotes} onChange={(e) => setTicketNotes(e.target.value)} placeholder="Internal resolution notes..." className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
               </div>
@@ -4108,7 +4318,7 @@ export default function Admin() {
                     <input required placeholder="e.g. Apex Legends" value={newGame.name} onChange={(e) => setNewGame({ ...newGame, name: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="text-dim">Category</label>
                     <select
@@ -4119,6 +4329,29 @@ export default function Admin() {
                       {CANONICAL_CATEGORIES.map((c) => (
                         <option key={c.slug} value={c.slug}>
                           {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-dim">Genre Category</label>
+                    <select
+                      value={newGame.genre_id || ''}
+                      onChange={(e) => {
+                        const selId = e.target.value
+                        const matchG = genres.find(g => (g.id || (g as any)._id) === selId || g.slug === selId)
+                        setNewGame({
+                          ...newGame,
+                          genre_id: selId,
+                          genre_name: matchG ? matchG.name : '',
+                        })
+                      }}
+                      className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                    >
+                      <option value="">No Genre Assigned</option>
+                      {genres.map((g) => (
+                        <option key={g.id || (g as any)._id || g.slug} value={g.id || (g as any)._id}>
+                          {g.name}
                         </option>
                       ))}
                     </select>
@@ -4221,7 +4454,7 @@ export default function Admin() {
                     <input required value={editingGame.tag} onChange={(e) => setEditingGame({ ...editingGame, tag: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-dim">Platform</label>
                     <input required value={editingGame.platform} onChange={(e) => setEditingGame({ ...editingGame, platform: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -4241,6 +4474,29 @@ export default function Admin() {
                       {!CANONICAL_CATEGORIES.some((c) => c.slug === editingGame.category) && (
                         <option value={editingGame.category}>{editingGame.category}</option>
                       )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-dim">Genre Category</label>
+                    <select
+                      value={editingGame.genre_id || ''}
+                      onChange={(e) => {
+                        const selId = e.target.value
+                        const matchG = genres.find(g => (g.id || (g as any)._id) === selId || g.slug === selId)
+                        setEditingGame({
+                          ...editingGame,
+                          genre_id: selId,
+                          genre_name: matchG ? matchG.name : undefined,
+                        })
+                      }}
+                      className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none"
+                    >
+                      <option value="">No Genre Assigned</option>
+                      {genres.map((g) => (
+                        <option key={g.id || (g as any)._id || g.slug} value={g.id || (g as any)._id}>
+                          {g.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -4825,12 +5081,8 @@ export default function Admin() {
                     <span className="border border-white/20 px-2 py-0.5 text-[10px] text-dim uppercase">
                       {activeTicketThread.category}
                     </span>
-                    <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${
-                      activeTicketThread.status === 'RESOLVED' || activeTicketThread.status === 'CLOSED' ? 'border-ok text-ok bg-ok/10' :
-                      activeTicketThread.status === 'WAITING_FOR_ADMIN' || activeTicketThread.status === 'UNREAD' ? 'border-live text-live bg-live/10' :
-                      'border-cyan text-cyan bg-cyan/10'
-                    }`}>
-                      {activeTicketThread.status}
+                    <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${formatTicketStatus(activeTicketThread.status).badgeClass}`}>
+                      {formatTicketStatus(activeTicketThread.status).label}
                     </span>
                   </div>
                   <div className="text-xs text-ink font-bold mt-1">
@@ -4840,31 +5092,20 @@ export default function Admin() {
 
                 <div className="flex items-center gap-2">
                   <select
-                    value={activeTicketThread.status}
+                    value={formatTicketStatus(activeTicketThread.status).value}
                     onChange={async (e) => {
                       const newSt = e.target.value
-                      try {
-                        await updateSupportTicket(activeTicketThread.id || activeTicketThread.ticket_id, { status: newSt })
-                        setActiveTicketThread({ ...activeTicketThread, status: newSt })
-                        showToast(`Ticket status updated to ${newSt}`)
-                        const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
-                        setSupportUsers(res)
-                      } catch (err: any) {
-                        alert(err.message || 'Status update failed')
-                      }
+                      await handleUpdateTicketStatus(activeTicketThread.id || activeTicketThread.ticket_id, newSt)
                     }}
-                    className="border border-white/15 bg-surface p-1 text-[10px] text-cyan font-bold outline-none uppercase"
+                    className={`border p-1 text-[11px] font-bold outline-none uppercase bg-graphite cursor-pointer ${
+                      formatTicketStatus(activeTicketThread.status).badgeClass
+                    }`}
                   >
-                    <option value="NEW">NEW</option>
-                    <option value="OPEN">OPEN</option>
-                    <option value="WAITING_FOR_USER">WAITING FOR USER</option>
-                    <option value="WAITING_FOR_ADMIN">WAITING FOR ADMIN</option>
-                    <option value="UNREAD">UNREAD</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="ON_HOLD">ON HOLD</option>
-                    <option value="RESOLVED">RESOLVED</option>
-                    <option value="CLOSED">CLOSED</option>
-                    <option value="ARCHIVED">ARCHIVED</option>
+                    {SUPPORT_TICKET_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-graphite text-ink">
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
 
                   <button
@@ -4932,15 +5173,15 @@ export default function Admin() {
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="text-dim text-[11px]">Next Status upon Reply:</span>
                   <select
-                    value={ticketNextStatus}
+                    value={formatTicketStatus(ticketNextStatus).value}
                     onChange={(e) => setTicketNextStatus(e.target.value)}
-                    className="border border-white/15 bg-surface p-1 text-[11px] text-ink outline-none uppercase"
+                    className="border border-white/15 bg-surface p-1 text-[11px] text-ink outline-none uppercase cursor-pointer"
                   >
-                    <option value="WAITING_FOR_USER">WAITING FOR USER (DEFAULT)</option>
-                    <option value="RESOLVED">RESOLVED</option>
-                    <option value="CLOSED">CLOSED</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="ON_HOLD">ON HOLD</option>
+                    {SUPPORT_TICKET_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label} {opt.value === 'WAITING_FOR_USER' ? '(Default)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
