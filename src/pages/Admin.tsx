@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { LiveMatchesManager } from '../components/admin/LiveMatchesManager'
@@ -96,6 +96,7 @@ import {
   getUsersWithSupportTickets,
   replyToSupportTicket,
   toggleArchiveSupportTicket,
+  getSupportTicketDetails,
   UserSupportGroup,
 } from '../services/support'
 import {
@@ -581,6 +582,46 @@ export default function Admin() {
   const [ticketReplyText, setTicketReplyText] = useState('')
   const [ticketNextStatus, setTicketNextStatus] = useState('WAITING_FOR_USER')
   const [isSubmittingTicketReply, setIsSubmittingTicketReply] = useState(false)
+  const threadMessagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Live auto-polling for active support ticket thread every 5 seconds
+  useEffect(() => {
+    if (!activeTicketThread) return
+    const threadTid = activeTicketThread.ticket_id || activeTicketThread.id
+    if (!threadTid) return
+
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await getSupportTicketDetails(threadTid)
+        if (fresh) {
+          setActiveTicketThread((prev: any) => {
+            if (!prev) return null
+            const prevCount = prev.messages?.length || 0
+            const freshCount = fresh.messages?.length || 0
+            if (
+              prevCount !== freshCount ||
+              prev.status !== fresh.status ||
+              prev.has_new_reply !== fresh.has_new_reply
+            ) {
+              return { ...prev, ...fresh }
+            }
+            return prev
+          })
+        }
+      } catch {
+        // Polling failure silent fallback
+      }
+    }, 5000)
+
+    return () => clearInterval(timer)
+  }, [activeTicketThread?.id, activeTicketThread?.ticket_id])
+
+  // Auto-scroll when messages update in active ticket thread
+  useEffect(() => {
+    if (activeTicketThread?.messages?.length) {
+      threadMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [activeTicketThread?.messages?.length])
 
   // Organizer Match Requests States
   const [matchRequests, setMatchRequests] = useState<MatchRequest[]>([])
@@ -2898,7 +2939,16 @@ export default function Admin() {
                         const isArchived = t.is_archived || t.status === 'ARCHIVED'
                         return (
                           <tr key={tid} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="p-3 font-bold text-cyan">[{tid}]</td>
+                            <td className="p-3 font-bold text-cyan">
+                              <div className="flex items-center gap-1.5">
+                                <span>[{tid}]</span>
+                                {(t.has_new_reply || t.status === 'WAITING_FOR_ADMIN') && (
+                                  <span className="bg-amber-400 text-void font-bold text-[9px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider animate-pulse">
+                                    New Reply
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3 text-ink font-semibold">{t.name || 'Contender'}</td>
                             <td className="p-3 text-dim">{t.email || '—'}</td>
                             <td className="p-3">
@@ -3045,6 +3095,11 @@ export default function Admin() {
                                   <div className="space-y-1 font-mono text-xs">
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span className="text-cyan font-bold">[{t.ticket_id || t.id}]</span>
+                                      {(t.has_new_reply || t.status === 'WAITING_FOR_ADMIN') && (
+                                        <span className="bg-amber-400 text-void font-bold text-[9px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider animate-pulse">
+                                          New Reply
+                                        </span>
+                                      )}
                                       <span className="border border-white/20 px-2 py-0.5 text-[10px] uppercase text-dim">
                                         {t.category}
                                       </span>
@@ -5084,6 +5139,10 @@ export default function Admin() {
                     <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase ${formatTicketStatus(activeTicketThread.status).badgeClass}`}>
                       {formatTicketStatus(activeTicketThread.status).label}
                     </span>
+                    <span className="flex items-center gap-1 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[9px] text-emerald-400 font-bold uppercase tracking-wider rounded-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>Live Sync</span>
+                    </span>
                   </div>
                   <div className="text-xs text-ink font-bold mt-1">
                     {activeTicketThread.name || 'Contender'} · <span className="text-dim">{activeTicketThread.email}</span>
@@ -5140,31 +5199,108 @@ export default function Admin() {
                     <p className="text-dim text-[11px] italic">No replies dispatched yet. Compose an administrative reply below.</p>
                   ) : (
                     activeTicketThread.messages.map((m: any, idx: number) => {
-                      const isAdmin = m.sender_role === 'ADMIN' || m.sender_name?.includes('Admin') || m.sender_name?.includes('Arbiter')
+                      const isSystem = m.message_type === 'SYSTEM' || m.sender_role === 'SYSTEM'
+                      const isAdmin = !isSystem && (m.message_type === 'ADMIN' || m.sender_role === 'ADMIN' || m.direction === 'outbound' || m.sender_name?.includes('Admin') || m.sender_name?.includes('Arbiter'))
+
+                      if (isSystem) {
+                        return (
+                          <div key={m.id || idx} className="flex flex-col items-center my-3">
+                            <div className="flex items-center gap-2 border border-white/10 bg-white/[0.04] px-3.5 py-1.5 rounded-full text-[10px] text-dim font-mono shadow-sm">
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan/70 animate-pulse"></span>
+                              <span className="text-cyan font-bold uppercase tracking-wider">SYSTEM CONFIRMATION DISPATCHED</span>
+                              <span>•</span>
+                              <span>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <div className="text-[11px] text-dim/80 text-center max-w-md mt-1.5 italic font-mono">
+                              {m.message || m.body_text || 'Automated confirmation receipt dispatched.'}
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      if (isAdmin) {
+                        return (
+                          <div
+                            key={m.id || idx}
+                            className="flex flex-col items-end my-1"
+                          >
+                            <div className="flex items-center gap-2 text-[10px] text-dim mb-1">
+                              <span>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-cyan font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan"></span>
+                                {m.sender_name || 'Admin Arbiter'}
+                              </span>
+                            </div>
+                            <div className="max-w-[85%] sm:max-w-[75%] p-3.5 rounded-lg text-xs whitespace-pre-wrap bg-cyan/10 border border-cyan/35 text-ink shadow-sm">
+                              <p className="whitespace-pre-wrap">{m.message || m.body_text}</p>
+                              {m.attachments && m.attachments.length > 0 && (
+                                <div className="mt-2.5 pt-2 border-t border-cyan/20 space-y-1">
+                                  <span className="text-[10px] text-cyan/70 font-bold uppercase tracking-wider block">Attachments:</span>
+                                  {m.attachments.map((att: any, attIdx: number) => (
+                                    <a
+                                      key={att.id || attIdx}
+                                      href={att.url || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-2 text-[11px] text-cyan hover:underline bg-cyan/15 px-2.5 py-1 rounded border border-cyan/25"
+                                    >
+                                      <span>📎</span>
+                                      <span className="truncate">{att.filename}</span>
+                                      {att.size > 0 && <span className="text-dim text-[10px]">({Math.round(att.size / 1024)} KB)</span>}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // User message
                       return (
                         <div
                           key={m.id || idx}
-                          className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                          className="flex flex-col items-start my-1"
                         >
                           <div className="flex items-center gap-2 text-[10px] text-dim mb-1">
-                            <span className={isAdmin ? 'text-cyan font-bold' : 'text-ink font-bold'}>
-                              {m.sender_name || (isAdmin ? 'Admin Arbiter' : 'Contender')}
+                            <span className="text-ink font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                              {m.sender_name || activeTicketThread.name || 'Contender'}
                             </span>
+                            {m.sender_email && <span className="text-dim/70 text-[9px]">&lt;{m.sender_email}&gt;</span>}
                             <span>{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            {m.direction === 'inbound' && (
+                              <span className="border border-white/20 bg-white/[0.04] px-1.5 py-0.2 text-[9px] text-dim uppercase">
+                                Inbound Email
+                              </span>
+                            )}
                           </div>
-                          <div
-                            className={`max-w-[85%] p-3 rounded text-xs whitespace-pre-wrap ${
-                              isAdmin
-                                ? 'bg-cyan/15 border border-cyan/30 text-ink'
-                                : 'bg-surface border border-white/15 text-ink'
-                            }`}
-                          >
-                            {m.message}
+                          <div className="max-w-[85%] sm:max-w-[75%] p-3.5 rounded-lg text-xs whitespace-pre-wrap bg-surface border border-white/15 text-ink shadow-sm">
+                            <p className="whitespace-pre-wrap">{m.message || m.body_text}</p>
+                            {m.attachments && m.attachments.length > 0 && (
+                              <div className="mt-2.5 pt-2 border-t border-white/10 space-y-1">
+                                <span className="text-[10px] text-dim font-bold uppercase tracking-wider block">Attachments:</span>
+                                {m.attachments.map((att: any, attIdx: number) => (
+                                  <a
+                                    key={att.id || attIdx}
+                                    href={att.url || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-[11px] text-ink hover:text-cyan bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded border border-white/10 transition-colors"
+                                  >
+                                    <span>📎</span>
+                                    <span className="truncate">{att.filename}</span>
+                                    {att.size > 0 && <span className="text-dim text-[10px]">({Math.round(att.size / 1024)} KB)</span>}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
                     })
                   )}
+                  <div ref={threadMessagesEndRef} />
                 </div>
               </div>
 

@@ -1,10 +1,32 @@
 import { apiClient } from './apiClient'
 
+export interface SupportAttachment {
+  id: string
+  filename: string
+  content_type: string
+  size: number
+  url?: string | null
+}
+
 export interface SupportTicketMessage {
   id?: string
-  sender_id: string
+  ticket_id?: string
+  thread_id?: string
+  sender_id?: string
   sender_name: string
+  sender_email?: string
+  recipient_email?: string
+  subject?: string
+  body_text?: string
+  body_html?: string
   message: string
+  message_id?: string
+  in_reply_to?: string
+  references?: string[]
+  direction?: 'inbound' | 'outbound' | string
+  message_type?: 'USER' | 'ADMIN' | 'SYSTEM' | string
+  sender_role?: 'USER' | 'ADMIN' | 'SYSTEM' | string
+  attachments?: SupportAttachment[]
   created_at: string
 }
 
@@ -20,7 +42,10 @@ export const SUPPORT_TICKET_STATUS_OPTIONS: { value: SupportTicketStatus; label:
 
 export function formatTicketStatus(status?: string): { label: string; badgeClass: string; value: SupportTicketStatus } {
   const norm = (status || 'OPEN').toUpperCase().replace(/\s+/g, '_')
-  if (norm === 'IN_PROGRESS' || norm === 'INPROGRESS' || norm === 'WAITING_FOR_ADMIN' || norm === 'ON_HOLD') {
+  if (norm === 'WAITING_FOR_ADMIN') {
+    return { label: 'Waiting for Admin', badgeClass: 'border-amber-400 text-amber-400 bg-amber-400/10', value: 'IN_PROGRESS' }
+  }
+  if (norm === 'IN_PROGRESS' || norm === 'INPROGRESS' || norm === 'ON_HOLD') {
     return { label: 'In Progress', badgeClass: 'border-amber-400 text-amber-400 bg-amber-400/10', value: 'IN_PROGRESS' }
   }
   if (norm === 'WAITING_FOR_USER' || norm === 'WAITINGFORUSER') {
@@ -50,9 +75,18 @@ export interface SupportTicket {
   status: SupportTicketStatus | string
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | string
   user_id?: string
+  user_handle?: string
+  has_new_reply?: boolean
+  last_message_at?: string
+  last_message_by?: string
   created_at: string
   updated_at?: string
   messages?: SupportTicketMessage[]
+  internal_notes?: string
+}
+
+export async function getSupportTicketDetails(ticketId: string): Promise<SupportTicket> {
+  return apiClient<SupportTicket>(`/support/tickets/${ticketId}`)
 }
 
 export async function getSupportTickets(): Promise<SupportTicket[]> {

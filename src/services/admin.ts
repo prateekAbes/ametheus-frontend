@@ -93,6 +93,9 @@ export interface SupportTicket {
   status: SupportTicketStatus | string
   is_archived?: boolean
   archived_at?: string
+  has_new_reply?: boolean
+  last_message_at?: string
+  last_message_by?: string
   messages?: any[]
   internal_notes?: string
   created_at: string
