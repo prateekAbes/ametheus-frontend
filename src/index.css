@@ -157,3 +157,12 @@ html { background: #05060a; scrollbar-gutter: stable; }
   .animate-runnerup-crown { animation: none; transform: perspective(700px) rotateY(10deg); }
   .animate-bronze-crown   { animation: none; transform: perspective(700px) rotateY(10deg); }
 }
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 0.95; transform: scale(1.15); }
+}
+.animate-star-twinkle {
+  animation: star-twinkle 4s ease-in-out infinite;
+}
+

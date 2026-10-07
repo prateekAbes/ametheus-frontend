@@ -1,22 +1,26 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useSignIn, useSignUp } from '@clerk/react/legacy'
-import { AuthenticateWithRedirectCallback } from '@clerk/react'
-import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react'
+import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/react'
+import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, ShieldAlert, Sparkles, Loader2, Check, X } from 'lucide-react'
 import { Hud, Particles } from '../components/ui'
 import { Logo } from '../components/Layout'
+import StarBackground from '../components/StarBackground'
 import { GAMES } from '../lib/data'
 import { getGames, Game as ApiGame } from '../services/games'
 import { useAuthContext } from '../context/AuthContext'
+import { checkUsernameAvailability, updateUserProfile } from '../services/auth'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
-type AuthMode = 'login' | 'signup' | 'forgot-password' | 'verify-email' | 'reset-password-code'
+type AuthMode = 'login' | 'signup' | 'setup' | 'unauthorized' | 'forgot-password' | 'verify-email' | 'reset-password-code'
 
 export default function Auth() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isSignedIn } = useAuthContext()
+  const { isSignedIn, profile, refreshProfile } = useAuthContext()
+  const { getToken } = useAuth()
+  const { user } = useUser()
   const pathname = location.pathname
 
   // Clerk hooks
@@ -24,29 +28,95 @@ export default function Auth() {
   const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp()
 
   // Determine initial mode based on route
-  const [mode, setMode] = useState<AuthMode>(() => {
-    if (pathname.includes('/signup')) return 'signup'
-    if (pathname.includes('/forgot-password')) return 'forgot-password'
+  const getInitialMode = (path: string): AuthMode => {
+    if (path.includes('/setup') || path.includes('/onboarding')) return 'setup'
+    if (path.includes('/unauthorized')) return 'unauthorized'
+    if (path.includes('/signup') || path.includes('/sign-up')) return 'signup'
+    if (path.includes('/forgot-password')) return 'forgot-password'
     return 'login'
-  })
+  }
 
-  // Synchronize mode if pathname changes
+  const [mode, setMode] = useState<AuthMode>(() => getInitialMode(pathname))
+
+  // Synchronize mode when pathname changes
   useEffect(() => {
-    if (pathname.includes('/signup')) setMode('signup')
-    else if (pathname.includes('/forgot-password')) setMode('forgot-password')
-    else if (!pathname.includes('sso-callback')) setMode('login')
+    if (pathname.includes('sso-callback')) return
+    setMode(getInitialMode(pathname))
   }, [pathname])
 
   // Form State
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+
+  // Real-time Username Availability Checking
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+  const [usernameMessage, setUsernameMessage] = useState<string>('')
+
+  // Debounced username validator (used in both Setup and Signup flows)
+  const targetUsername = mode === 'setup' ? username : username
+  useEffect(() => {
+    const clean = targetUsername.trim()
+    if (!clean) {
+      setUsernameStatus('idle')
+      setUsernameMessage('')
+      return
+    }
+    if (clean.length < 3) {
+      setUsernameStatus('invalid')
+      setUsernameMessage('Username must be at least 3 characters.')
+      return
+    }
+    if (!/^[a-zA-Z0-9_\-\.]+$/.test(clean)) {
+      setUsernameStatus('invalid')
+      setUsernameMessage('Letters, numbers, underscores, hyphens, and dots only.')
+      return
+    }
+
+    setUsernameStatus('checking')
+    setUsernameMessage('Checking availability...')
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkUsernameAvailability(clean)
+        if (res.available) {
+          setUsernameStatus('available')
+          setUsernameMessage(`✓ @${res.username} is available`)
+        } else {
+          setUsernameStatus('taken')
+          setUsernameMessage(`✕ ${res.message || 'Username is already taken'}`)
+        }
+      } catch {
+        setUsernameStatus('idle')
+        setUsernameMessage('')
+      }
+    }, 320)
+
+    return () => clearTimeout(timer)
+  }, [targetUsername, mode])
+
+  // Redirect handling:
+  // - If signed in but needs username setup: lock to setup mode
+  // - If signed in and has username: redirect to destination
+  const destination = (location.state as any)?.from?.pathname || '/'
+  useEffect(() => {
+    if (isSignedIn) {
+      // Check if user requires onboarding / username selection
+      const needsSetup = profile?.needs_username === true || (profile && !profile.has_chosen_username)
+      if (needsSetup) {
+        setMode('setup')
+      } else if (mode === 'setup' || mode === 'login' || mode === 'signup') {
+        navigate(destination, { replace: true })
+      }
+    }
+  }, [isSignedIn, profile?.needs_username, profile?.has_chosen_username, navigate, destination, mode])
 
   // Games pool for the left 3D background animation (left side logic unchanged)
   const [apiGames, setApiGames] = useState<ApiGame[]>([])
@@ -66,14 +136,6 @@ export default function Auth() {
     return () => clearInterval(t)
   }, [gamesPool.length])
 
-  // Redirect to requested page or home if already signed in
-  const destination = (location.state as any)?.from?.pathname || '/'
-  useEffect(() => {
-    if (isSignedIn) {
-      navigate(destination, { replace: true })
-    }
-  }, [isSignedIn, navigate, destination])
-
   // Left side visual attributes (UNTOUCHED)
   const rawG = gamesPool[gi % gamesPool.length]
   const g = {
@@ -88,11 +150,12 @@ export default function Auth() {
   // Handle OAuth SSO Callbacks cleanly
   if (location.pathname.includes('sso-callback')) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-void text-white">
-        <div className="relative z-10 flex flex-col items-center gap-4 rounded-xl border border-white/10 bg-[#0c0e17]/90 p-8 shadow-2xl backdrop-blur-xl">
-          <div className="size-8 animate-spin rounded-full border-2 border-cyan border-t-transparent" />
-          <p className="font-mono text-xs uppercase tracking-wider text-dim">
-            Completing authentication...
+      <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#05060a] text-white overflow-hidden">
+        <StarBackground />
+        <div className="relative z-10 flex flex-col items-center gap-4 rounded-2xl border border-white/[0.14] bg-[#0c0e18]/65 p-9 shadow-2xl backdrop-blur-2xl">
+          <div className="size-9 animate-spin rounded-full border-2 border-cyan border-t-transparent shadow-[0_0_12px_#3ef2ff]" />
+          <p className="font-mono text-xs uppercase tracking-widest text-ink/80">
+            Completing Ametheus Authentication...
           </p>
         </div>
         <AuthenticateWithRedirectCallback
@@ -103,13 +166,13 @@ export default function Auth() {
     )
   }
 
-  // Social / External OAuth Sign In
+  // Social / External Google Authentication
   const handleOAuth = async (strategy: 'oauth_google') => {
     setError('')
     setIsLoading(true)
     try {
       if (!isSignInLoaded || !signIn) {
-        throw new Error('Authentication service is initializing. Please try again.')
+        throw new Error('Authentication gateway initializing. Please wait a moment.')
       }
       await signIn.authenticateWithRedirect({
         strategy,
@@ -145,6 +208,7 @@ export default function Auth() {
       })
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId })
+        await refreshProfile()
         navigate(destination, { replace: true })
       } else if (result.status === 'needs_first_factor') {
         setError('Additional identity verification is required.')
@@ -171,6 +235,10 @@ export default function Auth() {
       setError('Please fill in your email and password.')
       return
     }
+    if (username && usernameStatus === 'taken') {
+      setError('The selected username is already taken. Please choose another.')
+      return
+    }
     setIsLoading(true)
     setError('')
     try {
@@ -181,6 +249,7 @@ export default function Auth() {
       })
       if (result.status === 'complete') {
         await setSignUpActive({ session: result.createdSessionId })
+        await refreshProfile()
         navigate(destination, { replace: true })
       } else if (result.unverifiedFields.includes('email_address')) {
         await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
@@ -195,6 +264,58 @@ export default function Auth() {
         err?.errors?.[0]?.message ||
         err?.message ||
         'Failed to create account.'
+      setError(msg)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Username Setup / Onboarding Flow (Canonical User Identity)
+  const handleSaveUsername = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanUsername = username.trim()
+    if (cleanUsername.length < 3) {
+      setError('Username must be at least 3 characters.')
+      return
+    }
+    if (usernameStatus === 'taken' || usernameStatus === 'invalid') {
+      setError('Please choose an available, valid Ametheus username.')
+      return
+    }
+    setIsLoading(true)
+    setError('')
+    try {
+      const token = await getToken()
+      await updateUserProfile(
+        {
+          username: cleanUsername,
+          display_name: displayName.trim() || cleanUsername,
+        },
+        token
+      )
+
+      // Synchronize canonical username to Clerk user metadata so Clerk stays consistent
+      if (user) {
+        try {
+          await user.update({
+            unsafeMetadata: {
+              ...user.unsafeMetadata,
+              username: cleanUsername,
+              has_chosen_username: true,
+            },
+          })
+        } catch (clerkSyncErr) {
+          console.warn('Clerk metadata update warning:', clerkSyncErr)
+        }
+      }
+
+      await refreshProfile()
+      window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+      navigate(destination, { replace: true })
+    } catch (err: any) {
+      const msg =
+        err?.message ||
+        'Failed to save username. Please try a different handle.'
       setError(msg)
     } finally {
       setIsLoading(false)
@@ -217,6 +338,7 @@ export default function Auth() {
       })
       if (result.status === 'complete') {
         await setSignUpActive({ session: result.createdSessionId })
+        await refreshProfile()
         navigate(destination, { replace: true })
       } else {
         setError('Verification incomplete. Please check the code and retry.')
@@ -280,6 +402,7 @@ export default function Auth() {
       })
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId })
+        await refreshProfile()
         navigate(destination, { replace: true })
       } else {
         setError('Password reset incomplete.')
@@ -340,11 +463,10 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* RIGHT: REDESIGNED PREMIUM AUTHENTICATION PANEL (STRICT REFERENCE MATCH) */}
-      <div className="relative z-10 flex min-h-screen flex-col justify-between bg-[#06070a] px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
-        {/* Ambient atmospheric background glows */}
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(62,242,255,0.07),transparent)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(139,92,246,0.04),transparent)]" />
+      {/* RIGHT: COMPLETE AUTHENTICATION EXPERIENCE (STAR/SPACE BACKDROP + TRANSLUCENT GLASS PANEL) */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
+        {/* Cinematic dark space / star background */}
+        <StarBackground />
 
         {/* Top Header Row */}
         <div className="relative z-10 flex items-center justify-between">
@@ -353,25 +475,25 @@ export default function Auth() {
               <Logo />
             </Link>
           </div>
-          <div className="ml-auto flex items-center gap-2 rounded-full border border-white/10 bg-surface/60 px-3.5 py-1.5 font-mono text-[11px] text-dim backdrop-blur-md shadow-inner">
+          <div className="ml-auto flex items-center gap-2 rounded-full border border-white/[0.12] bg-[#0c0e18]/60 px-3.5 py-1.5 font-mono text-[11px] text-dim backdrop-blur-xl shadow-inner">
             <span className="size-1.5 rounded-full bg-cyan animate-pulse shadow-[0_0_8px_#3ef2ff]" />
             <span className="tracking-wider uppercase">Sanctioned Esports Gateway</span>
           </div>
         </div>
 
-        {/* Center: Premium Authentication Card */}
-        <div className="relative z-10 my-auto w-full max-w-[430px] mx-auto py-6">
-          <div className="relative rounded-2xl border border-white/[0.09] bg-[#0c0e17]/90 p-7 sm:p-9 shadow-[0_24px_64px_rgba(0,0,0,0.85)] backdrop-blur-xl overflow-hidden">
+        {/* Center: Translucent Glass Authentication Card */}
+        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto py-6">
+          <div className="relative rounded-2xl border border-white/[0.14] bg-[#0c0e18]/60 p-7 sm:p-9 shadow-[0_30px_70px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.14)] backdrop-blur-2xl overflow-hidden transition-all duration-300">
             {/* Top specular accent line */}
             <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan/50 to-transparent" />
             {/* Soft inner ambient glow */}
-            <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 size-40 rounded-full bg-cyan/10 blur-3xl" />
+            <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 size-48 rounded-full bg-cyan/15 blur-3xl" />
 
             {/* Brand Header */}
             <div className="mb-6">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex size-7 items-center justify-center rounded border border-cyan/40 bg-cyan/10 shadow-[0_0_12px_rgba(62,242,255,0.2)]">
+                  <span className="flex size-7 items-center justify-center rounded border border-cyan/40 bg-cyan/10 shadow-[0_0_12px_rgba(62,242,255,0.25)]">
                     <svg width="15" height="14" viewBox="0 0 30 28" fill="none">
                       <polygon points="3,7 25,7 27,2 5,2" fill="#3ef2ff" />
                       <polygon points="7,15 21,15 23,10 9,10" fill="#3ef2ff" />
@@ -379,33 +501,37 @@ export default function Auth() {
                     </svg>
                   </span>
                   <span className="font-display text-sm font-black tracking-[0.2em] text-white">
-                    AMETHEUS <span className="text-cyan">ID</span>
+                    AMETHEUS <span className="text-cyan">{mode === 'setup' ? 'IDENTITY' : 'PASSPORT'}</span>
                   </span>
                 </div>
-                <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-dim">
-                  v2.6 SECURE
+                <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-dim">
+                  {mode === 'setup' ? 'ONBOARDING' : mode === 'unauthorized' ? 'RESTRICTED' : 'SECURE'}
                 </span>
               </div>
 
               <h2 className="font-display text-3xl font-black uppercase tracking-tight text-white leading-tight">
                 {mode === 'login' && 'Welcome back'}
                 {mode === 'signup' && 'Create account'}
+                {mode === 'setup' && 'Choose your username'}
+                {mode === 'unauthorized' && 'Access Restricted'}
                 {mode === 'forgot-password' && 'Reset password'}
                 {mode === 'verify-email' && 'Verify your email'}
                 {mode === 'reset-password-code' && 'Set new password'}
               </h2>
               <p className="font-sans text-xs text-dim mt-1.5 leading-relaxed">
-                {mode === 'login' && 'Sign in to continue to your contender account'}
-                {mode === 'signup' && 'Create your contender profile to compete in official circuits'}
+                {mode === 'login' && 'Sign in to access your contender account and live circuits'}
+                {mode === 'signup' && 'Register your contender profile to compete in official tournaments'}
+                {mode === 'setup' && 'This is how players, squads, and tournament brackets will identify you on Ametheus'}
+                {mode === 'unauthorized' && 'This circuit arena requires authorized contender credentials or elevated permissions'}
                 {mode === 'forgot-password' && 'Enter your email to receive recovery instructions'}
-                {mode === 'verify-email' && 'Enter the 6-digit confirmation code sent to your inbox'}
+                {mode === 'verify-email' && 'Enter the 6-digit confirmation code dispatched to your inbox'}
                 {mode === 'reset-password-code' && 'Enter the reset code and choose your new password'}
               </p>
             </div>
 
             {/* Error Notification Banner */}
             {error && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-live/30 bg-live/10 p-3 text-xs leading-relaxed text-live animate-fadeIn">
+              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-live/30 bg-live/10 p-3 text-xs leading-relaxed text-live backdrop-blur-md animate-fadeIn">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-live" />
                 <span className="flex-1 font-mono text-[11px]">{error}</span>
               </div>
@@ -413,7 +539,7 @@ export default function Auth() {
 
             {/* Success Notification Banner */}
             {successMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-ok/30 bg-ok/10 p-3 text-xs leading-relaxed text-ok animate-fadeIn">
+              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-ok/30 bg-ok/10 p-3 text-xs leading-relaxed text-ok backdrop-blur-md animate-fadeIn">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" />
                 <span className="flex-1 font-mono text-[11px]">{successMessage}</span>
               </div>
@@ -426,7 +552,7 @@ export default function Auth() {
                   type="button"
                   onClick={() => handleOAuth('oauth_google')}
                   disabled={isLoading || !isSignInLoaded}
-                  className="group relative flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-[#121522] px-4 font-sans text-xs font-semibold text-white shadow-sm transition-all hover:border-white/20 hover:bg-[#181d2e] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                  className="group relative flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-[#121522]/80 px-4 font-sans text-xs font-semibold text-white shadow-sm transition-all hover:border-white/20 hover:bg-[#181d2e] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer backdrop-blur-md"
                 >
                   <svg className="size-4 shrink-0 transition-transform group-hover:scale-105" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
@@ -442,14 +568,14 @@ export default function Auth() {
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/[0.08]" />
                   </div>
-                  <span className="relative bg-[#0c0e17] px-3 font-mono text-[10px] font-semibold uppercase tracking-widest text-dim">
+                  <span className="relative bg-[#0c0e18] px-3 font-mono text-[10px] font-semibold uppercase tracking-widest text-dim">
                     OR CONTINUE WITH EMAIL
                   </span>
                 </div>
               </>
             )}
 
-            {/* MODE 1: SIGN IN */}
+            {/* EXPERIENCE 1: SIGN IN (LOGIN) */}
             {mode === 'login' && (
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
@@ -463,7 +589,7 @@ export default function Auth() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -493,7 +619,7 @@ export default function Auth() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       disabled={isLoading}
-                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                     />
                     <button
                       type="button"
@@ -526,20 +652,39 @@ export default function Auth() {
               </form>
             )}
 
-            {/* MODE 2: SIGN UP */}
+            {/* EXPERIENCE 2: SIGN UP */}
             {mode === 'signup' && (
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
-                  <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
-                    Contender Username (Optional)
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium">
+                      Contender Handle (Optional)
+                    </label>
+                    <div className="min-h-[16px]">
+                      {usernameStatus === 'checking' && (
+                        <span className="font-mono text-[10px] text-cyan flex items-center gap-1">
+                          <Loader2 size={10} className="animate-spin" /> checking...
+                        </span>
+                      )}
+                      {usernameStatus === 'available' && (
+                        <span className="font-mono text-[10px] text-ok flex items-center gap-1">
+                          <Check size={10} /> available
+                        </span>
+                      )}
+                      {usernameStatus === 'taken' && (
+                        <span className="font-mono text-[10px] text-live flex items-center gap-1">
+                          <X size={10} /> taken
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. shadow_striker"
+                    placeholder="e.g. shadowfox"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -554,7 +699,7 @@ export default function Auth() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -570,7 +715,7 @@ export default function Auth() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="At least 8 characters"
                       disabled={isLoading}
-                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                     />
                     <button
                       type="button"
@@ -603,7 +748,131 @@ export default function Auth() {
               </form>
             )}
 
-            {/* MODE 3: EMAIL VERIFICATION CODE (AFTER SIGNUP) */}
+            {/* EXPERIENCE 5: USERNAME SETUP / ONBOARDING PANEL */}
+            {mode === 'setup' && (
+              <form onSubmit={handleSaveUsername} className="space-y-4">
+                <div>
+                  <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                    Ametheus Username <span className="text-cyan">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-dim">@</span>
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="shadowfox"
+                      disabled={isLoading}
+                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {usernameStatus === 'checking' && <Loader2 size={16} className="animate-spin text-cyan" />}
+                      {usernameStatus === 'available' && <Check size={16} className="text-ok" />}
+                      {usernameStatus === 'taken' && <X size={16} className="text-live" />}
+                    </div>
+                  </div>
+
+                  {/* Reserved space for live validation feedback (no panel jumping) */}
+                  <div className="mt-1.5 min-h-[20px] px-1 font-mono text-[11px]">
+                    {usernameStatus === 'checking' && (
+                      <span className="text-dim">Verifying availability in registry...</span>
+                    )}
+                    {usernameStatus === 'available' && (
+                      <span className="text-ok font-semibold">{usernameMessage}</span>
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <span className="text-live font-semibold">{usernameMessage}</span>
+                    )}
+                    {usernameStatus === 'invalid' && (
+                      <span className="text-warn">{usernameMessage}</span>
+                    )}
+                    {usernameStatus === 'idle' && (
+                      <span className="text-dim/70">Letters, numbers, underscores, hyphens, and dots (3-30 chars).</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                    Display Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma or Shadow Fox"
+                    disabled={isLoading}
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
+                  />
+                  <p className="mt-1 px-1 font-mono text-[10px] text-dim/70">
+                    Friendly name shown in matches and player card. Defaults to your username.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || (username.length >= 3 && usernameStatus === 'taken')}
+                  className="group relative flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan font-display text-base font-black uppercase tracking-wider text-void shadow-[0_0_20px_rgba(62,242,255,0.25)] transition-all hover:bg-[#5ef5ff] hover:shadow-[0_0_28px_rgba(62,242,255,0.4)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-4"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="size-4 animate-spin rounded-full border-2 border-void border-t-transparent" />
+                      <span className="font-mono text-xs font-bold tracking-wider">Finalizing Identity...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      <span>Complete Identity &amp; Enter Ametheus</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* EXPERIENCE 4: UNAUTHORIZED SIGN-IN */}
+            {mode === 'unauthorized' && (
+              <div className="space-y-5">
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4.5 backdrop-blur-md">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert size={20} className="mt-0.5 shrink-0 text-rose-400" />
+                    <div className="space-y-1">
+                      <p className="font-mono text-xs font-bold uppercase tracking-wider text-rose-300">
+                        Restricted Arena Terminal
+                      </p>
+                      <p className="font-sans text-xs text-ink/80 leading-relaxed">
+                        The requested circuit arena requires verified contender credentials or elevated permissions. Please authenticate with an authorized account to enter.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('login')
+                      navigate('/login')
+                      setError('')
+                      setSuccessMessage('')
+                    }}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan font-display text-base font-black uppercase tracking-wider text-void shadow-[0_0_20px_rgba(62,242,255,0.25)] transition-all hover:bg-[#5ef5ff] hover:shadow-[0_0_28px_rgba(62,242,255,0.4)] active:scale-[0.99] cursor-pointer"
+                  >
+                    <span>Sign In with Authorized Account</span>
+                    <ArrowRight size={16} />
+                  </button>
+
+                  <Link
+                    to="/"
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/20 text-white font-mono text-xs uppercase tracking-wider transition-all"
+                  >
+                    Return to Ametheus Arena
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* EMAIL VERIFICATION CODE (AFTER SIGNUP) */}
             {mode === 'verify-email' && (
               <form onSubmit={handleVerifyEmail} className="space-y-4">
                 <div>
@@ -617,7 +886,7 @@ export default function Auth() {
                     onChange={(e) => setVerificationCode(e.target.value)}
                     placeholder="Enter 6-digit code"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-center font-mono text-base tracking-widest text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-center font-mono text-base tracking-widest text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -638,7 +907,7 @@ export default function Auth() {
               </form>
             )}
 
-            {/* MODE 4: FORGOT PASSWORD (REQUEST CODE) */}
+            {/* FORGOT PASSWORD (REQUEST CODE) */}
             {mode === 'forgot-password' && (
               <form onSubmit={handleRequestPasswordReset} className="space-y-4">
                 <div>
@@ -652,7 +921,7 @@ export default function Auth() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -673,7 +942,7 @@ export default function Auth() {
               </form>
             )}
 
-            {/* MODE 5: SET NEW PASSWORD (WITH CODE) */}
+            {/* SET NEW PASSWORD (WITH CODE) */}
             {mode === 'reset-password-code' && (
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div>
@@ -687,7 +956,7 @@ export default function Auth() {
                     onChange={(e) => setVerificationCode(e.target.value)}
                     placeholder="Enter reset code"
                     disabled={isLoading}
-                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 text-center font-mono text-sm tracking-widest text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                    className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 text-center font-mono text-sm tracking-widest text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                   />
                 </div>
 
@@ -703,7 +972,7 @@ export default function Auth() {
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="At least 8 characters"
                       disabled={isLoading}
-                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/90 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30"
+                      className="h-11 w-full rounded-lg border border-white/10 bg-[#07090f]/75 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 backdrop-blur-md"
                     />
                     <button
                       type="button"
@@ -769,7 +1038,7 @@ export default function Auth() {
                   </button>
                 </p>
               )}
-              {(mode === 'forgot-password' || mode === 'reset-password-code' || mode === 'verify-email') && (
+              {(mode === 'forgot-password' || mode === 'reset-password-code' || mode === 'verify-email' || mode === 'unauthorized') && (
                 <button
                   type="button"
                   onClick={() => {
@@ -782,6 +1051,11 @@ export default function Auth() {
                 >
                   ← Back to Sign in
                 </button>
+              )}
+              {mode === 'setup' && (
+                <p className="text-[11px] text-dim/70">
+                  Step 2 of 2 · Official Contender Identity Registration
+                </p>
               )}
             </div>
           </div>

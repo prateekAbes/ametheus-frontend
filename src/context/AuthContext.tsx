@@ -141,9 +141,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user.primaryEmailAddress?.emailAddress ||
           user.emailAddresses?.[0]?.emailAddress ||
           `${user.id}@ametheus.gg`
+        const hasChosenUsername =
+          Boolean(user.username) ||
+          Boolean((user.unsafeMetadata as any)?.has_chosen_username) ||
+          Boolean((user.publicMetadata as any)?.has_chosen_username)
         const username =
-          user.username || user.firstName?.toLowerCase() || user.id.slice(0, 10)
-        const displayName = user.fullName || username
+          user.username ||
+          (user.unsafeMetadata as any)?.username ||
+          (user.publicMetadata as any)?.username ||
+          user.firstName?.toLowerCase() ||
+          user.id.slice(0, 10)
+        const displayName = (user.unsafeMetadata as any)?.username || user.username || username
         const avatarUrl = user.imageUrl
 
         // Metadata-indicated role (if set on Clerk user)
@@ -189,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 username,
                 display_name: displayName,
                 avatar_url: avatarUrl,
+                has_chosen_username: hasChosenUsername,
               },
               token
             )
@@ -297,13 +306,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const effectiveDisplayName = useMemo(() => {
     return (
-      profile?.display_name ||
-      user?.fullName ||
       profile?.username ||
+      profile?.display_name ||
       user?.username ||
       'Contender'
     )
-  }, [profile?.display_name, profile?.username, user?.fullName, user?.username])
+  }, [profile?.username, profile?.display_name, user?.username])
 
   const effectiveAvatarUrl = useMemo(() => {
     return resolveMediaUrl(profile?.avatar_url || user?.imageUrl)

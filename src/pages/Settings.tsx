@@ -460,8 +460,9 @@ export default function Settings() {
     setIsSaving(true)
     setSaveMessage('')
     try {
+      const cleanNewUsername = username.trim() || undefined
       await updateUserProfile({
-        username: username.trim() || undefined,
+        username: cleanNewUsername,
         display_name: displayName.trim() || undefined,
         avatar_url: avatarUrl ? avatarUrl.trim() : undefined,
         preferences: {
@@ -476,6 +477,21 @@ export default function Settings() {
           show_stats: showStats,
         },
       })
+
+      if (user && cleanNewUsername) {
+        try {
+          await user.update({
+            unsafeMetadata: {
+              ...user.unsafeMetadata,
+              username: cleanNewUsername,
+              has_chosen_username: true,
+            },
+          })
+        } catch (clerkSyncErr) {
+          console.warn('Failed to sync username to Clerk metadata:', clerkSyncErr)
+        }
+      }
+
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaved(true)

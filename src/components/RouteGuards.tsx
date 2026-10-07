@@ -4,7 +4,7 @@ import { useAuthContext } from '../context/AuthContext'
 import { Hud, Cta } from './ui'
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoading } = useAuthContext()
+  const { isSignedIn, isLoading, profile } = useAuthContext()
   const location = useLocation()
 
   if (isLoading) {
@@ -17,6 +17,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!isSignedIn) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (profile && (profile.needs_username === true || !profile.has_chosen_username)) {
+    return <Navigate to="/setup" state={{ from: location }} replace />
   }
 
   return <>{children}</>

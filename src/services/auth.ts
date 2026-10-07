@@ -15,6 +15,8 @@ export interface UserProfile {
   steam_id?: string
   preferences?: Record<string, any>
   privacy_settings?: Record<string, any>
+  has_chosen_username?: boolean
+  needs_username?: boolean
 }
 
 export interface UserSyncPayload {
@@ -23,6 +25,17 @@ export interface UserSyncPayload {
   username: string
   display_name?: string
   avatar_url?: string
+  has_chosen_username?: boolean
+}
+
+export interface UsernameCheckResponse {
+  available: boolean
+  username: string
+  message: string
+}
+
+export async function checkUsernameAvailability(username: string): Promise<UsernameCheckResponse> {
+  return apiClient<UsernameCheckResponse>(`/auth/check-username?username=${encodeURIComponent(username)}`)
 }
 
 export async function syncUser(payload: UserSyncPayload, token?: string | null): Promise<UserProfile> {

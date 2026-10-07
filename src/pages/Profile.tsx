@@ -112,7 +112,7 @@ export default function Profile() {
     }
   }
 
-  const username = authDisplayName || profile?.display_name || profile?.username || 'Player'
+  const username = profile?.username || authDisplayName || profile?.display_name || 'Player'
   const email = profile?.email || 'player@ametheus.gg'
   const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
   const rawAvatar = authAvatarUrl || profile?.avatar_url
