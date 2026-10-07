@@ -32,7 +32,10 @@ import { RequireAuth, RequireOrganizer, RequireSuperAdmin } from './components/R
 
 export const router = createBrowserRouter([
   { path: '/login', Component: Auth },
+  { path: '/login/*', Component: Auth },
   { path: '/signup', Component: Auth },
+  { path: '/signup/*', Component: Auth },
+  { path: '/sso-callback', Component: Auth },
   { path: '/forgot-password', Component: Auth },
   { path: '/verify', Component: Auth },
   { path: '/setup', Component: Auth },
