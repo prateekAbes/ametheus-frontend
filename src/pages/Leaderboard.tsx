@@ -179,14 +179,7 @@ export default function Leaderboard() {
               Verified contender ratings, match win percentages, and sanctioned tournament earnings across India&apos;s competitive esports battlegrounds.
             </p>
           </div>
-          <div className="flex gap-3">
-            <Link
-              to="/tournaments"
-              className="border border-white/15 bg-surface/80 px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-ink hover:border-rose-500 hover:text-rose-400 hover:shadow-[0_0_15px_rgba(244,63,94,0.25)] transition-all cursor-pointer"
-            >
-              Compete in Circuit →
-            </Link>
-          </div>
+
         </div>
 
         {/* 1. Game Discipline Filter Bar */}

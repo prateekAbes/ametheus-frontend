@@ -117,67 +117,43 @@ html { background: #05060a; scrollbar-gutter: stable; }
 
 /* Champion Crown Prestigious 3D Motion Animations */
 @keyframes champion-crown {
-  0% {
-    transform: perspective(700px) translateY(0px) rotateY(-18deg) rotateX(4deg) scale(1);
-    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
-  }
-  25% {
-    transform: perspective(700px) translateY(-5px) rotateY(-5deg) rotateX(1deg) scale(1.02);
-    filter: drop-shadow(0 7px 18px rgba(245, 158, 11, 0.65));
-  }
-  50% {
-    transform: perspective(700px) translateY(-9px) rotateY(18deg) rotateX(4deg) scale(1);
-    filter: drop-shadow(0 9px 22px rgba(245, 158, 11, 0.6));
-  }
-  75% {
-    transform: perspective(700px) translateY(-4px) rotateY(5deg) rotateX(6deg) scale(0.99);
-    filter: drop-shadow(0 6px 16px rgba(245, 158, 11, 0.5));
-  }
-  100% {
-    transform: perspective(700px) translateY(0px) rotateY(-18deg) rotateX(4deg) scale(1);
-    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
-  }
+  0%   { transform: perspective(700px) translateY(0px)  rotateY(0deg);   filter: drop-shadow(0 5px 14px rgba(245,158,11,0.55)) drop-shadow(0 0 6px rgba(245,158,11,0.25)); }
+  25%  { transform: perspective(700px) translateY(-6px) rotateY(90deg);  filter: drop-shadow(0 9px 22px rgba(245,158,11,0.70)) drop-shadow(0 0 10px rgba(245,158,11,0.35)); }
+  50%  { transform: perspective(700px) translateY(-9px) rotateY(180deg); filter: drop-shadow(0 11px 26px rgba(245,158,11,0.60)) drop-shadow(0 0 8px rgba(245,158,11,0.30)); }
+  75%  { transform: perspective(700px) translateY(-5px) rotateY(270deg); filter: drop-shadow(0 8px 20px rgba(245,158,11,0.65)) drop-shadow(0 0 8px rgba(245,158,11,0.30)); }
+  100% { transform: perspective(700px) translateY(0px)  rotateY(360deg); filter: drop-shadow(0 5px 14px rgba(245,158,11,0.55)) drop-shadow(0 0 6px rgba(245,158,11,0.25)); }
 }
 @keyframes runnerup-crown {
-  0% {
-    transform: perspective(700px) translateY(0px) rotateY(-12deg) rotateX(3deg);
-    filter: drop-shadow(0 3px 10px rgba(203, 213, 225, 0.3));
-  }
-  50% {
-    transform: perspective(700px) translateY(-6px) rotateY(12deg) rotateX(3deg);
-    filter: drop-shadow(0 6px 16px rgba(203, 213, 225, 0.45));
-  }
-  100% {
-    transform: perspective(700px) translateY(0px) rotateY(-12deg) rotateX(3deg);
-    filter: drop-shadow(0 3px 10px rgba(203, 213, 225, 0.3));
-  }
+  0%   { transform: perspective(700px) translateY(0px)  rotateY(0deg);   filter: drop-shadow(0 4px 10px rgba(203,213,225,0.35)); }
+  25%  { transform: perspective(700px) translateY(-5px) rotateY(90deg);  filter: drop-shadow(0 7px 16px rgba(203,213,225,0.50)); }
+  50%  { transform: perspective(700px) translateY(-7px) rotateY(180deg); filter: drop-shadow(0 8px 18px rgba(203,213,225,0.45)); }
+  75%  { transform: perspective(700px) translateY(-4px) rotateY(270deg); filter: drop-shadow(0 6px 14px rgba(203,213,225,0.45)); }
+  100% { transform: perspective(700px) translateY(0px)  rotateY(360deg); filter: drop-shadow(0 4px 10px rgba(203,213,225,0.35)); }
 }
 @keyframes bronze-crown {
-  0% {
-    transform: perspective(700px) translateY(0px) rotateY(-10deg) rotateX(3deg);
-    filter: drop-shadow(0 3px 10px rgba(217, 119, 6, 0.3));
-  }
-  50% {
-    transform: perspective(700px) translateY(-5px) rotateY(10deg) rotateX(3deg);
-    filter: drop-shadow(0 6px 14px rgba(217, 119, 6, 0.45));
-  }
-  100% {
-    transform: perspective(700px) translateY(0px) rotateY(-10deg) rotateX(3deg);
-    filter: drop-shadow(0 3px 10px rgba(217, 119, 6, 0.3));
-  }
+  0%   { transform: perspective(700px) translateY(0px)  rotateY(0deg);   filter: drop-shadow(0 3px 9px rgba(217,119,6,0.35)); }
+  25%  { transform: perspective(700px) translateY(-4px) rotateY(90deg);  filter: drop-shadow(0 6px 14px rgba(217,119,6,0.50)); }
+  50%  { transform: perspective(700px) translateY(-6px) rotateY(180deg); filter: drop-shadow(0 7px 16px rgba(217,119,6,0.45)); }
+  75%  { transform: perspective(700px) translateY(-4px) rotateY(270deg); filter: drop-shadow(0 5px 12px rgba(217,119,6,0.45)); }
+  100% { transform: perspective(700px) translateY(0px)  rotateY(360deg); filter: drop-shadow(0 3px 9px rgba(217,119,6,0.35)); }
 }
 .animate-champion-crown {
-  animation: champion-crown 5s ease-in-out infinite;
+  animation: champion-crown 8s linear infinite;
   transform-style: preserve-3d;
   will-change: transform, filter;
 }
 .animate-runnerup-crown {
-  animation: runnerup-crown 4.5s ease-in-out infinite;
+  animation: runnerup-crown 6s linear infinite;
   transform-style: preserve-3d;
   will-change: transform, filter;
 }
 .animate-bronze-crown {
-  animation: bronze-crown 4.5s ease-in-out infinite;
+  animation: bronze-crown 6s linear infinite;
   transform-style: preserve-3d;
   will-change: transform, filter;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-champion-crown { animation: none; transform: perspective(700px) rotateY(15deg); filter: drop-shadow(0 5px 14px rgba(245,158,11,0.5)); }
+  .animate-runnerup-crown { animation: none; transform: perspective(700px) rotateY(10deg); }
+  .animate-bronze-crown   { animation: none; transform: perspective(700px) rotateY(10deg); }
 }

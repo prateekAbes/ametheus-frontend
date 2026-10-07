@@ -94,9 +94,9 @@ export default function Auth() {
         </div>
       </div>
 
-      {/* RIGHT: CLERK SIGN-IN */}
-      <div className="relative z-10 flex min-h-screen flex-col justify-between bg-void px-6 py-10 lg:px-14 lg:py-12">
-        {/* Top Header */}
+      {/* RIGHT: AUTHENTICATION PANEL */}
+      <div className="relative z-10 flex min-h-screen flex-col bg-void px-6 py-10 lg:px-14 lg:py-12">
+        {/* Top Row: mobile logo + status badge */}
         <div className="flex items-center justify-between">
           <div className="lg:hidden">
             <Link to="/" aria-label="Ametheus Home">
@@ -109,9 +109,22 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Center: Clerk Authentication Component */}
+        {/* Center: Identity + Clerk Auth */}
         <div className="my-auto flex flex-col items-center justify-center py-8">
           <div className="w-full max-w-md">
+            {/* Ametheus Identity Header */}
+            <div className="mb-6 flex flex-col gap-1">
+              <p className="font-display text-3xl font-black uppercase tracking-tight text-ink">
+                {pathname === '/signup' ? 'Join Ametheus.' : 'Welcome back.'}
+              </p>
+              <p className="font-mono text-sm text-dim">
+                {pathname === '/signup'
+                  ? 'Create your contender profile and enter the circuit.'
+                  : 'Ready for your next match?'}
+              </p>
+            </div>
+
+            {/* Clerk Component */}
             {pathname === '/signup' ? (
               <SignUp
                 routing="path"
@@ -175,7 +188,7 @@ export default function Auth() {
         {/* Bottom Bar */}
         <div className="flex items-center justify-between border-t border-white/5 pt-6 font-mono text-[10px] uppercase tracking-widest text-dim">
           <span>AMETHEUS BATTLEGROUND</span>
-          <span className="text-cyan">AUTHENTICATION GATEWAY</span>
+          <Link to="/" className="text-cyan hover:text-white transition-colors">← Back to Home</Link>
         </div>
       </div>
     </div>
