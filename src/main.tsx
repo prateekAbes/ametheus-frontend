@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/react'
 import App from './App'
 import './index.css'
+import { initAppearance } from './lib/appearance'
+
+// Initialize user's persisted appearance palette and accent before render
+initAppearance()
 
 // Gracefully handle Vite lazy-loaded module hash updates after deployments
 window.addEventListener('vite:preloadError', (event) => {

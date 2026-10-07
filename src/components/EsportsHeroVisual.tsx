@@ -41,7 +41,7 @@ export default function EsportsHeroVisual({
               : variant === 'matches'
               ? `radial-gradient(ellipse at 80% 20%, #ff3b4e33, transparent 55%), radial-gradient(ellipse at 25% 90%, #ff7a1a22, transparent 50%)`
               : variant === 'leaderboard'
-              ? 'radial-gradient(ellipse at 70% 30%, #f59e0b33, transparent 55%), radial-gradient(ellipse at 20% 80%, #d9770622, transparent 50%)'
+              ? 'radial-gradient(ellipse at 75% 25%, #88133744, transparent 55%), radial-gradient(ellipse at 20% 75%, #4c051938, transparent 55%), radial-gradient(ellipse at 50% 10%, #9f123928, transparent 50%)'
               : variant === 'support'
               ? 'radial-gradient(ellipse at 80% 30%, #06b6d433, transparent 55%), radial-gradient(ellipse at 15% 90%, #0284c722, transparent 50%)'
               : variant === 'wallet'
@@ -184,10 +184,10 @@ export default function EsportsHeroVisual({
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Apex podium tier vector geometry */}
-          <polygon points="200,50 260,180 200,160 140,180" stroke="#f59e0b" strokeWidth="1.5" fill="#f59e0b" fillOpacity="0.1" />
-          <polygon points="200,80 320,320 80,320" stroke="#f59e0b" strokeWidth="1" strokeDasharray="6 4" />
-          <circle cx="200" cy="50" r="10" stroke="#f59e0b" strokeWidth="2" fill="none" />
+          {/* Apex podium tier vector geometry — Dark Red / Crimson Esports Accent */}
+          <polygon points="200,50 260,180 200,160 140,180" stroke="#e11d48" strokeWidth="1.5" fill="#881337" fillOpacity="0.15" />
+          <polygon points="200,80 320,320 80,320" stroke="#be123c" strokeWidth="1" strokeDasharray="6 4" />
+          <circle cx="200" cy="50" r="10" stroke="#e11d48" strokeWidth="2" fill="none" />
           <line x1="120" y1="240" x2="280" y2="240" stroke="white" strokeWidth="0.75" strokeOpacity="0.4" />
           <line x1="100" y1="280" x2="300" y2="280" stroke="white" strokeWidth="0.75" strokeOpacity="0.4" />
         </svg>

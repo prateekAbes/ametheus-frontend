@@ -88,7 +88,7 @@ export default function Reviews() {
         rating,
         review_text: reviewText.trim(),
         category,
-        user_name: displayName.trim() || profile?.display_name || profile?.username || authDisplayName || 'Verified Contender',
+        user_name: displayName.trim() || profile?.username || profile?.display_name || authDisplayName || 'Player',
       })
       setFeedbackMsg({
         type: 'ok',
@@ -124,7 +124,7 @@ export default function Reviews() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => {
-                setDisplayName(profile?.display_name || profile?.username || authDisplayName || '')
+                setDisplayName(profile?.username || profile?.display_name || authDisplayName || '')
                 setIsWriteModalOpen(true)
               }}
               className="border border-cyan bg-cyan px-5 py-2.5 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-sm"
@@ -298,8 +298,12 @@ export default function Reviews() {
 
                   <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2 text-[11px]">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="size-6 rounded-full bg-void border border-white/20 flex items-center justify-center font-black text-cyan text-[10px] shrink-0">
-                        {rev.user_name.charAt(0)}
+                      <div className="size-6 rounded-full bg-void border border-white/20 flex items-center justify-center font-black text-cyan text-[10px] shrink-0 overflow-hidden">
+                        {rev.avatar_url ? (
+                          <DynamicImage src={resolveMediaUrl(rev.avatar_url)} alt={rev.user_name} className="size-full object-cover" />
+                        ) : (
+                          rev.user_name.charAt(0)
+                        )}
                       </div>
                       <span className="font-display font-black uppercase text-ink truncate">
                         {rev.user_name}

@@ -381,11 +381,11 @@ export default function AccountMenu() {
               : 'pointer-events-none translate-y-6 opacity-0 duration-150 ease-in md:-translate-y-2 md:scale-[0.94]'
           }`}
       >
-        <div className="absolute inset-0 bg-void/80 backdrop-blur-[10px]" />
+        <div className="absolute inset-0 bg-[#08090d]/95 backdrop-blur-xl" />
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(180deg, ${acc}14, transparent 38%), linear-gradient(0deg, rgb(139 92 255 / .06), transparent 40%)`,
+            background: `linear-gradient(180deg, ${acc}18, transparent 38%), linear-gradient(0deg, rgb(139 92 255 / .08), transparent 40%)`,
           }}
         />
         <div
@@ -402,7 +402,7 @@ export default function AccountMenu() {
             }}
           />
         </div>
-        <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_1px_rgb(255_255_255/.06),0_30px_60px_-30px_rgb(0_0_0/.9)]" />
+        <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12),0_25px_60px_rgba(0,0,0,0.95)]" />
         <span
           className="pointer-events-none absolute right-1 top-0 hidden h-px w-10 md:block"
           style={{
@@ -411,13 +411,13 @@ export default function AccountMenu() {
         />
 
         <div className="relative max-h-[inherit] overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),10px)] md:pb-1.5">
-          <div className="mx-auto mb-1 mt-2.5 h-1 w-10 rounded-full bg-white/15 md:hidden" />
+          <div className="mx-auto mb-1 mt-2.5 h-1 w-10 rounded-full bg-white/20 md:hidden" />
 
           {/* Top User Identity Header Card */}
           {isSignedIn ? (
-            <div className="border-b border-white/[0.08] p-3 mx-1">
+            <div className="border-b border-white/10 p-3.5 mx-1">
               <div className="flex items-center gap-3">
-                <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-white/20 bg-surface">
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-white/25 bg-surface">
                   {userAvatar ? (
                     <img
                       src={userAvatar}
@@ -433,27 +433,27 @@ export default function AccountMenu() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="truncate text-sm font-bold text-ink">
+                    <span className="truncate text-sm font-black text-white">
                       {displayName}
                     </span>
                     <span
-                      className={`font-mono text-[9px] uppercase tracking-[0.16em] px-1.5 py-0.5 border shrink-0 ${
+                      className={`font-mono text-[9px] font-bold uppercase tracking-[0.16em] px-1.5 py-0.5 border shrink-0 ${
                         role === 'SUPER_ADMIN'
-                          ? 'border-magenta/40 bg-magenta/10 text-magenta'
+                          ? 'border-magenta/50 bg-magenta/15 text-magenta'
                           : role === 'ORGANIZER'
-                          ? 'border-cyan/40 bg-cyan/10 text-cyan'
-                          : 'border-white/20 bg-white/5 text-dim'
+                          ? 'border-cyan/50 bg-cyan/15 text-cyan'
+                          : 'border-white/25 bg-white/10 text-white/80'
                       }`}
                     >
                       {role === 'SUPER_ADMIN' ? 'SUPER ADMIN' : role}
                     </span>
                   </div>
-                  <div className="truncate font-mono text-[11px] text-dim">
+                  <div className="truncate font-mono text-[11px] font-medium text-white/70 mt-0.5">
                     {profile?.username ? `@${profile.username}` : profile?.email}
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-xs">
-                    <span className="font-mono text-[10px] uppercase text-dim">Vault</span>
-                    <span className="font-mono font-bold text-cyan">{balanceDisplay}</span>
+                  <div className="mt-1.5 flex items-center justify-between text-xs pt-1 border-t border-white/5">
+                    <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-white/60">Vault</span>
+                    <span className="font-mono font-black text-cyan text-sm">{balanceDisplay}</span>
                   </div>
                 </div>
               </div>
@@ -535,7 +535,7 @@ export default function AccountMenu() {
                     <span
                       className={`grid size-5 shrink-0 place-items-center transition-[transform,color,opacity] duration-300 ease-out ${
                         MOTION[r.key]
-                      } ${active || lit ? 'text-[var(--acc)]' : 'text-dim'}`}
+                      } ${active || lit ? 'text-[var(--acc)]' : 'text-white/70'}`}
                     >
                       <svg
                         width="16"
@@ -543,7 +543,7 @@ export default function AccountMenu() {
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.6"
+                        strokeWidth="1.7"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         aria-hidden
@@ -553,16 +553,16 @@ export default function AccountMenu() {
                     </span>
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-[13px] font-medium leading-tight transition-colors duration-200 ${
-                          lit ? 'text-ink font-semibold' : 'text-ink/80'
+                        className={`block truncate text-[13px] font-bold leading-tight tracking-tight transition-colors duration-200 ${
+                          lit ? 'text-white' : 'text-white/90'
                         }`}
                       >
                         {r.label}
                       </span>
                       {r.hint && (
                         <span
-                          className={`block truncate text-[11px] leading-tight transition-colors duration-200 ${
-                            lit ? 'text-ink/65' : 'text-dim'
+                          className={`block truncate font-mono text-[11px] font-medium leading-tight mt-0.5 transition-colors duration-200 ${
+                            lit ? 'text-white/90' : 'text-white/60'
                           }`}
                         >
                           {r.hint}
@@ -575,7 +575,7 @@ export default function AccountMenu() {
               )
             })}
 
-            <div className="mx-3 my-1.5 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+            <div className="mx-3 my-1.5 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
             {isSignedIn && (
               <button
@@ -592,11 +592,13 @@ export default function AccountMenu() {
               >
                 <span
                   className={`flex items-center gap-3 transition-colors duration-200 ${
-                    hover === 'out' ? 'text-live font-medium' : 'text-dim'
+                    hover === 'out' ? 'text-rose-400 font-bold' : 'text-white/80 font-semibold'
                   }`}
                 >
                   <span
-                    className={`grid size-5 place-items-center transition-transform duration-200 ${MOTION.out}`}
+                    className={`grid size-5 place-items-center transition-transform duration-200 ${MOTION.out} ${
+                      hover === 'out' ? 'text-rose-400' : 'text-white/70'
+                    }`}
                   >
                     <svg
                       width="16"
@@ -604,7 +606,7 @@ export default function AccountMenu() {
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="1.6"
+                      strokeWidth="1.7"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       aria-hidden

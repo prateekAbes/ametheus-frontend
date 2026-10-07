@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { LiveMatchesManager } from '../components/admin/LiveMatchesManager'
@@ -34,8 +34,6 @@ import {
   getOfficialEmailHistoryAdmin,
   startLiveTournamentAdmin,
   completeTournamentAdmin,
-  getAllPageMedia,
-  updatePageMedia,
   uploadMediaFile,
   getTournamentRegisteredRosters,
   getDisputes,
@@ -60,7 +58,6 @@ import {
   SUPPORT_TICKET_STATUS_OPTIONS,
   GameRegulation,
   EmailSystemStatus,
-  PageMediaConfig,
   AuditLog,
   PlatformNotificationItem,
 } from '../services/admin'
@@ -88,6 +85,13 @@ import {
   deleteReview,
   ReviewItem,
 } from '../services/reviews'
+import {
+  getAllCrestsAdmin,
+  createCrestAdmin,
+  updateCrestAdmin,
+  deleteCrestAdmin,
+  type Crest,
+} from '../services/crests'
 import {
   createTournamentOrganizer,
   updateTournamentOrganizer,
@@ -353,8 +357,8 @@ const TABS = [
   'FEATURED TOURNAMENT',
   'GAMES CATALOG',
   'GENRES & CATEGORIES',
-  'PAGE MEDIA',
   'REVIEWS MODERATION',
+  'PLAYER CRESTS',
   'USERS & ROLES',
   'PENDING PAYMENTS',
   'UPI & QR ACCOUNTS',
@@ -388,8 +392,18 @@ export default function Admin() {
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [regulations, setRegulations] = useState<GameRegulation[]>([])
   const [emailStatus, setEmailStatus] = useState<EmailSystemStatus | null>(null)
-  const [mediaConfigs, setMediaConfigs] = useState<PageMediaConfig[]>([])
   const [disputes, setDisputes] = useState<any[]>([])
+
+  // Player Crest Management
+  const [adminCrests, setAdminCrests] = useState<Crest[]>([])
+  const [crestSearch, setCrestSearch] = useState('')
+  const [isCreateCrestModalOpen, setIsCreateCrestModalOpen] = useState(false)
+  const [newCrestName, setNewCrestName] = useState('')
+  const [newCrestDesc, setNewCrestDesc] = useState('')
+  const [newCrestImageUrl, setNewCrestImageUrl] = useState('')
+  const [newCrestIsActive, setNewCrestIsActive] = useState(true)
+  const [isUploadingAdminCrest, setIsUploadingAdminCrest] = useState(false)
+  const [adminCrestActionMsg, setAdminCrestActionMsg] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
@@ -532,9 +546,6 @@ export default function Admin() {
   const [selectedGameToAdd, setSelectedGameToAdd] = useState('')
   const [isAssigningGame, setIsAssigningGame] = useState(false)
 
-  // PAGE MEDIA Interactive States
-  const [editingMedia, setEditingMedia] = useState<PageMediaConfig | null>(null)
-  const [isUploadingMediaFile, setIsUploadingMediaFile] = useState(false)
 
   // REVIEWS MODERATION Interactive States
   const [adminReviews, setAdminReviews] = useState<ReviewItem[]>([])
@@ -746,7 +757,6 @@ export default function Admin() {
         tixList,
         regList,
         eStat,
-        mList,
         dispList,
         mAll,
         genreList,
@@ -757,6 +767,7 @@ export default function Admin() {
         teams,
         offHist,
         notifs,
+        crestList,
       ] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
@@ -772,7 +783,6 @@ export default function Admin() {
         getAdminSupportTickets().then((r) => r.tickets).catch(() => []),
         getRegulations().catch(() => []),
         getEmailSystemStatusAdmin().catch(() => null),
-        getAllPageMedia().catch(() => []),
         getDisputes().catch(() => []),
         getMatches().catch(() => []),
         getGenres(true).catch(() => []),
@@ -783,6 +793,7 @@ export default function Admin() {
         apiClient<any[]>('/teams').catch(() => []),
         getOfficialEmailHistoryAdmin().catch(() => ({ total: 0, items: [] })),
         getAdminPlatformNotifications({ limit: 50, skip: 0 }).catch(() => ({ items: [], total: 0 })),
+        getAllCrestsAdmin().catch(() => []),
       ])
 
       if (s) setStats(s)
@@ -801,7 +812,6 @@ export default function Admin() {
       setTickets(tixList)
       setRegulations(regList)
       setEmailStatus(eStat)
-      setMediaConfigs(mList)
       setDisputes(dispList)
       if (Array.isArray(mAll)) setAdminMatches(mAll)
       setGenres(genreList)
@@ -811,6 +821,7 @@ export default function Admin() {
       setOrganizerEmailThreads(orgEmails)
       setTeamsList(teams || [])
       setOfficialHistory(offHist?.items || [])
+      setAdminCrests(crestList || [])
 
       if (fTour) {
         setSelectedFeaturedId(fTour.id || fTour.slug)
@@ -819,6 +830,76 @@ export default function Admin() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadAdminCrests = useCallback(async (searchQuery?: string) => {
+    try {
+      const data = await getAllCrestsAdmin(searchQuery)
+      setAdminCrests(data)
+    } catch (err) {
+      console.warn('Failed to load admin crests:', err)
+    }
+  }, [])
+
+  const handleCreateCrest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCrestName.trim() || !newCrestImageUrl.trim()) {
+      alert('Please provide crest name and image.')
+      return
+    }
+    try {
+      await createCrestAdmin({
+        name: newCrestName.trim(),
+        description: newCrestDesc.trim() || undefined,
+        image_url: newCrestImageUrl.trim(),
+        is_active: newCrestIsActive,
+      })
+      setIsCreateCrestModalOpen(false)
+      setNewCrestName('')
+      setNewCrestDesc('')
+      setNewCrestImageUrl('')
+      setNewCrestIsActive(true)
+      setAdminCrestActionMsg('New player crest successfully created!')
+      setTimeout(() => setAdminCrestActionMsg(''), 4000)
+      loadAdminCrests()
+    } catch (err: any) {
+      alert(err.message || 'Failed to create crest.')
+    }
+  }
+
+  const handleToggleCrestActive = async (crest: Crest) => {
+    try {
+      await updateCrestAdmin(crest.id, { is_active: !crest.is_active })
+      loadAdminCrests(crestSearch)
+    } catch (err: any) {
+      alert(err.message || 'Failed to update crest status.')
+    }
+  }
+
+  const handleDeleteCrest = async (crest: Crest) => {
+    if (!confirm(`Are you sure you want to delete crest "${crest.name}"?`)) return
+    try {
+      await deleteCrestAdmin(crest.id)
+      loadAdminCrests(crestSearch)
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete crest.')
+    }
+  }
+
+  const handleAdminCrestFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingAdminCrest(true)
+    try {
+      const res = await uploadMediaFile(file)
+      if (res && res.url) {
+        setNewCrestImageUrl(res.url)
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload crest image.')
+    } finally {
+      setIsUploadingAdminCrest(false)
     }
   }
 
@@ -1512,26 +1593,6 @@ export default function Admin() {
     }
   }
 
-  // Media Config Handler
-  const handleSaveMediaConfig = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingMedia) return
-    try {
-      await updatePageMedia(editingMedia.page_id, {
-        title: editingMedia.title,
-        media_type: editingMedia.media_type,
-        media_url: editingMedia.media_url,
-        fallback_url: editingMedia.fallback_url,
-        opacity: Number(editingMedia.opacity || 0.35),
-        is_active: editingMedia.is_active,
-      })
-      showToast(`Page media for "${editingMedia.title || editingMedia.page_id}" updated!`)
-      setEditingMedia(null)
-      loadData()
-    } catch (err: any) {
-      alert(err.message || 'Failed to update page media')
-    }
-  }
 
   if (authLoading) {
     return (
@@ -2427,68 +2488,6 @@ export default function Admin() {
           </div>
         )}
 
-        {/* TAB: PAGE MEDIA */}
-        {tab === 'PAGE MEDIA' && (
-          <div className="mt-8 space-y-8">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h2 className="font-display text-3xl font-black uppercase">Page Visual Media</h2>
-                <p className="text-xs text-dim">Configure visual media and background imagery across platform hub pages.</p>
-              </div>
-              <Hud className="text-cyan">{mediaConfigs.filter((m) => m.page_id !== 'home').length} ACTIVE PAGES</Hud>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {mediaConfigs
-                .filter((m) => m.page_id !== 'home')
-                .map((m) => (
-                  <Panel key={m.page_id} className="p-6 space-y-4">
-                    <div className="relative aspect-video w-full overflow-hidden border border-white/10 bg-void">
-                      {m.media_url ? (
-                        <img
-                          src={resolveMediaUrl(m.media_url)}
-                          alt={m.title || m.page_id}
-                          className="size-full object-cover"
-                          style={{ opacity: m.opacity ?? 0.35 }}
-                        />
-                      ) : (
-                        <div className="grid size-full place-items-center font-mono text-xs text-dim">
-                          NO ACTIVE MEDIA CONFIGURED
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 border border-white/20 bg-void/80 px-2 py-0.5 font-mono text-[9px] uppercase backdrop-blur-sm">
-                        {m.media_type || 'IMAGE'}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <span className="font-mono text-xs text-cyan font-bold">{m.page_id.toUpperCase()}</span>
-                      <span className={`border px-2 py-0.5 font-mono text-[9px] uppercase ${m.is_active ? 'border-ok/40 bg-ok/10 text-ok' : 'border-white/20 text-dim'}`}>
-                        {m.is_active ? 'ACTIVE' : 'INACTIVE'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="font-display text-2xl font-black uppercase">{m.title || m.page_id}</h3>
-                      <p className="text-xs text-dim font-mono truncate mt-1">
-                        URL: {m.media_url || 'None'}
-                      </p>
-                      <p className="text-xs text-dim font-mono">Opacity: {Math.round((m.opacity ?? 0.35) * 100)}%</p>
-                    </div>
-
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={() => setEditingMedia(m)}
-                        className="border border-cyan bg-cyan/15 px-4 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors"
-                      >
-                        Configure / Upload Media
-                      </button>
-                    </div>
-                  </Panel>
-                ))}
-            </div>
-          </div>
-        )}
 
         {/* TAB: REVIEWS MODERATION */}
         {tab === 'REVIEWS MODERATION' && (
@@ -2665,6 +2664,284 @@ export default function Admin() {
               </div>
             )}
           </div>
+        )}
+
+        {/* TAB: PLAYER CRESTS */}
+        {tab === 'PLAYER CRESTS' && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h2 className="font-display text-3xl font-black uppercase">Player Crests & Avatars</h2>
+                <p className="text-xs text-dim">
+                  Curate, upload, and toggle operator crests selectable by players across the platform.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Hud className="text-cyan">
+                  {adminCrests.filter((c) => c.is_active).length}/{adminCrests.length} ACTIVE
+                </Hud>
+                <button
+                  onClick={() => setIsCreateCrestModalOpen(true)}
+                  className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 transition-all shrink-0 cursor-pointer"
+                >
+                  + Add New Crest
+                </button>
+              </div>
+            </div>
+
+            {adminCrestActionMsg && (
+              <div className="border border-cyan/40 bg-cyan/10 p-3 font-mono text-xs text-cyan">
+                {adminCrestActionMsg}
+              </div>
+            )}
+
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <input
+                  type="text"
+                  placeholder="Filter crests by name or description..."
+                  value={crestSearch}
+                  onChange={(e) => {
+                    setCrestSearch(e.target.value)
+                    loadAdminCrests(e.target.value)
+                  }}
+                  className="w-full border border-white/15 bg-surface px-3 py-2 font-mono text-xs text-ink placeholder:text-dim outline-none focus:border-cyan"
+                />
+                {crestSearch && (
+                  <button
+                    onClick={() => {
+                      setCrestSearch('')
+                      loadAdminCrests('')
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-dim hover:text-ink cursor-pointer"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div className="font-mono text-xs text-dim">
+                Showing {adminCrests.length} {adminCrests.length === 1 ? 'crest' : 'crests'}
+              </div>
+            </div>
+
+            {/* Crests Grid */}
+            {adminCrests.length === 0 ? (
+              <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                NO PLAYER CRESTS FOUND. CLICK "+ ADD NEW CREST" TO CREATE ONE.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {adminCrests.map((crest) => (
+                  <Panel
+                    key={crest.id}
+                    className="p-4 flex flex-col justify-between border-white/10 hover:border-white/20 transition-all"
+                  >
+                    <div>
+                      {/* Crest Preview */}
+                      <div className="relative aspect-square w-full rounded border border-white/10 bg-void/80 flex items-center justify-center p-4 mb-3 overflow-hidden group">
+                        <img
+                          src={resolveMediaUrl(crest.image_url)}
+                          alt={crest.name}
+                          className="w-20 h-20 object-contain drop-shadow-md group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <span
+                            className={`border px-1.5 py-0.5 font-mono text-[9px] uppercase font-bold ${
+                              crest.is_active
+                                ? 'border-ok/40 bg-ok/10 text-ok'
+                                : 'border-white/20 bg-white/5 text-dim'
+                            }`}
+                          >
+                            {crest.is_active ? 'ACTIVE' : 'DISABLED'}
+                          </span>
+                        </div>
+                        {crest.category && (
+                          <div className="absolute bottom-2 left-2">
+                            <span className="border border-white/10 bg-surface/80 px-1.5 py-0.5 font-mono text-[9px] text-cyan uppercase">
+                              {crest.category}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <h4 className="font-display font-black text-sm uppercase text-ink tracking-wide">
+                        {crest.name}
+                      </h4>
+                      {crest.description && (
+                        <p className="mt-1 font-mono text-xs text-dim line-clamp-2 leading-relaxed">
+                          {crest.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => handleToggleCrestActive(crest)}
+                        className={`flex-1 border px-2.5 py-1 font-mono text-[11px] uppercase transition-colors cursor-pointer ${
+                          crest.is_active
+                            ? 'border-warn/40 bg-warn/10 text-warn hover:bg-warn/20'
+                            : 'border-ok/40 bg-ok/10 text-ok hover:bg-ok/20'
+                        }`}
+                      >
+                        {crest.is_active ? 'Disable' : 'Enable'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete crest "${crest.name}"?`)) {
+                            handleDeleteCrest(crest)
+                          }
+                        }}
+                        className="border border-live/40 bg-live/10 px-2.5 py-1 font-mono text-[11px] uppercase text-live hover:bg-live/20 transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </Panel>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CREATE CREST MODAL */}
+        {isCreateCrestModalOpen && (
+          <Portal lockScroll>
+            <div
+              role="dialog"
+              aria-modal
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
+            >
+              <div className="relative w-full max-w-lg max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-white/20 bg-graphite p-6 shadow-2xl select-text">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h3 className="font-display text-xl font-black uppercase text-cyan">
+                      Create Player Crest
+                    </h3>
+                    <p className="text-xs text-dim mt-0.5">
+                      Upload or link a vector emblem for player profiles.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsCreateCrestModalOpen(false)}
+                    className="font-mono text-sm text-dim hover:text-ink cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateCrest} className="mt-4 space-y-4 font-mono text-xs">
+                  <div>
+                    <label className="text-dim uppercase tracking-wider text-[11px] block mb-1">
+                      Crest Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Apex Predator, Neon Samurai"
+                      value={newCrestName}
+                      onChange={(e) => setNewCrestName(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-dim uppercase tracking-wider text-[11px] block mb-1">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Short bio or unlock requirements"
+                      value={newCrestDesc}
+                      onChange={(e) => setNewCrestDesc(e.target.value)}
+                      className="w-full border border-white/15 bg-surface p-2 text-xs text-ink outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  {/* File Upload / Direct URL */}
+                  <div className="space-y-2">
+                    <label className="text-dim uppercase tracking-wider text-[11px] block">
+                      Crest Emblem Image / SVG *
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <label className="border border-cyan/40 bg-cyan/10 hover:bg-cyan/20 px-3 py-1.5 text-cyan uppercase cursor-pointer text-xs transition-colors">
+                        {isUploadingAdminCrest ? 'Uploading...' : 'Upload Image / SVG'}
+                        <input
+                          type="file"
+                          accept="image/*,.svg"
+                          disabled={isUploadingAdminCrest}
+                          onChange={handleAdminCrestFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-[10px] text-dim">Supports SVG, PNG, WEBP</span>
+                    </div>
+
+                    <div className="pt-1">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Or enter direct image URL / SVG path"
+                        value={newCrestImageUrl}
+                        onChange={(e) => setNewCrestImageUrl(e.target.value)}
+                        className="w-full border border-white/15 bg-surface p-2 text-xs text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+
+                    {/* Image Preview */}
+                    {newCrestImageUrl && (
+                      <div className="mt-2 p-3 border border-white/10 bg-void/60 flex items-center gap-4">
+                        <div className="w-14 h-14 rounded border border-white/15 bg-void flex items-center justify-center p-2 shrink-0">
+                          <img
+                            src={resolveMediaUrl(newCrestImageUrl)}
+                            alt="Preview"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="text-[11px] text-dim truncate">
+                          <span className="text-ink font-bold block">Preview Ready</span>
+                          <span className="truncate block">{newCrestImageUrl}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="newCrestActive"
+                      checked={newCrestIsActive}
+                      onChange={(e) => setNewCrestIsActive(e.target.checked)}
+                      className="accent-cyan"
+                    />
+                    <label htmlFor="newCrestActive" className="text-dim text-xs cursor-pointer">
+                      Make available immediately (Active)
+                    </label>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateCrestModalOpen(false)}
+                      className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isUploadingAdminCrest || !newCrestName.trim() || !newCrestImageUrl.trim()}
+                      className="border border-cyan bg-cyan px-5 py-2 uppercase text-void font-bold hover:brightness-110 disabled:opacity-40 cursor-pointer transition-all"
+                    >
+                      Create Crest
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </Portal>
         )}
 
         {/* TAB 3: USERS & ROLES */}
@@ -5432,90 +5709,6 @@ export default function Admin() {
         </Portal>
       )}
 
-      {/* EDIT PAGE MEDIA MODAL */}
-      {editingMedia && (
-        <Portal lockScroll>
-          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
-            <div className="relative w-full max-w-lg max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-white/20 bg-graphite p-6 shadow-2xl select-text">
-              <h3 className="font-display text-2xl font-black uppercase text-cyan">Configure Page Media: {editingMedia.title || editingMedia.page_id}</h3>
-              <p className="text-xs text-dim mt-1 font-mono">Page ID: {editingMedia.page_id}</p>
-              <form onSubmit={handleSaveMediaConfig} className="mt-4 space-y-3 font-mono text-xs">
-                <div>
-                  <label className="text-dim">Page Title Label</label>
-                  <input required value={editingMedia.title || ''} onChange={(e) => setEditingMedia({ ...editingMedia, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-dim">Media Type</label>
-                    <select value={editingMedia.media_type} onChange={(e) => setEditingMedia({ ...editingMedia, media_type: e.target.value as any })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none">
-                      <option value="image">Static Image</option>
-                      <option value="gif">Animated GIF / Video Backing</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-dim">Active Status</label>
-                    <select value={editingMedia.is_active ? 'true' : 'false'} onChange={(e) => setEditingMedia({ ...editingMedia, is_active: e.target.value === 'true' })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none">
-                      <option value="true">Active & Visible</option>
-                      <option value="false">Disabled / Hidden</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-dim">Media Asset URL (Image / GIF / Web)</label>
-                  <div className="flex gap-2 mt-1">
-                    <input required placeholder="https://..." value={editingMedia.media_url} onChange={(e) => setEditingMedia({ ...editingMedia, media_url: e.target.value })} className="flex-1 border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                    <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3 py-2 uppercase text-cyan hover:bg-cyan/20 shrink-0">
-                      {isUploadingMediaFile ? '...' : 'Upload File'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={isUploadingMediaFile}
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0]
-                          if (!f) return
-                          setIsUploadingMediaFile(true)
-                          try {
-                            const res = await uploadMediaFile(f)
-                            if (res?.url) setEditingMedia((prev) => prev ? { ...prev, media_url: res.url } : null)
-                          } catch (err: any) {
-                            alert(err.message || 'Media upload failed')
-                          } finally {
-                            setIsUploadingMediaFile(false)
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-dim">Fallback Image URL</label>
-                  <input placeholder="https://..." value={editingMedia.fallback_url || ''} onChange={(e) => setEditingMedia({ ...editingMedia, fallback_url: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                </div>
-                <div>
-                  <div className="flex justify-between">
-                    <label className="text-dim">Visual Background Opacity</label>
-                    <span className="text-cyan font-bold">{Math.round((editingMedia.opacity ?? 0.35) * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="1.0"
-                    step="0.05"
-                    value={editingMedia.opacity ?? 0.35}
-                    onChange={(e) => setEditingMedia({ ...editingMedia, opacity: parseFloat(e.target.value) })}
-                    className="mt-2 w-full accent-cyan"
-                  />
-                </div>
-                <div className="pt-3 flex justify-end gap-2">
-                  <button type="button" onClick={() => setEditingMedia(null)} className="border border-white/20 px-3 py-1.5 uppercase text-dim cursor-pointer">Cancel</button>
-                  <button type="submit" className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold cursor-pointer">Save Media Config</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </Portal>
-      )}
 
       {/* CREATE GENRE MODAL */}
       {isCreateGenreOpen && (

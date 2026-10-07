@@ -13,6 +13,8 @@ export interface UserProfile {
   inr_reserved_paise?: number
   riot_id?: string
   steam_id?: string
+  preferences?: Record<string, any>
+  privacy_settings?: Record<string, any>
 }
 
 export interface UserSyncPayload {
@@ -51,6 +53,8 @@ export interface UserProfileUpdatePayload {
   riot_id?: string
   steam_id?: string
   avatar_url?: string
+  preferences?: Record<string, any>
+  privacy_settings?: Record<string, any>
 }
 
 export async function updateUserProfile(payload: UserProfileUpdatePayload, token?: string | null): Promise<UserProfile> {
@@ -65,3 +69,13 @@ export async function updateUserProfile(payload: UserProfileUpdatePayload, token
   })
 }
 
+export async function deleteAccount(token?: string | null): Promise<{ status: string; message: string }> {
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return apiClient<{ status: string; message: string }>('/auth/me', {
+    method: 'DELETE',
+    headers,
+  })
+}

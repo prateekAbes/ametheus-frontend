@@ -115,21 +115,69 @@ html { background: #05060a; scrollbar-gutter: stable; }
 .animate-silver-glow { animation: silver-glow 3.2s ease-in-out infinite; }
 .animate-bronze-glow { animation: bronze-glow 3.2s ease-in-out infinite; }
 
-/* Champion Crown Prestigious Motion Animations */
+/* Champion Crown Prestigious 3D Motion Animations */
 @keyframes champion-crown {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  25% { transform: translateY(-5px) rotate(-1.5deg); }
-  50% { transform: translateY(-8px) rotate(0deg); }
-  75% { transform: translateY(-5px) rotate(1.5deg); }
+  0% {
+    transform: perspective(700px) translateY(0px) rotateY(-18deg) rotateX(4deg) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
+  }
+  25% {
+    transform: perspective(700px) translateY(-5px) rotateY(-5deg) rotateX(1deg) scale(1.02);
+    filter: drop-shadow(0 7px 18px rgba(245, 158, 11, 0.65));
+  }
+  50% {
+    transform: perspective(700px) translateY(-9px) rotateY(18deg) rotateX(4deg) scale(1);
+    filter: drop-shadow(0 9px 22px rgba(245, 158, 11, 0.6));
+  }
+  75% {
+    transform: perspective(700px) translateY(-4px) rotateY(5deg) rotateX(6deg) scale(0.99);
+    filter: drop-shadow(0 6px 16px rgba(245, 158, 11, 0.5));
+  }
+  100% {
+    transform: perspective(700px) translateY(0px) rotateY(-18deg) rotateX(4deg) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
+  }
 }
 @keyframes runnerup-crown {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-5px) rotate(0deg); }
+  0% {
+    transform: perspective(700px) translateY(0px) rotateY(-12deg) rotateX(3deg);
+    filter: drop-shadow(0 3px 10px rgba(203, 213, 225, 0.3));
+  }
+  50% {
+    transform: perspective(700px) translateY(-6px) rotateY(12deg) rotateX(3deg);
+    filter: drop-shadow(0 6px 16px rgba(203, 213, 225, 0.45));
+  }
+  100% {
+    transform: perspective(700px) translateY(0px) rotateY(-12deg) rotateX(3deg);
+    filter: drop-shadow(0 3px 10px rgba(203, 213, 225, 0.3));
+  }
 }
 @keyframes bronze-crown {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-4px) rotate(0deg); }
+  0% {
+    transform: perspective(700px) translateY(0px) rotateY(-10deg) rotateX(3deg);
+    filter: drop-shadow(0 3px 10px rgba(217, 119, 6, 0.3));
+  }
+  50% {
+    transform: perspective(700px) translateY(-5px) rotateY(10deg) rotateX(3deg);
+    filter: drop-shadow(0 6px 14px rgba(217, 119, 6, 0.45));
+  }
+  100% {
+    transform: perspective(700px) translateY(0px) rotateY(-10deg) rotateX(3deg);
+    filter: drop-shadow(0 3px 10px rgba(217, 119, 6, 0.3));
+  }
 }
-.animate-champion-crown { animation: champion-crown 4.5s ease-in-out infinite; }
-.animate-runnerup-crown { animation: runnerup-crown 4.2s ease-in-out infinite; }
-.animate-bronze-crown { animation: bronze-crown 4.2s ease-in-out infinite; }
+.animate-champion-crown {
+  animation: champion-crown 5s ease-in-out infinite;
+  transform-style: preserve-3d;
+  will-change: transform, filter;
+}
+.animate-runnerup-crown {
+  animation: runnerup-crown 4.5s ease-in-out infinite;
+  transform-style: preserve-3d;
+  will-change: transform, filter;
+}
+.animate-bronze-crown {
+  animation: bronze-crown 4.5s ease-in-out infinite;
+  transform-style: preserve-3d;
+  will-change: transform, filter;
+}

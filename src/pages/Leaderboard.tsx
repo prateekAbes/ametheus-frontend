@@ -5,11 +5,9 @@ import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import { ChampionshipCrown, PodiumMedalBadge } from '../components/ChampionshipCrown'
 import {
   getLeaderboardEntries,
-  getLeaderboardStats,
   getLeaderboardCategories,
   getLeaderboardDisqualifications,
   LeaderboardEntry,
-  LeaderboardStats,
   LeaderboardCategory,
   LeaderboardDisqualification,
 } from '../services/leaderboard'
@@ -18,8 +16,7 @@ import { GAMES, inr } from '../lib/data'
 import DynamicImage from '../components/DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
 
-const LIMIT_OPTIONS = [10, 20, 30, 40, 50] as const
-type LimitOption = (typeof LIMIT_OPTIONS)[number]
+const PAGE_SIZE = 10
 
 export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -27,13 +24,11 @@ export default function Leaderboard() {
 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [disqualifications, setDisqualifications] = useState<LeaderboardDisqualification[]>([])
-  const [stats, setStats] = useState<LeaderboardStats | null>(null)
   const [categories, setCategories] = useState<LeaderboardCategory[]>([])
   const [games, setGames] = useState<ApiGame[]>([])
   const [selectedGame, setSelectedGame] = useState<string>(initialGame)
   const [selectedCategory, setSelectedCategory] = useState<string>('overall')
-  const [selectedLimit, setSelectedLimit] = useState<LimitOption>(10)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState<number>(1)
   const [loading, setLoading] = useState(true)
 
   // Fetch games list for discipline tabs
@@ -50,21 +45,18 @@ export default function Leaderboard() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [entriesData, statsData, catsData, dqsData] = await Promise.all([
+      const [entriesData, catsData, dqsData] = await Promise.all([
         getLeaderboardEntries({
           category: selectedCategory !== 'overall' ? selectedCategory : undefined,
           game: selectedGame !== 'all' ? selectedGame : undefined,
-          search: searchQuery.trim() || undefined,
-          limit: selectedLimit,
+          limit: 100,
           include_disqualified: true,
         }).catch(() => []),
-        getLeaderboardStats().catch(() => null),
         getLeaderboardCategories().catch(() => []),
         getLeaderboardDisqualifications().catch(() => []),
       ])
 
       setEntries(Array.isArray(entriesData) ? entriesData : [])
-      setStats(statsData || null)
       if (Array.isArray(catsData) && catsData.length > 0) {
         setCategories(catsData)
       }
@@ -78,21 +70,22 @@ export default function Leaderboard() {
 
   useEffect(() => {
     fetchData()
-  }, [selectedCategory, selectedGame, selectedLimit])
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    fetchData()
-  }
+  }, [selectedCategory, selectedGame])
 
   const handleSelectGame = (slug: string) => {
     setSelectedGame(slug)
+    setCurrentPage(1)
     if (slug === 'all') {
       searchParams.delete('game')
     } else {
       searchParams.set('game', slug)
     }
     setSearchParams(searchParams)
+  }
+
+  const handleSelectCategory = (catSlug: string) => {
+    setSelectedCategory(catSlug)
+    setCurrentPage(1)
   }
 
   // Cross-reference disqualification IDs
@@ -125,14 +118,47 @@ export default function Leaderboard() {
 
   const displayGames = games.length > 0 ? games.map((g) => normalizeGame(g as any)) : GAMES
 
+  const totalEntries = entries.length
+  const totalPages = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+
   const top1 = entries[0] || null
   const top2 = entries[1] || null
   const top3 = entries[2] || null
-  const remainingEntries = entries.slice(3)
+
+  // Entries for ladder table:
+  // Page 1: Ranks 4 to 10 (index 3 to 10)
+  // Page > 1: 10 contenders for that page
+  const tableEntries = useMemo(() => {
+    if (safeCurrentPage === 1) {
+      return entries.slice(3, PAGE_SIZE)
+    }
+    const startIdx = (safeCurrentPage - 1) * PAGE_SIZE
+    const endIdx = startIdx + PAGE_SIZE
+    return entries.slice(startIdx, endIdx)
+  }, [entries, safeCurrentPage])
+
+  const ladderStartRank = safeCurrentPage === 1 ? 4 : (safeCurrentPage - 1) * PAGE_SIZE + 1
+  const ladderEndRank = safeCurrentPage === 1
+    ? Math.min(PAGE_SIZE, totalEntries)
+    : Math.min(safeCurrentPage * PAGE_SIZE, totalEntries)
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+    if (safeCurrentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages]
+    }
+    if (safeCurrentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+    }
+    return [1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages]
+  }, [totalPages, safeCurrentPage])
 
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32 text-ink overflow-hidden">
-      {/* Retained atmospheric esports hero background */}
+      {/* Retained atmospheric esports hero background with dark red / maroon tones */}
       <EsportsHeroVisual variant="leaderboard" />
 
       <Container className="relative">
@@ -145,7 +171,7 @@ export default function Leaderboard() {
             </div>
             <h1 className="mt-2 font-display text-4xl sm:text-6xl font-black uppercase tracking-tight text-ink">
               Platform{' '}
-              <span className="bg-gradient-to-r from-rose-500 via-rose-400 to-amber-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-rose-500 via-rose-400 to-rose-200 bg-clip-text text-transparent">
                 Leaderboard
               </span>
             </h1>
@@ -162,30 +188,6 @@ export default function Leaderboard() {
             </Link>
           </div>
         </div>
-
-        {/* Decluttered Secondary Overview Stats Ribbon */}
-        {stats && (
-          <div className="mt-6 flex flex-wrap items-center gap-4 sm:gap-8 border border-white/10 border-l-2 border-l-rose-500 bg-surface/40 px-5 py-3 backdrop-blur-md">
-            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
-              <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Awarded Prizes:</span>
-              <span className="font-mono text-xs font-bold text-ink">{stats.total_awarded_prizes || '₹0'}</span>
-            </div>
-            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
-              <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Active Contenders:</span>
-              <span className="font-mono text-xs font-bold text-ink">{stats.active_contenders || '0'}</span>
-            </div>
-            <div className="flex items-center gap-2.5 border-r border-white/10 pr-4 sm:pr-8 last:border-0">
-              <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Verified Squads:</span>
-              <span className="font-mono text-xs font-bold text-ink">{stats.verified_squads || '0'}</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono text-[11px] uppercase text-dim tracking-wider">Top Squad:</span>
-              <span className="font-mono text-xs font-bold text-rose-300">
-                {stats.top_team_name ? `${stats.top_team_name} · ` : ''}{stats.top_team_earnings || '₹0'}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* 1. Game Discipline Filter Bar */}
         <div className="mt-8">
@@ -233,7 +235,7 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* 2. Ranking Criteria Metric, Limit Tabs & Search Bar */}
+        {/* 2. Ranking Criteria Metric Bar */}
         <div className="mt-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-t border-white/10 pt-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-dim uppercase mr-2 tracking-wider">Metric:</span>
@@ -241,7 +243,7 @@ export default function Leaderboard() {
               ? categories.map((cat) => (
                   <button
                     key={cat.slug}
-                    onClick={() => setSelectedCategory(cat.slug)}
+                    onClick={() => handleSelectCategory(cat.slug)}
                     className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
                       selectedCategory === cat.slug
                         ? 'border-rose-500/80 bg-rose-500/15 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
@@ -259,7 +261,7 @@ export default function Leaderboard() {
                 ].map(([slug, label]) => (
                   <button
                     key={slug}
-                    onClick={() => setSelectedCategory(slug)}
+                    onClick={() => handleSelectCategory(slug)}
                     className={`px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider transition-colors border cursor-pointer ${
                       selectedCategory === slug
                         ? 'border-rose-500/80 bg-rose-500/15 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
@@ -269,41 +271,6 @@ export default function Leaderboard() {
                     {label}
                   </button>
                 ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Limit Selector: Top 10, Top 20, Top 30, Top 40, Top 50 */}
-            <div className="flex items-center border border-white/15 bg-surface/80 p-0.5">
-              {LIMIT_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setSelectedLimit(opt)}
-                  className={`px-2.5 py-1 font-mono text-xs uppercase transition-all cursor-pointer ${
-                    selectedLimit === opt
-                      ? 'bg-rose-500 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.35)]'
-                      : 'text-dim hover:text-ink'
-                  }`}
-                >
-                  Top {opt}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Search squad or tag..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-surface border border-white/10 px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim/50 focus:border-rose-500 focus:outline-none w-44 sm:w-56 transition-colors"
-              />
-              <button
-                type="submit"
-                className="bg-rose-500/10 border border-rose-500/40 text-rose-400 hover:bg-rose-500/20 px-3.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Filter
-              </button>
-            </form>
           </div>
         </div>
 
@@ -327,9 +294,7 @@ export default function Leaderboard() {
           <div className="mt-14 border border-white/10 bg-surface/30 p-16 text-center">
             <Hud className="text-rose-400">No Ranked Contenders</Hud>
             <p className="mt-2 font-mono text-dim text-sm max-w-md mx-auto">
-              {searchQuery
-                ? `No contenders matched the search query "${searchQuery}".`
-                : 'No ranked squads found in the database for the selected discipline and criteria.'}
+              No ranked squads found in the database for the selected discipline and criteria.
             </p>
             {selectedGame !== 'all' && (
               <button
@@ -342,8 +307,30 @@ export default function Leaderboard() {
           </div>
         ) : (
           <div className="mt-14 space-y-16">
-            {/* DYNAMIC TOP THREE PODIUM (1st Gold, 2nd Silver, 3rd Bronze) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end pt-8 overflow-visible">
+            {/* If on page > 1, show compact breadcrumb banner instead of repeating full podium */}
+            {safeCurrentPage > 1 && (
+              <div className="flex items-center justify-between border border-white/10 bg-surface/50 px-5 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="size-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_#f43f5e]" />
+                  <span className="font-mono text-xs text-dim">
+                    Standings Ladder: Page <span className="font-bold text-ink">{safeCurrentPage}</span> of {totalPages} (Ranks #{ladderStartRank} to #{ladderEndRank})
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setCurrentPage(1)
+                    window.scrollTo({ top: 300, behavior: 'smooth' })
+                  }}
+                  className="font-mono text-xs font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  ← View Champions Podium (Page 1)
+                </button>
+              </div>
+            )}
+
+            {/* DYNAMIC TOP THREE PODIUM (1st Gold, 2nd Silver, 3rd Bronze) — Displayed on Page 1 */}
+            {safeCurrentPage === 1 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-end pt-8 overflow-visible">
               {/* 2nd Place: Silver Runner-Up (Left on desktop) */}
               {top2 && (
                 <div className="order-2 md:order-1 relative border border-slate-300/40 bg-gradient-to-b from-slate-300/10 via-surface/90 to-surface/95 p-6 pt-10 shadow-[0_0_20px_rgba(203,213,225,0.08),0_15px_30px_rgba(0,0,0,0.5)] animate-silver-glow transition-all duration-300 hover:border-slate-200">
@@ -590,147 +577,225 @@ export default function Leaderboard() {
                 </div>
               )}
             </div>
+          )}
 
-            {/* REST OF RANKINGS: Clean, compact standings table for rank 4 to selected limit */}
-            {remainingEntries.length > 0 && (
-              <div className="border border-white/10 bg-surface/20 overflow-hidden shadow-lg">
-                <div className="flex items-center justify-between border-b border-white/10 px-6 py-3.5 bg-surface/70">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-1.5 h-4 bg-rose-500 rounded-full" />
-                    <span className="font-mono text-xs uppercase tracking-wider text-ink font-bold">
-                      Standings Ladder (Rank #4 to #{entries.length})
-                    </span>
-                  </div>
-                  <span className="font-mono text-[10px] text-dim uppercase tracking-wider">
-                    Showing Top {selectedLimit}
+          {/* REST OF RANKINGS: Clean, compact standings table */}
+          {tableEntries.length > 0 && (
+            <div id="standings-ladder" className="border border-white/10 bg-surface/20 overflow-hidden shadow-lg scroll-mt-24">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 px-6 py-3.5 bg-surface/70">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-1.5 h-4 bg-rose-500 rounded-full" />
+                  <span className="font-mono text-xs uppercase tracking-wider text-ink font-bold">
+                    Standings Ladder (Rank #{ladderStartRank} to #{ladderEndRank})
                   </span>
                 </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-white/[0.02] text-dim uppercase tracking-wider text-[10px]">
-                        <th className="py-3 px-4 w-16">Rank</th>
-                        <th className="py-3 px-4">Contender / Squad</th>
-                        <th className="py-3 px-4">Discipline</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4 text-center">Elo Rating</th>
-                        <th className="py-3 px-4 text-center">Win Rate</th>
-                        <th className="py-3 px-4 text-center">Record</th>
-                        <th className="py-3 px-4 text-center">Recent Form</th>
-                        <th className="py-3 px-4 text-right">Prize Earnings</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/10">
-                      {remainingEntries.map((entry, idx) => {
-                        const rankNumber = idx + 4
-                        const isDq = isEntryDisqualified(entry)
-                        const isDisbanded = entry.is_disbanded || entry.status === 'DISBANDED'
-
-                        return (
-                          <tr
-                            key={entry.id || idx}
-                            className={`transition-colors hover:bg-white/[0.03] ${
-                              isDq ? 'bg-live/5' : isDisbanded ? 'bg-amber-950/[0.04]' : ''
-                            }`}
-                          >
-                            <td className="py-3.5 px-4 font-bold text-dim">
-                              #{String(rankNumber).padStart(2, '0')}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-2.5">
-                                {entry.logo_url ? (
-                                  <div className="size-7 shrink-0 overflow-hidden border border-white/10 bg-surface">
-                                    <DynamicImage
-                                      src={resolveMediaUrl(entry.logo_url)}
-                                      alt={entry.name}
-                                      className="size-7 object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="flex size-7 shrink-0 items-center justify-center border border-white/10 bg-surface text-[10px] font-bold text-rose-400">
-                                    {entry.name.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <div>
-                                  <span className="font-display text-sm font-black uppercase text-ink">
-                                    {entry.name}
-                                  </span>
-                                  {entry.tag && (
-                                    <span className="font-mono text-[10px] text-dim ml-1.5">
-                                      [{entry.tag}]
-                                    </span>
-                                  )}
-                                  {entry.captain && (
-                                    <span className="text-[10px] text-dim block">
-                                      {entry.captain}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-dim">
-                              {entry.game_name || entry.game_slug || 'Esports'}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              {isDq ? (
-                                <span className="inline-flex items-center gap-1 border border-live/80 bg-live/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-live animate-pulse">
-                                  DISQUALIFIED
-                                </span>
-                              ) : isDisbanded ? (
-                                <span className="inline-flex items-center gap-1 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                                  Historical
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 border border-ok/30 bg-ok/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ok">
-                                  Active
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-center font-bold text-rose-300">
-                              {entry.rating}
-                            </td>
-                            <td className="py-3.5 px-4 text-center font-bold text-ink">
-                              {entry.win_rate}%
-                            </td>
-                            <td className="py-3.5 px-4 text-center text-dim">
-                              <span className="text-ok font-bold">{entry.wins}W</span> -{' '}
-                              <span className="text-rose-400 font-bold">{entry.losses}L</span>
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                {entry.form && entry.form.length > 0 ? (
-                                  entry.form.map((f, fIdx) => (
-                                    <span
-                                      key={fIdx}
-                                      className={`inline-block size-4 text-[9px] font-black leading-4 rounded text-center ${
-                                        f === 'W'
-                                          ? 'bg-ok/20 text-ok border border-ok/40'
-                                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                                      }`}
-                                    >
-                                      {f}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-dim text-[10px]">—</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-bold text-ink">
-                              {inr(Number(entry.earnings || 0))}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <span className="font-mono text-[10px] text-dim uppercase tracking-wider">
+                  Page {safeCurrentPage} of {totalPages} · {totalEntries} Total Contenders
+                </span>
               </div>
-            )}
-          </div>
-        )}
-      </Container>
-    </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.02] text-dim uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4 w-16">Rank</th>
+                      <th className="py-3 px-4">Contender / Squad</th>
+                      <th className="py-3 px-4">Discipline</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-center">Elo Rating</th>
+                      <th className="py-3 px-4 text-center">Win Rate</th>
+                      <th className="py-3 px-4 text-center">Record</th>
+                      <th className="py-3 px-4 text-center">Recent Form</th>
+                      <th className="py-3 px-4 text-right">Prize Earnings</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {tableEntries.map((entry, idx) => {
+                      const rankNumber = entry.rank || (safeCurrentPage === 1 ? idx + 4 : (safeCurrentPage - 1) * PAGE_SIZE + idx + 1)
+                      const isDq = isEntryDisqualified(entry)
+                      const isDisbanded = entry.is_disbanded || entry.status === 'DISBANDED'
+
+                      return (
+                        <tr
+                          key={entry.id || idx}
+                          className={`transition-colors hover:bg-white/[0.03] ${
+                            isDq ? 'bg-live/5' : isDisbanded ? 'bg-amber-950/[0.04]' : ''
+                          }`}
+                        >
+                          <td className="py-3.5 px-4 font-bold text-dim">
+                            #{String(rankNumber).padStart(2, '0')}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              {entry.logo_url ? (
+                                <div className="size-7 shrink-0 overflow-hidden border border-white/10 bg-surface">
+                                  <DynamicImage
+                                    src={resolveMediaUrl(entry.logo_url)}
+                                    alt={entry.name}
+                                    className="size-7 object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex size-7 shrink-0 items-center justify-center border border-white/10 bg-surface text-[10px] font-bold text-rose-400">
+                                  {entry.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-display text-sm font-black uppercase text-ink">
+                                  {entry.name}
+                                </span>
+                                {entry.tag && (
+                                  <span className="font-mono text-[10px] text-dim ml-1.5">
+                                    [{entry.tag}]
+                                  </span>
+                                )}
+                                {entry.captain && (
+                                  <span className="text-[10px] text-dim block">
+                                    {entry.captain}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-dim">
+                            {entry.game_name || entry.game_slug || 'Esports'}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {isDq ? (
+                              <span className="inline-flex items-center gap-1 border border-live/80 bg-live/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-live animate-pulse">
+                                DISQUALIFIED
+                              </span>
+                            ) : isDisbanded ? (
+                              <span className="inline-flex items-center gap-1 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                                Historical
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 border border-ok/30 bg-ok/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ok">
+                                Active
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-bold text-rose-300">
+                            {entry.rating}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-bold text-ink">
+                            {entry.win_rate}%
+                          </td>
+                          <td className="py-3.5 px-4 text-center text-dim">
+                            <span className="text-ok font-bold">{entry.wins}W</span> -{' '}
+                            <span className="text-rose-400 font-bold">{entry.losses}L</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {entry.form && entry.form.length > 0 ? (
+                                entry.form.map((f, fIdx) => (
+                                  <span
+                                    key={fIdx}
+                                    className={`inline-block size-4 text-[9px] font-black leading-4 rounded text-center ${
+                                      f === 'W'
+                                        ? 'bg-ok/20 text-ok border border-ok/40'
+                                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                                    }`}
+                                  >
+                                    {f}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-dim text-[10px]">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-ink">
+                            {inr(Number(entry.earnings || 0))}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Proper Bottom Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border border-white/10 bg-surface/40 p-4 backdrop-blur-md">
+              <div className="font-mono text-xs text-dim">
+                Showing standings <span className="font-bold text-ink">#{ladderStartRank}</span> to{' '}
+                <span className="font-bold text-ink">#{ladderEndRank}</span> of{' '}
+                <span className="font-bold text-rose-400">{totalEntries}</span> contenders
+              </div>
+
+              <div className="flex items-center gap-1.5 font-mono text-xs">
+                {/* Previous Button */}
+                <button
+                  onClick={() => {
+                    if (safeCurrentPage > 1) {
+                      setCurrentPage(safeCurrentPage - 1)
+                      document.getElementById('standings-ladder')?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }}
+                  disabled={safeCurrentPage === 1}
+                  className={`px-3 py-1.5 border uppercase font-bold transition-all cursor-pointer ${
+                    safeCurrentPage === 1
+                      ? 'border-white/5 bg-white/[0.02] text-dim/30 cursor-not-allowed'
+                      : 'border-white/15 bg-surface text-dim hover:border-rose-500 hover:text-ink'
+                  }`}
+                >
+                  ← Previous
+                </button>
+
+                {/* Numbered Page Buttons */}
+                {pageNumbers.map((p, pIdx) => {
+                  if (p === '...') {
+                    return (
+                      <span key={`ellipsis-${pIdx}`} className="px-2 py-1 text-dim select-none">
+                        …
+                      </span>
+                    )
+                  }
+                  const isCurrent = p === safeCurrentPage
+                  return (
+                    <button
+                      key={`page-${p}`}
+                      onClick={() => {
+                        setCurrentPage(p as number)
+                        document.getElementById('standings-ladder')?.scrollIntoView({ behavior: 'smooth' })
+                      }}
+                      className={`min-w-8 h-8 px-2 border font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'border-rose-500 bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]'
+                          : 'border-white/10 bg-surface/60 text-dim hover:border-white/30 hover:text-ink'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                })}
+
+                {/* Next Button */}
+                <button
+                  onClick={() => {
+                    if (safeCurrentPage < totalPages) {
+                      setCurrentPage(safeCurrentPage + 1)
+                      document.getElementById('standings-ladder')?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }}
+                  disabled={safeCurrentPage === totalPages}
+                  className={`px-3 py-1.5 border uppercase font-bold transition-all cursor-pointer ${
+                    safeCurrentPage === totalPages
+                      ? 'border-white/5 bg-white/[0.02] text-dim/30 cursor-not-allowed'
+                      : 'border-white/15 bg-surface text-dim hover:border-rose-500 hover:text-ink'
+                  }`}
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Container>
+  </div>
   )
 }

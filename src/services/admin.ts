@@ -157,16 +157,6 @@ export interface EmailSystemStatus {
   }
 }
 
-export interface PageMediaConfig {
-  page_id: string
-  title?: string
-  media_type: 'gif' | 'image'
-  media_url: string
-  fallback_url?: string
-  is_active: boolean
-  opacity?: number
-  is_locked?: boolean
-}
 
 // Stats & Users
 export interface PublicPlatformStats {
@@ -569,29 +559,6 @@ export async function getOfficialEmailHistoryAdmin(): Promise<{ total: number; i
 }
 
 
-// Page Media
-export async function getAllPageMedia(): Promise<PageMediaConfig[]> {
-  try {
-    return await apiClient<PageMediaConfig[]>('/media/pages')
-  } catch {
-    return []
-  }
-}
-
-export async function getPageMedia(pageId: string): Promise<PageMediaConfig | null> {
-  try {
-    return await apiClient<PageMediaConfig>(`/media/pages/${pageId}`)
-  } catch {
-    return null
-  }
-}
-
-export async function updatePageMedia(pageId: string, payload: Partial<PageMediaConfig>): Promise<any> {
-  return apiClient(`/media/pages/${pageId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ ...payload, page_id: pageId }),
-  })
-}
 
 // Notifications Dispatcher
 export async function sendAdminNotification(payload: {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
-import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, Cta } from '../components/ui'
+import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, Cta, Modal } from '../components/ui'
 import { GAMES, gameBy, inr, AVATARS, img } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
@@ -8,19 +8,28 @@ import DynamicImage from '../components/DynamicImage'
 import { getMyTeams, type Team } from '../services/teams'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
+import { getAvailableCrests, type Crest as CrestType } from '../services/crests'
+import { updateUserProfile } from '../services/auth'
+import { uploadMediaFile } from '../services/admin'
 
 import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../services/support'
 
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
 export default function Profile() {
-  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, isSignedIn } = useAuthContext()
+  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, isSignedIn, refreshProfile } = useAuthContext()
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
   const [matches, setMatches] = useState<any[]>([])
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('ALL')
+
+  // Player Crest & Avatar Customization States
+  const [isCrestModalOpen, setIsCrestModalOpen] = useState(false)
+  const [availableCrests, setAvailableCrests] = useState<CrestType[]>([])
+  const [isUploadingCrest, setIsUploadingCrest] = useState(false)
+  const [crestModalMsg, setCrestModalMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -64,6 +73,44 @@ export default function Profile() {
       setIsLoadingFeed(false)
     })
   }, [isSignedIn, profile?.username])
+
+  useEffect(() => {
+    getAvailableCrests().then(setAvailableCrests).catch(() => {})
+  }, [])
+
+  const handleSelectCrest = async (crest: CrestType) => {
+    setCrestModalMsg(null)
+    try {
+      await updateUserProfile({ avatar_url: crest.image_url })
+      await refreshProfile()
+      window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+      setCrestModalMsg({ type: 'ok', text: `Crest '${crest.name}' successfully equipped and saved!` })
+      setTimeout(() => setCrestModalMsg(null), 4000)
+    } catch (err: any) {
+      setCrestModalMsg({ type: 'err', text: err.message || 'Failed to equip crest.' })
+    }
+  }
+
+  const handleUploadAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingCrest(true)
+    setCrestModalMsg(null)
+    try {
+      const res = await uploadMediaFile(file)
+      if (res && res.url) {
+        await updateUserProfile({ avatar_url: res.url })
+        await refreshProfile()
+        window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+        setCrestModalMsg({ type: 'ok', text: 'Custom avatar uploaded and saved to your account!' })
+        setTimeout(() => setCrestModalMsg(null), 4000)
+      }
+    } catch (err: any) {
+      setCrestModalMsg({ type: 'err', text: err.message || 'Failed to upload image.' })
+    } finally {
+      setIsUploadingCrest(false)
+    }
+  }
 
   const username = authDisplayName || profile?.display_name || profile?.username || 'Player'
   const email = profile?.email || 'player@ametheus.gg'
@@ -138,7 +185,7 @@ export default function Profile() {
         <Container className="relative grid items-end gap-10 pb-14 md:grid-cols-[minmax(260px,360px)_1fr]">
           <div className="relative border border-white/20 bg-graphite/80 p-3.5 shadow-2xl backdrop-blur-md">
             <Brackets color="border-cyan/70" />
-            <div className="relative overflow-hidden bg-void/60 border border-white/10">
+            <div className="relative overflow-hidden bg-void/60 border border-white/10 group">
               <DynamicImage
                 src={avatarDisplay}
                 alt={username}
@@ -146,6 +193,13 @@ export default function Profile() {
                 className="aspect-[4/5] w-full object-cover transition-transform duration-500 hover:scale-105"
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void/80 via-transparent to-transparent" />
+              <button
+                type="button"
+                onClick={() => setIsCrestModalOpen(true)}
+                className="absolute inset-x-3 bottom-3 border border-cyan/70 bg-void/90 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer shadow-xl backdrop-blur-sm"
+              >
+                ✎ Change Crest / Avatar
+              </button>
             </div>
             <div className="mt-3 flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
@@ -173,6 +227,11 @@ export default function Profile() {
               >
                 {role === 'SUPER_ADMIN' ? 'ROOT CONTENDER' : role}
               </span>
+              {profile?.privacy_settings?.visibility && (
+                <span className="font-mono text-[9px] uppercase tracking-[0.16em] px-2 py-0.5 border border-white/20 bg-white/5 text-dim">
+                  VISIBILITY: {profile.privacy_settings.visibility}
+                </span>
+              )}
             </div>
             <h1 className="reveal font-display text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white leading-none">
               {username}
@@ -199,6 +258,13 @@ export default function Profile() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCrestModalOpen(true)}
+                className="border border-cyan bg-cyan px-4 py-2 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-sm"
+              >
+                ★ Select Crest / Avatar
+              </button>
               <Link
                 to="/settings"
                 className="border border-white/20 bg-surface/80 px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan hover:bg-cyan/10 transition-all"
@@ -637,7 +703,24 @@ export default function Profile() {
           </div>
 
           <div className="mt-4">
-            {completedMatches.length === 0 ? (
+            {profile?.privacy_settings?.show_matches === false ? (
+              <div className="border border-white/10 bg-surface/30 p-8 text-center">
+                <p className="font-mono text-xs text-dim uppercase tracking-wider">
+                  Public Match History Disabled
+                </p>
+                <p className="mt-1 text-sm text-dim">
+                  Match arena history is currently set to private in your Privacy Settings.
+                </p>
+                <div className="mt-4">
+                  <Link
+                    to="/settings#Privacy"
+                    className="inline-block border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
+                  >
+                    Adjust Privacy Settings →
+                  </Link>
+                </div>
+              </div>
+            ) : completedMatches.length === 0 ? (
               <div className="border border-white/10 bg-surface/30 p-8 text-center">
                 <p className="font-mono text-xs text-dim uppercase tracking-wider">
                   No completed match scores recorded yet.
@@ -676,6 +759,132 @@ export default function Profile() {
           </div>
         </div>
       </Container>
+
+      {/* PLAYER CREST & AVATAR CUSTOMIZATION MODAL */}
+      <Modal
+        open={isCrestModalOpen}
+        onClose={() => {
+          setIsCrestModalOpen(false)
+          setCrestModalMsg(null)
+        }}
+        title="Player Crest & Avatar"
+        subtitle="Equip an official operator crest or upload your personal competitive esports avatar."
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-6 font-mono text-xs">
+          {crestModalMsg && (
+            <div
+              className={`p-3 border text-xs font-bold ${
+                crestModalMsg.type === 'ok'
+                  ? 'border-ok/40 bg-ok/10 text-ok'
+                  : 'border-live/40 bg-live/10 text-live'
+              }`}
+            >
+              {crestModalMsg.text}
+            </div>
+          )}
+
+          {/* Current Avatar Preview & Upload Action */}
+          <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center gap-5">
+            <div className="relative size-20 shrink-0 overflow-hidden rounded-full border-2 border-cyan/50 bg-surface">
+              <DynamicImage
+                src={avatarDisplay}
+                alt="Current Avatar"
+                className="size-full object-cover"
+              />
+            </div>
+            <div className="flex-1 text-center sm:text-left space-y-2">
+              <Hud className="text-cyan">Current Equipped Avatar</Hud>
+              <p className="text-[11px] text-dim">
+                Persisted to your account and visible on leaderboards, match lobbies, reviews, and team rosters.
+              </p>
+              <label className="inline-block cursor-pointer border border-cyan/40 bg-cyan/10 px-4 py-1.5 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors">
+                {isUploadingCrest ? 'Uploading...' : '↑ Upload Custom Image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={isUploadingCrest}
+                  onChange={handleUploadAvatarFile}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Sanctioned Operator Crests Grid */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Hud className="text-cyan">Available Sanctioned Crests ({availableCrests.length})</Hud>
+              <span className="text-[10px] text-dim">Click to equip instantly</span>
+            </div>
+
+            {availableCrests.length === 0 ? (
+              <div className="p-8 border border-dashed border-white/10 text-center text-dim">
+                Loading official crest catalog...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+                {availableCrests.map((c) => {
+                  const isSelected =
+                    rawAvatar === c.image_url ||
+                    avatarDisplay === c.image_url
+
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSelectCrest(c)}
+                      className={`text-left p-3 border transition-all flex items-center gap-3.5 cursor-pointer ${
+                        isSelected
+                          ? 'border-cyan bg-cyan/15 ring-1 ring-cyan shadow-[0_0_12px_rgba(62,242,255,0.2)]'
+                          : 'border-white/10 bg-surface/50 hover:border-white/30 hover:bg-surface'
+                      }`}
+                    >
+                      <div className="size-12 shrink-0 rounded-full border border-white/20 bg-void flex items-center justify-center p-1.5 overflow-hidden">
+                        <img
+                          src={resolveMediaUrl(c.image_url)}
+                          alt={c.name}
+                          className="size-full object-contain"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="font-display font-black uppercase text-sm text-ink truncate">
+                            {c.name}
+                          </p>
+                          {isSelected && (
+                            <span className="text-[9px] font-bold text-cyan uppercase shrink-0">
+                              ✓ Equipped
+                            </span>
+                          )}
+                        </div>
+                        {c.description && (
+                          <p className="font-sans text-[11px] text-dim line-clamp-2 mt-0.5 leading-tight">
+                            {c.description}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-white/10 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCrestModalOpen(false)
+                setCrestModalMsg(null)
+              }}
+              className="border border-white/20 px-5 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

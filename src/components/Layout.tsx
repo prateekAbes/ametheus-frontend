@@ -255,7 +255,76 @@ export function Footer() {
   return (
     <footer className="relative overflow-hidden border-t border-white/10 bg-void px-5 pb-24 pt-20 md:px-10 md:pb-0">
       <div className="mx-auto grid max-w-[1600px] gap-10 md:grid-cols-12 relative z-10">
-        <div className="md:col-span-5"><Logo /><p className="mt-4 max-w-xs text-sm text-dim">India's gaming battleground. Many games, many tournaments, one arena.</p></div>
+        {/* Enhanced Left Column: Brand Statement, Operational Status, Quick Navigation & Community */}
+        <div className="md:col-span-6 space-y-5">
+          <Logo />
+          <p className="max-w-md text-sm text-ink/75 leading-relaxed font-mono">
+            India&apos;s premier competitive gaming battleground. Built for athletes and squads with verified skill ratings, automated bracket matchmaking, and sanctioned esports tournament circuits.
+          </p>
+
+          <div className="flex items-center gap-2.5 font-mono text-[11px] text-dim">
+            <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
+            <span className="text-emerald-400 font-bold uppercase tracking-wider">PROTOCOL ACTIVE</span>
+            <span className="text-white/20">·</span>
+            <span className="uppercase tracking-widest text-[10px]">SANCTIONED ESPORTS PLATFORM</span>
+          </div>
+
+          <div className="pt-4 border-t border-white/10 max-w-md">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-cyan font-bold mb-3 flex items-center gap-1.5">
+              <span>✦</span>
+              <span>QUICK ARENA ACCESS</span>
+            </div>
+            <div className="grid grid-cols-2 gap-y-2 gap-x-4 font-mono text-xs">
+              <Link to="/tournaments" className="text-ink/70 hover:text-cyan transition-colors flex items-center gap-1.5">
+                <span className="text-cyan text-[10px]">›</span>
+                <span>Circuit Events</span>
+              </Link>
+              <Link to="/leaderboard" className="text-ink/70 hover:text-cyan transition-colors flex items-center gap-1.5">
+                <span className="text-cyan text-[10px]">›</span>
+                <span>Elo Standings</span>
+              </Link>
+              <Link to="/rules" className="text-ink/70 hover:text-cyan transition-colors flex items-center gap-1.5">
+                <span className="text-cyan text-[10px]">›</span>
+                <span>Fair Play & Rules</span>
+              </Link>
+              <Link to="/support" className="text-ink/70 hover:text-cyan transition-colors flex items-center gap-1.5">
+                <span className="text-cyan text-[10px]">›</span>
+                <span>Help & Support</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center gap-2">
+            <a
+              href="https://discord.gg/VzkfuK7We"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-white/15 bg-surface/50 hover:border-cyan/50 hover:bg-cyan/10 px-3 py-1 font-mono text-[11px] text-ink/80 hover:text-cyan transition-all flex items-center gap-1.5"
+            >
+              <span>Discord</span>
+              <span className="text-[10px] text-cyan">↗</span>
+            </a>
+            <a
+              href="https://www.instagram.com/official.ametheus"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-white/15 bg-surface/50 hover:border-cyan/50 hover:bg-cyan/10 px-3 py-1 font-mono text-[11px] text-ink/80 hover:text-cyan transition-all flex items-center gap-1.5"
+            >
+              <span>Instagram</span>
+              <span className="text-[10px] text-cyan">↗</span>
+            </a>
+            <a
+              href="https://www.youtube.com/@official.ametheus.goodgame"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-white/15 bg-surface/50 hover:border-cyan/50 hover:bg-cyan/10 px-3 py-1 font-mono text-[11px] text-ink/80 hover:text-cyan transition-all flex items-center gap-1.5"
+            >
+              <span>YouTube</span>
+              <span className="text-[10px] text-cyan">↗</span>
+            </a>
+          </div>
+        </div>
+
         {[
           ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
           ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
