@@ -31,9 +31,9 @@ export default function StarBackground({ className = '', variant = 'standard' }:
     const isContinuation = variant === 'continuation'
 
     // Total star counts per layer
-    const countDistant = isContinuation ? 105 : 35
-    const countMid = isContinuation ? 52 : 20
-    const countFocal = isContinuation ? 14 : 6
+    const countDistant = isContinuation ? 155 : 55
+    const countMid = isContinuation ? 72 : 28
+    const countFocal = isContinuation ? 18 : 8
 
     let starId = 0
 
@@ -53,7 +53,7 @@ export default function StarBackground({ className = '', variant = 'standard' }:
     // Helper to test if a coordinate is in the central UI bounding corridor
     // where authentication inputs and text reside (protects form readability)
     const isInCentralCorridor = (x: number, y: number) => {
-      return x >= 33 && x <= 67 && y >= 20 && y <= 80
+      return x >= 30 && x <= 70 && y >= 18 && y <= 82
     }
 
     // LAYER 1: Background Distant Stars (Tiny points of light, deep cosmos)
@@ -66,13 +66,13 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       const top = (s2 / 233280) * 100
       const inCenter = isInCentralCorridor(left, top)
 
-      // Sub-pixel sizes from 0.7px to 1.1px
+      // Sub-pixel sizes from 0.65px to 1.1px
       const sizeIndex = i % 4
-      const size = sizeIndex === 0 ? 0.7 : sizeIndex === 1 ? 0.85 : sizeIndex === 2 ? 1.0 : 1.15
+      const size = sizeIndex === 0 ? 0.65 : sizeIndex === 1 ? 0.8 : sizeIndex === 2 ? 0.95 : 1.1
 
-      // Opacity: outer stars slightly clearer (0.16–0.38), center stars restrained (0.10–0.22)
-      const rawOpacity = 0.14 + (s3 / 1000) * 0.24
-      const baseOpacity = inCenter ? Math.min(rawOpacity, 0.2) : rawOpacity
+      // Opacity: outer stars slightly clearer (0.14–0.32), center stars restrained (0.08–0.18)
+      const rawOpacity = 0.12 + (s3 / 1000) * 0.22
+      const baseOpacity = inCenter ? Math.min(rawOpacity, 0.16) : rawOpacity
 
       const color = starColors[i % starColors.length]
 
@@ -102,19 +102,19 @@ export default function StarBackground({ className = '', variant = 'standard' }:
         left = left < 50 ? left * 0.65 : 100 - (100 - left) * 0.65
       }
 
-      // Sizes: 1.2px to 1.7px
-      const size = i % 3 === 0 ? 1.2 : i % 3 === 1 ? 1.45 : 1.7
-      const rawOpacity = 0.32 + (s3 / 1000) * 0.3
-      const baseOpacity = inCenter ? 0.22 : rawOpacity
+      // Sizes: 1.15px to 1.65px
+      const size = i % 3 === 0 ? 1.15 : i % 3 === 1 ? 1.4 : 1.65
+      const rawOpacity = 0.28 + (s3 / 1000) * 0.28
+      const baseOpacity = inCenter ? 0.18 : rawOpacity
       const maxOpacity = baseOpacity * 1.35
 
-      // Only ~15% of middle stars gently breathe over a long duration (10s - 16s)
-      const hasAnimation = i % 6 === 0 && !inCenter
+      // Only ~12% of middle stars gently breathe over a long duration (10s - 16s)
+      const hasAnimation = i % 8 === 0 && !inCenter
       const animationDuration = 9 + (i % 5) * 1.6
       const animationDelay = (i % 7) * 1.1
 
       const color = i % 4 === 0 ? '#ffffff' : i % 4 === 1 ? '#e0f2fe' : '#f8fafc'
-      const boxShadow = size > 1.4 && !inCenter ? `0 0 2.5px rgba(255, 255, 255, 0.45)` : undefined
+      const boxShadow = size > 1.35 && !inCenter ? `0 0 2.5px rgba(255, 255, 255, 0.4)` : undefined
 
       list.push({
         id: starId++,
@@ -142,23 +142,23 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       let left = (s1 / 233280) * 100
       let top = (s2 / 233280) * 100
 
-      if (left >= 30 && left <= 70) {
-        left = left < 50 ? 5 + (left / 50) * 22 : 73 + ((left - 50) / 50) * 22
+      if (left >= 28 && left <= 72) {
+        left = left < 50 ? 5 + (left / 50) * 20 : 75 + ((left - 50) / 50) * 20
       }
-      if (top >= 25 && top <= 75) {
-        top = top < 50 ? 6 + (top / 50) * 16 : 78 + ((top - 50) / 50) * 16
+      if (top >= 22 && top <= 78) {
+        top = top < 50 ? 5 + (top / 50) * 15 : 80 + ((top - 50) / 50) * 15
       }
 
-      // Sizes: 2.0px to 2.6px
-      const size = i % 2 === 0 ? 2.1 : 2.5
-      const baseOpacity = 0.72 + (s3 / 1000) * 0.18
-      const maxOpacity = Math.min(1.0, baseOpacity * 1.25)
+      // Sizes: 1.9px to 2.4px
+      const size = i % 2 === 0 ? 1.9 : 2.3
+      const baseOpacity = 0.65 + (s3 / 1000) * 0.2
+      const maxOpacity = Math.min(0.95, baseOpacity * 1.25)
 
       // Soft delicate bloom, never harsh
-      const boxShadow = `0 0 3px 1px rgba(255, 255, 255, 0.65), 0 0 8px 2px rgba(186, 230, 253, 0.28)`
+      const boxShadow = `0 0 3px 1px rgba(255, 255, 255, 0.6), 0 0 8px 2px rgba(186, 230, 253, 0.25)`
 
-      // ~30% have very slow, subtle breath (8s - 14s)
-      const hasAnimation = i % 3 === 0
+      // ~25% have very slow, subtle breath (8s - 14s)
+      const hasAnimation = i % 4 === 0
       const animationDuration = 10 + (i % 4) * 1.5
       const animationDelay = (i % 5) * 1.4
 
@@ -191,6 +191,9 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       {/* Atmospheric depth: extremely soft, restrained celestial glow */}
       {variant === 'continuation' ? (
         <>
+          {/* Deep space base navy gradient */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(15,23,42,0.45)_0%,rgba(3,4,8,0.95)_75%)]" />
+
           {/* Faint deep midnight navy haze (upper-right) */}
           <div className="absolute -top-[12%] right-[8%] h-[60%] w-[52%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(30,58,138,0.075)_0%,rgba(15,23,42,0.04)_45%,transparent_70%)] blur-[110px]" />
 
@@ -200,18 +203,24 @@ export default function StarBackground({ className = '', variant = 'standard' }:
           {/* Faint cool cyan atmospheric horizon (top-center) */}
           <div className="absolute top-[-5%] left-[45%] -translate-x-1/2 h-[40%] w-[55%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(8,145,178,0.045)_0%,transparent_65%)] blur-[95px]" />
 
+          {/* Elegant transparent purple radial glow in the nebula background */}
+          <div className="absolute top-[32%] left-1/2 -translate-x-1/2 -translate-y-1/2 h-[520px] w-[640px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.045)_0%,rgba(59,130,246,0.025)_40%,transparent_70%)] blur-[115px] pointer-events-none" />
+
           {/* Central dark pocket / radial vignette to protect the UI and guarantee pristine contrast */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(3,4,8,0.52)_0%,transparent_70%)] pointer-events-none" />
         </>
       ) : (
         <>
-          <div className="absolute -top-[20%] right-[-10%] h-[80%] w-[80%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(62,242,255,0.05)_0%,transparent_65%)] blur-3xl" />
-          <div className="absolute -bottom-[20%] left-[-10%] h-[75%] w-[75%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.04)_0%,transparent_65%)] blur-3xl" />
+          {/* Main Login: deep black, deep navy, subtle blue, subtle purple, faint atmospheric gradients */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_20%,rgba(15,23,42,0.4)_0%,rgba(3,4,8,0.92)_70%)]" />
+          <div className="absolute -top-[15%] left-[-8%] h-[75%] w-[65%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(30,58,138,0.075)_0%,rgba(79,70,229,0.04)_45%,transparent_70%)] blur-[110px]" />
+          <div className="absolute top-[25%] right-[-10%] h-[70%] w-[65%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(62,242,255,0.045)_0%,rgba(139,92,246,0.035)_50%,transparent_65%)] blur-3xl" />
+          <div className="absolute -bottom-[20%] left-[20%] h-[65%] w-[65%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.035)_0%,rgba(30,58,138,0.045)_50%,transparent_65%)] blur-3xl" />
         </>
       )}
 
       {/* Subtle fine cosmic stardust texture */}
-      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px] opacity-[0.02]" />
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:48px_48px] opacity-[0.018]" />
 
       {/* Multi-layered stars rendering */}
       {stars.map((star) => (

@@ -3,8 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { useSignIn, useSignUp } from '@clerk/react/legacy'
 import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/react'
 import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, ShieldAlert, Sparkles, Loader2, Check, X } from 'lucide-react'
-import { Hud, Particles } from '../components/ui'
-import { Logo } from '../components/Layout'
 import StarBackground from '../components/StarBackground'
 import CelestialArc from '../components/CelestialArc'
 import { GAMES } from '../lib/data'
@@ -15,6 +13,31 @@ import { checkUsernameAvailability, updateUserProfile } from '../services/auth'
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
 type AuthMode = 'login' | 'signup' | 'setup' | 'unauthorized' | 'forgot-password' | 'verify-email' | 'reset-password-code'
+
+/**
+ * Unified full-width authentication footer matching celestial glass aesthetic.
+ * Shared across both Experience 1 (Main Login) and Experience 2 (/sign-up/continue).
+ */
+function AuthFooter() {
+  return (
+    <footer className="relative z-20 w-full border-t border-white/[0.08] bg-black/40 backdrop-blur-md px-6 py-4 sm:px-10 lg:px-16">
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left font-mono text-xs text-dim">
+        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-left">
+          Ametheus — Competitive Platform
+        </span>
+        <Link
+          to="/"
+          className="text-dim/80 hover:text-cyan transition-colors tracking-wider flex-1 sm:text-center"
+        >
+          Back to Home
+        </Link>
+        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-right">
+          Ametheus Login
+        </span>
+      </div>
+    </footer>
+  )
+}
 
 export default function Auth() {
   const location = useLocation()
@@ -318,12 +341,21 @@ export default function Auth() {
               has_chosen_username: true,
             },
           })
+          if (password) {
+            try {
+              await user.updatePassword({ newPassword: password })
+            } catch (pErr) {
+              console.warn('Password update notice:', pErr)
+            }
+          }
         } catch (clerkSyncErr) {
           console.warn('Clerk metadata update warning:', clerkSyncErr)
         }
       } else if (signUp && signUp.status === 'missing_requirements') {
         try {
-          const res = await signUp.update({ username: cleanUsername })
+          const updatePayload: any = { username: cleanUsername }
+          if (password) updatePayload.password = password
+          const res = await signUp.update(updatePayload)
           if (res.status === 'complete') {
             await setSignUpActive({ session: res.createdSessionId })
           }
@@ -450,53 +482,34 @@ export default function Auth() {
     pathname.includes('/onboarding')
 
   // =========================================================================
-  // 2. /sign-up/continue — USERNAME / CONTINUATION SCREEN (NO SPHERE, MAJOR CELESTIAL ARC, FULLY TRANSPARENT)
+  // 2. /sign-up/continue — STANDALONE ACCOUNT CONTINUATION PAGE
   // =========================================================================
   if (isContinuationScreen) {
     return (
-      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-8 sm:px-10 overflow-hidden bg-void">
-        {/* Celestial arc deep in space, layered behind the multi-tier star field */}
-        <CelestialArc variant="major" />
+      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+        {/* Full-screen rich celestial background without 3D sphere */}
         <StarBackground variant="continuation" />
 
-        {/* Top Header Row */}
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between">
-          <Link to="/" aria-label="Ametheus Home">
-            <Logo />
+        {/* Top Header Row: Clean text-only branding (NO LOGO/ICON, NO GATEWAY MESSAGING) */}
+        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
+          <Link
+            to="/"
+            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-cyan transition-colors uppercase"
+            aria-label="Ametheus Home"
+          >
+            Ametheus
           </Link>
-          <div className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-black/40 px-3.5 py-1.5 font-mono text-[11px] text-dim backdrop-blur-md shadow-inner">
-            <span className="size-1.5 rounded-full bg-cyan animate-pulse shadow-[0_0_8px_#3ef2ff]" />
-            <span className="tracking-wider uppercase">Contender Identity Protocol</span>
-          </div>
         </div>
 
-        {/* Center: COMPLETELY TRANSPARENT FLOATING USERNAME SETUP FORM */}
-        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto py-8">
-          {/* Brand Header */}
-          <div className="mb-8">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-7 items-center justify-center rounded border border-cyan/40 bg-cyan/10 shadow-[0_0_12px_rgba(62,242,255,0.25)]">
-                  <svg width="15" height="14" viewBox="0 0 30 28" fill="none">
-                    <polygon points="3,7 25,7 27,2 5,2" fill="#3ef2ff" />
-                    <polygon points="7,15 21,15 23,10 9,10" fill="#3ef2ff" />
-                    <polygon points="11,23 17,23 19,18 13,18" fill="#3ef2ff" />
-                  </svg>
-                </span>
-                <span className="font-display text-sm font-black tracking-[0.2em] text-white">
-                  AMETHEUS <span className="text-cyan">IDENTITY</span>
-                </span>
-              </div>
-              <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-dim">
-                STEP 2 OF 2
-              </span>
-            </div>
-
+        {/* Center: TRANSPARENT GLASS AUTHENTICATION PANEL */}
+        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.1] bg-[#080a14]/60 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_35px_rgba(99,102,241,0.08)]">
+          {/* Header */}
+          <div className="mb-7">
             <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-tight text-white leading-tight">
-              Choose your username
+              Complete Your Account
             </h2>
             <p className="font-sans text-xs text-dim mt-2 leading-relaxed">
-              This is how players, squads, and tournament brackets will identify you on Ametheus
+              Set your contender identity to finalize your profile
             </p>
           </div>
 
@@ -516,14 +529,16 @@ export default function Auth() {
             </div>
           )}
 
-          {/* Floating Username Form */}
-          <form onSubmit={handleSaveUsername} className="space-y-5">
+          {/* Continuation Form */}
+          <form onSubmit={handleSaveUsername} className="space-y-4">
             <div>
               <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
-                Ametheus Username <span className="text-cyan">*</span>
+                Username <span className="text-cyan">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-cyan font-bold select-none">@</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-cyan font-bold select-none">
+                  @
+                </span>
                 <input
                   type="text"
                   required
@@ -532,7 +547,7 @@ export default function Auth() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="shadowfox"
                   disabled={isLoading}
-                  className="h-12 w-full rounded-lg border border-white/15 bg-black/50 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_20px_rgba(62,242,255,0.2)]"
+                  className="h-12 w-full rounded-md border border-white/15 bg-black/50 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/70 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_16px_rgba(62,242,255,0.18)]"
                 />
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
                   {usernameStatus === 'checking' && <Loader2 size={16} className="animate-spin text-cyan" />}
@@ -541,8 +556,8 @@ export default function Auth() {
                 </div>
               </div>
 
-              {/* Reserved space for live validation feedback (no panel jumping) */}
-              <div className="mt-2 min-h-[20px] px-1 font-mono text-[11px]">
+              {/* Reserved space for live validation feedback */}
+              <div className="mt-1.5 min-h-[18px] px-1 font-mono text-[11px]">
                 {usernameStatus === 'checking' && (
                   <span className="text-dim flex items-center gap-1.5">
                     <Loader2 size={11} className="animate-spin text-cyan" /> Checking availability...
@@ -558,8 +573,32 @@ export default function Auth() {
                   <span className="text-warn">{usernameMessage}</span>
                 )}
                 {usernameStatus === 'idle' && (
-                  <span className="text-dim/70">Letters, numbers, underscores, hyphens, and dots (3-30 chars).</span>
+                  <span className="text-dim/60">3–30 chars (letters, numbers, _, -, .)</span>
                 )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Set or confirm password"
+                  disabled={isLoading}
+                  className="h-12 w-full rounded-md border border-white/15 bg-black/50 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/70 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_16px_rgba(62,242,255,0.18)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-dim hover:text-white transition-colors cursor-pointer p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
@@ -571,47 +610,34 @@ export default function Auth() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g. Rahul Sharma or Shadow Fox"
+                placeholder="e.g. Rahul Sharma"
                 disabled={isLoading}
-                className="h-12 w-full rounded-lg border border-white/15 bg-black/50 px-3.5 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_20px_rgba(62,242,255,0.2)]"
+                className="h-12 w-full rounded-md border border-white/15 bg-black/50 px-3.5 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/70 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_16px_rgba(62,242,255,0.18)]"
               />
-              <p className="mt-1.5 px-1 font-mono text-[10px] text-dim/70">
-                Friendly display name shown in matches and player card. Defaults to your username.
-              </p>
             </div>
 
             <button
               type="submit"
               disabled={isLoading || (username.length >= 3 && usernameStatus === 'taken')}
-              className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-cyan font-display text-base font-black uppercase tracking-wider text-void shadow-[0_0_24px_rgba(62,242,255,0.3)] transition-all hover:bg-[#5ef5ff] hover:shadow-[0_0_32px_rgba(62,242,255,0.45)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-4"
+              className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 font-display text-base font-black uppercase tracking-wider text-white shadow-[0_0_24px_rgba(124,58,237,0.3)] transition-all hover:brightness-110 hover:shadow-[0_0_32px_rgba(62,242,255,0.35)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-5"
             >
               {isLoading ? (
                 <>
-                  <div className="size-4 animate-spin rounded-full border-2 border-void border-t-transparent" />
-                  <span className="font-mono text-xs font-bold tracking-wider">Finalizing Identity...</span>
+                  <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span className="font-mono text-xs font-bold tracking-wider">Finalizing Account...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={16} />
-                  <span>Complete Identity &amp; Enter Ametheus</span>
+                  <span>Continue</span>
+                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Bottom helper */}
-          <div className="mt-8 border-t border-white/[0.08] pt-4 text-center font-mono text-[11px] text-dim/80">
-            Step 2 of 2 · Official Contender Identity Registration
-          </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between border-t border-white/[0.08] pt-4 font-mono text-[10px] uppercase tracking-widest text-dim">
-          <span>AMETHEUS BATTLEGROUND</span>
-          <Link to="/" className="text-cyan hover:text-white transition-colors">
-            ← Back to Home
-          </Link>
-        </div>
+        {/* ONE UNIFIED FULL-WIDTH FOOTER */}
+        <AuthFooter />
       </div>
     )
   }
@@ -620,30 +646,41 @@ export default function Auth() {
   // 1. INITIAL SIGN-IN / SIGN-UP (PRESERVE LEFT THREE.JS SPHERE, RIGHT CELESTIAL ARC, TRANSPARENT PANEL)
   // =========================================================================
   return (
-    <div className="relative grid min-h-screen lg:grid-cols-[1.1fr_1fr] bg-void">
-      {/* LEFT: AMETHEUS DYNAMIC ANIMATION (CLEAN BACKGROUND, NO IMAGES — 100% UNTOUCHED) */}
-      <div className="relative hidden overflow-hidden bg-void lg:block border-r border-white/10">
-        <Suspense fallback={null}>
-          <Scene3D
-            accent={g.accent}
-            className="pointer-events-none absolute inset-0 opacity-40"
+    <div className="relative min-h-screen flex flex-col justify-between bg-void overflow-hidden">
+      {/* Global celestial background behind sphere and overlay panel */}
+      <StarBackground variant="standard" />
+
+      {/* Main interactive area: Left 3D Sphere Showcase, Right Auth Overlay Panel */}
+      <div className="relative z-10 flex-1 grid lg:grid-cols-[1.1fr_1fr] items-stretch">
+        {/* LEFT: 3D SPHERE SHOWCASE */}
+        <div className="relative hidden overflow-hidden lg:flex lg:flex-col justify-between p-12 lg:p-16 border-r border-white/10">
+          <Suspense fallback={null}>
+            <Scene3D
+              accent={g.accent}
+              scale={1.25}
+              className="pointer-events-none absolute inset-0 opacity-80"
+            />
+          </Suspense>
+          <div
+            className="absolute inset-0 transition-[background] duration-1000 pointer-events-none"
+            style={{
+              background: `radial-gradient(circle at 40% 40%, ${g.accent}30, transparent 65%), linear-gradient(to top, #05060a 15%, transparent 60%)`,
+            }}
           />
-        </Suspense>
-        <div
-          className="absolute inset-0 transition-[background] duration-1000"
-          style={{
-            background: `radial-gradient(circle at 30% 30%, ${g.accent}40, transparent 65%), linear-gradient(to top, #05060a 10%, #05060a99 50%, #05060a66)`,
-          }}
-        />
-        <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-40" />
-        <Particles n={24} />
 
-        <div className="relative flex h-full flex-col justify-between p-12 lg:p-16">
-          <Link to="/" aria-label="Ametheus Home">
-            <Logo />
-          </Link>
+          {/* Top Brand Text Header (NO LOGO/ICON) */}
+          <div className="relative z-10">
+            <Link
+              to="/"
+              className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-cyan transition-colors uppercase"
+              aria-label="Ametheus Home"
+            >
+              Ametheus
+            </Link>
+          </div>
 
-          <div>
+          {/* Center Esports Game Highlights */}
+          <div className="relative z-10 my-auto py-12">
             <span
               className="font-display text-sm font-black uppercase tracking-[0.2em] transition-colors duration-500"
               style={{ color: g.accent }}
@@ -656,62 +693,46 @@ export default function Auth() {
             <p className="mt-4 max-w-md text-sm leading-relaxed text-dim">{g.desc}</p>
           </div>
 
-          <div className="flex items-center justify-between border-t border-white/10 pt-6">
-            <Hud className="text-cyan">◆ AMETHEUS COMPETITIVE PLATFORM</Hud>
-            <span className="font-mono text-xs text-dim">VERIFIED ESPORTS</span>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT: COMPLETE AUTHENTICATION EXPERIENCE (TRANSPARENT FLOATING PANEL + RIGHT CELESTIAL ARC) */}
-      <div className="relative z-10 flex min-h-screen flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
-        {/* Cinematic dark space + subtle right-side celestial arc */}
-        <StarBackground variant="standard" />
-        <CelestialArc variant="subtle" />
-
-        {/* Top Header Row */}
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="lg:hidden">
-            <Link to="/" aria-label="Ametheus Home">
-              <Logo />
-            </Link>
-          </div>
-          <div className="ml-auto flex items-center gap-2 rounded-full border border-white/[0.12] bg-black/40 px-3.5 py-1.5 font-mono text-[11px] text-dim backdrop-blur-md shadow-inner">
-            <span className="size-1.5 rounded-full bg-cyan animate-pulse shadow-[0_0_8px_#3ef2ff]" />
-            <span className="tracking-wider uppercase">Sanctioned Esports Gateway</span>
-          </div>
+          {/* Bottom space filler to keep vertical balance */}
+          <div className="relative z-10" />
         </div>
 
-        {/* Center: COMPLETELY TRANSPARENT FLOATING AUTHENTICATION FORM */}
-        <div className="relative z-10 my-auto w-full max-w-[420px] mx-auto py-6">
-          {/* Brand Header */}
-          <div className="mb-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-7 items-center justify-center rounded border border-cyan/40 bg-cyan/10 shadow-[0_0_12px_rgba(62,242,255,0.25)]">
-                  <svg width="15" height="14" viewBox="0 0 30 28" fill="none">
-                    <polygon points="3,7 25,7 27,2 5,2" fill="#3ef2ff" />
-                    <polygon points="7,15 21,15 23,10 9,10" fill="#3ef2ff" />
-                    <polygon points="11,23 17,23 19,18 13,18" fill="#3ef2ff" />
-                  </svg>
-                </span>
-                <span className="font-display text-sm font-black tracking-[0.2em] text-white">
-                  AMETHEUS <span className="text-cyan">PASSPORT</span>
+        {/* RIGHT: AUTHENTICATION OVERLAY PANEL */}
+        <div className="relative z-10 flex flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
+          {/* Subtle celestial arc on right */}
+          <CelestialArc variant="subtle" />
+
+          {/* Top Header Row (Mobile Brand Text only, NO LOGO, NO GATEWAY TEXT) */}
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="lg:hidden">
+              <Link
+                to="/"
+                className="font-display text-base font-black tracking-[0.2em] text-white hover:text-cyan transition-colors uppercase"
+                aria-label="Ametheus Home"
+              >
+                Ametheus
+              </Link>
+            </div>
+          </div>
+
+          {/* Center: COMPLETELY TRANSPARENT FLOATING AUTHENTICATION FORM */}
+          <div className="relative z-10 my-auto w-full max-w-[420px] mx-auto py-6">
+            {/* Brand Header */}
+            <div className="mb-6">
+              <div className="mb-2">
+                <span className="font-display text-xs font-black tracking-[0.25em] text-dim uppercase">
+                  Ametheus
                 </span>
               </div>
-              <span className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-dim">
-                {mode === 'unauthorized' ? 'RESTRICTED' : 'SECURE'}
-              </span>
-            </div>
 
-            <h2 className="font-display text-3xl font-black uppercase tracking-tight text-white leading-tight">
-              {mode === 'login' && 'Welcome back'}
-              {mode === 'signup' && 'Create account'}
-              {mode === 'unauthorized' && 'Access Restricted'}
-              {mode === 'forgot-password' && 'Reset password'}
-              {mode === 'verify-email' && 'Verify your email'}
-              {mode === 'reset-password-code' && 'Set new password'}
-            </h2>
+              <h2 className="font-display text-3xl font-black uppercase tracking-tight text-white leading-tight">
+                {mode === 'login' && 'Welcome back'}
+                {mode === 'signup' && 'Create account'}
+                {mode === 'unauthorized' && 'Access Restricted'}
+                {mode === 'forgot-password' && 'Reset password'}
+                {mode === 'verify-email' && 'Verify your email'}
+                {mode === 'reset-password-code' && 'Set new password'}
+              </h2>
             <p className="font-sans text-xs text-dim mt-1.5 leading-relaxed">
               {mode === 'login' && 'Sign in to access your contender account and live circuits'}
               {mode === 'signup' && 'Register your contender profile to compete in official tournaments'}
@@ -756,12 +777,9 @@ export default function Auth() {
                 <span>Continue with Google</span>
               </button>
 
-              {/* Subtle Divider */}
-              <div className="relative my-5 flex items-center justify-center">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/[0.08]" />
-                </div>
-                <span className="relative bg-void px-3 font-mono text-[10px] font-semibold uppercase tracking-widest text-dim">
+              {/* Spacing & text without horizontal separator line */}
+              <div className="my-5 flex items-center justify-center">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-dim/75">
                   OR CONTINUE WITH EMAIL
                 </span>
               </div>
@@ -1114,7 +1132,7 @@ export default function Auth() {
           )}
 
           {/* Bottom Mode Switcher */}
-          <div className="mt-6 border-t border-white/[0.08] pt-4 text-center font-mono text-xs text-dim">
+          <div className="mt-6 pt-2 text-center font-mono text-xs text-dim">
             {mode === 'login' && (
               <p>
                 Don&apos;t have an account?{' '}
@@ -1166,14 +1184,13 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="relative z-10 flex items-center justify-between border-t border-white/[0.08] pt-4 font-mono text-[10px] uppercase tracking-widest text-dim">
-          <span>AMETHEUS BATTLEGROUND</span>
-          <Link to="/" className="text-cyan hover:text-white transition-colors">
-            ← Back to Home
-          </Link>
-        </div>
+        {/* Bottom space filler inside right panel */}
+        <div className="relative z-10" />
       </div>
     </div>
+
+    {/* ONE UNIFIED FULL-WIDTH FOOTER */}
+    <AuthFooter />
+  </div>
   )
 }

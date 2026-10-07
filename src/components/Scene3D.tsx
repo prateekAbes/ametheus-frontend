@@ -23,7 +23,7 @@ function usePointer() {
 }
 
 /** Amethyst crystal — a distorting icosahedron with a wireframe shell. */
-function Crystal({ accent, shellOpacity = 0.18 }: { accent: string; shellOpacity?: number }) {
+function Crystal({ accent, shellOpacity = 0.18, scale = 1 }: { accent: string; shellOpacity?: number; scale?: number }) {
   const g = useRef<THREE.Group>(null)
   const shell = useRef<THREE.Mesh>(null)
   useFrame((s, dt) => {
@@ -32,7 +32,7 @@ function Crystal({ accent, shellOpacity = 0.18 }: { accent: string; shellOpacity
     g.current.rotation.y += dt * (0.22 + scroll * 0.8)
     g.current.rotation.x = THREE.MathUtils.lerp(g.current.rotation.x, pointer.y * 0.5, 0.05)
     g.current.position.x = THREE.MathUtils.lerp(g.current.position.x, pointer.x * 0.6, 0.04)
-    g.current.scale.setScalar(1 + scroll * 0.35)
+    g.current.scale.setScalar(scale * (1 + scroll * 0.35))
     if (shell.current) shell.current.rotation.z = s.clock.elapsedTime * -0.14
   })
   return (
@@ -119,6 +119,7 @@ export default function Scene3D({
   className = '',
   shellOpacity,
   opacity,
+  scale = 1,
 }: {
   crystal?: boolean
   accent?: string
@@ -126,6 +127,7 @@ export default function Scene3D({
   className?: string
   shellOpacity?: number
   opacity?: number
+  scale?: number
 }) {
   const resolvedShellOpacity = shellOpacity ?? opacity ?? 0.18
   usePointer()
@@ -147,7 +149,7 @@ export default function Scene3D({
           <pointLight position={[4, 3, 4]} intensity={60} color="#3ef2ff" />
           <pointLight position={[-4, -2, 3]} intensity={50} color="#ff3dbb" />
           <Field count={mobile ? 400 : particles} />
-          {crystal && <Crystal accent={accent} shellOpacity={resolvedShellOpacity} />}
+          {crystal && <Crystal accent={accent} shellOpacity={resolvedShellOpacity} scale={scale} />}
           <Rig />
         </Canvas>
       )}
