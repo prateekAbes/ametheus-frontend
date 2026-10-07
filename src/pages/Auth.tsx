@@ -653,20 +653,14 @@ export default function Auth() {
       {/* Main interactive area: Left 3D Sphere Showcase, Right Auth Overlay Panel */}
       <div className="relative z-10 flex-1 grid lg:grid-cols-[1.1fr_1fr] items-stretch">
         {/* LEFT: 3D SPHERE SHOWCASE */}
-        <div className="relative hidden overflow-hidden lg:flex lg:flex-col justify-between p-12 lg:p-16 border-r border-white/10">
+        <div className="relative hidden overflow-hidden lg:flex lg:flex-col justify-between p-12 lg:p-16">
           <Suspense fallback={null}>
             <Scene3D
               accent={g.accent}
-              scale={1.25}
+              scale={0.90}
               className="pointer-events-none absolute inset-0 opacity-80"
             />
           </Suspense>
-          <div
-            className="absolute inset-0 transition-[background] duration-1000 pointer-events-none"
-            style={{
-              background: `radial-gradient(circle at 40% 40%, ${g.accent}30, transparent 65%), linear-gradient(to top, #05060a 15%, transparent 60%)`,
-            }}
-          />
 
           {/* Top Brand Text Header (NO LOGO/ICON) */}
           <div className="relative z-10">
@@ -699,9 +693,6 @@ export default function Auth() {
 
         {/* RIGHT: AUTHENTICATION OVERLAY PANEL */}
         <div className="relative z-10 flex flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
-          {/* Subtle celestial arc on right */}
-          <CelestialArc variant="subtle" />
-
           {/* Top Header Row (Mobile Brand Text only, NO LOGO, NO GATEWAY TEXT) */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="lg:hidden">
@@ -715,8 +706,8 @@ export default function Auth() {
             </div>
           </div>
 
-          {/* Center: COMPLETELY TRANSPARENT FLOATING AUTHENTICATION FORM */}
-          <div className="relative z-10 my-auto w-full max-w-[420px] mx-auto py-6">
+          {/* Center: REFINED TRANSLUCENT GLASS FLOATING AUTHENTICATION PANEL */}
+          <div className="relative z-10 my-auto w-full max-w-[425px] mx-auto p-7 sm:p-8 rounded-2xl border border-white/[0.08] bg-black/35 backdrop-blur-md shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_30px_rgba(139,92,246,0.06)]">
             {/* Brand Header */}
             <div className="mb-6">
               <div className="mb-2">

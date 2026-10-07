@@ -120,6 +120,7 @@ export default function Scene3D({
   shellOpacity,
   opacity,
   scale = 1,
+  showBg = false,
 }: {
   crystal?: boolean
   accent?: string
@@ -128,6 +129,7 @@ export default function Scene3D({
   shellOpacity?: number
   opacity?: number
   scale?: number
+  showBg?: boolean
 }) {
   const resolvedShellOpacity = shellOpacity ?? opacity ?? 0.18
   usePointer()
@@ -142,7 +144,12 @@ export default function Scene3D({
     return () => io.disconnect()
   }, [])
   return (
-    <div ref={box} className={`pointer-events-none absolute inset-0 ${className}`} aria-hidden style={{ background: `radial-gradient(50% 50% at 50% 50%, ${accent}22, transparent 70%)` }}>
+    <div
+      ref={box}
+      className={`pointer-events-none absolute inset-0 ${className}`}
+      aria-hidden
+      style={showBg ? { background: `radial-gradient(50% 50% at 50% 50%, ${accent}22, transparent 70%)` } : undefined}
+    >
       {!reduce && (
         <Canvas frameloop={on ? 'always' : 'never'} dpr={[1, mobile ? 1 : 1.5]} camera={{ position: [0, 0, mobile ? 8 : 7], fov: mobile ? 52 : 50 }} gl={{ antialias: !mobile, alpha: true, powerPreference: 'high-performance' }}>
           <ambientLight intensity={0.3} />
