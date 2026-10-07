@@ -31,63 +31,63 @@ export default function CelestialArc({ variant = 'subtle', className = '' }: Cel
         className={`pointer-events-none absolute inset-0 size-full overflow-hidden select-none ${className}`}
         aria-hidden="true"
       >
-        {/* Deep ambient cosmic glow behind the arc */}
-        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 h-[520px] w-[860px] max-w-[95vw] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.18)_0%,rgba(139,92,246,0.12)_35%,transparent_70%)] blur-[90px]" />
-        <div className="absolute top-[22%] left-[45%] -translate-x-1/2 h-[380px] w-[620px] max-w-[90vw] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.14)_0%,transparent_65%)] blur-[75px]" />
+        {/* Deep ambient cosmic glow behind the arc - restrained and subtle */}
+        <div className="absolute top-[8%] left-1/2 -translate-x-1/2 h-[520px] w-[860px] max-w-[95vw] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.06)_0%,rgba(139,92,246,0.04)_35%,transparent_70%)] blur-[100px]" />
+        <div className="absolute top-[22%] left-[45%] -translate-x-1/2 h-[380px] w-[620px] max-w-[90vw] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.05)_0%,transparent_65%)] blur-[85px]" />
 
         {/* Master Oversized Celestial Arc (SVG) */}
         <svg
           viewBox="0 0 1400 900"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[130%] w-[130%] min-w-[1100px] max-w-none opacity-95 transition-opacity duration-700"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[130%] w-[130%] min-w-[1100px] max-w-none opacity-85 transition-opacity duration-700"
           preserveAspectRatio="xMidYMid meet"
         >
           <defs>
             {/* Multi-stop gradient: Royal violet -> electric cobalt -> luminous cyan */}
             <linearGradient id="majorArcGradient" x1="180" y1="780" x2="1120" y2="260" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" />
-              <stop offset="22%" stopColor="#8b5cf6" stopOpacity="0.85" />
-              <stop offset="48%" stopColor="#4f46e5" stopOpacity="0.95" />
-              <stop offset="70%" stopColor="#2563eb" stopOpacity="1" />
-              <stop offset="88%" stopColor="#06b6d4" stopOpacity="1" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
+              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.3" />
+              <stop offset="22%" stopColor="#8b5cf6" stopOpacity="0.75" />
+              <stop offset="48%" stopColor="#4f46e5" stopOpacity="0.85" />
+              <stop offset="70%" stopColor="#2563eb" stopOpacity="0.9" />
+              <stop offset="88%" stopColor="#06b6d4" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.75" />
             </linearGradient>
 
             {/* Razor-sharp specular highlight gradient across the crest */}
             <linearGradient id="majorCrestSpecular" x1="450" y1="210" x2="880" y2="280" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#a855f7" stopOpacity="0" />
-              <stop offset="35%" stopColor="#93c5fd" stopOpacity="0.85" />
-              <stop offset="55%" stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="75%" stopColor="#67e8f9" stopOpacity="0.9" />
+              <stop offset="35%" stopColor="#93c5fd" stopOpacity="0.75" />
+              <stop offset="55%" stopColor="#ffffff" stopOpacity="0.95" />
+              <stop offset="75%" stopColor="#67e8f9" stopOpacity="0.8" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
             </linearGradient>
 
             {/* Dark celestial sphere body gradient */}
             <radialGradient id="majorPlanetBody" cx="700" cy="880" r="640" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#04050a" stopOpacity="0.98" />
-              <stop offset="70%" stopColor="#060814" stopOpacity="0.92" />
-              <stop offset="92%" stopColor="#0c1126" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0.45" />
+              <stop offset="0%" stopColor="#030408" stopOpacity="0.99" />
+              <stop offset="70%" stopColor="#05060f" stopOpacity="0.95" />
+              <stop offset="92%" stopColor="#0a0d1e" stopOpacity="0.88" />
+              <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0.35" />
             </radialGradient>
 
             {/* Specular star flare radial glow */}
             <radialGradient id="starFlareGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="25%" stopColor="#67e8f9" stopOpacity="0.8" />
-              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.3" />
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
+              <stop offset="25%" stopColor="#67e8f9" stopOpacity="0.6" />
+              <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.2" />
               <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0" />
             </radialGradient>
 
             {/* Glow filters */}
             <filter id="majorBloom" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="36" result="blur" />
+              <feGaussianBlur stdDeviation="30" result="blur" />
             </filter>
             <filter id="majorCorona" x="-10%" y="-10%" width="120%" height="120%">
-              <feGaussianBlur stdDeviation="12" result="blur" />
+              <feGaussianBlur stdDeviation="10" result="blur" />
             </filter>
             <filter id="majorRimGlow" x="-5%" y="-5%" width="110%" height="110%">
-              <feGaussianBlur stdDeviation="3.5" result="blur" />
+              <feGaussianBlur stdDeviation="3" result="blur" />
             </filter>
           </defs>
 
@@ -95,27 +95,27 @@ export default function CelestialArc({ variant = 'subtle', className = '' }: Cel
           <path
             d="M 120 780 A 620 540 0 0 1 1280 780 L 1280 920 L 120 920 Z"
             fill="url(#majorPlanetBody)"
-            opacity="0.96"
+            opacity="0.98"
           />
 
-          {/* Layer 1: Ambient Deep Nebula Bloom (Wide soft glow) */}
+          {/* Layer 1: Ambient Deep Nebula Bloom (Restrained soft glow) */}
           <path
             d="M 120 780 A 620 540 0 0 1 1280 780"
             stroke="url(#majorArcGradient)"
-            strokeWidth="54"
+            strokeWidth="36"
             strokeLinecap="round"
             filter="url(#majorBloom)"
-            opacity="0.38"
+            opacity="0.22"
           />
 
           {/* Layer 2: Radiant Luminous Corona (Medium blur) */}
           <path
             d="M 120 780 A 620 540 0 0 1 1280 780"
             stroke="url(#majorArcGradient)"
-            strokeWidth="18"
+            strokeWidth="14"
             strokeLinecap="round"
             filter="url(#majorCorona)"
-            opacity="0.75"
+            opacity="0.55"
           />
 
           {/* Layer 3: Razor-sharp Luminous Outer Rim */}

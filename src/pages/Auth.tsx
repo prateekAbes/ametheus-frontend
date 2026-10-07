@@ -455,9 +455,9 @@ export default function Auth() {
   if (isContinuationScreen) {
     return (
       <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-8 sm:px-10 overflow-hidden bg-void">
-        {/* Deep starry space + Major oversized celestial arc */}
-        <StarBackground variant="continuation" />
+        {/* Celestial arc deep in space, layered behind the multi-tier star field */}
         <CelestialArc variant="major" />
+        <StarBackground variant="continuation" />
 
         {/* Top Header Row */}
         <div className="relative z-10 w-full max-w-4xl flex items-center justify-between">

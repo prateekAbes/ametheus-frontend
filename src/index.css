@@ -159,10 +159,25 @@ html { background: #05060a; scrollbar-gutter: stable; }
 }
 
 @keyframes star-twinkle {
-  0%, 100% { opacity: 0.25; transform: scale(0.85); }
-  50% { opacity: 0.95; transform: scale(1.15); }
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50% { opacity: 0.85; transform: scale(1.05); }
 }
 .animate-star-twinkle {
-  animation: star-twinkle 4s ease-in-out infinite;
+  animation: star-twinkle 6s ease-in-out infinite;
+}
+
+@keyframes star-gentle-breathe {
+  0%, 100% { opacity: var(--star-min-opacity, 0.35); }
+  50% { opacity: var(--star-max-opacity, 0.8); }
+}
+.animate-star-gentle {
+  animation: star-gentle-breathe var(--star-duration, 12s) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-star-gentle,
+  .animate-star-twinkle {
+    animation: none !important;
+  }
 }
 
