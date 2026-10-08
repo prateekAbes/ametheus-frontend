@@ -16,11 +16,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!isSignedIn) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/sign-in" state={{ from: location }} replace />
   }
 
   if (profile && (profile.needs_username === true || !profile.has_chosen_username)) {
-    return <Navigate to="/setup" state={{ from: location }} replace />
+    return <Navigate to="/sign-up/continue" state={{ from: location }} replace />
   }
 
   return <>{children}</>
@@ -38,7 +38,7 @@ export function RequireOrganizer({ children }: { children: React.ReactNode }) {
   }
 
   if (!isSignedIn) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/sign-in" replace />
   }
 
   if (!isOrganizer) {
@@ -71,7 +71,7 @@ export function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
   }
 
   if (!isSignedIn) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/sign-in" replace />
   }
 
   if (!isSuperAdmin) {

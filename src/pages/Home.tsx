@@ -258,7 +258,7 @@ function Hero({
         {!isSignedIn && (
           <div data-h="cta" className="mt-6">
             <Link
-              to="/login"
+              to="/sign-in"
               className="group inline-flex items-center gap-2.5 rounded-full border border-cyan/40 bg-void/80 px-4 py-2 font-mono text-xs uppercase tracking-[0.18em] text-cyan backdrop-blur-md transition-all duration-300 hover:border-cyan hover:bg-cyan/15 hover:shadow-[0_0_24px_rgba(62,242,255,0.3)]"
             >
               <span className="size-1.5 rounded-full bg-cyan animate-pulse" />

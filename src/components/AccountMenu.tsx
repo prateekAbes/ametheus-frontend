@@ -206,7 +206,7 @@ export default function AccountMenu() {
     return [
       {
         key: 'in',
-        to: '/login',
+        to: '/sign-in',
         label: 'Sign In',
         hint: 'Access your account',
         group: 0,
@@ -320,7 +320,7 @@ export default function AccountMenu() {
       */}
       {!isSignedIn ? (
         <Link
-          to="/login"
+          to="/sign-in"
           aria-label="Sign in"
           className="group relative flex items-center gap-2 rounded-full border border-cyan/40 bg-void/80 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-cyan backdrop-blur-md transition-all duration-200 hover:border-cyan hover:bg-cyan/15 hover:shadow-[0_0_12px_rgba(62,242,255,0.25)]"
         >
@@ -468,7 +468,7 @@ export default function AccountMenu() {
               </p>
               <div className="mt-3 flex">
                 <Link
-                  to="/login"
+                  to="/sign-in"
                   className="w-full border border-cyan bg-cyan/10 py-1.5 font-mono text-xs uppercase tracking-wider text-cyan transition-colors hover:bg-cyan/20 text-center"
                 >
                   Sign In

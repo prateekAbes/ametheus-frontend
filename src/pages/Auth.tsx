@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useSignIn, useSignUp } from '@clerk/react/legacy'
 import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/react'
-import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, ShieldAlert, Sparkles, Loader2, Check, X } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, ShieldAlert, Loader2, Check, X } from 'lucide-react'
 import StarBackground from '../components/StarBackground'
 import CelestialArc from '../components/CelestialArc'
 import { GAMES } from '../lib/data'
@@ -31,9 +31,12 @@ function AuthFooter() {
         >
           Back to Home
         </Link>
-        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-right">
+        <Link
+          to="/sign-in"
+          className="tracking-wider uppercase text-dim/90 hover:text-cyan transition-colors flex-1 sm:text-right"
+        >
           Ametheus Login
-        </span>
+        </Link>
       </div>
     </footer>
   )
@@ -322,6 +325,53 @@ export default function Auth() {
     setIsLoading(true)
     setError('')
     try {
+      // PRIORITY 1: If a Clerk signup attempt is still in a pending/missing_requirements state,
+      // complete it through the signup lifecycle first. This is the correct path for fresh
+      // /sign-up/continue flows before a full Clerk session exists.
+      if (signUp && (signUp.status === 'missing_requirements' || signUp.status === 'abandoned')) {
+        try {
+          const updatePayload: Record<string, any> = { username: cleanUsername }
+          if (password) updatePayload.password = password
+          const res = await signUp.update(updatePayload)
+          if (res.status === 'complete') {
+            // Signup is now complete — activate the session
+            await setSignUpActive({ session: res.createdSessionId })
+            // Sync to backend profile asynchronously after session is active
+            try {
+              const token = await getToken()
+              await updateUserProfile(
+                {
+                  username: cleanUsername,
+                  display_name: displayName.trim() || cleanUsername,
+                },
+                token
+              )
+            } catch (profileSyncErr) {
+              console.warn('Backend profile sync after signup:', profileSyncErr)
+            }
+            await refreshProfile()
+            window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+            navigate(destination, { replace: true })
+            return
+          } else if (res.unverifiedFields?.includes('email_address')) {
+            // Email verification still needed
+            await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+            setMode('verify-email')
+            setSuccessMessage('A verification code has been sent to your email.')
+            return
+          }
+          // If signup update succeeded but isn't complete, fall through to profile sync
+        } catch (clerkSignUpErr: any) {
+          // Only swallow if it's a "no active signup" error — otherwise propagate
+          const errMsg = clerkSignUpErr?.errors?.[0]?.longMessage || clerkSignUpErr?.message || ''
+          if (!errMsg.toLowerCase().includes('no active signup') && !errMsg.toLowerCase().includes('session')) {
+            throw clerkSignUpErr
+          }
+          // Otherwise fall through to the user-based path
+        }
+      }
+
+      // PRIORITY 2: Already authenticated user — sync username to backend and Clerk metadata
       const token = await getToken()
       await updateUserProfile(
         {
@@ -351,17 +401,6 @@ export default function Auth() {
         } catch (clerkSyncErr) {
           console.warn('Clerk metadata update warning:', clerkSyncErr)
         }
-      } else if (signUp && signUp.status === 'missing_requirements') {
-        try {
-          const updatePayload: any = { username: cleanUsername }
-          if (password) updatePayload.password = password
-          const res = await signUp.update(updatePayload)
-          if (res.status === 'complete') {
-            await setSignUpActive({ session: res.createdSessionId })
-          }
-        } catch (clerkSignUpErr) {
-          console.warn('Clerk signUp update warning:', clerkSignUpErr)
-        }
       }
 
       await refreshProfile()
@@ -369,6 +408,8 @@ export default function Auth() {
       navigate(destination, { replace: true })
     } catch (err: any) {
       const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
         err?.message ||
         'Failed to save username. Please try a different handle.'
       setError(msg)
@@ -532,14 +573,15 @@ export default function Auth() {
           {/* Continuation Form */}
           <form onSubmit={handleSaveUsername} className="space-y-4">
             <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
-                Username <span className="text-cyan">*</span>
+              <label htmlFor="continue-username" className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
+                Username <span className="text-cyan" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-cyan font-bold select-none">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-cyan font-bold select-none" aria-hidden="true">
                   @
                 </span>
                 <input
+                  id="continue-username"
                   type="text"
                   required
                   autoFocus
@@ -547,9 +589,12 @@ export default function Auth() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="shadowfox"
                   disabled={isLoading}
+                  autoComplete="username"
+                  aria-describedby="continue-username-feedback"
+                  aria-invalid={usernameStatus === 'taken' || usernameStatus === 'invalid'}
                   className="h-12 w-full rounded-md border border-white/15 bg-black/50 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/70 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_16px_rgba(62,242,255,0.18)]"
                 />
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2" aria-hidden="true">
                   {usernameStatus === 'checking' && <Loader2 size={16} className="animate-spin text-cyan" />}
                   {usernameStatus === 'available' && <Check size={16} className="text-ok" />}
                   {usernameStatus === 'taken' && <X size={16} className="text-live" />}
@@ -557,10 +602,10 @@ export default function Auth() {
               </div>
 
               {/* Reserved space for live validation feedback */}
-              <div className="mt-1.5 min-h-[18px] px-1 font-mono text-[11px]">
+              <div id="continue-username-feedback" className="mt-1.5 min-h-[18px] px-1 font-mono text-[11px]" aria-live="polite">
                 {usernameStatus === 'checking' && (
                   <span className="text-dim flex items-center gap-1.5">
-                    <Loader2 size={11} className="animate-spin text-cyan" /> Checking availability...
+                    <Loader2 size={11} className="animate-spin text-cyan" aria-hidden="true" /> Checking availability...
                   </span>
                 )}
                 {usernameStatus === 'available' && (
@@ -579,16 +624,18 @@ export default function Auth() {
             </div>
 
             <div>
-              <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
+              <label htmlFor="continue-password" className="block font-mono text-[11px] uppercase tracking-wider text-ink/90 font-medium mb-1.5">
                 Password
               </label>
               <div className="relative">
                 <input
+                  id="continue-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Set or confirm password"
                   disabled={isLoading}
+                  autoComplete="new-password"
                   className="h-12 w-full rounded-md border border-white/15 bg-black/50 px-3.5 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-cyan/70 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:shadow-[0_0_16px_rgba(62,242,255,0.18)]"
                 />
                 <button
@@ -693,6 +740,9 @@ export default function Auth() {
 
         {/* RIGHT: AUTHENTICATION OVERLAY PANEL */}
         <div className="relative z-10 flex flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
+          {/* Celestial arc background element on right side — extends the celestial atmosphere */}
+          <CelestialArc variant="subtle" />
+
           {/* Top Header Row (Mobile Brand Text only, NO LOGO, NO GATEWAY TEXT) */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="lg:hidden">
@@ -781,23 +831,25 @@ export default function Auth() {
           {mode === 'login' && (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="signin-email" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Email address
                 </label>
                 <input
+                  id="signin-email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   disabled={isLoading}
+                  autoComplete="email"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
 
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <label className="font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium">
+                  <label htmlFor="signin-password" className="font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium">
                     Password
                   </label>
                   <button
@@ -815,12 +867,14 @@ export default function Auth() {
                 </div>
                 <div className="relative">
                   <input
+                    id="signin-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={isLoading}
+                    autoComplete="current-password"
                     className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 pr-10 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                   />
                   <button
@@ -859,7 +913,7 @@ export default function Auth() {
             <form onSubmit={handleSignUp} className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium">
+                  <label htmlFor="signup-username" className="font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium">
                     Contender Handle (Optional)
                   </label>
                   <div className="min-h-[16px]">
@@ -881,42 +935,48 @@ export default function Auth() {
                   </div>
                 </div>
                 <input
+                  id="signup-username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. shadowfox"
                   disabled={isLoading}
+                  autoComplete="username"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
 
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="signup-email" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Email address
                 </label>
                 <input
+                  id="signup-email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   disabled={isLoading}
+                  autoComplete="email"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
 
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="signup-password" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Password
                 </label>
                 <div className="relative">
                   <input
+                    id="signup-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 8 characters"
                     disabled={isLoading}
+                    autoComplete="new-password"
                     className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 pr-10 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                   />
                   <button
@@ -972,7 +1032,7 @@ export default function Auth() {
                   type="button"
                   onClick={() => {
                     setMode('login')
-                    navigate('/login')
+                    navigate('/sign-in')
                     setError('')
                     setSuccessMessage('')
                   }}
@@ -996,16 +1056,18 @@ export default function Auth() {
           {mode === 'verify-email' && (
             <form onSubmit={handleVerifyEmail} className="space-y-4">
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="verify-email-code" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Verification Code
                 </label>
                 <input
+                  id="verify-email-code"
                   type="text"
                   required
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
                   placeholder="Enter 6-digit code"
                   disabled={isLoading}
+                  autoComplete="one-time-code"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-center font-mono text-base tracking-widest text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
@@ -1031,16 +1093,18 @@ export default function Auth() {
           {mode === 'forgot-password' && (
             <form onSubmit={handleRequestPasswordReset} className="space-y-4">
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="forgot-email" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Account Email
                 </label>
                 <input
+                  id="forgot-email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   disabled={isLoading}
+                  autoComplete="email"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
@@ -1066,32 +1130,36 @@ export default function Auth() {
           {mode === 'reset-password-code' && (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="reset-code" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   Reset Code
                 </label>
                 <input
+                  id="reset-code"
                   type="text"
                   required
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
                   placeholder="Enter reset code"
                   disabled={isLoading}
+                  autoComplete="one-time-code"
                   className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 text-center font-mono text-sm tracking-widest text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                 />
               </div>
 
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
+                <label htmlFor="reset-new-password" className="block font-mono text-[11px] uppercase tracking-wider text-ink/80 font-medium mb-1.5">
                   New Password
                 </label>
                 <div className="relative">
                   <input
+                    id="reset-new-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="At least 8 characters"
                     disabled={isLoading}
+                    autoComplete="new-password"
                     className="h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3.5 pr-10 text-sm text-white placeholder:text-dim/50 backdrop-blur-sm transition-all focus:border-cyan/80 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-cyan/40 focus:shadow-[0_0_16px_rgba(62,242,255,0.2)]"
                   />
                   <button
@@ -1131,7 +1199,7 @@ export default function Auth() {
                   type="button"
                   onClick={() => {
                     setMode('signup')
-                    navigate('/signup')
+                    navigate('/sign-up')
                     setError('')
                     setSuccessMessage('')
                   }}
@@ -1148,7 +1216,7 @@ export default function Auth() {
                   type="button"
                   onClick={() => {
                     setMode('login')
-                    navigate('/login')
+                    navigate('/sign-in')
                     setError('')
                     setSuccessMessage('')
                   }}
@@ -1163,7 +1231,7 @@ export default function Auth() {
                 type="button"
                 onClick={() => {
                   setMode('login')
-                  navigate('/login')
+                  navigate('/sign-in')
                   setError('')
                   setSuccessMessage('')
                 }}

@@ -212,7 +212,7 @@ function Nav() {
               ) : (
                 <>
                   <Link
-                    to="/login"
+                    to="/sign-in"
                     onClick={() => setDrawer(false)}
                     className="bg-void px-4 py-3 text-sm text-cyan hover:text-white font-mono uppercase tracking-wider"
                   >
