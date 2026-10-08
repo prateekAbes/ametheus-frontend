@@ -530,6 +530,7 @@ export default function Auth() {
       <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
         {/* Full-screen rich celestial background without 3D sphere */}
         <StarBackground variant="continuation" />
+        <CelestialArc variant="major" />
 
         {/* Top Header Row: Clean text-only branding (NO LOGO/ICON, NO GATEWAY MESSAGING) */}
         <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
@@ -543,7 +544,7 @@ export default function Auth() {
         </div>
 
         {/* Center: TRANSPARENT GLASS AUTHENTICATION PANEL */}
-        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.1] bg-[#080a14]/60 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_35px_rgba(99,102,241,0.08)]">
+        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-black/35 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)]">
           {/* Header */}
           <div className="mb-7">
             <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-tight text-white leading-tight">
@@ -697,6 +698,9 @@ export default function Auth() {
       {/* Global celestial background behind sphere and overlay panel */}
       <StarBackground variant="standard" />
 
+      {/* Large sweeping purple arc across top into upper/middle-right */}
+      <CelestialArc variant="sweeping" />
+
       {/* Main interactive area: Left 3D Sphere Showcase, Right Auth Overlay Panel */}
       <div className="relative z-10 flex-1 grid lg:grid-cols-[1.1fr_1fr] items-stretch">
         {/* LEFT: 3D SPHERE SHOWCASE */}
@@ -740,9 +744,6 @@ export default function Auth() {
 
         {/* RIGHT: AUTHENTICATION OVERLAY PANEL */}
         <div className="relative z-10 flex flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
-          {/* Celestial arc background element on right side — extends the celestial atmosphere */}
-          <CelestialArc variant="subtle" />
-
           {/* Top Header Row (Mobile Brand Text only, NO LOGO, NO GATEWAY TEXT) */}
           <div className="relative z-10 flex items-center justify-between">
             <div className="lg:hidden">
@@ -757,7 +758,7 @@ export default function Auth() {
           </div>
 
           {/* Center: REFINED TRANSLUCENT GLASS FLOATING AUTHENTICATION PANEL */}
-          <div className="relative z-10 my-auto w-full max-w-[425px] mx-auto p-7 sm:p-8 rounded-2xl border border-white/[0.08] bg-black/35 backdrop-blur-md shadow-[0_16px_40px_rgba(0,0,0,0.5),0_0_30px_rgba(139,92,246,0.06)]">
+          <div className="relative z-10 my-auto w-full max-w-[425px] mx-auto p-7 sm:p-8 rounded-2xl border border-white/[0.14] bg-black/35 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.55),0_0_35px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.12)]">
             {/* Brand Header */}
             <div className="mb-6">
               <div className="mb-2">

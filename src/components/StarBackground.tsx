@@ -71,30 +71,16 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       '#38bdf8', // Subtle cyan particle dot
     ]
 
-    // Helper to test if a coordinate is in the form UI bounding corridor
-    // (used to keep star opacity soft directly behind form text)
-    const isInCentralCorridor = (x: number, y: number) => {
-      if (isContinuation) {
-        return x >= 28 && x <= 72 && y >= 18 && y <= 82
-      }
-      // For standard main login: right-side form card corridor on desktop
-      return x >= 56 && x <= 92 && y >= 18 && y <= 82
-    }
-
-    // LAYER 1: Background Distant Stars (Tiny points of light, deep cosmos)
+    // LAYER 1: Background Distant Stars (Tiny points of light, deep cosmos across entire page)
     for (let i = 0; i < countDistant; i++) {
       const left = rng() * 100
       const top = rng() * 100
-      const inCenter = isInCentralCorridor(left, top)
 
-      // Sub-pixel sizes from 0.65px to 1.1px
+      // Sub-pixel sizes from 0.7px to 1.2px
       const sizeIndex = i % 4
-      const size = sizeIndex === 0 ? 0.65 : sizeIndex === 1 ? 0.8 : sizeIndex === 2 ? 0.95 : 1.1
+      const size = sizeIndex === 0 ? 0.7 : sizeIndex === 1 ? 0.85 : sizeIndex === 2 ? 1.0 : 1.25
 
-      // Opacity: outer stars clearer (0.15–0.35), form area stars subtle (0.09–0.17)
-      const rawOpacity = 0.14 + rng() * 0.22
-      const baseOpacity = inCenter ? Math.min(rawOpacity, 0.16) : rawOpacity
-
+      const rawOpacity = 0.22 + rng() * 0.35
       const color = distantColors[i % distantColors.length]
 
       list.push({
@@ -102,42 +88,35 @@ export default function StarBackground({ className = '', variant = 'standard' }:
         top,
         left,
         size,
-        baseOpacity,
+        baseOpacity: rawOpacity,
         color,
         hasAnimation: false, // Distant stars are calm and static
       })
     }
 
-    // LAYER 2: Middle Field Stars (Softly glowing, small-medium points & colored dots)
+    // LAYER 2: Middle Field Stars (Softly glowing points & colored dots across entire screen)
     for (let i = 0; i < countMid; i++) {
-      let left = rng() * 100
-      let top = rng() * 100
-      const inCenter = isInCentralCorridor(left, top)
+      const left = rng() * 100
+      const top = rng() * 100
 
-      // Softly nudge in continuation center if needed so form has clean breathing space
-      if (inCenter && isContinuation && i % 2 === 0) {
-        left = left < 50 ? left * 0.65 : 100 - (100 - left) * 0.65
-      }
+      // Sizes: 1.2px to 1.8px
+      const size = i % 3 === 0 ? 1.2 : i % 3 === 1 ? 1.5 : 1.8
+      const baseOpacity = 0.38 + rng() * 0.35
+      const maxOpacity = Math.min(0.95, baseOpacity * 1.35)
 
-      // Sizes: 1.15px to 1.65px
-      const size = i % 3 === 0 ? 1.15 : i % 3 === 1 ? 1.4 : 1.65
-      const rawOpacity = 0.28 + rng() * 0.26
-      const baseOpacity = inCenter ? 0.18 : rawOpacity
-      const maxOpacity = baseOpacity * 1.35
-
-      // Only ~16% of middle stars gently breathe over a long duration (9s - 16s)
-      const hasAnimation = i % 6 === 0 && !inCenter
-      const animationDuration = 9 + (i % 5) * 1.6
+      // ~20% of middle stars gently breathe over a long duration (7s - 14s)
+      const hasAnimation = i % 5 === 0
+      const animationDuration = 8 + (i % 5) * 1.5
       const animationDelay = (i % 7) * 1.1
 
       const color = midColors[i % midColors.length]
       const boxShadow =
-        size > 1.35 && !inCenter
+        size > 1.4
           ? color === '#38bdf8'
-            ? '0 0 3px rgba(56, 189, 248, 0.5)'
+            ? '0 0 3px rgba(56, 189, 248, 0.6)'
             : color === '#c4b5fd' || color === '#ede9fe'
-            ? '0 0 3px rgba(167, 139, 250, 0.5)'
-            : '0 0 2.5px rgba(255, 255, 255, 0.45)'
+            ? '0 0 3px rgba(167, 139, 250, 0.6)'
+            : '0 0 2.5px rgba(255, 255, 255, 0.55)'
           : undefined
 
       list.push({
@@ -155,40 +134,23 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       })
     }
 
-    // LAYER 3: Foreground Focal Celestial Points (Brighter, delicate halo bloom)
+    // LAYER 3: Foreground Focal Celestial Points (Brighter, delicate halo bloom across entire screen)
     for (let i = 0; i < countFocal; i++) {
-      let left = rng() * 100
-      let top = rng() * 100
+      const left = rng() * 100
+      const top = rng() * 100
 
-      if (isContinuation) {
-        if (left >= 28 && left <= 72) {
-          left = left < 50 ? 5 + (left / 50) * 20 : 75 + ((left - 50) / 50) * 20
-        }
-        if (top >= 22 && top <= 78) {
-          top = top < 50 ? 5 + (top / 50) * 15 : 80 + ((top - 50) / 50) * 15
-        }
-      } else {
-        // Standard login: frame the canvas (left sky, top sky across full page, right perimeter, bottom sky)
-        // Avoid placing bright halos directly over form inputs (58% to 90%, 25% to 75%)
-        if (left >= 58 && left <= 90 && top >= 25 && top <= 75) {
-          if (i % 3 === 0) top = 4 + (rng() * 18) // top sky above form
-          else if (i % 3 === 1) left = 91 + (rng() * 7) // far right flank
-          else left = 45 + (rng() * 11) // center corridor between sphere and form
-        }
-      }
+      // Sizes: 2.0px to 2.6px
+      const size = i % 2 === 0 ? 2.0 : 2.5
+      const baseOpacity = 0.75 + rng() * 0.22
+      const maxOpacity = Math.min(1.0, baseOpacity * 1.25)
 
-      // Sizes: 1.9px to 2.4px
-      const size = i % 2 === 0 ? 1.9 : 2.3
-      const baseOpacity = 0.65 + rng() * 0.22
-      const maxOpacity = Math.min(0.95, baseOpacity * 1.25)
+      // Soft delicate bloom
+      const boxShadow = '0 0 4px 1.5px rgba(255, 255, 255, 0.75), 0 0 10px 3px rgba(167, 139, 250, 0.35)'
 
-      // Soft delicate bloom, never harsh
-      const boxShadow = '0 0 3px 1px rgba(255, 255, 255, 0.65), 0 0 8px 2px rgba(167, 139, 250, 0.28)'
-
-      // ~25% have very slow, subtle breath (8s - 14s)
-      const hasAnimation = i % 4 === 0
-      const animationDuration = 10 + (i % 4) * 1.5
-      const animationDelay = (i % 5) * 1.4
+      // ~30% have very slow, subtle breath (8s - 14s)
+      const hasAnimation = i % 3 === 0
+      const animationDuration = 9 + (i % 4) * 1.5
+      const animationDelay = (i % 5) * 1.2
 
       list.push({
         id: starId++,

@@ -154,7 +154,7 @@ export default function Reviews() {
         )}
 
         {/* Rating Metrics & Star Breakdown */}
-        {summary && (
+        {summary && summary.total_reviews > 0 && (
           <div className="mt-10 grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* Left: Overall Score Card */}
             <Panel className="md:col-span-4 p-6 sm:p-8 flex flex-col justify-center items-center text-center bg-surface/40 border-white/15">
@@ -197,6 +197,28 @@ export default function Reviews() {
                 )
               })}
             </Panel>
+          </div>
+        )}
+
+        {/* Global Empty State Banner when no reviews exist */}
+        {summary && summary.total_reviews === 0 && !loading && (
+          <div className="mt-10 p-12 border border-dashed border-white/20 bg-surface/30 text-center flex flex-col items-center justify-center space-y-4">
+            <span className="text-3xl text-dim">★</span>
+            <h3 className="font-display text-xl font-bold uppercase text-ink">
+              No reviews yet. Be the first to share your experience.
+            </h3>
+            <p className="text-xs text-dim max-w-md">
+              Share your feedback on tournaments, matchmaking, and gameplay to help fellow contenders.
+            </p>
+            <button
+              onClick={() => {
+                setDisplayName(profile?.username || profile?.display_name || authDisplayName || '')
+                setIsWriteModalOpen(true)
+              }}
+              className="mt-2 border border-cyan bg-cyan px-5 py-2.5 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer"
+            >
+              ★ Write the First Review
+            </button>
           </div>
         )}
 
@@ -277,8 +299,17 @@ export default function Reviews() {
           {loading ? (
             <div className="p-12 text-center text-dim font-mono">Loading reviews...</div>
           ) : reviewsList.length === 0 ? (
-            <div className="p-12 border border-dashed border-white/15 text-center text-dim">
-              No reviews published under this category yet. Be the first contender to review!
+            <div className="p-12 border border-dashed border-white/15 text-center text-dim space-y-3">
+              <p className="text-sm font-semibold text-ink/80">No reviews yet. Be the first to share your experience.</p>
+              <button
+                onClick={() => {
+                  setDisplayName(profile?.username || profile?.display_name || authDisplayName || '')
+                  setIsWriteModalOpen(true)
+                }}
+                className="mt-2 text-cyan underline hover:text-cyan/80 text-xs font-mono"
+              >
+                Write a Review →
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

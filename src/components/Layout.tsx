@@ -257,34 +257,40 @@ export function Footer() {
       <div className="mx-auto grid max-w-[1600px] gap-10 md:grid-cols-12 relative z-10">
         {/* Left Column: Premium Brand Block */}
         <div className="md:col-span-6 space-y-6">
-          <Logo />
+          <Link to="/" className="group inline-block outline-none select-none">
+            <span className="font-display text-xl font-black tracking-[0.18em] text-white transition-colors duration-300 group-hover:text-cyan">
+              AMETHEUS
+            </span>
+          </Link>
           <p className="max-w-sm text-sm text-ink/60 leading-relaxed font-mono">
             India&apos;s competitive esports platform — verified skill ratings, structured tournaments, and sanctioned circuits built for serious players.
           </p>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
             <a
               href="https://discord.gg/VzkfuK7We"
               target="_blank"
               rel="noopener noreferrer"
-              className="border border-white/10 bg-surface/40 hover:border-cyan/40 hover:bg-cyan/5 px-3 py-1.5 font-mono text-[11px] text-ink/60 hover:text-cyan transition-all flex items-center gap-1.5"
+              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
             >
               <span>Discord</span>
               <span className="text-[10px] text-cyan">↗</span>
             </a>
+            <span className="text-white/20 select-none">·</span>
             <a
               href="https://www.instagram.com/official.ametheus"
               target="_blank"
               rel="noopener noreferrer"
-              className="border border-white/10 bg-surface/40 hover:border-cyan/40 hover:bg-cyan/5 px-3 py-1.5 font-mono text-[11px] text-ink/60 hover:text-cyan transition-all flex items-center gap-1.5"
+              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
             >
               <span>Instagram</span>
               <span className="text-[10px] text-cyan">↗</span>
             </a>
+            <span className="text-white/20 select-none">·</span>
             <a
               href="https://www.youtube.com/@official.ametheus.goodgame"
               target="_blank"
               rel="noopener noreferrer"
-              className="border border-white/10 bg-surface/40 hover:border-cyan/40 hover:bg-cyan/5 px-3 py-1.5 font-mono text-[11px] text-ink/60 hover:text-cyan transition-all flex items-center gap-1.5"
+              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
             >
               <span>YouTube</span>
               <span className="text-[10px] text-cyan">↗</span>

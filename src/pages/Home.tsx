@@ -121,7 +121,6 @@ function Hero({
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
-  const coord = useRef<HTMLSpanElement>(null)
   const shards = games
     .filter((g) => g.banner_url || g.logo_url)
     .slice(0, SLOTS.length)
@@ -145,8 +144,6 @@ function Hero({
         el.style.setProperty('--py', (py * 2 - 1).toFixed(3))
         el.style.setProperty('--lx', `${(px * 100).toFixed(1)}%`)
         el.style.setProperty('--ly', `${(py * 100).toFixed(1)}%`)
-        if (coord.current)
-          coord.current.textContent = `X ${(px * 100).toFixed(1)} / Y ${(py * 100).toFixed(1)}`
       })
     }
     el.addEventListener('pointermove', move, { passive: true })
@@ -284,10 +281,6 @@ function Hero({
       <Hud className="absolute right-6 top-[46%] z-10 hidden [writing-mode:vertical-rl] md:block">
         {gameCount} GAMES · INDIA · EST. 2026
       </Hud>
-      <div className="absolute bottom-8 left-6 z-10 hidden flex-col gap-1 md:left-10 md:flex">
-        <Hud><span ref={coord}>X 50.0 / Y 40.0</span></Hud>
-        <Hud className="text-cyan">INDIA SERVER · 14MS</Hud>
-      </div>
 
       <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2">
         <Hud>DESCEND</Hud>
