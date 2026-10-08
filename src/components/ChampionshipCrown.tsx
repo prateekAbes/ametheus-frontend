@@ -268,40 +268,103 @@ export function ChampionshipCrown({ rank, size = 'md', className = '' }: Champio
   )
 }
 
+import { GoldGemBadge } from './GoldGemBadge'
+
 interface PodiumMedalBadgeProps {
   rank: 1 | 2 | 3
   className?: string
+  size?: 'sm' | 'md' | 'lg'
 }
 
-export function PodiumMedalBadge({ rank, className = '' }: PodiumMedalBadgeProps) {
+export function PodiumMedalBadge({ rank, className = '', size = 'md' }: PodiumMedalBadgeProps) {
   if (rank === 1) {
     return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-sm border border-amber-400/90 bg-gradient-to-r from-amber-500/25 via-amber-400/20 to-amber-600/25 px-3 py-1 font-mono text-[11px] font-black tracking-wider text-amber-200 shadow-[0_0_15px_rgba(251,191,36,0.35)] ${className}`}
-      >
-        <span className="text-amber-300">✦</span>
-        <span>01 · GOLD CHAMPION</span>
-      </span>
+      <GoldGemBadge
+        size={size}
+        label="01 GOLD GEM"
+        sublabel="TIER 01 · CHAMPION"
+        className={className}
+      />
     )
   }
 
   if (rank === 2) {
     return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-sm border border-slate-300/80 bg-gradient-to-r from-slate-400/20 via-slate-200/15 to-slate-400/20 px-2.5 py-1 font-mono text-[11px] font-black tracking-wider text-slate-100 shadow-[0_0_12px_rgba(203,213,225,0.25)] ${className}`}
-      >
-        <span className="text-slate-300">✦</span>
-        <span>02 · SILVER RUNNER-UP</span>
-      </span>
+      <div className={`relative inline-flex items-center select-none group transition-all duration-300 ${className}`}>
+        <div className="absolute -inset-1 rounded-sm bg-slate-300/10 blur-sm opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-[3px] border border-slate-300/70 bg-gradient-to-r from-[#141824]/95 via-[#1D2436]/90 to-[#101420]/95 px-3 py-1 shadow-[inset_0_1px_1px_rgba(241,245,249,0.3),0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/30" />
+          <div className="pointer-events-none absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-slate-200/60 to-transparent" />
+          <div className="flex items-center justify-center shrink-0">
+            <svg className="size-4.5 filter drop-shadow" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L4 6V12C4 17.5 12 22 12 22C12 22 20 17.5 20 12V6L12 2Z" fill="url(#silver-grad)" stroke="#E2E8F0" strokeWidth="0.8" strokeLinejoin="round" />
+              <polygon points="12,4 18,7 12,11 6,7" fill="#FFFFFF" opacity="0.4" />
+              <polygon points="12,11 18,7 18,12 12,19" fill="#64748B" opacity="0.6" />
+              <defs>
+                <linearGradient id="silver-grad" x1="4" y1="2" x2="20" y2="22">
+                  <stop offset="0%" stopColor="#F8FAFC" />
+                  <stop offset="50%" stopColor="#94A3B8" />
+                  <stop offset="100%" stopColor="#475569" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div className="flex items-center gap-1.5 border-l border-slate-400/30 pl-2">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5 leading-none">
+                <span className="font-mono text-xs font-black text-slate-100">02</span>
+                <span className="text-slate-400 text-[9px] font-mono">·</span>
+                <span className="font-display text-xs font-black uppercase tracking-wider text-slate-100">
+                  SILVER RUNNER-UP
+                </span>
+              </div>
+              <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-slate-400/80 font-semibold mt-0.5 leading-none">
+                TIER 02 · CONTENDER
+              </span>
+            </div>
+          </div>
+          <div className="absolute top-0 right-0 size-1.5 border-t border-r border-slate-300/80 pointer-events-none" />
+        </div>
+      </div>
     )
   }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-sm border border-amber-700/80 bg-gradient-to-r from-amber-800/20 via-amber-600/15 to-amber-900/20 px-2.5 py-1 font-mono text-[11px] font-black tracking-wider text-amber-300 shadow-[0_0_12px_rgba(217,119,6,0.25)] ${className}`}
-    >
-      <span className="text-amber-500">✦</span>
-      <span>03 · BRONZE 3RD PLACE</span>
-    </span>
+    <div className={`relative inline-flex items-center select-none group transition-all duration-300 ${className}`}>
+      <div className="absolute -inset-1 rounded-sm bg-amber-700/10 blur-sm opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none" />
+      <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-[3px] border border-amber-700/70 bg-gradient-to-r from-[#20150d]/95 via-[#2d1e13]/90 to-[#180f08]/95 px-3 py-1 shadow-[inset_0_1px_1px_rgba(254,215,170,0.2),0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/30" />
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
+        <div className="flex items-center justify-center shrink-0">
+          <svg className="size-4.5 filter drop-shadow" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L4 6V12C4 17.5 12 22 12 22C12 22 20 17.5 20 12V6L12 2Z" fill="url(#bronze-grad)" stroke="#D97706" strokeWidth="0.8" strokeLinejoin="round" />
+            <polygon points="12,4 18,7 12,11 6,7" fill="#FED7AA" opacity="0.4" />
+            <polygon points="12,11 18,7 18,12 12,19" fill="#78350F" opacity="0.7" />
+            <defs>
+              <linearGradient id="bronze-grad" x1="4" y1="2" x2="20" y2="22">
+                <stop offset="0%" stopColor="#FED7AA" />
+                <stop offset="50%" stopColor="#B45309" />
+                <stop offset="100%" stopColor="#78350F" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div className="flex items-center gap-1.5 border-l border-amber-700/30 pl-2">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="font-mono text-xs font-black text-amber-200">03</span>
+              <span className="text-amber-700 text-[9px] font-mono">·</span>
+              <span className="font-display text-xs font-black uppercase tracking-wider text-amber-200">
+                BRONZE 3RD PLACE
+              </span>
+            </div>
+            <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-amber-400/70 font-semibold mt-0.5 leading-none">
+              TIER 03 · FINALIST
+            </span>
+          </div>
+        </div>
+        <div className="absolute top-0 right-0 size-1.5 border-t border-r border-amber-500/80 pointer-events-none" />
+      </div>
+    </div>
   )
 }

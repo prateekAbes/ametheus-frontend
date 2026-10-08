@@ -11,6 +11,7 @@ import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import { getAvailableCrests, type Crest as CrestType } from '../services/crests'
 import { updateUserProfile } from '../services/auth'
 import { uploadMediaFile } from '../services/admin'
+import { GoldGemBadge } from '../components/GoldGemBadge'
 
 import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../services/support'
 
@@ -181,30 +182,43 @@ export default function Profile() {
     <div className="bg-void pb-28">
       <section className="relative overflow-hidden pt-32">
         <div className="absolute inset-0 bg-gradient-to-t from-void via-void/80 to-void/40" />
+        {/* Subtle atmospheric crimson and amber ambient glow */}
+        <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 size-[520px] rounded-full bg-rose-950/20 blur-[140px] pointer-events-none" />
+        <div className="absolute top-1/3 right-1/4 size-[420px] rounded-full bg-amber-950/15 blur-[130px] pointer-events-none" />
         <Particles n={20} />
+
         <Container className="relative grid items-end gap-10 pb-14 md:grid-cols-[minmax(260px,360px)_1fr]">
-          <div className="relative border border-white/20 bg-graphite/80 p-3.5 shadow-2xl backdrop-blur-md">
-            <Brackets color="border-cyan/70" />
-            <div className="relative overflow-hidden bg-void/60 border border-white/10 group">
+          {/* PLAYER AVATAR CARD */}
+          <div className="relative border border-white/10 bg-gradient-to-b from-[#121622]/95 via-[#0D101A]/95 to-[#080A10]/98 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl group/avatar-card">
+            <Brackets color="border-rose-500/40" />
+            <div className="relative overflow-hidden rounded-[2px] bg-[#05060A] border border-white/10 group-hover/avatar-card:border-rose-500/40 transition-colors duration-500 group">
+              {/* Online / Match Ready Status Jewel */}
+              <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#080A10]/90 border border-emerald-500/40 backdrop-blur-md shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
+                <span className="font-mono text-[9px] font-bold text-emerald-300 tracking-wider">ONLINE</span>
+              </div>
+
               <DynamicImage
                 src={avatarDisplay}
                 alt={username}
                 eager
-                className="aspect-[4/5] w-full object-cover transition-transform duration-500 hover:scale-105"
+                className="aspect-[4/5] w-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void/80 via-transparent to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#080A10] via-transparent to-transparent opacity-90" />
+              
               <button
                 type="button"
                 onClick={() => setIsCrestModalOpen(true)}
-                className="absolute inset-x-3 bottom-3 border border-cyan/70 bg-void/90 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer shadow-xl backdrop-blur-sm"
+                className="absolute inset-x-3 bottom-3 border border-rose-500/40 bg-[#0B0E16]/90 py-2.5 font-mono text-[11px] font-bold uppercase tracking-wider text-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-500 transition-all cursor-pointer shadow-xl backdrop-blur-md flex items-center justify-center gap-1.5"
               >
-                ✎ Change Crest / Avatar
+                <span>✎ Change Crest / Avatar</span>
               </button>
             </div>
-            <div className="mt-3 flex items-center justify-between px-1">
+
+            <div className="mt-3.5 flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
-                <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
-                <Hud>Player Card</Hud>
+                <span className="size-1.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_#f43f5e]" />
+                <Hud className="text-slate-300 font-bold tracking-widest text-[10px]">VERIFIED ATHLETE</Hud>
               </div>
               <Badge
                 s={role === 'SUPER_ADMIN' ? 'live' : role === 'ORGANIZER' ? 'active' : 'default'}
@@ -213,67 +227,80 @@ export default function Profile() {
             </div>
           </div>
 
+          {/* IDENTITY & KEY INFORMATION BLOCK */}
           <div className="flex flex-col justify-end">
-            <div className="flex flex-wrap items-center gap-2.5 mb-2">
-              <Hud className="text-cyan">◇ Esports identity</Hud>
+            {/* Metadata & Tier Badge Row */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
+              <Hud className="text-rose-400 font-bold tracking-widest">◇ ESPORTS IDENTITY</Hud>
               <span
-                className={`font-mono text-[9px] uppercase tracking-[0.16em] px-2 py-0.5 border ${
+                className={`font-mono text-[9px] uppercase tracking-[0.18em] px-2.5 py-0.5 border ${
                   role === 'SUPER_ADMIN'
-                    ? 'border-magenta/40 bg-magenta/10 text-magenta'
+                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 font-bold shadow-[0_0_10px_rgba(244,63,94,0.15)]'
                     : role === 'ORGANIZER'
-                    ? 'border-cyan/40 bg-cyan/10 text-cyan'
-                    : 'border-white/20 bg-white/5 text-dim'
+                    ? 'border-cyan/40 bg-cyan/10 text-cyan font-bold'
+                    : 'border-white/20 bg-white/5 text-slate-300 font-semibold'
                 }`}
               >
                 {role === 'SUPER_ADMIN' ? 'ROOT CONTENDER' : role}
               </span>
+
               {profile?.privacy_settings?.visibility && (
-                <span className="font-mono text-[9px] uppercase tracking-[0.16em] px-2 py-0.5 border border-white/20 bg-white/5 text-dim">
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] px-2.5 py-0.5 border border-white/15 bg-white/5 text-slate-400">
                   VISIBILITY: {profile.privacy_settings.visibility}
                 </span>
               )}
+
+              {/* Integrated "01 GOLD GEM" Collectible Status Badge */}
+              <GoldGemBadge
+                size="sm"
+                label="01 GOLD GEM"
+                sublabel="TIER 01 · ELITE"
+              />
             </div>
-            <h1 className="reveal font-display text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white leading-none">
+
+            {/* Prominent Player Username */}
+            <h1 className="reveal font-display text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white leading-none drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
               {username}
             </h1>
 
             {/* Key Information Micro-Panels */}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
-                <Hud>Email</Hud>
-                <p className="mt-1 font-mono text-xs font-semibold text-ink truncate" title={email}>{email}</p>
+              <div className="border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-3.5 hover:border-rose-500/30 transition-all rounded-[2px] shadow-sm">
+                <Hud className="text-slate-400 tracking-[0.16em]">EMAIL IDENTITY</Hud>
+                <p className="mt-1 font-mono text-xs font-semibold text-slate-200 truncate" title={email}>{email}</p>
               </div>
-              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
-                <Hud>Account Role</Hud>
-                <p className="mt-1 font-display text-base font-black uppercase text-ink truncate">{role}</p>
+              <div className="border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-3.5 hover:border-rose-500/30 transition-all rounded-[2px] shadow-sm">
+                <Hud className="text-slate-400 tracking-[0.16em]">ACCOUNT ROLE</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-rose-300 truncate">{role}</p>
               </div>
-              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
-                <Hud>Ametheus Vault</Hud>
-                <p className="mt-1 font-display text-base font-black uppercase text-cyan truncate">{inr(balanceInr)}</p>
+              <div className="border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-3.5 hover:border-amber-500/30 transition-all rounded-[2px] shadow-sm">
+                <Hud className="text-slate-400 tracking-[0.16em]">AMETHEUS VAULT</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-amber-300 truncate">{inr(balanceInr)}</p>
               </div>
-              <div className="border border-white/10 bg-surface/50 p-3.5 hover:border-white/20 transition-all">
-                <Hud>Active Teams</Hud>
-                <p className="mt-1 font-display text-base font-black uppercase text-ink truncate">{teams.length} Squads</p>
+              <div className="border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-3.5 hover:border-rose-500/30 transition-all rounded-[2px] shadow-sm">
+                <Hud className="text-slate-400 tracking-[0.16em]">ACTIVE TEAMS</Hud>
+                <p className="mt-1 font-display text-base font-black uppercase text-white truncate">{teams.length} Squads</p>
               </div>
             </div>
 
+            {/* Profile Action Buttons */}
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setIsCrestModalOpen(true)}
-                className="border border-cyan bg-cyan px-4 py-2 font-display text-xs font-black uppercase tracking-wider text-void hover:bg-cyan/90 transition-all cursor-pointer shadow-sm"
+                className="border border-rose-500/80 bg-gradient-to-r from-rose-600 via-rose-600 to-rose-700 px-5 py-2.5 font-display text-xs font-black uppercase tracking-wider text-white hover:from-rose-500 hover:to-rose-600 transition-all cursor-pointer shadow-[0_0_20px_rgba(225,29,72,0.3)] flex items-center gap-1.5"
               >
-                ★ Select Crest / Avatar
+                <span>★ Select Crest / Avatar</span>
               </button>
               <Link
                 to="/settings"
-                className="border border-white/20 bg-surface/80 px-4 py-2 font-mono text-xs uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan hover:bg-cyan/10 transition-all"
+                className="border border-white/15 bg-white/[0.05] hover:bg-white/[0.09] hover:border-white/30 px-5 py-2.5 font-mono text-xs uppercase tracking-wider text-slate-200 transition-all flex items-center gap-1.5"
               >
                 Edit Profile
               </Link>
               <Link
                 to="/wallet"
-                className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-all"
+                className="border border-amber-500/40 bg-amber-500/10 hover:border-amber-400/60 hover:bg-amber-500/20 px-5 py-2.5 font-mono text-xs uppercase tracking-wider text-amber-300 transition-all flex items-center gap-1.5"
               >
                 Manage Wallet
               </Link>
@@ -282,30 +309,43 @@ export default function Profile() {
         </Container>
       </section>
 
+      {/* METRICS & PERFORMANCE TELEMETRY SECTION */}
       <Container>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
           {[
             ['Registered Teams', String(teams.length), 'Active Squads'],
-            ['Ametheus Vault', inr(balanceInr), 'Paise Balance'],
-            ['Registered Events', String(registrations.length), 'Tournaments'],
+            ['Ametheus Vault', inr(balanceInr), 'Verified Balance'],
+            ['Registered Events', String(registrations.length), 'Tournaments Played'],
             ['Regional Division', 'India (IN)', 'Official Server'],
           ].map(([k, v, sub], i) => (
             <div
               key={k}
-              className="relative overflow-hidden border border-white/15 bg-gradient-to-b from-surface/70 to-surface/30 p-5 md:p-6 shadow-md transition-all hover:border-white/30 group"
+              className="relative overflow-hidden border border-white/[0.09] bg-gradient-to-b from-[#111624]/90 via-[#0B0E16]/95 to-[#06080D]/98 p-5 md:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-rose-500/40 group"
             >
-              <div className="h-0.5 w-6 bg-cyan/60 group-hover:w-full transition-all duration-300 mb-3" />
-              <Hud>{k}</Hud>
+              {/* Top Directional Edge Highlight Beam */}
+              <div
+                className={`h-[2px] w-8 group-hover:w-full transition-all duration-500 mb-3.5 ${
+                  i === 1
+                    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-600'
+                    : 'bg-gradient-to-r from-rose-500 via-rose-600 to-rose-800'
+                }`}
+              />
+              <Hud className="text-slate-400 font-bold tracking-[0.2em]">{k}</Hud>
               <p
-                className={`mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-none ${
-                  i === 1 ? 'text-cyan' : 'text-white'
+                className={`mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-none tabular-nums ${
+                  i === 1 ? 'text-amber-300' : 'text-white'
                 }`}
               >
                 {v}
               </p>
-              <span className="mt-2 block font-mono text-[10px] uppercase text-dim tracking-wider">
-                {sub}
-              </span>
+              <div className="mt-2.5 flex items-center gap-1.5 font-mono text-[10px] uppercase text-slate-500 tracking-wider">
+                <span
+                  className={`size-1 rounded-full ${
+                    i === 1 ? 'bg-amber-400' : 'bg-rose-500'
+                  } opacity-75`}
+                />
+                <span>{sub}</span>
+              </div>
             </div>
           ))}
         </div>
