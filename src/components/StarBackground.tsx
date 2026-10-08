@@ -167,6 +167,60 @@ export default function StarBackground({ className = '', variant = 'standard' }:
       })
     }
 
+    // LAYER 4: High-Density Left-Side Celestial Atmosphere (Continuous micro stardust & glowing points on left side)
+    const countLeftSmall = isContinuation ? 160 : 180
+    for (let i = 0; i < countLeftSmall; i++) {
+      const left = rng() * 56
+      const top = rng() * 100
+      const sizeIndex = i % 3
+      const size = sizeIndex === 0 ? 0.65 : sizeIndex === 1 ? 0.85 : 1.15
+      const edgeFade = left > 46 ? Math.max(0.18, 1 - (left - 46) / 10) : 1
+      const rawOpacity = (0.24 + rng() * 0.45) * edgeFade
+      const color = distantColors[i % distantColors.length]
+      list.push({
+        id: starId++,
+        top,
+        left,
+        size,
+        baseOpacity: rawOpacity,
+        color,
+        hasAnimation: i % 4 === 0,
+        animationDuration: 7 + (i % 5) * 1.5,
+        animationDelay: (i % 6) * 0.9,
+      })
+    }
+
+    const countLeftMedium = isContinuation ? 40 : 50
+    for (let i = 0; i < countLeftMedium; i++) {
+      const left = rng() * 54
+      const top = rng() * 100
+      const size = i % 2 === 0 ? 1.4 : 1.9
+      const edgeFade = left > 44 ? Math.max(0.2, 1 - (left - 44) / 10) : 1
+      const baseOpacity = (0.35 + rng() * 0.40) * edgeFade
+      const maxOpacity = Math.min(0.95, baseOpacity * 1.35)
+      const color = midColors[i % midColors.length]
+      const boxShadow =
+        color === '#38bdf8'
+          ? '0 0 4px rgba(56, 189, 248, 0.7)'
+          : color === '#c4b5fd' || color === '#ede9fe'
+          ? '0 0 4px rgba(167, 139, 250, 0.7)'
+          : '0 0 3px rgba(255, 255, 255, 0.65)'
+
+      list.push({
+        id: starId++,
+        top,
+        left,
+        size,
+        baseOpacity,
+        maxOpacity,
+        color,
+        boxShadow,
+        hasAnimation: true,
+        animationDuration: 8 + (i % 4) * 2,
+        animationDelay: (i % 5) * 1.1,
+      })
+    }
+
     return list
   }, [variant])
 

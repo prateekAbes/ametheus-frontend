@@ -5,6 +5,7 @@ import { AuthenticateWithRedirectCallback, useAuth, useUser } from '@clerk/react
 import { Eye, EyeOff, AlertCircle, CheckCircle2, ArrowRight, ShieldAlert, Loader2, Check, X } from 'lucide-react'
 import StarBackground from '../components/StarBackground'
 import CelestialArc from '../components/CelestialArc'
+import CrownBadge from '../components/CrownBadge'
 import { GAMES } from '../lib/data'
 import { getGames, Game as ApiGame } from '../services/games'
 import { useAuthContext } from '../context/AuthContext'
@@ -21,22 +22,55 @@ type AuthMode = 'login' | 'signup' | 'setup' | 'unauthorized' | 'forgot-password
 function AuthFooter() {
   return (
     <footer className="relative z-20 w-full border-t border-white/[0.08] bg-black/40 backdrop-blur-md px-6 py-4 sm:px-10 lg:px-16">
-      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left font-mono text-xs text-dim">
-        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-left">
-          Ametheus — Competitive Platform
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left font-mono text-xs text-dim">
+        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-left font-bold text-white/90">
+          Ametheus
         </span>
-        <Link
-          to="/"
-          className="text-dim/80 hover:text-cyan transition-colors tracking-wider flex-1 sm:text-center"
-        >
-          Back to Home
-        </Link>
-        <Link
-          to="/sign-in"
-          className="tracking-wider uppercase text-dim/90 hover:text-cyan transition-colors flex-1 sm:text-right"
-        >
-          Ametheus Login
-        </Link>
+
+        {/* Official External Links */}
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <a
+            href="https://discord.gg/VzkfuK7We"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dim/80 hover:text-[#5865F2] transition-colors tracking-wider"
+          >
+            Discord
+          </a>
+          <span className="text-white/20">·</span>
+          <a
+            href="https://www.instagram.com/official.ametheus"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dim/80 hover:text-[#E1306C] transition-colors tracking-wider"
+          >
+            Instagram
+          </a>
+          <span className="text-white/20">·</span>
+          <a
+            href="https://www.youtube.com/@official.ametheus.goodgame"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dim/80 hover:text-[#FF0000] transition-colors tracking-wider"
+          >
+            YouTube
+          </a>
+        </div>
+
+        <div className="flex items-center gap-4 flex-1 justify-end">
+          <Link
+            to="/"
+            className="text-dim/80 hover:text-cyan transition-colors tracking-wider"
+          >
+            Back to Home
+          </Link>
+          <Link
+            to="/sign-in"
+            className="tracking-wider uppercase text-dim/90 hover:text-cyan transition-colors"
+          >
+            Ametheus Login
+          </Link>
+        </div>
       </div>
     </footer>
   )
@@ -545,6 +579,7 @@ export default function Auth() {
 
         {/* Center: TRANSPARENT GLASS AUTHENTICATION PANEL */}
         <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-black/35 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)]">
+          <CrownBadge className="mb-4" />
           {/* Header */}
           <div className="mb-7">
             <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-tight text-white leading-tight">
@@ -759,6 +794,7 @@ export default function Auth() {
 
           {/* Center: REFINED TRANSLUCENT GLASS FLOATING AUTHENTICATION PANEL */}
           <div className="relative z-10 my-auto w-full max-w-[425px] mx-auto p-7 sm:p-8 rounded-2xl border border-white/[0.14] bg-black/35 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.55),0_0_35px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <CrownBadge className="mb-4" />
             {/* Brand Header */}
             <div className="mb-6">
               <div className="mb-2">
