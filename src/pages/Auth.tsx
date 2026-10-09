@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   ArrowRight,
   ShieldAlert,
+  ShieldCheck,
+  Lock,
   Loader2,
   Check,
   X,
@@ -114,7 +116,12 @@ export default function Auth() {
     pathname.includes('/onboarding')
 
   const isSsoCallback = pathname.includes('/sso-callback')
-  const isUnauthorized = pathname.includes('/unauthorized')
+  const isUnauthorizedSignIn =
+    pathname === '/unauthorized-sign-in' ||
+    pathname.startsWith('/unauthorized-sign-in/')
+  const isUnauthorized =
+    (pathname === '/unauthorized' || pathname.startsWith('/unauthorized/')) &&
+    !isUnauthorizedSignIn
 
   // Destination redirect handling
   const searchParams = new URLSearchParams(location.search)
@@ -520,7 +527,143 @@ export default function Auth() {
   }
 
   // =========================================================================
-  // 3. /unauthorized Screen
+  // 3. /unauthorized-sign-in Screen (Unrecognized Device Session Revocation)
+  // =========================================================================
+  if (isUnauthorizedSignIn) {
+    const errorParam = searchParams.get('error') || searchParams.get('error_code')
+    const hasError = Boolean(errorParam)
+    const errorMessage =
+      searchParams.get('message') ||
+      (errorParam === 'session_expired' || errorParam === 'expired'
+        ? 'This revocation link has expired.'
+        : errorParam
+        ? `Revocation issue encountered: ${errorParam}`
+        : '')
+
+    return (
+      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+        <StarBackground variant="continuation" />
+        <CelestialArc variant={hasError ? 'subtle' : 'major'} />
+
+        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
+          <Link
+            to="/"
+            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#6C47FF] transition-colors uppercase"
+            aria-label="Ametheus Home"
+          >
+            Ametheus
+          </Link>
+        </div>
+
+        <div className="relative z-10 my-auto w-full max-w-[480px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-[#090A0F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_35px_rgba(108,71,255,0.12)]">
+          {hasError ? (
+            <div className="space-y-6">
+              <div className="flex items-start gap-3.5">
+                <div className="size-10 rounded-full border border-rose-500/40 bg-rose-500/15 flex items-center justify-center shrink-0">
+                  <ShieldAlert size={22} className="text-rose-400" />
+                </div>
+                <div className="space-y-1">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-rose-400 block">
+                    Security Notice
+                  </span>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white leading-tight">
+                    Revocation Unsuccessful
+                  </h2>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-200/90 font-mono leading-relaxed">
+                {errorMessage || 'The revocation link could not be verified or has already expired.'}
+              </div>
+
+              <p className="font-sans text-xs text-dim leading-relaxed">
+                If you suspect unauthorized activity on your account, we strongly advise changing your password immediately and inspecting your active sessions.
+              </p>
+
+              <div className="space-y-2.5 pt-2">
+                <Link
+                  to="/settings?tab=Security"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                >
+                  <Lock size={14} />
+                  <span>Update Password & Sessions</span>
+                </Link>
+
+                <Link
+                  to="/sign-in"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                >
+                  <span>Sign In</span>
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-start gap-3.5">
+                <div className="size-10 rounded-full border border-emerald-500/40 bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={22} className="text-emerald-400" />
+                </div>
+                <div className="space-y-1">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-400 block">
+                    Security Action Confirmed
+                  </span>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white leading-tight">
+                    Unrecognized Session Terminated
+                  </h2>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200/90 font-mono leading-relaxed">
+                The unauthorized session was revoked on the authentication server. Access from that device has been immediately terminated.
+              </div>
+
+              <div className="space-y-2 text-xs text-dim">
+                <p className="font-sans leading-relaxed">
+                  Recommended next steps to safeguard your Ametheus account:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 font-sans text-white/80">
+                  <li>Review all current active logins under Security settings.</li>
+                  <li>Update your password if you suspect your credentials were leaked.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                <Link
+                  to="/settings?tab=Security"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                >
+                  <ShieldCheck size={14} />
+                  <span>Review Active Sessions</span>
+                </Link>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    to="/sign-in"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                  >
+                    <span>Sign In</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                  <Link
+                    to="/"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-dim hover:text-white font-mono text-xs uppercase tracking-wider transition-all"
+                  >
+                    <span>Return to Arena</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <AuthFooter />
+      </div>
+    )
+  }
+
+  // =========================================================================
+  // 4. /unauthorized Screen
   // =========================================================================
   if (isUnauthorized) {
     return (

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Games from './pages/Games'
@@ -43,6 +43,9 @@ export const router = createBrowserRouter([
   { path: '/sign-up/continue', Component: Auth },
   { path: '/unauthorized-sign-in', Component: Auth },
   { path: '/unauthorized', Component: Auth },
+  { path: '/user/security', element: <Navigate to="/settings?tab=Security" replace /> },
+  { path: '/user', element: <Navigate to="/settings" replace /> },
+  { path: '/user/*', element: <Navigate to="/settings" replace /> },
   { path: '/setup', Component: Auth },
   { path: '/onboarding', Component: Auth },
   { path: '/sso-callback', Component: Auth },

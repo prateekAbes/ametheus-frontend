@@ -86,7 +86,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
-      afterSignOutUrl="/"
+      afterSignOutUrl="/sign-in"
       routerPush={(to) => router.navigate(to)}
       routerReplace={(to) => router.navigate(to, { replace: true })}
       appearance={ametheusClerkAppearance}

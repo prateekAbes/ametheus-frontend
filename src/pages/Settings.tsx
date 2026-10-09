@@ -215,6 +215,25 @@ export default function Settings() {
     return () => obs.disconnect()
   }, [])
 
+  // Deep-linking: activate tab and scroll into view when tab or section parameter is present
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const tabParam = searchParams.get('tab') || searchParams.get('section')
+    const hashParam = window.location.hash.replace('#', '')
+    const target = (tabParam || hashParam || '').toLowerCase()
+
+    const matched = SECTIONS.find((s) => s.toLowerCase() === target)
+    if (matched) {
+      setActive(matched)
+      const el = document.getElementById(matched)
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 120)
+      }
+    }
+  }, [])
+
   // ---------------- Handlers ----------------
 
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
