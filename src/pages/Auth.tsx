@@ -228,20 +228,32 @@ export default function Auth() {
     return () => clearTimeout(timer)
   }, [username])
 
-  // Social / Google OAuth sign in
+  // Social / Google OAuth sign in & sign up
   const handleOAuth = async (strategy: 'oauth_google') => {
     setError('')
     setIsLoading(true)
     try {
-      if (!isSignInLoaded || !signIn) {
-        throw new Error('Authentication gateway initializing. Please wait a moment.')
+      if (mode === 'signup' || isSignUpRoute) {
+        if (!isSignUpLoaded || !signUp) {
+          throw new Error('Authentication gateway initializing. Please wait a moment.')
+        }
+        await signUp.authenticateWithRedirect({
+          strategy,
+          redirectUrl: '/sso-callback',
+          redirectUrlComplete: destination,
+          continueSignUp: true,
+        })
+      } else {
+        if (!isSignInLoaded || !signIn) {
+          throw new Error('Authentication gateway initializing. Please wait a moment.')
+        }
+        await signIn.authenticateWithRedirect({
+          strategy,
+          redirectUrl: '/sso-callback',
+          redirectUrlComplete: destination,
+          continueSignUp: true,
+        })
       }
-      await signIn.authenticateWithRedirect({
-        strategy,
-        redirectUrl: '/sso-callback',
-        redirectUrlComplete: destination,
-        continueSignUp: true,
-      })
     } catch (err: any) {
       setIsLoading(false)
       const msg =
@@ -594,6 +606,7 @@ export default function Auth() {
         <AuthenticateWithRedirectCallback
           signInFallbackRedirectUrl={destination}
           signUpFallbackRedirectUrl={destination}
+          continueSignUpUrl="/sign-up/continue"
         />
       </div>
     )
@@ -1068,7 +1081,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => handleOAuth('oauth_google')}
-                  disabled={isLoading || !isSignInLoaded}
+                  disabled={isLoading || (mode === 'signup' ? !isSignUpLoaded : !isSignInLoaded)}
                   className="group relative flex h-11 w-full items-center justify-center gap-3 rounded-md border border-white/10 bg-[#090b10] hover:bg-[#121620] hover:border-white/20 px-4 font-sans text-xs font-semibold text-white/90 shadow-sm transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-6"
                 >
                   <svg className="size-4 shrink-0 transition-transform group-hover:scale-105" viewBox="0 0 24 24">

@@ -276,10 +276,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             inr_balance: '0.00',
             inr_balance_paise: 0,
             inr_reserved_paise: 0,
+            has_chosen_username: hasChosenUsername,
+            needs_username: !hasChosenUsername,
           }
           return {
             ...base,
             role: fallbackCanonical as any,
+            has_chosen_username: hasChosenUsername,
+            needs_username: !hasChosenUsername,
           }
         })
         syncedUserIdRef.current = user.id
