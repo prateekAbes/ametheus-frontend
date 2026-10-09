@@ -60,10 +60,10 @@ export function LeaderboardPodium({
         />
       </div>
 
-      {/* PODIUM COLUMNS: #2 (Left), #1 (Center, Elevated), #3 (Right) */}
-      <div className="relative z-10 grid grid-cols-3 items-end gap-2 sm:gap-4 md:gap-6 px-1 sm:px-2">
-        {/* 2nd Place Podium Column (Left) */}
-        <div className="order-1 w-full">
+      {/* PODIUM COLUMNS: Layered 3D Axonometric Blocks matching reference */}
+      <div className="relative z-10 flex items-end justify-center w-full max-w-3xl mx-auto px-1 sm:px-3">
+        {/* 2nd Place Podium Column (Left, Layered Behind #1) */}
+        <div className="flex-1 relative z-10 -mr-2 sm:-mr-4 md:-mr-6 min-w-0">
           {top2 ? (
             <PodiumColumn
               entry={top2}
@@ -73,7 +73,7 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top2, disqualifiedIds)}
             />
           ) : (
-            <div className="h-32 border border-dashed border-white/10 flex items-center justify-center p-2 text-center">
+            <div className="h-44 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40">
               <span className="font-mono text-[9px] text-white/30 uppercase">
                 #2 Vacant
               </span>
@@ -81,8 +81,8 @@ export function LeaderboardPodium({
           )}
         </div>
 
-        {/* 1st Place Podium Column (Center, Elevated & Tallest) */}
-        <div className="order-2 w-full">
+        {/* 1st Place Podium Column (Center, Foreground & Tallest) */}
+        <div className="flex-[1.14] relative z-20 min-w-0">
           {top1 ? (
             <PodiumColumn
               entry={top1}
@@ -94,8 +94,8 @@ export function LeaderboardPodium({
           ) : null}
         </div>
 
-        {/* 3rd Place Podium Column (Right) */}
-        <div className="order-3 w-full">
+        {/* 3rd Place Podium Column (Right, Layered Behind #1) */}
+        <div className="flex-1 relative z-10 -ml-2 sm:-ml-4 md:-ml-6 min-w-0">
           {top3 ? (
             <PodiumColumn
               entry={top3}
@@ -105,7 +105,7 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top3, disqualifiedIds)}
             />
           ) : (
-            <div className="h-28 border border-dashed border-white/10 flex items-center justify-center p-2 text-center">
+            <div className="h-36 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40">
               <span className="font-mono text-[9px] text-white/30 uppercase">
                 #3 Vacant
               </span>

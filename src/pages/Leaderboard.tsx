@@ -206,20 +206,21 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#090b11] text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
-      {/* Restrained esports-inspired background atmosphere & precision grid */}
+    <div className="relative min-h-screen bg-[#10172F] text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
+      {/* Visibly colored dark navy / indigo background with restrained violet variation */}
       <div
         className="pointer-events-none fixed inset-0 select-none overflow-hidden"
         aria-hidden="true"
       >
-        {/* Ambient top-center refined dark charcoal and navy esports aura */}
+        {/* Layered midnight navy, deep blue, dark indigo, and muted violet aura */}
         <div
           className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(ellipse 90% 55% at 50% -30px, rgba(14, 23, 42, 0.75), transparent 70%),
-              radial-gradient(ellipse 80% 45% at 50% 35%, rgba(10, 16, 28, 0.5), transparent 75%),
-              radial-gradient(ellipse 85% 45% at 50% -20px, rgba(34, 197, 94, 0.05), transparent 70%)
+              radial-gradient(ellipse 110% 70% at 50% -10%, #171B3B 0%, transparent 75%),
+              radial-gradient(ellipse 90% 60% at 85% 25%, rgba(48, 32, 79, 0.7) 0%, transparent 70%),
+              radial-gradient(ellipse 85% 55% at 15% 45%, rgba(37, 32, 77, 0.75) 0%, transparent 75%),
+              linear-gradient(180deg, #10172F 0%, #171B3B 40%, #10172F 100%)
             `,
           }}
         />

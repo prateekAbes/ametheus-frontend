@@ -870,12 +870,6 @@ export default function Auth() {
                 Username <span className="text-[#3ef2ff]" aria-hidden="true">*</span>
               </label>
               <div className="relative">
-                <span
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-[#3ef2ff] font-bold select-none"
-                  aria-hidden="true"
-                >
-                  @
-                </span>
                 <input
                   id="continue-username"
                   type="text"
@@ -888,7 +882,7 @@ export default function Auth() {
                   autoComplete="username"
                   aria-describedby="continue-username-feedback"
                   aria-invalid={usernameStatus === 'taken' || usernameStatus === 'invalid'}
-                  className="h-11 w-full rounded-md border border-white/10 bg-[#07090e]/80 pl-8 pr-10 text-sm text-white placeholder:text-white/20 backdrop-blur-sm transition-all focus:border-[#3ef2ff] focus:outline-none focus:ring-1 focus:ring-[#3ef2ff]/30"
+                  className="h-11 w-full rounded-md border border-white/10 bg-[#07090e]/80 pl-3.5 pr-10 text-sm text-white placeholder:text-white/20 backdrop-blur-sm transition-all focus:border-[#3ef2ff] focus:outline-none focus:ring-1 focus:ring-[#3ef2ff]/30"
                 />
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2" aria-hidden="true">
                   {usernameStatus === 'checking' && (
