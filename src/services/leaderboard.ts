@@ -86,3 +86,40 @@ export async function getLeaderboardStats(): Promise<LeaderboardStats> {
 export async function getLeaderboardCategories(): Promise<LeaderboardCategory[]> {
   return apiClient<LeaderboardCategory[]>('/leaderboard/categories')
 }
+
+/**
+ * Checks whether a given leaderboard entry belongs to the currently signed-in user.
+ */
+export function isEntryCurrentUser(
+  entry: LeaderboardEntry | null | undefined,
+  currentUserId?: string,
+  currentUsername?: string
+): boolean {
+  if (!entry) return false
+  const uid = currentUserId?.toLowerCase()
+  const uname = currentUsername?.toLowerCase()
+  const eId = (entry.id || '').toLowerCase()
+  const eName = (entry.name || '').toLowerCase()
+  const eCap = (entry.captain || '').replace('@', '').toLowerCase()
+  return (
+    (!!uid && (eId === uid || eName === uid)) ||
+    (!!uname && (eName === uname || eCap === uname))
+  )
+}
+
+/**
+ * Checks whether a leaderboard entry has been marked as disqualified.
+ */
+export function isEntryDisqualified(
+  entry: LeaderboardEntry | null | undefined,
+  disqualifiedIds?: Set<string>
+): boolean {
+  if (!entry) return false
+  if (entry.is_disqualified) return true
+  if ((entry.status || '').toUpperCase() === 'DISQUALIFIED') return true
+  if (!disqualifiedIds || disqualifiedIds.size === 0) return false
+  const id = (entry.id || '').toLowerCase()
+  const name = (entry.name || '').toLowerCase()
+  return disqualifiedIds.has(id) || disqualifiedIds.has(name)
+}
+

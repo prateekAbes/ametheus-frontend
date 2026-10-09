@@ -1,8 +1,8 @@
 import React from 'react'
+import { Link } from 'react-router'
 import { LeaderboardEntry } from '../../services/leaderboard'
 import { resolveMediaUrl } from '../../services/apiClient'
 import DynamicImage from '../DynamicImage'
-import { ChampionshipCrown } from '../ChampionshipCrown'
 import { inr } from '../../lib/data'
 
 interface PodiumColumnProps {
@@ -127,6 +127,25 @@ export function PodiumColumn({
   const avatarUrl = resolveMediaUrl(entry.logo_url)
   const initial = (entry.name || 'C').charAt(0).toUpperCase()
 
+  const avatarContent = avatarUrl ? (
+    <DynamicImage
+      src={avatarUrl}
+      alt={`${entry.name} avatar`}
+      className="size-full object-cover"
+    />
+  ) : (
+    <div
+      className={`flex size-full items-center justify-center font-display font-black text-ink ${
+        isFirst ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl'
+      }`}
+      style={{
+        background: `linear-gradient(135deg, ${theme.accentColor}22 0%, #12141d 100%)`,
+      }}
+    >
+      {initial}
+    </div>
+  )
+
   return (
     <div
       className={`group relative flex flex-col items-center justify-end transition-all duration-500 ${
@@ -134,42 +153,34 @@ export function PodiumColumn({
       }`}
     >
       {/* ============================================================== */}
-      {/* 1. PERCHED AVATAR & CROWN STANDING ATOP THE 3D PLATFORM */}
+      {/* 1. PERCHED AVATAR ATOP THE 3D PLATFORM                         */}
       {/* ============================================================== */}
-      <div className="relative mb-2 flex flex-col items-center select-none">
-        {/* Crown / Prestige Badge perched directly above avatar */}
-        <div className="relative z-30 mb-1 flex items-center justify-center">
-          <ChampionshipCrown rank={rank} size={isFirst ? 'lg' : 'md'} />
-        </div>
-
-        {/* Player Avatar with Rank Rim & Cyber Glow */}
+      <div className="relative mb-3 flex flex-col items-center select-none">
+        {/* Player Avatar with Rank Rim & Cyber Accent */}
         <div className="relative z-20">
-          <div
-            className={`relative overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105 ${
-              isFirst
-                ? 'size-18 sm:size-22 md:size-26'
-                : 'size-14 sm:size-18 md:size-20'
-            } rounded-full ${theme.avatarRing}`}
-          >
-            {avatarUrl ? (
-              <DynamicImage
-                src={avatarUrl}
-                alt={`${entry.name} avatar`}
-                className="size-full object-cover"
-              />
-            ) : (
-              <div
-                className={`flex size-full items-center justify-center font-display font-black text-ink ${
-                  isFirst ? 'text-3xl sm:text-4xl' : 'text-xl sm:text-2xl'
-                }`}
-                style={{
-                  background: `linear-gradient(135deg, ${theme.accentColor}22 0%, #12141d 100%)`,
-                }}
-              >
-                {initial}
-              </div>
-            )}
-          </div>
+          {isCurrentUser ? (
+            <Link
+              to="/profile"
+              title="View your profile"
+              className={`relative block overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105 ${
+                isFirst
+                  ? 'size-18 sm:size-22 md:size-26'
+                  : 'size-14 sm:size-18 md:size-20'
+              } rounded-full ${theme.avatarRing}`}
+            >
+              {avatarContent}
+            </Link>
+          ) : (
+            <div
+              className={`relative overflow-hidden bg-surface transition-transform duration-300 group-hover:scale-105 ${
+                isFirst
+                  ? 'size-18 sm:size-22 md:size-26'
+                  : 'size-14 sm:size-18 md:size-20'
+              } rounded-full ${theme.avatarRing}`}
+            >
+              {avatarContent}
+            </div>
+          )}
 
           {/* Rank Badge attached to avatar */}
           <div
@@ -295,12 +306,22 @@ export function PodiumColumn({
 
             {/* Contender Name & Tag */}
             <div className="mt-2 sm:mt-3">
-              <h3
-                title={entry.name}
-                className="font-display text-xs sm:text-xl md:text-2xl lg:text-3xl font-black uppercase tracking-tight text-ink truncate leading-tight"
-              >
-                {entry.name}
-              </h3>
+              {isCurrentUser ? (
+                <Link
+                  to="/profile"
+                  title="View your profile"
+                  className="font-display text-xs sm:text-xl md:text-2xl lg:text-3xl font-black uppercase tracking-tight text-ink hover:text-[#3dff9a] transition-colors truncate block leading-tight"
+                >
+                  {entry.name}
+                </Link>
+              ) : (
+                <h3
+                  title={entry.name}
+                  className="font-display text-xs sm:text-xl md:text-2xl lg:text-3xl font-black uppercase tracking-tight text-ink truncate leading-tight"
+                >
+                  {entry.name}
+                </h3>
+              )}
               <div className="mt-0.5 flex items-center justify-center gap-1 font-mono text-[9px] sm:text-xs">
                 {entry.tag && (
                   <span className="font-bold shrink-0" style={{ color: theme.accentColor }}>

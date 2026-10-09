@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { Container, Hud } from '../components/ui'
 import EsportsHeroVisual from '../components/EsportsHeroVisual'
@@ -10,7 +10,7 @@ import {
   LeaderboardCategory,
   LeaderboardDisqualification,
 } from '../services/leaderboard'
-import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
+import { getGames, Game as ApiGame } from '../services/games'
 import { GAMES } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 
@@ -43,19 +43,41 @@ export default function Leaderboard() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
   const [hasError, setHasError] = useState<boolean>(false)
 
-  // Fetch games list for discipline selector
+  // Track the latest active request ID to prevent race conditions from out-of-order responses
+  const activeRequestIdRef = useRef<number>(0)
+
+  // Fetch static metadata (games, categories, disqualifications) on mount
   useEffect(() => {
-    getGames()
-      .then((res) => {
-        if (Array.isArray(res) && res.length > 0) {
-          setGames(res)
-        }
-      })
-      .catch(() => {})
+    Promise.allSettled([
+      getGames(),
+      getLeaderboardCategories(),
+      getLeaderboardDisqualifications(),
+    ]).then(([gamesRes, catsRes, dqsRes]) => {
+      if (gamesRes.status === 'fulfilled' && Array.isArray(gamesRes.value) && gamesRes.value.length > 0) {
+        setGames(gamesRes.value)
+      }
+      if (catsRes.status === 'fulfilled' && Array.isArray(catsRes.value) && catsRes.value.length > 0) {
+        setCategories(catsRes.value)
+      }
+      if (dqsRes.status === 'fulfilled' && Array.isArray(dqsRes.value)) {
+        setDisqualifications(dqsRes.value)
+      }
+    })
   }, [])
 
-  // Primary data fetching routine
-  const fetchData = useCallback(async (isRefresh = false) => {
+  // Sync selectedGame with URL search parameters (e.g. on back/forward browser navigation)
+  useEffect(() => {
+    const gameParam = searchParams.get('game') || 'all'
+    if (gameParam !== selectedGame) {
+      setSelectedGame(gameParam)
+      setCurrentPage(1)
+    }
+  }, [searchParams, selectedGame])
+
+  // Dynamic entries fetching routine with race condition protection
+  const fetchEntries = useCallback(async (isRefresh = false) => {
+    const requestId = ++activeRequestIdRef.current
+
     if (isRefresh) {
       setIsRefreshing(true)
     } else {
@@ -64,34 +86,52 @@ export default function Leaderboard() {
     setHasError(false)
 
     try {
-      const [entriesData, catsData, dqsData] = await Promise.all([
-        getLeaderboardEntries({
-          category: selectedCategory !== 'overall' ? selectedCategory : undefined,
-          game: selectedGame !== 'all' ? selectedGame : undefined,
-          limit: 100,
-          include_disqualified: true,
-        }),
-        getLeaderboardCategories().catch(() => []),
-        getLeaderboardDisqualifications().catch(() => []),
-      ])
+      const entriesPromise = getLeaderboardEntries({
+        category: selectedCategory !== 'overall' ? selectedCategory : undefined,
+        game: selectedGame !== 'all' ? selectedGame : undefined,
+        limit: 100,
+        include_disqualified: true,
+      })
 
-      setEntries(Array.isArray(entriesData) ? entriesData : [])
-      if (Array.isArray(catsData) && catsData.length > 0) {
-        setCategories(catsData)
+      // If explicit user refresh, also reload categories and disqualifications
+      if (isRefresh) {
+        const [entriesData, catsData, dqsData] = await Promise.all([
+          entriesPromise,
+          getLeaderboardCategories().catch(() => []),
+          getLeaderboardDisqualifications().catch(() => []),
+        ])
+
+        if (requestId === activeRequestIdRef.current) {
+          setEntries(Array.isArray(entriesData) ? entriesData : [])
+          if (Array.isArray(catsData) && catsData.length > 0) {
+            setCategories(catsData)
+          }
+          if (Array.isArray(dqsData)) {
+            setDisqualifications(dqsData)
+          }
+        }
+      } else {
+        const entriesData = await entriesPromise
+        if (requestId === activeRequestIdRef.current) {
+          setEntries(Array.isArray(entriesData) ? entriesData : [])
+        }
       }
-      setDisqualifications(Array.isArray(dqsData) ? dqsData : [])
     } catch (err) {
-      console.warn('Failed to load leaderboard data:', err)
-      setHasError(true)
+      if (requestId === activeRequestIdRef.current) {
+        console.warn('Failed to load leaderboard data:', err)
+        setHasError(true)
+      }
     } finally {
-      setLoading(false)
-      setIsRefreshing(false)
+      if (requestId === activeRequestIdRef.current) {
+        setLoading(false)
+        setIsRefreshing(false)
+      }
     }
   }, [selectedCategory, selectedGame])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchEntries()
+  }, [fetchEntries])
 
   // Game filter handler
   const handleSelectGame = (slug: string) => {
@@ -260,7 +300,7 @@ export default function Leaderboard() {
           onSelectCategory={handleSelectCategory}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
-          onRefresh={() => fetchData(true)}
+          onRefresh={() => fetchEntries(true)}
           isRefreshing={isRefreshing}
         />
 
@@ -270,7 +310,7 @@ export default function Leaderboard() {
         {loading ? (
           <LeaderboardSkeleton />
         ) : hasError ? (
-          <LeaderboardErrorState onRetry={() => fetchData(false)} />
+          <LeaderboardErrorState onRetry={() => fetchEntries(false)} />
         ) : filteredEntries.length === 0 ? (
           <LeaderboardEmptyState
             hasFilters={hasActiveFilters}

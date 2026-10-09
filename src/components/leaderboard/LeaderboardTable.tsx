@@ -1,5 +1,10 @@
 import React from 'react'
-import { LeaderboardEntry } from '../../services/leaderboard'
+import { Link } from 'react-router'
+import {
+  LeaderboardEntry,
+  isEntryCurrentUser,
+  isEntryDisqualified,
+} from '../../services/leaderboard'
 import { resolveMediaUrl } from '../../services/apiClient'
 import DynamicImage from '../DynamicImage'
 import { inr } from '../../lib/data'
@@ -31,26 +36,6 @@ export function LeaderboardTable({
 }: LeaderboardTableProps) {
   if (entries.length === 0) {
     return null
-  }
-
-  const isUser = (e: LeaderboardEntry) => {
-    const uid = currentUserId?.toLowerCase()
-    const uname = currentUsername?.toLowerCase()
-    const eId = (e.id || '').toLowerCase()
-    const eName = (e.name || '').toLowerCase()
-    const eCap = (e.captain || '').replace('@', '').toLowerCase()
-    return (
-      (!!uid && (eId === uid || eName === uid)) ||
-      (!!uname && (eName === uname || eCap === uname))
-    )
-  }
-
-  const isDq = (e: LeaderboardEntry) => {
-    if (e.is_disqualified) return true
-    if ((e.status || '').toUpperCase() === 'DISQUALIFIED') return true
-    const id = (e.id || '').toLowerCase()
-    const name = (e.name || '').toLowerCase()
-    return disqualifiedIds.has(id) || disqualifiedIds.has(name)
   }
 
   const ladderStartRank =
@@ -152,15 +137,16 @@ export function LeaderboardTable({
                   (currentPage === 1
                     ? idx + 4
                     : (currentPage - 1) * pageSize + idx + 1)
-                const isDqEntry = isDq(entry)
+                const isDqEntry = isEntryDisqualified(entry, disqualifiedIds)
                 const isDisbanded =
                   entry.is_disbanded || entry.status === 'DISBANDED'
-                const isCurrent = isUser(entry)
+                const isCurrent = isEntryCurrentUser(entry, currentUserId, currentUsername)
                 const avatarUrl = resolveMediaUrl(entry.logo_url)
+                const rowKey = entry.id ? `entry-${entry.id}` : `rank-${rankNumber}-${entry.name}`
 
                 return (
                   <tr
-                    key={entry.id || idx}
+                    key={rowKey}
                     className={`transition-colors hover:bg-white/[0.04] ${
                       isCurrent
                         ? 'bg-[#3dff9a]/10 border-l-2 border-l-[#3dff9a]'
@@ -179,7 +165,23 @@ export function LeaderboardTable({
                     {/* Contender Name, Avatar, Tag */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        {avatarUrl ? (
+                        {isCurrent ? (
+                          <Link to="/profile" title="View your profile" className="group/avatar shrink-0">
+                            {avatarUrl ? (
+                              <div className="size-8 shrink-0 overflow-hidden rounded border border-[#3dff9a]/40 bg-surface group-hover/avatar:border-[#3dff9a] transition-colors">
+                                <DynamicImage
+                                  src={avatarUrl}
+                                  alt={entry.name}
+                                  className="size-8 object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex size-8 shrink-0 items-center justify-center rounded border border-[#3dff9a]/40 bg-surface text-xs font-bold text-[#3dff9a] group-hover/avatar:border-[#3dff9a] transition-colors">
+                                {(entry.name || 'C').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </Link>
+                        ) : avatarUrl ? (
                           <div className="size-8 shrink-0 overflow-hidden rounded border border-white/15 bg-surface">
                             <DynamicImage
                               src={avatarUrl}
@@ -194,9 +196,19 @@ export function LeaderboardTable({
                         )}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-display text-sm font-black uppercase text-ink truncate">
-                              {entry.name}
-                            </span>
+                            {isCurrent ? (
+                              <Link
+                                to="/profile"
+                                title="View your profile"
+                                className="font-display text-sm font-black uppercase text-ink hover:text-[#3dff9a] transition-colors truncate"
+                              >
+                                {entry.name}
+                              </Link>
+                            ) : (
+                              <span className="font-display text-sm font-black uppercase text-ink truncate">
+                                {entry.name}
+                              </span>
+                            )}
                             {entry.tag && (
                               <span className="font-mono text-[10px] text-dim">
                                 [{entry.tag}]
@@ -312,13 +324,14 @@ export function LeaderboardTable({
               (currentPage === 1
                 ? idx + 4
                 : (currentPage - 1) * pageSize + idx + 1)
-            const isDqEntry = isDq(entry)
-            const isCurrent = isUser(entry)
+            const isDqEntry = isEntryDisqualified(entry, disqualifiedIds)
+            const isCurrent = isEntryCurrentUser(entry, currentUserId, currentUsername)
             const avatarUrl = resolveMediaUrl(entry.logo_url)
+            const rowKey = entry.id ? `m-entry-${entry.id}` : `m-rank-${rankNumber}-${entry.name}`
 
             return (
               <div
-                key={entry.id || idx}
+                key={rowKey}
                 className={`p-3.5 space-y-2 ${
                   isCurrent
                     ? 'bg-[#3dff9a]/10 border-l-2 border-l-[#3dff9a]'
@@ -332,7 +345,23 @@ export function LeaderboardTable({
                     <span className="font-mono text-xs font-bold text-dim">
                       #{String(rankNumber).padStart(2, '0')}
                     </span>
-                    {avatarUrl ? (
+                    {isCurrent ? (
+                      <Link to="/profile" title="View your profile" className="group/avatar shrink-0">
+                        {avatarUrl ? (
+                          <div className="size-7 shrink-0 overflow-hidden rounded border border-[#3dff9a]/40 bg-surface group-hover/avatar:border-[#3dff9a] transition-colors">
+                            <DynamicImage
+                              src={avatarUrl}
+                              alt={entry.name}
+                              className="size-7 object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex size-7 shrink-0 items-center justify-center rounded border border-[#3dff9a]/40 bg-surface text-xs font-bold text-[#3dff9a] group-hover/avatar:border-[#3dff9a] transition-colors">
+                            {(entry.name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </Link>
+                    ) : avatarUrl ? (
                       <div className="size-7 shrink-0 overflow-hidden rounded border border-white/15 bg-surface">
                         <DynamicImage
                           src={avatarUrl}
@@ -346,9 +375,19 @@ export function LeaderboardTable({
                       </div>
                     )}
                     <div>
-                      <span className="font-display text-sm font-black uppercase text-ink">
-                        {entry.name}
-                      </span>
+                      {isCurrent ? (
+                        <Link
+                          to="/profile"
+                          title="View your profile"
+                          className="font-display text-sm font-black uppercase text-ink hover:text-[#3dff9a] transition-colors"
+                        >
+                          {entry.name}
+                        </Link>
+                      ) : (
+                        <span className="font-display text-sm font-black uppercase text-ink">
+                          {entry.name}
+                        </span>
+                      )}
                       {entry.tag && (
                         <span className="font-mono text-[10px] text-dim ml-1">
                           [{entry.tag}]

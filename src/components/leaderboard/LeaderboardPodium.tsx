@@ -1,5 +1,9 @@
 import React from 'react'
-import { LeaderboardEntry } from '../../services/leaderboard'
+import {
+  LeaderboardEntry,
+  isEntryCurrentUser,
+  isEntryDisqualified,
+} from '../../services/leaderboard'
 import { PodiumColumn } from './PodiumColumn'
 
 interface LeaderboardPodiumProps {
@@ -24,28 +28,6 @@ export function LeaderboardPodium({
   const top1 = topEntries[0] || null
   const top2 = topEntries[1] || null
   const top3 = topEntries[2] || null
-
-  const isUser = (e: LeaderboardEntry | null) => {
-    if (!e) return false
-    const uid = currentUserId?.toLowerCase()
-    const uname = currentUsername?.toLowerCase()
-    const eId = (e.id || '').toLowerCase()
-    const eName = (e.name || '').toLowerCase()
-    const eCap = (e.captain || '').replace('@', '').toLowerCase()
-    return (
-      (!!uid && (eId === uid || eName === uid)) ||
-      (!!uname && (eName === uname || eCap === uname))
-    )
-  }
-
-  const isDq = (e: LeaderboardEntry | null) => {
-    if (!e) return false
-    if (e.is_disqualified) return true
-    if ((e.status || '').toUpperCase() === 'DISQUALIFIED') return true
-    const id = (e.id || '').toLowerCase()
-    const name = (e.name || '').toLowerCase()
-    return disqualifiedIds.has(id) || disqualifiedIds.has(name)
-  }
 
   return (
     <div className="relative mx-auto w-full max-w-5xl py-6 select-none overflow-visible">
@@ -91,8 +73,8 @@ export function LeaderboardPodium({
               entry={top2}
               rank={2}
               selectedCategory={selectedCategory}
-              isCurrentUser={isUser(top2)}
-              isDisqualified={isDq(top2)}
+              isCurrentUser={isEntryCurrentUser(top2, currentUserId, currentUsername)}
+              isDisqualified={isEntryDisqualified(top2, disqualifiedIds)}
             />
           ) : (
             <div className="h-48 border border-dashed border-white/10 rounded-sm flex items-center justify-center p-3 text-center">
@@ -110,8 +92,8 @@ export function LeaderboardPodium({
               entry={top1}
               rank={1}
               selectedCategory={selectedCategory}
-              isCurrentUser={isUser(top1)}
-              isDisqualified={isDq(top1)}
+              isCurrentUser={isEntryCurrentUser(top1, currentUserId, currentUsername)}
+              isDisqualified={isEntryDisqualified(top1, disqualifiedIds)}
             />
           ) : null}
         </div>
@@ -123,8 +105,8 @@ export function LeaderboardPodium({
               entry={top3}
               rank={3}
               selectedCategory={selectedCategory}
-              isCurrentUser={isUser(top3)}
-              isDisqualified={isDq(top3)}
+              isCurrentUser={isEntryCurrentUser(top3, currentUserId, currentUsername)}
+              isDisqualified={isEntryDisqualified(top3, disqualifiedIds)}
             />
           ) : (
             <div className="h-40 border border-dashed border-white/10 rounded-sm flex items-center justify-center p-3 text-center">
