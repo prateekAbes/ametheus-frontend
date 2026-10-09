@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import {
   AuthenticateWithRedirectCallback,
@@ -20,71 +20,44 @@ import {
 } from 'lucide-react'
 import StarBackground from '../components/StarBackground'
 import CelestialArc from '../components/CelestialArc'
-import { GAMES } from '../lib/data'
-import { getGames, Game as ApiGame } from '../services/games'
 import { useAuthContext } from '../context/AuthContext'
 import { checkUsernameAvailability, updateUserProfile } from '../services/auth'
 import { ametheusClerkAppearance } from '../lib/clerkTheme'
 
-const Scene3D = lazy(() => import('../components/Scene3D'))
-
 /**
- * Unified full-width authentication footer matching celestial glass aesthetic.
+ * Clean, minimal authentication footer.
+ * Contains only Ametheus branding and Back to Home link.
  */
 function AuthFooter() {
   return (
-    <footer className="relative z-20 w-full border-t border-white/[0.08] bg-black/40 backdrop-blur-md px-6 py-4 sm:px-10 lg:px-16">
-      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left font-mono text-xs text-dim">
-        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-left font-bold text-white/90">
-          Ametheus
-        </span>
-
-        {/* Official External Links */}
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <a
-            href="https://discord.gg/VzkfuK7We"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#5865F2] transition-colors tracking-wider"
-          >
-            Discord
-          </a>
-          <span className="text-white/20">·</span>
-          <a
-            href="https://www.instagram.com/official.ametheus"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#E1306C] transition-colors tracking-wider"
-          >
-            Instagram
-          </a>
-          <span className="text-white/20">·</span>
-          <a
-            href="https://www.youtube.com/@official.ametheus.goodgame"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#FF0000] transition-colors tracking-wider"
-          >
-            YouTube
-          </a>
-        </div>
-
-        <div className="flex items-center gap-4 flex-1 justify-end">
-          <Link
-            to="/"
-            className="text-dim/80 hover:text-cyan transition-colors tracking-wider"
-          >
-            Back to Home
-          </Link>
-          <Link
-            to="/sign-in"
-            className="tracking-wider uppercase text-dim/90 hover:text-[#6C47FF] transition-colors"
-          >
-            Ametheus Login
-          </Link>
-        </div>
+    <footer className="relative z-10 w-full border-t border-white/10 px-6 py-5">
+      <div className="max-w-4xl mx-auto flex items-center justify-between text-xs font-mono text-dim">
+        <span className="uppercase tracking-wider font-semibold text-white/70">Ametheus</span>
+        <Link
+          to="/"
+          className="text-dim hover:text-white transition-colors tracking-wider"
+        >
+          Back to Home
+        </Link>
       </div>
     </footer>
+  )
+}
+
+/**
+ * Minimal header displaying only Ametheus branding.
+ */
+function AuthHeader() {
+  return (
+    <header className="relative z-10 w-full max-w-4xl mx-auto flex items-center justify-between px-6 pt-8 pb-4">
+      <Link
+        to="/"
+        className="font-display text-xl font-black tracking-[0.25em] text-white hover:text-cyan transition-colors uppercase"
+        aria-label="Ametheus Home"
+      >
+        Ametheus
+      </Link>
+    </header>
   )
 }
 
@@ -221,7 +194,7 @@ export default function Auth() {
       return
     }
     if (usernameStatus === 'taken' || usernameStatus === 'invalid') {
-      setError('Please choose an available, valid Ametheus username.')
+      setError('Please choose an available, valid username.')
       return
     }
     setIsLoading(true)
@@ -276,53 +249,18 @@ export default function Auth() {
     }
   }
 
-  // Games pool for the left 3D background animation
-  const [apiGames, setApiGames] = useState<ApiGame[]>([])
-  useEffect(() => {
-    getGames()
-      .then((res) => {
-        if (Array.isArray(res) && res.length > 0) setApiGames(res)
-      })
-      .catch(() => {})
-  }, [])
-
-  const gamesPool = apiGames.length > 0 ? apiGames : GAMES
-  const [gi, setGi] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => setGi((i) => (i + 1) % gamesPool.length), 3200)
-    return () => clearInterval(t)
-  }, [gamesPool.length])
-
-  const rawG = gamesPool[gi % gamesPool.length]
-  const g = {
-    name: (rawG as any).name || 'Ametheus',
-    short: (rawG as any).tag || (rawG as any).short || 'AMETHEUS',
-    genre: (rawG as any).category || (rawG as any).genre || 'Esports',
-    accent:
-      (rawG as any).accent_color ||
-      (rawG as any).accentColor ||
-      (rawG as any).accent ||
-      '#6C47FF',
-    line:
-      (rawG as any).announcement_text ||
-      (rawG as any).announcementText ||
-      (rawG as any).line ||
-      'The Gaming Battleground',
-    desc: (rawG as any).description || (rawG as any).desc || '',
-  }
-
   // =========================================================================
   // 1. OAuth SSO Callback screen
   // =========================================================================
   if (isSsoCallback) {
     return (
-      <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#05060a] text-white overflow-hidden">
+      <div className="relative flex min-h-screen flex-col items-center justify-center bg-void text-white overflow-hidden">
         <StarBackground variant="continuation" />
         <CelestialArc variant="subtle" />
         <div className="relative z-10 flex flex-col items-center gap-4 p-8">
-          <div className="size-9 animate-spin rounded-full border-2 border-[#6C47FF] border-t-transparent shadow-[0_0_16px_#6C47FF]" />
+          <div className="size-9 animate-spin rounded-full border-2 border-cyan border-t-transparent shadow-[0_0_16px_rgba(0,245,255,0.4)]" />
           <p className="font-mono text-xs uppercase tracking-widest text-white/80">
-            Completing Ametheus Authentication...
+            Completing authentication...
           </p>
         </div>
         <AuthenticateWithRedirectCallback
@@ -337,50 +275,37 @@ export default function Auth() {
   // 2. /sign-up/continue — Dedicated Username Setup OR Incomplete Signup
   // =========================================================================
   if (isContinuationRoute) {
-    // If user is already signed in with Clerk and needs a username: show contender setup form
     if (
       isSignedIn &&
       (profile?.needs_username === true || !profile?.has_chosen_username)
     ) {
       return (
-        <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+        <div className="relative min-h-screen flex flex-col justify-between bg-void text-white overflow-hidden">
           <StarBackground variant="continuation" />
           <CelestialArc variant="major" />
 
-          {/* Top Header Row */}
-          <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
-            <Link
-              to="/"
-              className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#6C47FF] transition-colors uppercase"
-              aria-label="Ametheus Home"
-            >
-              Ametheus
-            </Link>
-          </div>
+          <AuthHeader />
 
-          {/* Center: Contender Identity Setup Panel */}
-          <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-[#090A0F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_35px_rgba(108,71,255,0.15)]">
+          {/* Floating Username Form without cards/containers */}
+          <main className="relative z-10 my-auto w-full max-w-[380px] mx-auto px-6 py-8">
             <div className="mb-6">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#6C47FF] block mb-1">
-                Account Setup
-              </span>
-              <h2 className="font-display text-3xl font-black uppercase tracking-tight text-white leading-tight">
-                Choose Contender Handle
-              </h2>
-              <p className="font-sans text-xs text-dim mt-2 leading-relaxed">
-                Set your unique username to compete in tournaments and appear on leaderboards.
+              <h1 className="font-display text-3xl font-black uppercase tracking-tight text-white">
+                Choose username
+              </h1>
+              <p className="font-sans text-xs text-dim mt-1.5 leading-relaxed">
+                Set your username to continue to Ametheus.
               </p>
             </div>
 
             {error && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-live/40 bg-live/15 p-3 text-xs leading-relaxed text-live backdrop-blur-md animate-fadeIn">
+              <div className="mb-5 flex items-start gap-2.5 border border-live/40 bg-live/10 p-3 text-xs leading-relaxed text-live">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-live" />
                 <span className="flex-1 font-mono text-[11px]">{error}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-ok/40 bg-ok/15 p-3 text-xs leading-relaxed text-ok backdrop-blur-md animate-fadeIn">
+              <div className="mb-5 flex items-start gap-2.5 border border-ok/40 bg-ok/10 p-3 text-xs leading-relaxed text-ok">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" />
                 <span className="flex-1 font-mono text-[11px]">{successMessage}</span>
               </div>
@@ -392,11 +317,11 @@ export default function Auth() {
                   htmlFor="continue-username"
                   className="block font-mono text-[11px] uppercase tracking-wider text-slate-300 font-medium mb-1.5"
                 >
-                  Username <span className="text-[#6C47FF]" aria-hidden="true">*</span>
+                  Username <span className="text-cyan" aria-hidden="true">*</span>
                 </label>
                 <div className="relative">
                   <span
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-[#6C47FF] font-bold select-none"
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-cyan font-bold select-none"
                     aria-hidden="true"
                   >
                     @
@@ -413,11 +338,11 @@ export default function Auth() {
                     autoComplete="username"
                     aria-describedby="continue-username-feedback"
                     aria-invalid={usernameStatus === 'taken' || usernameStatus === 'invalid'}
-                    className="h-12 w-full rounded-md border border-white/15 bg-black/60 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
+                    className="h-11 w-full border border-white/15 bg-white/[0.04] pl-8 pr-10 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan focus:bg-white/[0.08] focus:outline-none"
                   />
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2" aria-hidden="true">
                     {usernameStatus === 'checking' && (
-                      <Loader2 size={16} className="animate-spin text-[#6C47FF]" />
+                      <Loader2 size={16} className="animate-spin text-cyan" />
                     )}
                     {usernameStatus === 'available' && (
                       <Check size={16} className="text-ok" />
@@ -435,7 +360,7 @@ export default function Auth() {
                 >
                   {usernameStatus === 'checking' && (
                     <span className="text-dim flex items-center gap-1.5">
-                      <Loader2 size={11} className="animate-spin text-[#6C47FF]" aria-hidden="true" />
+                      <Loader2 size={11} className="animate-spin text-cyan" aria-hidden="true" />
                       Checking availability...
                     </span>
                   )}
@@ -449,69 +374,66 @@ export default function Auth() {
                     <span className="text-warn">{usernameMessage}</span>
                   )}
                   {usernameStatus === 'idle' && (
-                    <span className="text-dim/60">3–30 chars (letters, numbers, _, -, .)</span>
+                    <span className="text-dim/60">3–30 characters</span>
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="block font-mono text-[11px] uppercase tracking-wider text-slate-300 font-medium mb-1.5">
-                  Display Name (Optional)
+                <label
+                  htmlFor="continue-displayname"
+                  className="block font-mono text-[11px] uppercase tracking-wider text-slate-300 font-medium mb-1.5"
+                >
+                  Display Name <span className="text-dim/50 font-normal">(Optional)</span>
                 </label>
                 <input
+                  id="continue-displayname"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Rahul Sharma"
+                  placeholder="Shadow Fox"
                   disabled={isLoading}
-                  className="h-12 w-full rounded-md border border-white/15 bg-black/60 px-3.5 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
+                  autoComplete="name"
+                  className="h-11 w-full border border-white/15 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-dim/40 transition-all focus:border-cyan focus:bg-white/[0.08] focus:outline-none"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading || (username.length >= 3 && usernameStatus === 'taken')}
-                className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-base font-black uppercase tracking-wider text-white shadow-[0_0_24px_rgba(108,71,255,0.35)] transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-5"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span className="font-mono text-xs font-bold tracking-wider">
-                      Saving Profile...
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>Confirm Contender Handle</span>
-                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-                  </>
-                )}
-              </button>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isLoading || usernameStatus !== 'available'}
+                  className="flex h-11 w-full items-center justify-center gap-2 bg-cyan hover:bg-cyan/90 disabled:opacity-40 disabled:cursor-not-allowed font-display text-sm font-black uppercase tracking-wider text-void transition-all cursor-pointer"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin text-void" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
-          </div>
+          </main>
 
           <AuthFooter />
         </div>
       )
     }
 
-    // Otherwise, render Clerk's SignUp continuation flow
+    // Unfinished sign-up continuation via Clerk
     return (
-      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+      <div className="relative min-h-screen flex flex-col justify-between bg-void text-white overflow-hidden">
         <StarBackground variant="continuation" />
         <CelestialArc variant="major" />
 
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
-          <Link
-            to="/"
-            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#6C47FF] transition-colors uppercase"
-            aria-label="Ametheus Home"
-          >
-            Ametheus
-          </Link>
-        </div>
+        <AuthHeader />
 
-        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
+        <main className="relative z-10 my-auto w-full max-w-[400px] mx-auto px-6 py-8">
           <SignUp
             path="/sign-up"
             routing="path"
@@ -519,7 +441,7 @@ export default function Auth() {
             fallbackRedirectUrl={destination}
             appearance={ametheusClerkAppearance}
           />
-        </div>
+        </main>
 
         <AuthFooter />
       </div>
@@ -541,49 +463,34 @@ export default function Auth() {
         : '')
 
     return (
-      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+      <div className="relative min-h-screen flex flex-col justify-between bg-void text-white overflow-hidden">
         <StarBackground variant="continuation" />
         <CelestialArc variant={hasError ? 'subtle' : 'major'} />
 
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
-          <Link
-            to="/"
-            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#6C47FF] transition-colors uppercase"
-            aria-label="Ametheus Home"
-          >
-            Ametheus
-          </Link>
-        </div>
+        <AuthHeader />
 
-        <div className="relative z-10 my-auto w-full max-w-[480px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-[#090A0F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_35px_rgba(108,71,255,0.12)]">
+        <main className="relative z-10 my-auto w-full max-w-[420px] mx-auto px-6 py-8">
           {hasError ? (
-            <div className="space-y-6">
-              <div className="flex items-start gap-3.5">
-                <div className="size-10 rounded-full border border-rose-500/40 bg-rose-500/15 flex items-center justify-center shrink-0">
-                  <ShieldAlert size={22} className="text-rose-400" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-rose-400 block">
-                    Security Notice
-                  </span>
-                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white leading-tight">
-                    Revocation Unsuccessful
-                  </h2>
-                </div>
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <ShieldAlert size={24} className="text-rose-400 shrink-0" />
+                <h1 className="font-display text-2xl font-black uppercase tracking-tight text-white">
+                  Revocation Unsuccessful
+                </h1>
               </div>
 
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-200/90 font-mono leading-relaxed">
+              <div className="border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-200/90 font-mono leading-relaxed">
                 {errorMessage || 'The revocation link could not be verified or has already expired.'}
               </div>
 
               <p className="font-sans text-xs text-dim leading-relaxed">
-                If you suspect unauthorized activity on your account, we strongly advise changing your password immediately and inspecting your active sessions.
+                If you suspect unauthorized activity on your account, please update your password and inspect your active sessions.
               </p>
 
               <div className="space-y-2.5 pt-2">
                 <Link
                   to="/settings?tab=Security"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                  className="flex h-11 w-full items-center justify-center gap-2 bg-cyan hover:bg-cyan/90 font-display text-xs font-black uppercase tracking-wider text-void transition-all cursor-pointer"
                 >
                   <Lock size={14} />
                   <span>Update Password & Sessions</span>
@@ -591,7 +498,7 @@ export default function Auth() {
 
                 <Link
                   to="/sign-in"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                  className="flex h-11 w-full items-center justify-center gap-2 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
                 >
                   <span>Sign In</span>
                   <ArrowRight size={14} />
@@ -599,39 +506,30 @@ export default function Auth() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
-              <div className="flex items-start gap-3.5">
-                <div className="size-10 rounded-full border border-emerald-500/40 bg-emerald-500/15 flex items-center justify-center shrink-0">
-                  <ShieldCheck size={22} className="text-emerald-400" />
-                </div>
-                <div className="space-y-1">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-400 block">
-                    Security Action Confirmed
-                  </span>
-                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white leading-tight">
-                    Unrecognized Session Terminated
-                  </h2>
-                </div>
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <ShieldCheck size={24} className="text-emerald-400 shrink-0" />
+                <h1 className="font-display text-2xl font-black uppercase tracking-tight text-white">
+                  Session Terminated
+                </h1>
               </div>
 
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200/90 font-mono leading-relaxed">
-                The unauthorized session was revoked on the authentication server. Access from that device has been immediately terminated.
+              <div className="border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200/90 font-mono leading-relaxed">
+                The unauthorized session was revoked on the authentication server. Access from that device has been terminated.
               </div>
 
-              <div className="space-y-2 text-xs text-dim">
-                <p className="font-sans leading-relaxed">
-                  Recommended next steps to safeguard your Ametheus account:
-                </p>
+              <div className="space-y-1.5 text-xs text-dim">
+                <p className="font-sans leading-relaxed">Recommended next steps:</p>
                 <ul className="list-disc pl-4 space-y-1 font-sans text-white/80">
-                  <li>Review all current active logins under Security settings.</li>
-                  <li>Update your password if you suspect your credentials were leaked.</li>
+                  <li>Review active logins under Security settings.</li>
+                  <li>Update your password if your credentials may be compromised.</li>
                 </ul>
               </div>
 
               <div className="space-y-2.5 pt-2">
                 <Link
                   to="/settings?tab=Security"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                  className="flex h-11 w-full items-center justify-center gap-2 bg-cyan hover:bg-cyan/90 font-display text-xs font-black uppercase tracking-wider text-void transition-all cursor-pointer"
                 >
                   <ShieldCheck size={14} />
                   <span>Review Active Sessions</span>
@@ -640,22 +538,22 @@ export default function Auth() {
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     to="/sign-in"
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                    className="flex h-10 items-center justify-center gap-1.5 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
                   >
                     <span>Sign In</span>
                     <ArrowRight size={13} />
                   </Link>
                   <Link
                     to="/"
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-dim hover:text-white font-mono text-xs uppercase tracking-wider transition-all"
+                    className="flex h-10 items-center justify-center gap-1.5 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-dim hover:text-white font-mono text-xs uppercase tracking-wider transition-all"
                   >
-                    <span>Return to Arena</span>
+                    <span>Back to Home</span>
                   </Link>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </main>
 
         <AuthFooter />
       </div>
@@ -663,55 +561,48 @@ export default function Auth() {
   }
 
   // =========================================================================
-  // 4. /unauthorized Screen
+  // 4. /unauthorized Screen (403 Permission Screen)
   // =========================================================================
   if (isUnauthorized) {
     return (
-      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+      <div className="relative min-h-screen flex flex-col justify-between bg-void text-white overflow-hidden">
         <StarBackground variant="continuation" />
         <CelestialArc variant="subtle" />
 
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
-          <Link
-            to="/"
-            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-cyan transition-colors uppercase"
-            aria-label="Ametheus Home"
-          >
-            Ametheus
-          </Link>
-        </div>
+        <AuthHeader />
 
-        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 rounded-2xl border border-rose-500/30 bg-[#090A0F]/95 backdrop-blur-xl shadow-2xl">
-          <div className="flex items-start gap-3">
-            <ShieldAlert size={22} className="mt-0.5 shrink-0 text-rose-400" />
-            <div className="space-y-1">
-              <p className="font-mono text-xs font-bold uppercase tracking-wider text-rose-300">
-                Restricted Arena Terminal
-              </p>
-              <p className="font-sans text-xs text-dim leading-relaxed">
-                The requested circuit arena requires verified contender credentials or elevated permissions. Please authenticate with an authorized account.
-              </p>
+        <main className="relative z-10 my-auto w-full max-w-[420px] mx-auto px-6 py-8">
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <ShieldAlert size={24} className="text-rose-400 shrink-0" />
+              <h1 className="font-display text-2xl font-black uppercase tracking-tight text-white">
+                Access Restricted
+              </h1>
+            </div>
+
+            <p className="font-sans text-xs text-dim leading-relaxed">
+              This area requires verified credentials or elevated permissions. Please authenticate with an authorized account.
+            </p>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/sign-in')}
+                className="flex h-11 w-full items-center justify-center gap-2 bg-cyan hover:bg-cyan/90 font-display text-xs font-black uppercase tracking-wider text-void transition-all cursor-pointer"
+              >
+                <span>Sign In to Ametheus</span>
+                <ArrowRight size={14} />
+              </button>
+
+              <Link
+                to="/"
+                className="flex h-11 w-full items-center justify-center gap-2 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+              >
+                Back to Home
+              </Link>
             </div>
           </div>
-
-          <div className="mt-6 space-y-2.5">
-            <button
-              type="button"
-              onClick={() => navigate('/sign-in')}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-sm font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
-            >
-              <span>Sign In with Authorized Account</span>
-              <ArrowRight size={16} />
-            </button>
-
-            <Link
-              to="/"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
-            >
-              Return to Arena
-            </Link>
-          </div>
-        </div>
+        </main>
 
         <AuthFooter />
       </div>
@@ -719,92 +610,37 @@ export default function Auth() {
   }
 
   // =========================================================================
-  // 4. MAIN APPLICATION-HOSTED AUTHENTICATION (SIGN-IN & SIGN-UP)
+  // 5. MAIN APPLICATION-HOSTED AUTHENTICATION (SIGN-IN & SIGN-UP)
+  // Clean floating forms with no artificial outer cards or banner panels.
   // =========================================================================
   return (
-    <div className="relative min-h-screen flex flex-col justify-between bg-void overflow-hidden">
+    <div className="relative min-h-screen flex flex-col justify-between bg-void text-white overflow-hidden">
       <StarBackground variant="standard" />
       <CelestialArc variant="sweeping" />
 
-      {/* Main interactive grid: Left 3D Showcase (Desktop), Right Clerk Auth Panel */}
-      <div className="relative z-10 flex-1 grid lg:grid-cols-[1.1fr_1fr] items-stretch">
-        {/* LEFT: 3D SPHERE SHOWCASE */}
-        <div className="relative hidden overflow-hidden lg:flex lg:flex-col justify-between p-12 lg:p-16">
-          <Suspense fallback={null}>
-            <Scene3D
-              accent={g.accent}
-              scale={0.90}
-              className="pointer-events-none absolute inset-0 opacity-80"
-            />
-          </Suspense>
+      <AuthHeader />
 
-          {/* Top Brand Text Header */}
-          <div className="relative z-10">
-            <Link
-              to="/"
-              className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-cyan transition-colors uppercase"
-              aria-label="Ametheus Home"
-            >
-              Ametheus
-            </Link>
-          </div>
+      {/* Floating Center Form: Naturally Integrated into Page Background */}
+      <main className="relative z-10 my-auto w-full max-w-[400px] mx-auto px-6 py-8">
+        {isSignUpRoute ? (
+          <SignUp
+            path="/sign-up"
+            routing="path"
+            signInUrl="/sign-in"
+            fallbackRedirectUrl={destination}
+            appearance={ametheusClerkAppearance}
+          />
+        ) : (
+          <SignIn
+            path="/sign-in"
+            routing="path"
+            signUpUrl="/sign-up"
+            fallbackRedirectUrl={destination}
+            appearance={ametheusClerkAppearance}
+          />
+        )}
+      </main>
 
-          {/* Center Esports Game Highlights */}
-          <div className="relative z-10 my-auto py-12">
-            <span
-              className="font-display text-sm font-black uppercase tracking-[0.2em] transition-colors duration-500"
-              style={{ color: g.accent }}
-            >
-              {g.short} · {g.genre}
-            </span>
-            <p className="mt-3 font-display text-5xl font-black uppercase leading-[0.85] text-white">
-              {g.line}
-            </p>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-dim">{g.desc}</p>
-          </div>
-
-          <div className="relative z-10" />
-        </div>
-
-        {/* RIGHT: APPLICATION-HOSTED CLERK AUTHENTICATION COMPONENT */}
-        <div className="relative z-10 flex flex-col justify-between px-6 py-8 sm:px-10 lg:px-12 xl:px-14 overflow-hidden">
-          {/* Top Mobile Brand Header */}
-          <div className="relative z-10 flex items-center justify-between lg:hidden mb-4">
-            <Link
-              to="/"
-              className="font-display text-base font-black tracking-[0.2em] text-white hover:text-cyan transition-colors uppercase"
-              aria-label="Ametheus Home"
-            >
-              Ametheus
-            </Link>
-          </div>
-
-          {/* Center: Clerk Prebuilt Component Container */}
-          <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
-            {isSignUpRoute ? (
-              <SignUp
-                path="/sign-up"
-                routing="path"
-                signInUrl="/sign-in"
-                fallbackRedirectUrl={destination}
-                appearance={ametheusClerkAppearance}
-              />
-            ) : (
-              <SignIn
-                path="/sign-in"
-                routing="path"
-                signUpUrl="/sign-up"
-                fallbackRedirectUrl={destination}
-                appearance={ametheusClerkAppearance}
-              />
-            )}
-          </div>
-
-          <div className="relative z-10" />
-        </div>
-      </div>
-
-      {/* ONE UNIFIED FULL-WIDTH FOOTER */}
       <AuthFooter />
     </div>
   )
