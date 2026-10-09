@@ -449,7 +449,7 @@ export default function Settings() {
       }
       await clerk.signOut()
       localStorage.clear()
-      window.location.href = '/login'
+      window.location.href = '/sign-in'
     } catch (err: any) {
       setDeleteError(err.errors?.[0]?.message || err.message || 'Failed to delete account.')
       setIsDeleting(false)

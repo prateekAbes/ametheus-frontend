@@ -36,14 +36,6 @@ export interface LeaderboardDisqualification {
   disqualified_at?: string
 }
 
-export interface LeaderboardStats {
-  total_awarded_prizes: string
-  active_contenders: string
-  verified_squads: string
-  top_team_earnings: string
-  top_team_name: string
-}
-
 export interface LeaderboardCategory {
   id: string
   name: string
@@ -77,10 +69,6 @@ export async function getLeaderboardEntries(params?: {
 
 export async function getLeaderboardDisqualifications(): Promise<LeaderboardDisqualification[]> {
   return apiClient<LeaderboardDisqualification[]>('/leaderboard/disqualifications')
-}
-
-export async function getLeaderboardStats(): Promise<LeaderboardStats> {
-  return apiClient<LeaderboardStats>('/leaderboard/stats')
 }
 
 export async function getLeaderboardCategories(): Promise<LeaderboardCategory[]> {
