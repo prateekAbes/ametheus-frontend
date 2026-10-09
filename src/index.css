@@ -19,7 +19,7 @@
   --color-warn: #ffc23d;
 }
 
-html { background: #05060a; color: #eef0f6; scrollbar-width: none; }
+html { background: #05060a; color: #eef0f6; scrollbar-width: none; scrollbar-gutter: stable; }
 body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow-x: clip; }
 ::selection { background: #3ef2ff; color: #05060a; }
 
@@ -64,7 +64,6 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
 @keyframes radar { to { transform: translate(-50%, -50%) rotate(360deg) } }
 .radar { background: conic-gradient(from 0deg, transparent 0 300deg, rgb(62 242 255 / .12) 360deg); animation: radar 6s linear infinite; }
 .in-view { } /* visible by default; GSAP hides only below-the-fold items it will reveal */
-html { background: #05060a; scrollbar-gutter: stable; }
 .cv-auto { content-visibility: auto; contain-intrinsic-size: auto 800px; }
 .skeleton { background: linear-gradient(90deg, #12141d 0%, #191c28 50%, #12141d 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0 } }

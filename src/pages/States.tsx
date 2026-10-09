@@ -5,7 +5,7 @@ import { AVATARS } from '../lib/data'
 const COLORS = [['void', 'bg-void'], ['graphite', 'bg-graphite'], ['surface', 'bg-surface'], ['ink', 'bg-ink'], ['dim', 'bg-dim'], ['cyan', 'bg-cyan'], ['violet', 'bg-violet'], ['magenta', 'bg-magenta'], ['live', 'bg-live'], ['ok', 'bg-ok'], ['warn', 'bg-warn']]
 const STATES = [
   { code: '404', title: 'Page not found', body: "You've dropped outside the zone. This page doesn't exist.", cta: 'Back to base', to: '/' },
-  { code: '403', title: 'Access denied', body: "You don't have clearance for this area.", cta: 'Log in', to: '/login' },
+  { code: '403', title: 'Access denied', body: "You don't have clearance for this area.", cta: 'Log in', to: '/sign-in' },
   { code: '500', title: 'Server error', body: "The server got knocked. We're reviving it.", cta: 'Retry', to: '/states' },
   { code: '0T', title: 'No tournaments', body: 'No tournaments match these filters. New brackets drop every week.', cta: 'Browse all', to: '/tournaments' },
   { code: '0S', title: 'No teams', body: "You're flying solo. Create a squad or accept an invite.", cta: 'Create team', to: '/teams' },

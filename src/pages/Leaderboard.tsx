@@ -3,10 +3,8 @@ import { useSearchParams } from 'react-router'
 import { Container } from '../components/ui'
 import {
   getLeaderboardEntries,
-  getLeaderboardCategories,
   getLeaderboardDisqualifications,
   LeaderboardEntry,
-  LeaderboardCategory,
   LeaderboardDisqualification,
 } from '../services/leaderboard'
 import { getGames, Game as ApiGame } from '../services/games'
@@ -38,7 +36,6 @@ export default function Leaderboard() {
 
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [disqualifications, setDisqualifications] = useState<LeaderboardDisqualification[]>([])
-  const [categories, setCategories] = useState<LeaderboardCategory[]>([])
   const [games, setGames] = useState<ApiGame[]>([])
 
   const [selectedGame, setSelectedGame] = useState<string>(initialGame)
@@ -47,24 +44,19 @@ export default function Leaderboard() {
   const [currentPage, setCurrentPage] = useState<number>(1)
 
   const [loading, setLoading] = useState<boolean>(true)
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false)
   const [hasError, setHasError] = useState<boolean>(false)
 
   // Track the latest active request ID to prevent race conditions from out-of-order responses
   const activeRequestIdRef = useRef<number>(0)
 
-  // Fetch static metadata (games, categories, disqualifications) on mount
+  // Fetch static metadata (games, disqualifications) on mount
   useEffect(() => {
     Promise.allSettled([
       getGames(),
-      getLeaderboardCategories(),
       getLeaderboardDisqualifications(),
-    ]).then(([gamesRes, catsRes, dqsRes]) => {
+    ]).then(([gamesRes, dqsRes]) => {
       if (gamesRes.status === 'fulfilled' && Array.isArray(gamesRes.value) && gamesRes.value.length > 0) {
         setGames(gamesRes.value)
-      }
-      if (catsRes.status === 'fulfilled' && Array.isArray(catsRes.value) && catsRes.value.length > 0) {
-        setCategories(catsRes.value)
       }
       if (dqsRes.status === 'fulfilled' && Array.isArray(dqsRes.value)) {
         setDisqualifications(dqsRes.value)
@@ -82,46 +74,22 @@ export default function Leaderboard() {
   }, [searchParams, selectedGame])
 
   // Dynamic entries fetching routine with race condition protection
-  const fetchEntries = useCallback(async (isRefresh = false) => {
+  const fetchEntries = useCallback(async () => {
     const requestId = ++activeRequestIdRef.current
 
-    if (isRefresh) {
-      setIsRefreshing(true)
-    } else {
-      setLoading(true)
-    }
+    setLoading(true)
     setHasError(false)
 
     try {
-      const entriesPromise = getLeaderboardEntries({
+      const entriesData = await getLeaderboardEntries({
         category: selectedCategory !== 'overall' ? selectedCategory : undefined,
         game: selectedGame !== 'all' ? selectedGame : undefined,
         limit: 100,
         include_disqualified: true,
       })
 
-      // If explicit user refresh, also reload categories and disqualifications
-      if (isRefresh) {
-        const [entriesData, catsData, dqsData] = await Promise.all([
-          entriesPromise,
-          getLeaderboardCategories().catch(() => []),
-          getLeaderboardDisqualifications().catch(() => []),
-        ])
-
-        if (requestId === activeRequestIdRef.current) {
-          setEntries(Array.isArray(entriesData) ? entriesData : [])
-          if (Array.isArray(catsData) && catsData.length > 0) {
-            setCategories(catsData)
-          }
-          if (Array.isArray(dqsData)) {
-            setDisqualifications(dqsData)
-          }
-        }
-      } else {
-        const entriesData = await entriesPromise
-        if (requestId === activeRequestIdRef.current) {
-          setEntries(Array.isArray(entriesData) ? entriesData : [])
-        }
+      if (requestId === activeRequestIdRef.current) {
+        setEntries(Array.isArray(entriesData) ? entriesData : [])
       }
     } catch (err) {
       if (requestId === activeRequestIdRef.current) {
@@ -131,7 +99,6 @@ export default function Leaderboard() {
     } finally {
       if (requestId === activeRequestIdRef.current) {
         setLoading(false)
-        setIsRefreshing(false)
       }
     }
   }, [selectedCategory, selectedGame])
@@ -336,7 +303,7 @@ export default function Leaderboard() {
             {loading ? (
               <LeaderboardSkeleton />
             ) : hasError ? (
-              <LeaderboardErrorState onRetry={() => fetchEntries(false)} />
+              <LeaderboardErrorState onRetry={() => fetchEntries()} />
             ) : filteredEntries.length === 0 ? (
               <LeaderboardEmptyState
                 hasFilters={hasActiveFilters}
