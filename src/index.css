@@ -112,11 +112,15 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
 /* ===================================================================== */
 .cl-rootBox {
   width: 100%;
+  background: transparent !important;
 }
 .cl-cardBox {
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
+  width: 100% !important;
+  max-width: 440px !important;
+  margin: 0 auto !important;
+  box-shadow: none !important;
+  border: none !important;
+  background-color: transparent !important;
 }
 .cl-card {
   background-color: transparent !important;
@@ -127,45 +131,81 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
   -webkit-backdrop-filter: none !important;
   padding: 0 !important;
 }
-.cl-cardBox {
-  box-shadow: none !important;
-  border: none !important;
-  background-color: transparent !important;
+.cl-header {
+  padding: 0 !important;
+  margin-bottom: 1.5rem !important;
+  text-align: left !important;
+  align-items: flex-start !important;
 }
 .cl-headerTitle {
   font-family: var(--font-display) !important;
-  font-size: 1.875rem !important;
+  font-size: 2.25rem !important;
   font-weight: 900 !important;
   text-transform: uppercase !important;
   letter-spacing: -0.025em !important;
   color: #ffffff !important;
+  line-height: 1.1 !important;
+  text-align: left !important;
 }
 .cl-headerSubtitle {
   font-family: var(--font-sans) !important;
   font-size: 0.75rem !important;
   color: #94a3b8 !important;
+  margin-top: 0.375rem !important;
+  text-align: left !important;
 }
 .cl-socialButtonsBlockButton {
-  background-color: rgba(0, 0, 0, 0.5) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(9, 11, 16, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.375rem !important;
+  height: 2.75rem !important;
   transition: all 0.2s ease !important;
 }
 .cl-socialButtonsBlockButton:hover {
   background-color: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+.cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+}
+.cl-socialButtonsProviderIcon {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+.cl-dividerRow {
+  margin: 1.25rem 0 !important;
+}
+.cl-dividerLine {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  height: 1px !important;
+}
+.cl-dividerText {
+  font-family: var(--font-mono) !important;
+  font-size: 0.625rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  background: transparent !important;
+  padding: 0 0.5rem !important;
 }
 .cl-formButtonPrimary {
   background-color: #6c47ff !important;
   color: #ffffff !important;
   font-family: var(--font-display) !important;
-  font-size: 0.875rem !important;
+  font-size: 1rem !important;
   font-weight: 900 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.375rem !important;
+  height: 2.75rem !important;
+  width: 100% !important;
   box-shadow: 0 0 20px rgba(108, 71, 255, 0.35) !important;
+  border: none !important;
+  cursor: pointer !important;
   transition: all 0.2s ease !important;
 }
 .cl-formButtonPrimary:hover {
@@ -173,34 +213,50 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
   box-shadow: 0 0 28px rgba(108, 71, 255, 0.5) !important;
 }
 .cl-formFieldInput {
-  background-color: rgba(5, 6, 10, 0.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(7, 9, 14, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.375rem !important;
+  height: 2.75rem !important;
+  padding: 0 0.875rem !important;
+  font-size: 0.875rem !important;
+  transition: all 0.2s ease !important;
 }
 .cl-formFieldInput:focus {
   border-color: #6c47ff !important;
-  box-shadow: 0 0 0 2px rgba(108, 71, 255, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(108, 71, 255, 0.5) !important;
+  outline: none !important;
 }
 .cl-formFieldLabel {
   font-family: var(--font-mono) !important;
   font-size: 0.6875rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  color: #cbd5e1 !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 500 !important;
+  margin-bottom: 0.375rem !important;
 }
+.cl-formFieldAction,
 .cl-footerActionLink {
   color: #6c47ff !important;
   font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: color 0.15s ease !important;
 }
+.cl-formFieldAction:hover,
 .cl-footerActionLink:hover {
   color: #8364ff !important;
   text-decoration: underline !important;
 }
+.cl-footerActionText {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+}
 .cl-footer {
   border-top: none !important;
   background-color: transparent !important;
-  padding-top: 0 !important;
+  padding: 0 !important;
+  margin-top: 1rem !important;
 }
 .cl-identityPreviewText {
   color: #ffffff !important;
@@ -213,9 +269,15 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
 .cl-footerPagesLink,
 .cl-internal-b3fm6y,
 .cl-internal-ph3869,
+.cl-internal-1dauvpw,
+.cl-internal-117y3e6,
 [class*="footerPages"],
 [class*="securedBy"],
 [data-localization-key*="securedBy"] {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  opacity: 0 !important;
 }
+
 

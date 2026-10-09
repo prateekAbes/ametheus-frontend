@@ -34,19 +34,23 @@ const Scene3D = lazy(() => import('../components/Scene3D'))
 function AuthFooter() {
   return (
     <footer className="relative z-20 w-full border-t border-white/[0.08] bg-black/40 backdrop-blur-md px-6 py-4 sm:px-10 lg:px-16">
-      <div className="w-full flex items-center justify-between gap-4 font-mono text-xs text-dim">
-        <Link
-          to="/"
-          className="tracking-wider uppercase text-dim/90 font-bold text-white/90 hover:text-cyan transition-colors"
-        >
-          Ametheus
-        </Link>
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-dim">
+        <span className="tracking-wider uppercase text-dim/90 font-medium">
+          AMETHEUS — COMPETITIVE PLATFORM
+        </span>
 
         <Link
           to="/"
-          className="text-dim/80 hover:text-cyan transition-colors tracking-wider"
+          className="text-dim/80 hover:text-white transition-colors tracking-wider"
         >
           Back to Home
+        </Link>
+
+        <Link
+          to="/sign-in"
+          className="tracking-wider uppercase text-dim/90 hover:text-white transition-colors"
+        >
+          AMETHEUS LOGIN
         </Link>
       </div>
     </footer>
@@ -326,14 +330,14 @@ export default function Auth() {
           {/* Center: Contender Identity Setup Panel */}
           <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
             <div className="mb-6">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#6C47FF] block mb-1">
-                Account Setup
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/50 block mb-2">
+                AMETHEUS
               </span>
-              <h2 className="font-display text-3xl font-black uppercase tracking-tight text-white leading-tight">
-                Choose Contender Handle
+              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-tight text-white leading-tight">
+                Complete Your Account
               </h2>
               <p className="font-sans text-xs text-dim mt-2 leading-relaxed">
-                Set your unique username to compete in tournaments and appear on leaderboards.
+                Set your contender identity to finalize your profile
               </p>
             </div>
 
@@ -378,7 +382,7 @@ export default function Auth() {
                     autoComplete="username"
                     aria-describedby="continue-username-feedback"
                     aria-invalid={usernameStatus === 'taken' || usernameStatus === 'invalid'}
-                    className="h-12 w-full rounded-md border border-white/15 bg-black/60 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
+                    className="h-11 w-full rounded-md border border-white/12 bg-[#07090E]/80 pl-8 pr-10 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-[#07090E] focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
                   />
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2" aria-hidden="true">
                     {usernameStatus === 'checking' && (
@@ -429,14 +433,14 @@ export default function Auth() {
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="e.g. Rahul Sharma"
                   disabled={isLoading}
-                  className="h-12 w-full rounded-md border border-white/15 bg-black/60 px-3.5 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
+                  className="h-11 w-full rounded-md border border-white/12 bg-[#07090E]/80 px-3.5 text-sm text-white placeholder:text-dim/40 backdrop-blur-sm transition-all focus:border-[#6C47FF] focus:bg-[#07090E] focus:outline-none focus:ring-1 focus:ring-[#6C47FF]/50"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading || (username.length >= 3 && usernameStatus === 'taken')}
-                className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-base font-black uppercase tracking-wider text-white shadow-[0_0_24px_rgba(108,71,255,0.35)] transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-5"
+                className="group relative flex h-11 sm:h-12 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-base font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer mt-5"
               >
                 {isLoading ? (
                   <>
@@ -447,7 +451,7 @@ export default function Auth() {
                   </>
                 ) : (
                   <>
-                    <span>Confirm Contender Handle</span>
+                    <span>Continue</span>
                     <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                   </>
                 )}
@@ -477,6 +481,11 @@ export default function Auth() {
         </div>
 
         <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
+          <div className="mb-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/50 block">
+              AMETHEUS
+            </span>
+          </div>
           <SignUp
             path="/sign-up"
             routing="path"
@@ -520,7 +529,12 @@ export default function Auth() {
           </Link>
         </div>
 
-        <div className="relative z-10 my-auto w-full max-w-[480px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-[#090A0F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_35px_rgba(108,71,255,0.12)]">
+        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
+          <div className="mb-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/50 block">
+              AMETHEUS
+            </span>
+          </div>
           {hasError ? (
             <div className="space-y-6">
               <div className="flex items-start gap-3.5">
@@ -537,7 +551,7 @@ export default function Auth() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-200/90 font-mono leading-relaxed">
+              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-200/90 font-mono leading-relaxed">
                 {errorMessage || 'The revocation link could not be verified or has already expired.'}
               </div>
 
@@ -548,7 +562,7 @@ export default function Auth() {
               <div className="space-y-2.5 pt-2">
                 <Link
                   to="/settings?tab=Security"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
                 >
                   <Lock size={14} />
                   <span>Update Password & Sessions</span>
@@ -556,7 +570,7 @@ export default function Auth() {
 
                 <Link
                   to="/sign-in"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
                 >
                   <span>Sign In</span>
                   <ArrowRight size={14} />
@@ -579,7 +593,7 @@ export default function Auth() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200/90 font-mono leading-relaxed">
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200/90 font-mono leading-relaxed">
                 The unauthorized session was revoked on the authentication server. Access from that device has been immediately terminated.
               </div>
 
@@ -596,7 +610,7 @@ export default function Auth() {
               <div className="space-y-2.5 pt-2">
                 <Link
                   to="/settings?tab=Security"
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-xs font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
                 >
                   <ShieldCheck size={14} />
                   <span>Review Active Sessions</span>
@@ -605,14 +619,14 @@ export default function Auth() {
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     to="/sign-in"
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
                   >
                     <span>Sign In</span>
                     <ArrowRight size={13} />
                   </Link>
                   <Link
                     to="/"
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-dim hover:text-white font-mono text-xs uppercase tracking-wider transition-all"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-dim hover:text-white font-mono text-xs uppercase tracking-wider transition-all"
                   >
                     <span>Return to Arena</span>
                   </Link>
@@ -646,7 +660,12 @@ export default function Auth() {
           </Link>
         </div>
 
-        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 rounded-2xl border border-rose-500/30 bg-[#090A0F]/95 backdrop-blur-xl shadow-2xl">
+        <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
+          <div className="mb-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/50 block">
+              AMETHEUS
+            </span>
+          </div>
           <div className="flex items-start gap-3">
             <ShieldAlert size={22} className="mt-0.5 shrink-0 text-rose-400" />
             <div className="space-y-1">
@@ -663,7 +682,7 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => navigate('/sign-in')}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6C47FF] hover:bg-[#5835ea] font-display text-sm font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#6C47FF] hover:bg-[#5835ea] font-display text-sm font-black uppercase tracking-wider text-white shadow-[0_0_20px_rgba(108,71,255,0.35)] transition-all cursor-pointer"
             >
               <span>Sign In with Authorized Account</span>
               <ArrowRight size={16} />
@@ -671,7 +690,7 @@ export default function Auth() {
 
             <Link
               to="/"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-white font-mono text-xs uppercase tracking-wider transition-all"
             >
               Return to Arena
             </Link>
@@ -746,6 +765,11 @@ export default function Auth() {
 
           {/* Center: Clerk Prebuilt Component Container */}
           <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
+            <div className="mb-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/50 block">
+                AMETHEUS
+              </span>
+            </div>
             {isSignUpRoute ? (
               <SignUp
                 path="/sign-up"

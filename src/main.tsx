@@ -38,11 +38,8 @@ function extractClerkFrontendApi(publishableKey: string): string | null {
   return null
 }
 
-const rawPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const rawPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_live_Y2xlcmsuYW1ldGhldXMuZ2FtZXMk'
 
-if (!rawPublishableKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY')
-}
 
 const clerkPublishableKey = rawPublishableKey.trim()
 const decodedFrontendApi = extractClerkFrontendApi(clerkPublishableKey)
