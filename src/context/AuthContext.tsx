@@ -141,17 +141,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user.primaryEmailAddress?.emailAddress ||
           user.emailAddresses?.[0]?.emailAddress ||
           `${user.id}@ametheus.gg`
+        const clerkUsername = user.username?.trim() || ''
+        const metadataUsername =
+          ((user.unsafeMetadata as any)?.username as string)?.trim() ||
+          ((user.publicMetadata as any)?.username as string)?.trim() ||
+          ''
+        // Canonical username resolution: prioritize dedicated Clerk username, then metadata username.
+        // Under no circumstances fall back to firstName, email prefix, or user ID!
+        const canonicalUsername = clerkUsername || metadataUsername || ''
         const hasChosenUsername =
-          Boolean(user.username) ||
+          Boolean(clerkUsername) ||
+          Boolean(metadataUsername) ||
           Boolean((user.unsafeMetadata as any)?.has_chosen_username) ||
           Boolean((user.publicMetadata as any)?.has_chosen_username)
-        const username =
-          user.username ||
-          (user.unsafeMetadata as any)?.username ||
-          (user.publicMetadata as any)?.username ||
-          user.firstName?.toLowerCase() ||
-          user.id.slice(0, 10)
-        const displayName = (user.unsafeMetadata as any)?.username || user.username || username
+        const username = canonicalUsername
+        const displayName =
+          user.fullName?.trim() ||
+          canonicalUsername ||
+          user.firstName?.trim() ||
+          'Contender'
         const avatarUrl = user.imageUrl
 
         // Metadata-indicated role (if set on Clerk user)
@@ -172,6 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 parsed.email?.toLowerCase() === userEmail.toLowerCase())
             ) {
               parsed.role = normalizeRole(parsed.role || metadataRole, userEmail)
+              if (clerkUsername && parsed.username !== clerkUsername) {
+                parsed.username = clerkUsername
+              }
               setProfile(parsed)
             }
           }
@@ -277,7 +288,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false)
       }
     },
-    [isAuthLoaded, isUserLoaded, clerkSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getToken]
+    [
+      isAuthLoaded,
+      isUserLoaded,
+      clerkSignedIn,
+      user?.id,
+      user?.username,
+      (user?.unsafeMetadata as any)?.username,
+      user?.primaryEmailAddress?.emailAddress,
+      getToken,
+    ]
   )
 
   useEffect(() => {

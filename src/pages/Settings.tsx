@@ -480,7 +480,9 @@ export default function Settings() {
 
       if (user && cleanNewUsername) {
         try {
+          // Attempt updating Clerk dedicated username directly
           await user.update({
+            username: cleanNewUsername,
             unsafeMetadata: {
               ...user.unsafeMetadata,
               username: cleanNewUsername,
@@ -488,7 +490,18 @@ export default function Settings() {
             },
           })
         } catch (clerkSyncErr) {
-          console.warn('Failed to sync username to Clerk metadata:', clerkSyncErr)
+          // If dedicated username update fails in Clerk (e.g. requires separate flow or restricted), fallback to metadata
+          try {
+            await user.update({
+              unsafeMetadata: {
+                ...user.unsafeMetadata,
+                username: cleanNewUsername,
+                has_chosen_username: true,
+              },
+            })
+          } catch (metaErr) {
+            console.warn('Failed to sync username to Clerk metadata:', metaErr)
+          }
         }
       }
 

@@ -415,10 +415,12 @@ export default function Auth() {
         token
       )
 
-      // Synchronize canonical username to Clerk user metadata so Clerk stays consistent
+      // Synchronize canonical username to Clerk user so Clerk stays consistent
       if (user) {
         try {
+          // Attempt updating Clerk dedicated username directly
           await user.update({
+            username: cleanUsername,
             unsafeMetadata: {
               ...user.unsafeMetadata,
               username: cleanUsername,
@@ -433,7 +435,24 @@ export default function Auth() {
             }
           }
         } catch (clerkSyncErr) {
-          console.warn('Clerk metadata update warning:', clerkSyncErr)
+          try {
+            await user.update({
+              unsafeMetadata: {
+                ...user.unsafeMetadata,
+                username: cleanUsername,
+                has_chosen_username: true,
+              },
+            })
+            if (password) {
+              try {
+                await user.updatePassword({ newPassword: password })
+              } catch (pErr) {
+                console.warn('Password update notice:', pErr)
+              }
+            }
+          } catch (metaErr) {
+            console.warn('Clerk metadata update warning:', metaErr)
+          }
         }
       }
 

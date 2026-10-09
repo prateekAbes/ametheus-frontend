@@ -83,6 +83,10 @@ export interface SupportTicket {
   updated_at?: string
   messages?: SupportTicketMessage[]
   internal_notes?: string
+  is_archived?: boolean
+  archived_at?: string
+  archived_by?: string
+  archive_reason?: string
 }
 
 export async function getSupportTicketDetails(ticketId: string): Promise<SupportTicket> {
@@ -141,7 +145,9 @@ export async function replyToSupportTicket(
 export interface UserSupportGroup {
   _id: string
   email?: string
+  username?: string
   user_name?: string
+  display_name?: string
   user_id?: string
   total_tickets: number
   open_tickets: number
@@ -157,8 +163,22 @@ export async function getUsersWithSupportTickets(search?: string, isArchived: bo
   return apiClient<UserSupportGroup[]>(`/support/users-with-tickets${qs ? `?${qs}` : ''}`)
 }
 
-export async function toggleArchiveSupportTicket(ticketId: string): Promise<SupportTicket> {
+export async function archiveSupportTicket(ticketId: string, reason?: string): Promise<SupportTicket> {
   return apiClient<SupportTicket>(`/support/tickets/${ticketId}/archive`, {
     method: 'POST',
+    body: reason ? JSON.stringify({ reason }) : undefined,
   })
+}
+
+export async function restoreSupportTicket(ticketId: string): Promise<SupportTicket> {
+  return apiClient<SupportTicket>(`/support/tickets/${ticketId}/unarchive`, {
+    method: 'POST',
+  })
+}
+
+export async function toggleArchiveSupportTicket(ticketId: string, currentlyArchived?: boolean): Promise<SupportTicket> {
+  if (currentlyArchived) {
+    return restoreSupportTicket(ticketId)
+  }
+  return archiveSupportTicket(ticketId)
 }

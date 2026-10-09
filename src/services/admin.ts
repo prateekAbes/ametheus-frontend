@@ -451,14 +451,24 @@ export async function publishGame(gameId: string): Promise<any> {
 export async function getAdminSupportTickets(params?: {
   status?: string
   category?: string
+  search?: string
+  is_archived?: boolean
   limit?: number
+  skip?: number
 }): Promise<{ tickets: SupportTicket[]; total: number }> {
   const q = new URLSearchParams()
   if (params?.status && params.status !== 'ALL') q.set('status', params.status)
   if (params?.category && params.category !== 'ALL') q.set('category', params.category)
+  if (params?.search) q.set('search', params.search)
+  if (params?.is_archived !== undefined) q.set('is_archived', String(params.is_archived))
   if (params?.limit) q.set('limit', String(params.limit))
+  if (params?.skip) q.set('skip', String(params.skip))
   const qs = q.toString()
   return apiClient<{ tickets: SupportTicket[]; total: number }>(`/support/tickets${qs ? `?${qs}` : ''}`)
+}
+
+export async function getAdminSupportTicketCounts(): Promise<{ active: number; archived: number; total: number }> {
+  return apiClient<{ active: number; archived: number; total: number }>('/support/tickets/counts')
 }
 
 export async function updateSupportTicket(

@@ -22,6 +22,7 @@ import {
   completePayout,
   rejectPayout,
   getAdminSupportTickets,
+  getAdminSupportTicketCounts,
   updateSupportTicket,
   retrySupportTicketEmail,
   getRegulations,
@@ -106,6 +107,8 @@ import { getMatches, updateMatch, ApiMatch } from '../services/matches'
 import {
   getUsersWithSupportTickets,
   replyToSupportTicket,
+  archiveSupportTicket,
+  restoreSupportTicket,
   toggleArchiveSupportTicket,
   getSupportTicketDetails,
   UserSupportGroup,
@@ -647,6 +650,7 @@ export default function Admin() {
   const [loadingSupportUsers, setLoadingSupportUsers] = useState(false)
   const [supportSearchTerm, setSupportSearchTerm] = useState('')
   const [supportShowArchived, setSupportShowArchived] = useState(false)
+  const [supportTicketCounts, setSupportTicketCounts] = useState<{ active: number; archived: number; total: number }>({ active: 0, archived: 0, total: 0 })
   const [supportViewMode, setSupportViewMode] = useState<'ALL_TICKETS' | 'USER_GROUPS'>('ALL_TICKETS')
   const [expandedSupportUserId, setExpandedSupportUserId] = useState<string | null>(null)
   const [activeTicketThread, setActiveTicketThread] = useState<any | null>(null)
@@ -654,6 +658,24 @@ export default function Admin() {
   const [ticketNextStatus, setTicketNextStatus] = useState('WAITING_FOR_USER')
   const [isSubmittingTicketReply, setIsSubmittingTicketReply] = useState(false)
   const threadMessagesEndRef = useRef<HTMLDivElement>(null)
+
+  const loadSupportTicketsData = async (showArchived = supportShowArchived, searchTerm = supportSearchTerm) => {
+    setLoadingSupportUsers(true)
+    try {
+      const [tixRes, uRes, countsRes] = await Promise.all([
+        getAdminSupportTickets({ limit: 100, is_archived: showArchived, search: searchTerm || undefined }),
+        getUsersWithSupportTickets(searchTerm || undefined, showArchived),
+        getAdminSupportTicketCounts().catch(() => ({ active: 0, archived: 0, total: 0 })),
+      ])
+      setTickets(tixRes.tickets || [])
+      setSupportUsers(uRes || [])
+      if (countsRes) setSupportTicketCounts(countsRes)
+    } catch (err) {
+      console.warn('Failed to load support tickets:', err)
+    } finally {
+      setLoadingSupportUsers(false)
+    }
+  }
 
   // Live auto-polling for active support ticket thread every 5 seconds
   useEffect(() => {
@@ -768,6 +790,7 @@ export default function Admin() {
         offHist,
         notifs,
         crestList,
+        sCounts,
       ] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
@@ -780,7 +803,7 @@ export default function Admin() {
         getFeaturedTournament().catch(() => null),
         getAdminUpiAccounts().catch(() => []),
         getAdminPayouts().catch(() => []),
-        getAdminSupportTickets().then((r) => r.tickets).catch(() => []),
+        getAdminSupportTickets({ limit: 100, is_archived: false }).then((r) => r.tickets).catch(() => []),
         getRegulations().catch(() => []),
         getEmailSystemStatusAdmin().catch(() => null),
         getDisputes().catch(() => []),
@@ -794,6 +817,7 @@ export default function Admin() {
         getOfficialEmailHistoryAdmin().catch(() => ({ total: 0, items: [] })),
         getAdminPlatformNotifications({ limit: 50, skip: 0 }).catch(() => ({ items: [], total: 0 })),
         getAllCrestsAdmin().catch(() => []),
+        getAdminSupportTicketCounts().catch(() => ({ active: 0, archived: 0, total: 0 })),
       ])
 
       if (s) setStats(s)
@@ -810,6 +834,7 @@ export default function Admin() {
       setUpiAccounts(upiList)
       setPayouts(payList)
       setTickets(tixList)
+      if (sCounts) setSupportTicketCounts(sCounts)
       setRegulations(regList)
       setEmailStatus(eStat)
       setDisputes(dispList)
@@ -3399,16 +3424,9 @@ export default function Admin() {
                 <p className="text-xs text-dim">Inspect inquiry threads, review category issues, dispatch email replies, and archive closed cases.</p>
               </div>
               <div className="flex items-center gap-3">
-                <Hud className="text-dim">{filteredTickets.length} TICKETS FOUND</Hud>
+                <Hud className="text-dim">{filteredTickets.length} TICKETS DISPLAYED</Hud>
                 <button
-                  onClick={async () => {
-                    const [res, tixRes] = await Promise.all([
-                      getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => []),
-                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
-                    ])
-                    setSupportUsers(res)
-                    setTickets(tixRes)
-                  }}
+                  onClick={() => loadSupportTicketsData(supportShowArchived, supportSearchTerm)}
                   className="border border-white/15 bg-surface px-3 py-1 font-mono text-xs uppercase hover:border-cyan text-ink"
                 >
                   Refresh
@@ -3447,14 +3465,9 @@ export default function Admin() {
 
                 {/* Status Filter */}
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     setSupportShowArchived(false)
-                    const [res, tixRes] = await Promise.all([
-                      getUsersWithSupportTickets(supportSearchTerm, false).catch(() => []),
-                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
-                    ])
-                    setSupportUsers(res)
-                    setTickets(tixRes)
+                    loadSupportTicketsData(false, supportSearchTerm)
                   }}
                   className={`border px-3 py-1 font-mono text-xs uppercase transition-colors ${
                     !supportShowArchived
@@ -3462,17 +3475,12 @@ export default function Admin() {
                       : 'border-white/15 bg-surface text-dim hover:text-ink'
                   }`}
                 >
-                  Active Tickets ({tickets.filter((t) => !t.is_archived).length})
+                  Active Tickets ({supportTicketCounts.active})
                 </button>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     setSupportShowArchived(true)
-                    const [res, tixRes] = await Promise.all([
-                      getUsersWithSupportTickets(supportSearchTerm, true).catch(() => []),
-                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
-                    ])
-                    setSupportUsers(res)
-                    setTickets(tixRes)
+                    loadSupportTicketsData(true, supportSearchTerm)
                   }}
                   className={`border px-3 py-1 font-mono text-xs uppercase transition-colors ${
                     supportShowArchived
@@ -3480,7 +3488,7 @@ export default function Admin() {
                       : 'border-white/15 bg-surface text-dim hover:text-ink'
                   }`}
                 >
-                  Archived Tickets ({tickets.filter((t) => t.is_archived).length})
+                  Archived Tickets ({supportTicketCounts.archived})
                 </button>
               </div>
 
@@ -3489,11 +3497,10 @@ export default function Admin() {
                   type="text"
                   placeholder="Search user, email, ticket ID, category..."
                   value={supportSearchTerm}
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const q = e.target.value
                     setSupportSearchTerm(q)
-                    const res = await getUsersWithSupportTickets(q, supportShowArchived).catch(() => [])
-                    setSupportUsers(res)
+                    loadSupportTicketsData(supportShowArchived, q)
                   }}
                   className="w-full border border-white/15 bg-surface px-3 py-1.5 font-mono text-xs text-ink outline-none focus:border-cyan"
                 />
@@ -3604,21 +3611,26 @@ export default function Admin() {
                               <button
                                 onClick={async () => {
                                   try {
-                                    await toggleArchiveSupportTicket(tid)
-                                    showToast('Ticket archive status toggled.')
-                                    const [res, tixRes] = await Promise.all([
-                                      getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => []),
-                                      getAdminSupportTickets({ limit: 100 }).then((r) => r.tickets).catch(() => []),
-                                    ])
-                                    setSupportUsers(res)
-                                    setTickets(tixRes)
+                                    if (isArchived) {
+                                      await restoreSupportTicket(tid)
+                                      showToast(`Ticket ${tid} restored to active queue.`)
+                                    } else {
+                                      await archiveSupportTicket(tid)
+                                      showToast(`Ticket ${tid} archived.`)
+                                    }
+                                    await loadSupportTicketsData(supportShowArchived, supportSearchTerm)
                                   } catch (err: any) {
-                                    alert(err.message || 'Archive toggle failed')
+                                    alert(err.message || 'Archive operation failed')
                                   }
                                 }}
-                                className="border border-white/10 px-2 py-1 text-[11px] text-dim hover:text-ink uppercase"
+                                className={`border px-2 py-1 text-[11px] uppercase transition-colors ${
+                                  isArchived
+                                    ? 'border-ok/30 bg-ok/10 text-ok hover:bg-ok/20'
+                                    : 'border-white/10 text-dim hover:text-ink hover:border-white/30'
+                                }`}
+                                title={isArchived ? 'Restore ticket to active desk' : 'Archive closed/resolved ticket'}
                               >
-                                {isArchived ? 'Unarchive' : 'Archive'}
+                                {isArchived ? 'Restore' : 'Archive'}
                               </button>
                             </td>
                           </tr>
@@ -3646,7 +3658,7 @@ export default function Admin() {
                         <div className="space-y-1 font-mono">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-display font-black uppercase text-ink text-lg">
-                              {u.user_name || u.email?.split('@')[0] || 'Contender'}
+                              {u.username || u.user_name || u.display_name || (u.email ? u.email.split('@')[0] : 'Contender')}
                             </span>
                             <span className="text-dim text-xs">({u.email || 'No email registered'})</span>
                             {u.open_tickets > 0 && (
@@ -3732,18 +3744,28 @@ export default function Admin() {
                                     </button>
                                     <button
                                       onClick={async () => {
+                                        const tid = t.id || t.ticket_id
+                                        const isCurrentlyArchived = t.is_archived || t.status === 'ARCHIVED'
                                         try {
-                                          await toggleArchiveSupportTicket(t.id || t.ticket_id)
-                                          showToast('Ticket archive status toggled.')
-                                          const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
-                                          setSupportUsers(res)
+                                          if (isCurrentlyArchived) {
+                                            await restoreSupportTicket(tid)
+                                            showToast(`Ticket ${tid} restored to active queue.`)
+                                          } else {
+                                            await archiveSupportTicket(tid)
+                                            showToast(`Ticket ${tid} archived.`)
+                                          }
+                                          await loadSupportTicketsData(supportShowArchived, supportSearchTerm)
                                         } catch (err: any) {
-                                          alert(err.message || 'Archive toggle failed')
+                                          alert(err.message || 'Archive operation failed')
                                         }
                                       }}
-                                      className="border border-white/10 px-2.5 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink"
+                                      className={`border px-2.5 py-1.5 font-mono text-xs uppercase transition-colors ${
+                                        t.is_archived || t.status === 'ARCHIVED'
+                                          ? 'border-ok/30 bg-ok/10 text-ok hover:bg-ok/20'
+                                          : 'border-white/10 text-dim hover:text-ink hover:border-white/30'
+                                      }`}
                                     >
-                                      {t.is_archived || t.status === 'ARCHIVED' ? 'Unarchive' : 'Archive'}
+                                      {t.is_archived || t.status === 'ARCHIVED' ? 'Restore' : 'Archive'}
                                     </button>
                                   </div>
                                 </div>
@@ -6175,6 +6197,33 @@ export default function Admin() {
                   </select>
 
                   <button
+                    onClick={async () => {
+                      const tid = activeTicketThread.id || activeTicketThread.ticket_id
+                      const isCurrentlyArchived = Boolean(activeTicketThread.is_archived)
+                      try {
+                        if (isCurrentlyArchived) {
+                          await restoreSupportTicket(tid)
+                          showToast(`Ticket ${tid} restored to active queue.`)
+                        } else {
+                          await archiveSupportTicket(tid)
+                          showToast(`Ticket ${tid} archived.`)
+                        }
+                        setActiveTicketThread((prev: any) => prev ? { ...prev, is_archived: !isCurrentlyArchived } : null)
+                        await loadSupportTicketsData(supportShowArchived, supportSearchTerm)
+                      } catch (err: any) {
+                        alert(err.message || 'Archive operation failed')
+                      }
+                    }}
+                    className={`border px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${
+                      activeTicketThread.is_archived
+                        ? 'border-ok/40 bg-ok/10 text-ok hover:bg-ok/20'
+                        : 'border-white/15 bg-surface text-dim hover:text-ink hover:border-white/30'
+                    }`}
+                  >
+                    {activeTicketThread.is_archived ? 'Restore Ticket' : 'Archive Ticket'}
+                  </button>
+
+                  <button
                     onClick={() => setActiveTicketThread(null)}
                     className="text-dim hover:text-ink text-xs uppercase border border-white/15 px-2.5 py-1 cursor-pointer"
                   >
@@ -6364,8 +6413,7 @@ export default function Admin() {
                         setActiveTicketThread(updated)
                         setTicketReplyText('')
                         showToast('Reply dispatched to contender!')
-                        const res = await getUsersWithSupportTickets(supportSearchTerm, supportShowArchived).catch(() => [])
-                        setSupportUsers(res)
+                        loadSupportTicketsData(supportShowArchived, supportSearchTerm)
                       } catch (err: any) {
                         alert(err.message || 'Failed to send reply')
                       } finally {
