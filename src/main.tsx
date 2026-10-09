@@ -5,6 +5,9 @@ import App from './App'
 import './index.css'
 import { initAppearance } from './lib/appearance'
 
+import { router } from './routes'
+import { ametheusClerkAppearance } from './lib/clerkTheme'
+
 // Initialize user's persisted appearance palette and accent before render
 initAppearance()
 
@@ -28,7 +31,17 @@ if (!clerkPublishableKey) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={clerkPublishableKey}>
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      afterSignOutUrl="/"
+      routerPush={(to) => router.navigate(to)}
+      routerReplace={(to) => router.navigate(to, { replace: true })}
+      appearance={ametheusClerkAppearance}
+    >
       <App />
     </ClerkProvider>
   </React.StrictMode>,

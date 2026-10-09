@@ -108,3 +108,101 @@ html { background: #05060a; scrollbar-gutter: stable; }
   }
 }
 
+/* ===================================================================== */
+/* CLERK AUTHENTICATION COMPONENT OVERRIDES — AMETHEUS THEME            */
+/* ===================================================================== */
+.cl-rootBox {
+  width: 100%;
+}
+.cl-cardBox {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+.cl-card {
+  background-color: rgba(9, 10, 15, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(108, 71, 255, 0.15) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+.cl-headerTitle {
+  font-family: var(--font-display) !important;
+  font-size: 1.875rem !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: -0.025em !important;
+  color: #ffffff !important;
+}
+.cl-headerSubtitle {
+  font-family: var(--font-sans) !important;
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important;
+}
+.cl-socialButtonsBlockButton {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.2s ease !important;
+}
+.cl-socialButtonsBlockButton:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+.cl-formButtonPrimary {
+  background-color: #6c47ff !important;
+  color: #ffffff !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.875rem !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 0 20px rgba(108, 71, 255, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+.cl-formButtonPrimary:hover {
+  background-color: #5835ea !important;
+  box-shadow: 0 0 28px rgba(108, 71, 255, 0.5) !important;
+}
+.cl-formFieldInput {
+  background-color: rgba(5, 6, 10, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-radius: 0.5rem !important;
+}
+.cl-formFieldInput:focus {
+  border-color: #6c47ff !important;
+  box-shadow: 0 0 0 2px rgba(108, 71, 255, 0.3) !important;
+}
+.cl-formFieldLabel {
+  font-family: var(--font-mono) !important;
+  font-size: 0.6875rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #cbd5e1 !important;
+}
+.cl-footerActionLink {
+  color: #6c47ff !important;
+  font-weight: 700 !important;
+}
+.cl-footerActionLink:hover {
+  color: #8364ff !important;
+  text-decoration: underline !important;
+}
+.cl-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.cl-identityPreviewText {
+  color: #ffffff !important;
+  font-family: var(--font-mono) !important;
+}
+.cl-identityPreviewEditButton {
+  color: #6c47ff !important;
+}
+.cl-internal-b3fm6y {
+  opacity: 0.5 !important;
+}
+
