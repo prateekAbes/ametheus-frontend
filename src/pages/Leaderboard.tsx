@@ -206,21 +206,51 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="relative min-h-screen bg-black text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
-      {/* Subtle, low-contrast background grid matching the reference */}
+    <div className="relative min-h-screen bg-[#05060A] text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
+      {/* Restrained esports-inspired background atmosphere & precision grid */}
       <div
-        className="pointer-events-none fixed inset-0 opacity-[0.06] select-none"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
-          `,
-          backgroundSize: '24px 24px',
-        }}
+        className="pointer-events-none fixed inset-0 select-none overflow-hidden"
         aria-hidden="true"
-      />
+      >
+        {/* Ambient top-center emerald esports aura */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse 85% 45% at 50% -20px, rgba(34, 197, 94, 0.08), transparent 70%),
+              radial-gradient(ellipse 70% 35% at 50% 30%, rgba(30, 41, 59, 0.22), transparent 75%)
+            `,
+          }}
+        />
+        {/* Precision structural grid with radial falloff mask */}
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
+            `,
+            backgroundSize: '28px 28px',
+            maskImage: 'radial-gradient(ellipse 90% 85% at 50% 35%, black 40%, transparent 95%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 90% 85% at 50% 35%, black 40%, transparent 95%)',
+          }}
+        />
+      </div>
 
       <Container className="relative z-10">
+        {/* LEADERBOARD SECTION HEADING */}
+        <div className="mb-8 md:mb-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="size-2 rounded-full bg-[#22c55e] inline-block shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+            <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#22c55e] font-semibold">
+              Global Standings
+            </span>
+          </div>
+          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-white">
+            LEADERBOARD
+          </h1>
+        </div>
+
         {/* ============================================================== */}
         {/* DESKTOP: 2-COLUMN LAYOUT (SIDEBAR METRIC SELECTOR + PODIUM/LIST)*/}
         {/* ============================================================== */}

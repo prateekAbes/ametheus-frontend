@@ -119,12 +119,18 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
   margin: 0 auto;
 }
 .cl-card {
-  background-color: rgba(9, 10, 15, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 1rem !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(108, 71, 255, 0.15) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+}
+.cl-cardBox {
+  box-shadow: none !important;
+  border: none !important;
+  background-color: transparent !important;
 }
 .cl-headerTitle {
   font-family: var(--font-display) !important;
@@ -192,7 +198,9 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
   text-decoration: underline !important;
 }
 .cl-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: none !important;
+  background-color: transparent !important;
+  padding-top: 0 !important;
 }
 .cl-identityPreviewText {
   color: #ffffff !important;
@@ -201,7 +209,13 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overf
 .cl-identityPreviewEditButton {
   color: #6c47ff !important;
 }
-.cl-internal-b3fm6y {
-  opacity: 0.5 !important;
+.cl-footerPages,
+.cl-footerPagesLink,
+.cl-internal-b3fm6y,
+.cl-internal-ph3869,
+[class*="footerPages"],
+[class*="securedBy"],
+[data-localization-key*="securedBy"] {
+  display: none !important;
 }
 

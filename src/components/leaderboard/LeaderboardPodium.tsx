@@ -31,9 +31,18 @@ export function LeaderboardPodium({
 
   return (
     <div className="relative mx-auto w-full max-w-4xl py-4 sm:py-6 select-none">
+      {/* Ambient floor glow beneath podium */}
+      <div
+        className="pointer-events-none absolute -bottom-6 inset-x-0 h-28 select-none opacity-40"
+        aria-hidden="true"
+        style={{
+          background: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(34, 197, 94, 0.16), transparent 75%)',
+        }}
+      />
+
       {/* Subtle floor grid line beneath podium */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 overflow-hidden opacity-20 select-none"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 overflow-hidden opacity-25 select-none"
         aria-hidden="true"
       >
         <div

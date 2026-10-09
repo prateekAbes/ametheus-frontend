@@ -463,14 +463,22 @@ export default function Settings() {
     try {
       const token = await clerk.session?.getToken()
       await deleteAccount(token)
-      if (user) {
-        await user.delete()
+      try {
+        await clerk.signOut()
+      } catch {
+        // Ignored if session is already invalidated on server
       }
-      await clerk.signOut()
       localStorage.clear()
-      window.location.href = '/sign-in'
+      sessionStorage.clear()
+      window.location.href = '/'
     } catch (err: any) {
-      setDeleteError(err.errors?.[0]?.message || err.message || 'Failed to delete account.')
+      const errorMsg =
+        err?.data?.detail ||
+        err?.data?.message ||
+        err?.message ||
+        err?.errors?.[0]?.message ||
+        'Failed to delete account. Please try again.'
+      setDeleteError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg))
       setIsDeleting(false)
     }
   }

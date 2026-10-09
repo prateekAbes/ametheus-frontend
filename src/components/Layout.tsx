@@ -252,6 +252,15 @@ function Nav() {
 }
 
 export function Footer() {
+  const { pathname } = useLocation()
+  const isHome = pathname === '/'
+
+  const navColumns = [
+    ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
+    ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
+    ...(!isHome ? [['Outlinks', [['Discord', 'https://discord.gg/VzkfuK7We', true], ['Instagram', 'https://www.instagram.com/official.ametheus', true], ['YouTube', 'https://www.youtube.com/@official.ametheus.goodgame', true]]]] : []),
+  ] as [string, [string, string, boolean?][]][]
+
   return (
     <footer className="relative overflow-hidden border-t border-white/10 bg-void px-5 pb-24 pt-20 md:px-10 md:pb-0">
       <div className="mx-auto grid max-w-[1600px] gap-10 md:grid-cols-12 relative z-10">
@@ -298,11 +307,7 @@ export function Footer() {
           </div>
         </div>
 
-        {[
-          ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
-          ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
-          ['Outlinks', [['Discord', 'https://discord.gg/VzkfuK7We', true], ['Instagram', 'https://www.instagram.com/official.ametheus', true], ['YouTube', 'https://www.youtube.com/@official.ametheus.goodgame', true]]],
-        ].map(([h, links]) => (
+        {navColumns.map(([h, links]) => (
           <div key={h as string} className="md:col-span-2">
             <Hud className="text-cyan">{h as string}</Hud>
             <ul className="mt-4 space-y-2">

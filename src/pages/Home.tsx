@@ -159,11 +159,9 @@ function Hero({
       gsap
         .timeline({ defaults: { ease: 'expo.out' }, delay: 0.15 })
         .from('[data-h="title"]', { yPercent: 30, scale: 1.12, opacity: 0, duration: 1.6 })
-        .from('[data-h="kicker"]', { y: 14, opacity: 0, duration: 0.8 }, '<0.25')
         .from('[data-h="tag"]', { y: 18, opacity: 0, duration: 1 }, '<0.2')
-        .from('[data-h="copy"], [data-h="cta"]', { y: 24, opacity: 0, stagger: 0.08, duration: 0.9 }, '<0.15')
+        .from('[data-h="cta"]', { y: 24, opacity: 0, stagger: 0.08, duration: 0.9 }, '<0.15')
         .from('[data-h="shard"]', { opacity: 0, scale: 0.8, stagger: 0.1, duration: 1.3 }, '<-0.3')
-        .from('[data-h="hud"]', { opacity: 0, x: -16, stagger: 0.06, duration: 0.7 }, '<0.3')
       if (!isMobile()) {
         const st = { trigger: ref.current, start: 'top top', end: 'bottom top', scrub: true }
         gsap.to('[data-h="stage"]', { yPercent: 18, opacity: 0.25, ease: 'none', scrollTrigger: st })
@@ -221,11 +219,6 @@ function Hero({
       ))}
 
       <div data-h="stage" className="relative z-10 flex h-full w-full max-w-full flex-col items-center justify-center px-4 text-center overflow-x-hidden">
-        <div data-h="kicker" className="mb-6">
-          <Hud className="text-cyan">
-            <Dot pulse /> &nbsp;System Online · Welcome to Ametheus
-          </Hud>
-        </div>
         <h1
           data-h="title"
           className="relative w-full max-w-[96vw] select-none text-balance font-display font-black uppercase leading-[0.85] sm:leading-[0.8] tracking-[-0.01em] text-[clamp(2.5rem,15vw,22rem)] sm:text-[clamp(3.5rem,18vw,22rem)]"
@@ -243,9 +236,6 @@ function Hero({
         </h1>
         <p data-h="tag" className="mt-4 font-display text-base font-bold uppercase tracking-[0.2em] sm:text-xl sm:tracking-[0.35em] md:text-4xl md:tracking-[0.45em]">
           India's Gaming Battleground
-        </p>
-        <p data-h="copy" className="mt-5 max-w-md text-balance text-sm sm:text-base text-dim px-2">
-          A premium esports platform where players discover games, build teams, enter tournaments, and compete.
         </p>
         <div data-h="cta" className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Cta to="/tournaments">Explore Tournaments</Cta>
@@ -265,22 +255,6 @@ function Hero({
           </div>
         )}
       </div>
-
-      <div className="absolute left-5 top-28 z-10 hidden flex-col gap-4 sm:flex md:left-10">
-        {[
-          [activeCount, 'Active tournaments'],
-          [gameCount, 'Games'],
-          [4, 'Live worlds'],
-        ].map(([v, k]) => (
-          <div data-h="hud" key={k as string} className="flex items-baseline gap-3">
-            <span className="font-display text-3xl font-black tabular-nums">{v}</span>
-            <Hud>{k as string}</Hud>
-          </div>
-        ))}
-      </div>
-      <Hud className="absolute right-6 top-[46%] z-10 hidden [writing-mode:vertical-rl] md:block">
-        {gameCount} GAMES · INDIA · EST. 2026
-      </Hud>
 
       <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2">
         <Hud>DESCEND</Hud>

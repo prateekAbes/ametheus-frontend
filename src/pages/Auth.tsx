@@ -34,55 +34,20 @@ const Scene3D = lazy(() => import('../components/Scene3D'))
 function AuthFooter() {
   return (
     <footer className="relative z-20 w-full border-t border-white/[0.08] bg-black/40 backdrop-blur-md px-6 py-4 sm:px-10 lg:px-16">
-      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left font-mono text-xs text-dim">
-        <span className="tracking-wider uppercase text-dim/90 flex-1 sm:text-left font-bold text-white/90">
+      <div className="w-full flex items-center justify-between gap-4 font-mono text-xs text-dim">
+        <Link
+          to="/"
+          className="tracking-wider uppercase text-dim/90 font-bold text-white/90 hover:text-cyan transition-colors"
+        >
           Ametheus
-        </span>
+        </Link>
 
-        {/* Official External Links */}
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <a
-            href="https://discord.gg/VzkfuK7We"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#5865F2] transition-colors tracking-wider"
-          >
-            Discord
-          </a>
-          <span className="text-white/20">·</span>
-          <a
-            href="https://www.instagram.com/official.ametheus"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#E1306C] transition-colors tracking-wider"
-          >
-            Instagram
-          </a>
-          <span className="text-white/20">·</span>
-          <a
-            href="https://www.youtube.com/@official.ametheus.goodgame"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-dim/80 hover:text-[#FF0000] transition-colors tracking-wider"
-          >
-            YouTube
-          </a>
-        </div>
-
-        <div className="flex items-center gap-4 flex-1 justify-end">
-          <Link
-            to="/"
-            className="text-dim/80 hover:text-cyan transition-colors tracking-wider"
-          >
-            Back to Home
-          </Link>
-          <Link
-            to="/sign-in"
-            className="tracking-wider uppercase text-dim/90 hover:text-[#6C47FF] transition-colors"
-          >
-            Ametheus Login
-          </Link>
-        </div>
+        <Link
+          to="/"
+          className="text-dim/80 hover:text-cyan transition-colors tracking-wider"
+        >
+          Back to Home
+        </Link>
       </div>
     </footer>
   )
@@ -359,7 +324,7 @@ export default function Auth() {
           </div>
 
           {/* Center: Contender Identity Setup Panel */}
-          <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto p-8 sm:p-10 rounded-2xl border border-white/[0.12] bg-[#090A0F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_35px_rgba(108,71,255,0.15)]">
+          <div className="relative z-10 my-auto w-full max-w-[440px] mx-auto">
             <div className="mb-6">
               <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#6C47FF] block mb-1">
                 Account Setup
