@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router'
-import { Container, Hud } from '../components/ui'
-import EsportsHeroVisual from '../components/EsportsHeroVisual'
+import { Container } from '../components/ui'
 import {
   getLeaderboardEntries,
   getLeaderboardCategories,
@@ -15,7 +14,6 @@ import { GAMES } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 
 import { LeaderboardPodium } from '../components/leaderboard/LeaderboardPodium'
-import { LeaderboardControls } from '../components/leaderboard/LeaderboardControls'
 import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable'
 import { LeaderboardSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
 import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmptyState'
@@ -23,9 +21,18 @@ import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErro
 
 const PAGE_SIZE = 10
 
+const METRIC_OPTIONS = [
+  { id: 'overall', label: 'Overall Standings' },
+  { id: 'win_rate', label: 'Highest Win Rate' },
+  { id: 'wins', label: 'Most Match Wins' },
+  { id: 'pc', label: 'PC Competitive' },
+  { id: 'mobile', label: 'Mobile Competitive' },
+]
+
 export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialGame = searchParams.get('game') || 'all'
+  const initialCategory = searchParams.get('category') || 'overall'
 
   const { profile } = useAuthContext()
 
@@ -35,7 +42,7 @@ export default function Leaderboard() {
   const [games, setGames] = useState<ApiGame[]>([])
 
   const [selectedGame, setSelectedGame] = useState<string>(initialGame)
-  const [selectedCategory, setSelectedCategory] = useState<string>('overall')
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [currentPage, setCurrentPage] = useState<number>(1)
 
@@ -149,6 +156,12 @@ export default function Leaderboard() {
   const handleSelectCategory = (catSlug: string) => {
     setSelectedCategory(catSlug)
     setCurrentPage(1)
+    if (catSlug === 'overall') {
+      searchParams.delete('category')
+    } else {
+      searchParams.set('category', catSlug)
+    }
+    setSearchParams(searchParams)
   }
 
   // Search filter handler
@@ -220,154 +233,163 @@ export default function Leaderboard() {
 
   const handleResetFilters = () => {
     handleSelectGame('all')
-    setSelectedCategory('overall')
+    handleSelectCategory('overall')
     setSearchQuery('')
     setCurrentPage(1)
   }
 
   return (
-    <div className="relative min-h-screen bg-void pb-28 pt-28 sm:pt-32 text-ink overflow-hidden">
-      {/* Retained atmospheric esports visual background with subtle grid & flares */}
-      <EsportsHeroVisual variant="leaderboard" />
-
-      {/* Cybernetic floor grid lines inspired by reference */}
+    <div className="relative min-h-screen bg-black text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
+      {/* Subtle, low-contrast background grid matching the reference */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-36 h-[650px] opacity-20 select-none overflow-hidden"
+        className="pointer-events-none fixed inset-0 opacity-[0.06] select-none"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
+          `,
+          backgroundSize: '24px 24px',
+        }}
         aria-hidden="true"
-      >
-        <div
-          className="size-full"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, rgba(61, 255, 154, 0.15) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(61, 255, 154, 0.15) 1px, transparent 1px)
-            `,
-            backgroundSize: '48px 48px',
-            maskImage: 'radial-gradient(ellipse at center 40%, black 20%, transparent 75%)',
-          }}
-        />
-      </div>
+      />
 
-      <Container className="relative z-10 space-y-10">
+      <Container className="relative z-10">
         {/* ============================================================== */}
-        {/* SECTION 2 — LEADERBOARD INTRODUCTION                           */}
+        {/* DESKTOP: 2-COLUMN LAYOUT (SIDEBAR METRIC SELECTOR + PODIUM/LIST)*/}
         {/* ============================================================== */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="size-2 rounded-full bg-[#3dff9a] shadow-[0_0_10px_#3dff9a] animate-pulse" />
-              <Hud className="text-[#3dff9a] font-bold tracking-widest">
-                OFFICIAL STANDINGS &amp; ELO RATINGS
-              </Hud>
-              <span className="text-white/20 select-none">·</span>
-              <span className="font-mono text-[10px] text-dim uppercase tracking-wider hidden sm:inline-block">
-                Current Competitive Circuit
-              </span>
+        <div className="grid grid-cols-1 md:grid-cols-[190px_1fr] lg:grid-cols-[210px_1fr] gap-6 lg:gap-8 items-start">
+          {/* ============================================================ */}
+          {/* LEFT COMPACT SIDEBAR: METRIC SELECTOR ON DESKTOP              */}
+          {/* ============================================================ */}
+          <aside className="hidden md:block border border-white/10 bg-black/80 p-3 select-none sticky top-24">
+            <span className="block font-mono text-[10px] uppercase tracking-wider text-white/40 mb-2">
+              Metrics
+            </span>
+            <div className="space-y-1">
+              {METRIC_OPTIONS.map((m) => {
+                const isActive = selectedCategory === m.id
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => handleSelectCategory(m.id)}
+                    className={`w-full text-left px-2.5 py-1.5 font-mono text-xs transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-white/[0.08] text-[#22c55e] font-bold border-l-2 border-[#22c55e]'
+                        : 'text-white/60 hover:text-white hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                )
+              })}
             </div>
 
-            <h1 className="font-display text-4xl sm:text-6xl md:text-7xl font-black uppercase tracking-tight text-ink">
-              Leaderboard
-            </h1>
-
-            <p className="mt-2 text-sm sm:text-base text-dim max-w-xl font-mono leading-relaxed">
-              The players setting the standard. Verified Elo ratings, match win percentages, and sanctioned tournament earnings across India&apos;s competitive esports battlegrounds.
-            </p>
-          </div>
-
-          {/* Quick Stats Pill */}
-          <div className="flex items-center gap-4 font-mono text-xs text-dim bg-surface/60 border border-white/10 px-4 py-3 rounded-xs backdrop-blur-md self-start md:self-auto">
-            <div>
-              <span className="text-[10px] text-dim/70 uppercase block">Active Circuit</span>
-              <span className="font-bold text-ink">Tier 1 National</span>
-            </div>
-            <span className="text-white/20 select-none">|</span>
-            <div>
-              <span className="text-[10px] text-dim/70 uppercase block">Ranked Squads</span>
-              <span className="font-bold text-[#3dff9a]">{totalEntries}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================================== */}
-        {/* SECTION 3 — RANKING CONTROLS (DISCIPLINES, METRICS, SEARCH)    */}
-        {/* ============================================================== */}
-        <LeaderboardControls
-          games={displayGames}
-          selectedGame={selectedGame}
-          onSelectGame={handleSelectGame}
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onSelectCategory={handleSelectCategory}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          onRefresh={() => fetchEntries(true)}
-          isRefreshing={isRefreshing}
-        />
-
-        {/* ============================================================== */}
-        {/* SECTION 4 & 5 — CONTENT (PODIUM & STANDINGS TABLE)             */}
-        {/* ============================================================== */}
-        {loading ? (
-          <LeaderboardSkeleton />
-        ) : hasError ? (
-          <LeaderboardErrorState onRetry={() => fetchEntries(false)} />
-        ) : filteredEntries.length === 0 ? (
-          <LeaderboardEmptyState
-            hasFilters={hasActiveFilters}
-            onResetFilters={handleResetFilters}
-          />
-        ) : (
-          <div className="space-y-16">
-            {/* If user is on page > 1, show a compact jump-back notification banner */}
-            {safeCurrentPage > 1 && (
-              <div className="flex items-center justify-between border border-white/10 bg-surface/50 px-5 py-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="size-2 rounded-full bg-[#3dff9a] animate-pulse shadow-[0_0_8px_#3dff9a]" />
-                  <span className="font-mono text-xs text-dim">
-                    Standings Ladder: Page <span className="font-bold text-ink">{safeCurrentPage}</span> of {totalPages} (Ranks #{ (safeCurrentPage - 1) * PAGE_SIZE + 1 } to #{ Math.min(safeCurrentPage * PAGE_SIZE, totalEntries) })
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentPage(1)
-                    window.scrollTo({ top: 250, behavior: 'smooth' })
-                  }}
-                  className="font-mono text-xs font-bold text-[#3dff9a] hover:underline transition-colors cursor-pointer"
+            {/* Discipline selector */}
+            {displayGames.length > 1 && (
+              <div className="mt-4 pt-3 border-t border-white/10">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-white/40 mb-1.5">
+                  Discipline
+                </span>
+                <select
+                  value={selectedGame}
+                  onChange={(e) => handleSelectGame(e.target.value)}
+                  className="w-full bg-black border border-white/15 px-2 py-1 font-mono text-xs text-white focus:border-[#22c55e] outline-none cursor-pointer"
                 >
-                  ← View Top 3 Podium (Page 1)
-                </button>
+                  <option value="all">All Titles</option>
+                  {displayGames.map((g) => (
+                    <option key={g.slug} value={g.slug}>{g.name}</option>
+                  ))}
+                </select>
               </div>
             )}
+          </aside>
 
-            {/* TOP THREE PODIUM CENTERPIECE (Rendered on Page 1) */}
-            {safeCurrentPage === 1 && podiumEntries.length > 0 && (
-              <LeaderboardPodium
-                topEntries={podiumEntries}
-                selectedCategory={selectedCategory}
-                currentUserId={profile?.id}
-                currentUsername={profile?.username}
-                disqualifiedIds={dqIdentifiers}
-              />
-            )}
+          {/* ============================================================ */}
+          {/* RIGHT / MAIN CONTENT AREA                                     */}
+          {/* ============================================================ */}
+          <main className="min-w-0 w-full space-y-6">
+            {/* Mobile horizontal metric selector (screen < md) */}
+            <div className="block md:hidden border-b border-white/10 pb-2">
+              <div className="flex overflow-x-auto gap-1">
+                {METRIC_OPTIONS.map((m) => {
+                  const isActive = selectedCategory === m.id
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => handleSelectCategory(m.id)}
+                      className={`shrink-0 px-2.5 py-1 font-mono text-xs transition-colors ${
+                        isActive
+                          ? 'bg-white/10 text-[#22c55e] font-bold border-b border-[#22c55e]'
+                          : 'text-white/60 hover:text-white'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-            {/* FULL STANDINGS LADDER TABLE / REMAINING PLAYERS */}
-            {tableEntries.length > 0 && (
-              <LeaderboardTable
-                entries={tableEntries}
-                selectedCategory={selectedCategory}
-                currentPage={safeCurrentPage}
-                totalPages={totalPages}
-                totalEntries={totalEntries}
-                pageSize={PAGE_SIZE}
-                onPageChange={(p) => setCurrentPage(p)}
-                currentUserId={profile?.id}
-                currentUsername={profile?.username}
-                disqualifiedIds={dqIdentifiers}
+            {/* Content Loading / Error / Empty / Data states */}
+            {loading ? (
+              <LeaderboardSkeleton />
+            ) : hasError ? (
+              <LeaderboardErrorState onRetry={() => fetchEntries(false)} />
+            ) : filteredEntries.length === 0 ? (
+              <LeaderboardEmptyState
+                hasFilters={hasActiveFilters}
+                onResetFilters={handleResetFilters}
               />
+            ) : (
+              <div className="space-y-6">
+                {/* 1. TOP THREE ELEVATED PODIUM CENTERPIECE */}
+                {safeCurrentPage === 1 && podiumEntries.length > 0 && (
+                  <LeaderboardPodium
+                    topEntries={podiumEntries}
+                    selectedCategory={selectedCategory}
+                    currentUserId={profile?.id}
+                    currentUsername={profile?.username}
+                    disqualifiedIds={dqIdentifiers}
+                  />
+                )}
+
+                {/* 2. SEARCH CONTROL PLACED DIRECTLY ABOVE RANKING LIST */}
+                <div className="flex items-center justify-between gap-3 border border-white/10 bg-black/60 px-3 py-2 font-mono">
+                  <span className="text-[11px] uppercase tracking-wider text-white/40">
+                    Standings List ({totalEntries})
+                  </span>
+                  <div className="relative max-w-xs w-full">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      placeholder="Search player or squad..."
+                      className="w-full bg-black border border-white/15 px-2.5 py-1 text-xs text-white placeholder:text-white/30 focus:border-[#22c55e] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. MINIMAL RANKING LIST / STANDINGS TABLE (RANKS 4+) */}
+                {tableEntries.length > 0 && (
+                  <LeaderboardTable
+                    entries={tableEntries}
+                    selectedCategory={selectedCategory}
+                    currentPage={safeCurrentPage}
+                    totalPages={totalPages}
+                    totalEntries={totalEntries}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={(p) => setCurrentPage(p)}
+                    currentUserId={profile?.id}
+                    currentUsername={profile?.username}
+                    disqualifiedIds={dqIdentifiers}
+                  />
+                )}
+              </div>
             )}
-          </div>
-        )}
+          </main>
+        </div>
       </Container>
     </div>
   )

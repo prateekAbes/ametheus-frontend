@@ -30,43 +30,30 @@ export function LeaderboardPodium({
   const top3 = topEntries[2] || null
 
   return (
-    <div className="relative mx-auto w-full max-w-5xl py-6 select-none overflow-visible">
-      {/* ============================================================== */}
-      {/* 3D PERSPECTIVE FLOOR GRID & AMBIENT UNDER-GLOW */}
-      {/* ============================================================== */}
+    <div className="relative mx-auto w-full max-w-4xl py-4 sm:py-6 select-none">
+      {/* Subtle floor grid line beneath podium */}
       <div
-        className="pointer-events-none absolute -inset-x-8 -bottom-10 h-44 overflow-hidden opacity-30 select-none"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 overflow-hidden opacity-20 select-none"
         aria-hidden="true"
       >
-        {/* Angled Perspective Floor Grid */}
         <div
           className="size-full"
           style={{
             backgroundImage: `
-              linear-gradient(to right, rgba(61, 255, 154, 0.2) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(61, 255, 154, 0.2) 1px, transparent 1px)
+              linear-gradient(to right, rgba(34, 197, 94, 0.25) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(34, 197, 94, 0.25) 1px, transparent 1px)
             `,
-            backgroundSize: '40px 20px',
-            transform: 'perspective(500px) rotateX(65deg)',
+            backgroundSize: '32px 16px',
+            transform: 'perspective(400px) rotateX(60deg)',
             transformOrigin: 'bottom',
             maskImage: 'linear-gradient(to top, black 20%, transparent 90%)',
           }}
         />
-
-        {/* Center Emerald Ambient Floor Light */}
-        <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-24 blur-3xl opacity-40 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at center, #3dff9a55 0%, transparent 70%)',
-          }}
-        />
       </div>
 
-      {/* ============================================================== */}
       {/* PODIUM COLUMNS: #2 (Left), #1 (Center, Elevated), #3 (Right) */}
-      {/* ============================================================== */}
-      <div className="relative z-10 grid grid-cols-3 items-end gap-2.5 sm:gap-4 md:gap-6 lg:gap-8 px-1 sm:px-4">
-        {/* 2nd Place Podium Column (Left on desktop) */}
+      <div className="relative z-10 grid grid-cols-3 items-end gap-2 sm:gap-4 md:gap-6 px-1 sm:px-2">
+        {/* 2nd Place Podium Column (Left) */}
         <div className="order-1 w-full">
           {top2 ? (
             <PodiumColumn
@@ -77,8 +64,8 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top2, disqualifiedIds)}
             />
           ) : (
-            <div className="h-48 border border-dashed border-white/10 rounded-sm flex items-center justify-center p-3 text-center">
-              <span className="font-mono text-[10px] text-dim/60 uppercase">
+            <div className="h-32 border border-dashed border-white/10 flex items-center justify-center p-2 text-center">
+              <span className="font-mono text-[9px] text-white/30 uppercase">
                 #2 Vacant
               </span>
             </div>
@@ -98,7 +85,7 @@ export function LeaderboardPodium({
           ) : null}
         </div>
 
-        {/* 3rd Place Podium Column (Right on desktop) */}
+        {/* 3rd Place Podium Column (Right) */}
         <div className="order-3 w-full">
           {top3 ? (
             <PodiumColumn
@@ -109,8 +96,8 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top3, disqualifiedIds)}
             />
           ) : (
-            <div className="h-40 border border-dashed border-white/10 rounded-sm flex items-center justify-center p-3 text-center">
-              <span className="font-mono text-[10px] text-dim/60 uppercase">
+            <div className="h-28 border border-dashed border-white/10 flex items-center justify-center p-2 text-center">
+              <span className="font-mono text-[9px] text-white/30 uppercase">
                 #3 Vacant
               </span>
             </div>

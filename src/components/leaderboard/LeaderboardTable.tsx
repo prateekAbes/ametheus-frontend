@@ -45,279 +45,59 @@ export function LeaderboardTable({
       ? Math.min(pageSize, totalEntries)
       : Math.min(currentPage * pageSize, totalEntries)
 
-  // Primary metric column title
-  const getPrimaryMetricLabel = () => {
+  // Primary metric column title matching active metric only
+  const getMetricHeader = () => {
     switch (selectedCategory) {
       case 'win_rate':
         return 'Win Rate'
-      case 'earnings':
-        return 'Prize Earnings'
       case 'wins':
-        return 'Victories'
-      case 'matches_played':
-        return 'Matches'
+        return 'Match Wins'
+      case 'earnings':
+        return 'Total Prize'
+      case 'pc':
+        return 'PC Rating'
+      case 'mobile':
+        return 'Mobile Rating'
       case 'overall':
       default:
-        return 'Elo Rating'
+        return 'Score'
     }
   }
 
-  // Generate page numbers
-  const pageNumbers = () => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1)
+  // Format the single metric value for each row
+  const getMetricValue = (entry: LeaderboardEntry) => {
+    switch (selectedCategory) {
+      case 'win_rate':
+        return `${entry.win_rate ?? 0}%`
+      case 'wins':
+        return `${entry.wins ?? 0} W`
+      case 'earnings':
+        return inr(Number(entry.earnings || 0))
+      case 'pc':
+      case 'mobile':
+      case 'overall':
+      default:
+        return `${entry.rating ?? 1500}`
     }
-    if (currentPage <= 4) {
-      return [1, 2, 3, 4, 5, '...', totalPages]
-    }
-    if (currentPage >= totalPages - 3) {
-      return [
-        1,
-        '...',
-        totalPages - 4,
-        totalPages - 3,
-        totalPages - 2,
-        totalPages - 1,
-        totalPages,
-      ]
-    }
-    return [
-      1,
-      '...',
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      '...',
-      totalPages,
-    ]
   }
 
   return (
-    <div id="standings-ladder" className="w-full scroll-mt-24 space-y-4">
+    <div id="standings-ladder" className="w-full scroll-mt-20 space-y-3">
       {/* ============================================================== */}
-      {/* 1. DESKTOP / TABLET LADDER TABLE */}
+      {/* MINIMAL STANDINGS TABLE / LIST                                  */}
       {/* ============================================================== */}
-      <div className="border border-white/10 bg-surface/30 overflow-hidden shadow-xl backdrop-blur-md">
-        {/* Table Header Strip */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 px-5 py-3.5 bg-surface/80">
-          <div className="flex items-center gap-2.5">
-            <span className="w-1.5 h-4 bg-[#3dff9a] rounded-full shadow-[0_0_8px_#3dff9a]" />
-            <span className="font-mono text-xs uppercase tracking-wider text-ink font-bold">
-              Standings Ladder (Ranks #{ladderStartRank} to #{ladderEndRank})
-            </span>
+      <div className="border border-white/10 bg-black/70 overflow-hidden">
+        {/* Table Head */}
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 bg-white/[0.02] font-mono text-[10px] text-white/40 uppercase tracking-wider">
+          <div className="flex items-center gap-3">
+            <span className="w-10 text-center">Rank</span>
+            <span>Contender</span>
           </div>
-          <span className="font-mono text-[11px] text-dim uppercase tracking-wider">
-            Page {currentPage} of {totalPages} · {totalEntries} Contenders Listed
-          </span>
+          <span className="text-right">{getMetricHeader()}</span>
         </div>
 
-        {/* Responsive Table for md+ screens */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left font-mono text-xs">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.02] text-dim uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4 w-16 text-center">Rank</th>
-                <th className="py-3 px-4">Contender / Squad</th>
-                <th className="py-3 px-4">Discipline</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-center font-bold text-[#3dff9a]">
-                  {getPrimaryMetricLabel()} (Primary)
-                </th>
-                <th className="py-3 px-4 text-center">Elo</th>
-                <th className="py-3 px-4 text-center">Win Rate</th>
-                <th className="py-3 px-4 text-center">Record</th>
-                <th className="py-3 px-4 text-center">Recent Form</th>
-                <th className="py-3 px-4 text-right">Prize Earnings</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {entries.map((entry, idx) => {
-                const rankNumber =
-                  entry.rank ||
-                  (currentPage === 1
-                    ? idx + 4
-                    : (currentPage - 1) * pageSize + idx + 1)
-                const isDqEntry = isEntryDisqualified(entry, disqualifiedIds)
-                const isDisbanded =
-                  entry.is_disbanded || entry.status === 'DISBANDED'
-                const isCurrent = isEntryCurrentUser(entry, currentUserId, currentUsername)
-                const avatarUrl = resolveMediaUrl(entry.logo_url)
-                const rowKey = entry.id ? `entry-${entry.id}` : `rank-${rankNumber}-${entry.name}`
-
-                return (
-                  <tr
-                    key={rowKey}
-                    className={`transition-colors hover:bg-white/[0.04] ${
-                      isCurrent
-                        ? 'bg-[#3dff9a]/10 border-l-2 border-l-[#3dff9a]'
-                        : isDqEntry
-                        ? 'bg-live/5'
-                        : isDisbanded
-                        ? 'bg-amber-950/[0.04]'
-                        : ''
-                    }`}
-                  >
-                    {/* Rank */}
-                    <td className="py-3 px-4 text-center font-bold text-dim">
-                      #{String(rankNumber).padStart(2, '0')}
-                    </td>
-
-                    {/* Contender Name, Avatar, Tag */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        {isCurrent ? (
-                          <Link to="/profile" title="View your profile" className="group/avatar shrink-0">
-                            {avatarUrl ? (
-                              <div className="size-8 shrink-0 overflow-hidden rounded border border-[#3dff9a]/40 bg-surface group-hover/avatar:border-[#3dff9a] transition-colors">
-                                <DynamicImage
-                                  src={avatarUrl}
-                                  alt={entry.name}
-                                  className="size-8 object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex size-8 shrink-0 items-center justify-center rounded border border-[#3dff9a]/40 bg-surface text-xs font-bold text-[#3dff9a] group-hover/avatar:border-[#3dff9a] transition-colors">
-                                {(entry.name || 'C').charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                          </Link>
-                        ) : avatarUrl ? (
-                          <div className="size-8 shrink-0 overflow-hidden rounded border border-white/15 bg-surface">
-                            <DynamicImage
-                              src={avatarUrl}
-                              alt={entry.name}
-                              className="size-8 object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded border border-white/15 bg-surface text-xs font-bold text-[#3dff9a]">
-                            {(entry.name || 'C').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            {isCurrent ? (
-                              <Link
-                                to="/profile"
-                                title="View your profile"
-                                className="font-display text-sm font-black uppercase text-ink hover:text-[#3dff9a] transition-colors truncate"
-                              >
-                                {entry.name}
-                              </Link>
-                            ) : (
-                              <span className="font-display text-sm font-black uppercase text-ink truncate">
-                                {entry.name}
-                              </span>
-                            )}
-                            {entry.tag && (
-                              <span className="font-mono text-[10px] text-dim">
-                                [{entry.tag}]
-                              </span>
-                            )}
-                            {isCurrent && (
-                              <span className="border border-[#3dff9a]/80 bg-[#3dff9a]/20 text-[#3dff9a] px-1 py-0.2 font-mono text-[8px] font-bold uppercase rounded-xs">
-                                YOU
-                              </span>
-                            )}
-                          </div>
-                          {entry.captain && (
-                            <span className="text-[10px] text-dim block truncate">
-                              {entry.captain}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Discipline */}
-                    <td className="py-3 px-4 text-dim">
-                      {entry.game_name || entry.game_slug || 'Esports'}
-                    </td>
-
-                    {/* Status Badge */}
-                    <td className="py-3 px-4">
-                      {isDqEntry ? (
-                        <span className="inline-flex items-center border border-live/80 bg-live/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-live animate-pulse">
-                          DISQUALIFIED
-                        </span>
-                      ) : isDisbanded ? (
-                        <span className="inline-flex items-center border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
-                          Historical
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center border border-[#3dff9a]/40 bg-[#3dff9a]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#3dff9a]">
-                          Active
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Primary Highlighted Metric */}
-                    <td className="py-3 px-4 text-center font-bold text-[#3dff9a]">
-                      {selectedCategory === 'win_rate'
-                        ? `${entry.win_rate ?? 0}%`
-                        : selectedCategory === 'earnings'
-                        ? inr(Number(entry.earnings || 0))
-                        : selectedCategory === 'wins'
-                        ? `${entry.wins ?? 0} W`
-                        : selectedCategory === 'matches_played'
-                        ? `${entry.matches_played ?? 0}`
-                        : `${entry.rating ?? 1500} ELO`}
-                    </td>
-
-                    {/* Elo */}
-                    <td className="py-3 px-4 text-center font-bold text-ink">
-                      {entry.rating ?? 1500}
-                    </td>
-
-                    {/* Win Rate */}
-                    <td className="py-3 px-4 text-center font-bold text-ink">
-                      {entry.win_rate ?? 0}%
-                    </td>
-
-                    {/* Record */}
-                    <td className="py-3 px-4 text-center text-dim">
-                      <span className="text-ok font-bold">{entry.wins ?? 0}W</span>{' '}
-                      -{' '}
-                      <span className="text-rose-400 font-bold">
-                        {entry.losses ?? 0}L
-                      </span>
-                    </td>
-
-                    {/* Recent Form */}
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {entry.form && entry.form.length > 0 ? (
-                          entry.form.map((f, fIdx) => (
-                            <span
-                              key={fIdx}
-                              className={`inline-block size-4 text-[9px] font-black leading-4 rounded-xs text-center ${
-                                f === 'W'
-                                  ? 'bg-[#3dff9a]/20 text-[#3dff9a] border border-[#3dff9a]/40'
-                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                              }`}
-                            >
-                              {f}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-dim text-[10px]">—</span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Prize Earnings */}
-                    <td className="py-3 px-4 text-right font-bold text-ink">
-                      {inr(Number(entry.earnings || 0))}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Compact Card Layout for < md screens */}
-        <div className="block md:hidden divide-y divide-white/10">
+        {/* Table Rows */}
+        <div className="divide-y divide-white/5 font-mono text-xs">
           {entries.map((entry, idx) => {
             const rankNumber =
               entry.rank ||
@@ -327,99 +107,107 @@ export function LeaderboardTable({
             const isDqEntry = isEntryDisqualified(entry, disqualifiedIds)
             const isCurrent = isEntryCurrentUser(entry, currentUserId, currentUsername)
             const avatarUrl = resolveMediaUrl(entry.logo_url)
-            const rowKey = entry.id ? `m-entry-${entry.id}` : `m-rank-${rankNumber}-${entry.name}`
+            const rowKey = entry.id ? `entry-${entry.id}` : `rank-${rankNumber}-${entry.name}`
+
+            // Canonical username display
+            const displayName =
+              entry.name && !entry.name.toLowerCase().startsWith('player_') && !entry.name.toLowerCase().startsWith('user_')
+                ? entry.name
+                : entry.captain
+                ? entry.captain.replace('@', '')
+                : entry.name || 'Contender'
+
+            const initial = displayName.charAt(0).toUpperCase()
 
             return (
               <div
                 key={rowKey}
-                className={`p-3.5 space-y-2 ${
+                className={`flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
                   isCurrent
-                    ? 'bg-[#3dff9a]/10 border-l-2 border-l-[#3dff9a]'
+                    ? 'bg-[#22c55e]/10 border-l-2 border-l-[#22c55e]'
                     : isDqEntry
-                    ? 'bg-live/5'
+                    ? 'opacity-40'
                     : ''
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-bold text-dim">
-                      #{String(rankNumber).padStart(2, '0')}
-                    </span>
-                    {isCurrent ? (
-                      <Link to="/profile" title="View your profile" className="group/avatar shrink-0">
+                {/* Left: Rank & Contender (with square avatar) */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-10 text-center font-bold text-white/50 shrink-0">
+                    #{String(rankNumber).padStart(2, '0')}
+                  </span>
+
+                  {/* Square Profile Picture */}
+                  {isCurrent ? (
+                    <Link to="/profile" title="View your profile" className="shrink-0">
+                      <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-[#22c55e]/50 bg-black">
                         {avatarUrl ? (
-                          <div className="size-7 shrink-0 overflow-hidden rounded border border-[#3dff9a]/40 bg-surface group-hover/avatar:border-[#3dff9a] transition-colors">
-                            <DynamicImage
-                              src={avatarUrl}
-                              alt={entry.name}
-                              className="size-7 object-cover"
-                            />
-                          </div>
+                          <DynamicImage
+                            src={avatarUrl}
+                            alt={displayName}
+                            className="size-full object-cover rounded-none"
+                          />
                         ) : (
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded border border-[#3dff9a]/40 bg-surface text-xs font-bold text-[#3dff9a] group-hover/avatar:border-[#3dff9a] transition-colors">
-                            {(entry.name || 'C').charAt(0).toUpperCase()}
+                          <div className="flex size-full items-center justify-center font-bold text-white/80 bg-white/5 text-[10px]">
+                            {initial}
                           </div>
                         )}
-                      </Link>
-                    ) : avatarUrl ? (
-                      <div className="size-7 shrink-0 overflow-hidden rounded border border-white/15 bg-surface">
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-white/15 bg-black">
+                      {avatarUrl ? (
                         <DynamicImage
                           src={avatarUrl}
-                          alt={entry.name}
-                          className="size-7 object-cover"
+                          alt={displayName}
+                          className="size-full object-cover rounded-none"
                         />
-                      </div>
-                    ) : (
-                      <div className="flex size-7 shrink-0 items-center justify-center rounded border border-white/15 bg-surface text-xs font-bold text-[#3dff9a]">
-                        {(entry.name || 'C').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
+                      ) : (
+                        <div className="flex size-full items-center justify-center font-bold text-white/80 bg-white/5 text-[10px]">
+                          {initial}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Player Name */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 truncate">
                       {isCurrent ? (
                         <Link
                           to="/profile"
-                          title="View your profile"
-                          className="font-display text-sm font-black uppercase text-ink hover:text-[#3dff9a] transition-colors"
+                          className="font-bold uppercase text-white hover:text-[#22c55e] transition-colors truncate"
                         >
-                          {entry.name}
+                          {displayName}
                         </Link>
                       ) : (
-                        <span className="font-display text-sm font-black uppercase text-ink">
-                          {entry.name}
+                        <span className="font-bold uppercase text-white truncate">
+                          {displayName}
                         </span>
                       )}
                       {entry.tag && (
-                        <span className="font-mono text-[10px] text-dim ml-1">
+                        <span className="text-[10px] text-white/40 shrink-0">
                           [{entry.tag}]
+                        </span>
+                      )}
+                      {isCurrent && (
+                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-[#22c55e] text-black shrink-0">
+                          YOU
+                        </span>
+                      )}
+                      {isDqEntry && (
+                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40 shrink-0">
+                          DQ
                         </span>
                       )}
                     </div>
                   </div>
-
-                  {/* Primary Stat on mobile */}
-                  <span className="font-mono text-xs font-black text-[#3dff9a]">
-                    {selectedCategory === 'win_rate'
-                      ? `${entry.win_rate ?? 0}%`
-                      : selectedCategory === 'earnings'
-                      ? inr(Number(entry.earnings || 0))
-                      : selectedCategory === 'wins'
-                      ? `${entry.wins ?? 0} W`
-                      : selectedCategory === 'matches_played'
-                      ? `${entry.matches_played ?? 0} M`
-                      : `${entry.rating ?? 1500} ELO`}
-                  </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-mono text-dim border-t border-white/5 pt-1.5">
-                  <span>{entry.game_name || entry.game_slug || 'Esports'}</span>
-                  <span>
-                    Rating: <strong className="text-ink">{entry.rating ?? 1500}</strong>
+                {/* Right: Metric Value ONLY */}
+                <div className="text-right shrink-0 pl-3">
+                  <span className="font-bold text-white">
+                    {getMetricValue(entry)}
                   </span>
-                  <span>
-                    Record: <strong className="text-ok">{entry.wins ?? 0}W</strong>-
-                    <strong className="text-rose-400">{entry.losses ?? 0}L</strong>
-                  </span>
-                  <span>{inr(Number(entry.earnings || 0))}</span>
                 </div>
               </div>
             )
@@ -428,91 +216,53 @@ export function LeaderboardTable({
       </div>
 
       {/* ============================================================== */}
-      {/* 2. PAGINATION CONTROLS */}
+      {/* PAGINATION CONTROLS                                             */}
       {/* ============================================================== */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border border-white/10 bg-surface/40 p-4 backdrop-blur-md">
-          <div className="font-mono text-xs text-dim">
-            Showing standings <span className="font-bold text-ink">#{ladderStartRank}</span> to{' '}
-            <span className="font-bold text-ink">#{ladderEndRank}</span> of{' '}
-            <span className="font-bold text-[#3dff9a]">{totalEntries}</span> contenders
-          </div>
+        <div className="flex items-center justify-between border border-white/10 bg-black/60 px-3 py-2 font-mono text-xs">
+          <span className="text-white/40 text-[11px]">
+            #{ladderStartRank}-#{ladderEndRank} of {totalEntries}
+          </span>
 
-          <div className="flex items-center gap-1.5 font-mono text-xs">
-            {/* Previous Button */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 if (currentPage > 1) {
                   onPageChange(currentPage - 1)
-                  document
-                    .getElementById('standings-ladder')
-                    ?.scrollIntoView({ behavior: 'smooth' })
+                  document.getElementById('standings-ladder')?.scrollIntoView({ behavior: 'smooth' })
                 }
               }}
               disabled={currentPage === 1}
-              className={`px-3 py-1.5 border uppercase font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer ${
                 currentPage === 1
-                  ? 'border-white/5 bg-white/[0.02] text-dim/30 cursor-not-allowed'
-                  : 'border-white/15 bg-surface text-dim hover:border-[#3dff9a] hover:text-ink'
+                  ? 'border-white/5 text-white/20 cursor-not-allowed'
+                  : 'border-white/15 text-white/70 hover:border-white/30 hover:text-white'
               }`}
             >
-              ← Previous
+              Prev
             </button>
 
-            {/* Numbered Page Buttons */}
-            {pageNumbers().map((p, pIdx) => {
-              if (p === '...') {
-                return (
-                  <span
-                    key={`ellipsis-${pIdx}`}
-                    className="px-2 py-1 text-dim select-none"
-                  >
-                    …
-                  </span>
-                )
-              }
-              const isCurrent = p === currentPage
-              return (
-                <button
-                  key={`page-${p}`}
-                  type="button"
-                  onClick={() => {
-                    onPageChange(p as number)
-                    document
-                      .getElementById('standings-ladder')
-                      ?.scrollIntoView({ behavior: 'smooth' })
-                  }}
-                  className={`min-w-8 h-8 px-2 border font-bold transition-all cursor-pointer ${
-                    isCurrent
-                      ? 'border-[#3dff9a] bg-[#3dff9a] text-void shadow-[0_0_12px_rgba(61,255,154,0.4)]'
-                      : 'border-white/10 bg-surface/60 text-dim hover:border-white/30 hover:text-ink'
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            })}
+            <span className="px-2 text-white/50 text-[10px]">
+              {currentPage} / {totalPages}
+            </span>
 
-            {/* Next Button */}
             <button
               type="button"
               onClick={() => {
                 if (currentPage < totalPages) {
                   onPageChange(currentPage + 1)
-                  document
-                    .getElementById('standings-ladder')
-                    ?.scrollIntoView({ behavior: 'smooth' })
+                  document.getElementById('standings-ladder')?.scrollIntoView({ behavior: 'smooth' })
                 }
               }}
               disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 border uppercase font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer ${
                 currentPage === totalPages
-                  ? 'border-white/5 bg-white/[0.02] text-dim/30 cursor-not-allowed'
-                  : 'border-white/15 bg-surface text-dim hover:border-[#3dff9a] hover:text-ink'
+                  ? 'border-white/5 text-white/20 cursor-not-allowed'
+                  : 'border-white/15 text-white/70 hover:border-white/30 hover:text-white'
               }`}
             >
-              Next →
+              Next
             </button>
           </div>
         </div>
