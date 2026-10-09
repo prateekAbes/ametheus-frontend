@@ -218,13 +218,6 @@ export default function EsportsHeroVisual({
         </svg>
       )}
 
-      {/* Decorative corner framing ticks */}
-      <div className="absolute right-8 top-8 hidden md:block">
-        <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
-          <span className="size-1 rounded-full bg-cyan animate-pulse" />
-          <span>ESPORTS PROTOCOL // SYS-READY</span>
-        </div>
-      </div>
     </div>
   )
 }

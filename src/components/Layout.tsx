@@ -274,37 +274,6 @@ export function Footer() {
           <p className="max-w-sm text-sm text-ink/60 leading-relaxed font-mono">
             India&apos;s competitive esports platform — verified skill ratings, structured tournaments, and sanctioned circuits built for serious players.
           </p>
-          <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-            <a
-              href="https://discord.gg/VzkfuK7We"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
-            >
-              <span>Discord</span>
-              <span className="text-[10px] text-cyan">↗</span>
-            </a>
-            <span className="text-white/20 select-none">·</span>
-            <a
-              href="https://www.instagram.com/official.ametheus"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
-            >
-              <span>Instagram</span>
-              <span className="text-[10px] text-cyan">↗</span>
-            </a>
-            <span className="text-white/20 select-none">·</span>
-            <a
-              href="https://www.youtube.com/@official.ametheus.goodgame"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-dim hover:text-cyan transition-colors flex items-center gap-1.5"
-            >
-              <span>YouTube</span>
-              <span className="text-[10px] text-cyan">↗</span>
-            </a>
-          </div>
         </div>
 
         {navColumns.map(([h, links]) => (

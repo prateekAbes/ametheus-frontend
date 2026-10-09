@@ -276,7 +276,7 @@ export default function Games() {
                   <SectionHead
                     idx="01"
                     kicker="Competitive Genres"
-                    title={<>Tournament <span className="text-cyan">Disciplines</span></>}
+                    title="Games"
                     sub="Explore official esports battlegrounds grouped by discipline. Select any discipline to inspect registered games."
                   />
                 </div>

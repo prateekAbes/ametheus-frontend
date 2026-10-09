@@ -819,21 +819,22 @@ export default function Auth() {
   // =========================================================================
   if (isContinuationRoute) {
     return (
-      <div className="relative min-h-screen flex flex-col justify-between items-center px-6 py-6 sm:px-10 overflow-hidden bg-void">
+      <div className="relative min-h-screen flex flex-col justify-between overflow-x-hidden bg-void selection:bg-[#3ef2ff]/30 selection:text-white">
         <StarBackground variant="continuation" />
         <CelestialArc variant="major" />
 
-        <div className="relative z-10 w-full max-w-4xl flex items-center justify-between pt-2">
-          <Link
-            to="/"
-            className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#3ef2ff] transition-colors uppercase"
-            aria-label="Ametheus Home"
-          >
-            Ametheus
-          </Link>
-        </div>
+        <div className="relative z-10 flex-1 flex flex-col justify-between items-center w-full px-6 pt-6 pb-6 sm:px-10">
+          <div className="w-full max-w-4xl flex items-center justify-between pt-2">
+            <Link
+              to="/"
+              className="font-display text-lg font-black tracking-[0.25em] text-white hover:text-[#3ef2ff] transition-colors uppercase"
+              aria-label="Ametheus Home"
+            >
+              Ametheus
+            </Link>
+          </div>
 
-        <div className="relative z-10 my-auto w-full max-w-[420px] mx-auto">
+          <div className="my-auto w-full max-w-[420px] mx-auto py-6">
           <div className="mb-6">
             <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.25em] text-white/50 block mb-2">
               AMETHEUS
@@ -963,10 +964,11 @@ export default function Auth() {
             </button>
           </form>
         </div>
-
-        <AuthFooter />
       </div>
-    )
+
+      <AuthFooter />
+    </div>
+  )
   }
 
   // =========================================================================

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
-import { useUser, useClerk } from '@clerk/react'
+import { useUser, useClerk, useAuth } from '@clerk/react'
 import { Container, Cta, Field, Hud, Panel, Toggle, Badge } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
 import { updateUserProfile, deleteAccount } from '../services/auth'
@@ -47,6 +47,7 @@ export default function Settings() {
   const { profile, refreshProfile } = useAuthContext()
   const { user } = useUser()
   const clerk = useClerk()
+  const { getToken } = useAuth()
 
   const [active, setActive] = useState<string>('Account')
   const [dirty, setDirty] = useState(false)
@@ -456,12 +457,27 @@ export default function Settings() {
     }
   }
 
+  const isDeleteConfirmed = () => {
+    const expected = (profile?.username || '').trim().toLowerCase()
+    const input = deleteConfirmText.trim().toLowerCase()
+    if (!input) return false
+    return (expected && input === expected) || input === 'confirm' || input === 'delete'
+  }
+
   const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== (profile?.username || 'confirm')) return
+    if (!isDeleteConfirmed()) return
     setIsDeleting(true)
     setDeleteError('')
     try {
-      const token = await clerk.session?.getToken()
+      let token: string | null | undefined = null
+      try {
+        token = await getToken()
+      } catch {
+        // Fallback to clerk session if hook throws
+      }
+      if (!token) {
+        token = await clerk.session?.getToken()
+      }
       await deleteAccount(token)
       try {
         await clerk.signOut()
@@ -1054,37 +1070,47 @@ export default function Settings() {
                 )}
 
                 {showDeleteConfirm ? (
-                  <div className="border border-live/40 bg-surface p-4 space-y-3">
-                    <p className="font-mono text-xs text-live uppercase font-bold">
-                      Type your username "{profile?.username || 'confirm'}" to proceed:
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleDeleteAccount()
+                    }}
+                    className="border border-live/40 bg-surface p-4 space-y-3"
+                  >
+                    <p className="font-mono text-xs text-live font-bold">
+                      Type your username <span className="underline">{profile?.username || 'confirm'}</span>, or "confirm" to proceed:
                     </p>
                     <input
                       type="text"
                       value={deleteConfirmText}
                       onChange={(e) => setDeleteConfirmText(e.target.value)}
-                      placeholder="Enter username"
+                      placeholder={profile?.username || 'confirm'}
+                      disabled={isDeleting}
+                      autoFocus
                       className="w-full border border-live/40 bg-void px-3 py-2 text-sm text-ink outline-none focus:border-live"
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={handleDeleteAccount}
-                        disabled={isDeleting || deleteConfirmText !== (profile?.username || 'confirm')}
+                        type="submit"
+                        disabled={isDeleting || !isDeleteConfirmed()}
                         className="border border-live bg-live px-4 py-2 font-mono text-xs uppercase text-white hover:bg-live/90 disabled:opacity-40 transition-colors cursor-pointer"
                       >
                         {isDeleting ? 'Deleting...' : 'Permanently Delete Account'}
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           setShowDeleteConfirm(false)
                           setDeleteConfirmText('')
                           setDeleteError('')
                         }}
+                        disabled={isDeleting}
                         className="border border-white/20 px-4 py-2 font-mono text-xs uppercase text-dim hover:text-ink transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
                     </div>
-                  </div>
+                  </form>
                 ) : (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
