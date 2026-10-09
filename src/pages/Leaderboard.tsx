@@ -222,15 +222,6 @@ export default function Leaderboard() {
 
       <Container className="relative z-10">
         {/* ============================================================== */}
-        {/* PAGE HEADING: MINIMALIST, HIGH-IMPACT ESPORTS HEADER            */}
-        {/* ============================================================== */}
-        <div className="mb-8">
-          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-white">
-            Leaderboard
-          </h1>
-        </div>
-
-        {/* ============================================================== */}
         {/* DESKTOP: 2-COLUMN LAYOUT (SIDEBAR METRIC SELECTOR + PODIUM/LIST)*/}
         {/* ============================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-[190px_1fr] lg:grid-cols-[210px_1fr] gap-6 lg:gap-8 items-start">

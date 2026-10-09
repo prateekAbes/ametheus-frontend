@@ -463,18 +463,11 @@ export default function Settings() {
     try {
       const token = await clerk.session?.getToken()
       await deleteAccount(token)
-      try {
-        if (user) {
-          await user.delete()
-        }
-      } catch (clerkErr) {
-        console.warn('Clerk client-side user deletion handled/warning:', clerkErr)
+      if (user) {
+        await user.delete()
       }
-      try {
-        await clerk.signOut()
-      } catch {}
+      await clerk.signOut()
       localStorage.clear()
-      sessionStorage.clear()
       window.location.href = '/sign-in'
     } catch (err: any) {
       setDeleteError(err.errors?.[0]?.message || err.message || 'Failed to delete account.')
@@ -1014,7 +1007,7 @@ export default function Settings() {
                         user?.twoFactorEnabled ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'
                       }`}
                     >
-                      {user?.twoFactorEnabled ? '✓ 2FA Active' : 'Disabled (Optional)'}
+                      {user?.twoFactorEnabled ? '✓ 2FA Active' : 'Disabled (Recommended)'}
                     </span>
                     <button
                       onClick={() => clerk.openUserProfile()}
