@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient'
+import { optimizeImageForUpload } from '../utils/imageOptimizer'
 
 export interface AdminStats {
   total_users: number
@@ -355,8 +356,9 @@ export async function uploadUpiAccountQr(accountId: string, file: File): Promise
   media_id?: string
   account?: UpiAccount
 }> {
+  const optimized = await optimizeImageForUpload(file, { maxDimension: 1200, maxSizeBytes: 850 * 1024 })
   const formData = new FormData()
-  formData.append('file', file)
+  formData.append('file', optimized)
   return apiClient<{
     status: string
     qr_url: string
@@ -591,8 +593,9 @@ export async function uploadMediaFile(file: File): Promise<{
   data_url: string
   filename: string
 }> {
+  const optimized = await optimizeImageForUpload(file, { maxDimension: 1920, maxSizeBytes: 850 * 1024 })
   const formData = new FormData()
-  formData.append('file', file)
+  formData.append('file', optimized)
   return apiClient<{
     status: string
     id: string

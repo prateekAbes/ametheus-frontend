@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { submitMatchResult } from '../../services/matches'
+import { optimizeImageForUpload } from '../../utils/imageOptimizer'
 import { Brackets, Hud, Modal } from '../ui'
 
 interface Props {
@@ -21,19 +22,20 @@ export function EvidenceSubmissionModal({ match, isOpen, onClose, onSuccess }: P
 
   if (!isOpen || !match) return null
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 20 * 1024 * 1024) {
       alert('Screenshot exceeds 20MB limit.')
       return
     }
+    const optimized = await optimizeImageForUpload(file, { maxDimension: 1920, maxSizeBytes: 800 * 1024 })
     const reader = new FileReader()
     reader.onload = (event) => {
       const result = event.target?.result as string
       setEvidenceUrl(result)
     }
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(optimized)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

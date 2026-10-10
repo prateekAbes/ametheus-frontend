@@ -178,8 +178,10 @@ export async function apiClient<T>(
     })
   } catch (netErr: any) {
     const errorMsg = netErr?.message || 'Network connection failed'
+    const isUpload = options.body instanceof FormData
+    const extra = isUpload ? ' If uploading media, ensure the file is within allowed limits.' : ''
     throw new ApiError(0, {
-      message: `Unable to connect to Ametheus server (${API_BASE_URL}). Please verify your connection or try again. Details: ${errorMsg}`,
+      message: `Unable to connect to Ametheus server (${API_BASE_URL}). Please verify your connection or try again.${extra} Details: ${errorMsg}`,
     })
   }
 

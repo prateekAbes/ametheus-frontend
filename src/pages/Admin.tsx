@@ -205,23 +205,23 @@ function BannerImageUploader({
         } else {
           setInfo(`✓ Verified: 9:16 vertical mobile aspect ratio (${width}x${height}px)`)
         }
-      } else {
+      } else if (recommendedRatio === '16:9') {
         const targetRatio = 16 / 9
         if (Math.abs(ratio - targetRatio) > 0.18) {
-          setWarning(
-            `⚠️ Non-standard aspect ratio: ${width}x${height} (${ratio.toFixed(2)}:1). Recommended ratio is 16:9 (~1.78:1, e.g. ${recommendedRes}). Image will be fitted/cropped to 16:9.`
+          setInfo(
+            `✓ Uploaded: ${width}x${height}px (${ratio.toFixed(2)}:1). Adapts cleanly to ${recommendedRatio} container.`
           )
         } else {
           setInfo(`✓ Verified: 16:9 widescreen aspect ratio (${width}x${height}px)`)
         }
 
-        if (width < 1280 || height < 720) {
-          setWarning((prev) =>
-            prev
-              ? `${prev} | Note: Low resolution (${width}x${height}px). Recommended is ${recommendedRes} for high-DPI displays.`
-              : `ℹ️ Note: Resolution is ${width}x${height}px. Recommended is ${recommendedRes} for optimal visual quality.`
+        if (width < 640 || height < 360) {
+          setWarning(
+            `ℹ️ Note: Image resolution is ${width}x${height}px. Recommended is ${recommendedRes} for high-DPI displays.`
           )
         }
+      } else {
+        setInfo(`✓ Verified: ${width}x${height}px (${ratio.toFixed(2)}:1)`)
       }
 
       setPreviewSrc(objectUrl)
