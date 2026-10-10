@@ -115,7 +115,7 @@ export default function Profile() {
   const username = profile?.username || authDisplayName || profile?.display_name || 'Player'
   const email = profile?.email || 'player@ametheus.gg'
   const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
-  const rawAvatar = authAvatarUrl || profile?.avatar_url
+  const rawAvatar = profile?.avatar_url || authAvatarUrl
   const avatarDisplay = rawAvatar ? resolveMediaUrl(rawAvatar) : img(AVATARS[0], 800)
 
   // Filter registrations by participation lifecycle

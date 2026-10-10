@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { resolveMediaUrl } from '../services/apiClient'
 
 type ImageStatus = 'missing' | 'loading' | 'success' | 'error'
 
@@ -19,20 +20,22 @@ function optimizeUrl(url?: string | null): string {
   if (!url || typeof url !== 'string') return ''
   const trimmed = url.trim()
   if (!trimmed) return ''
+  const resolved = resolveMediaUrl(trimmed)
+  if (!resolved) return ''
   // Optimize Unsplash images for responsive fast WebP delivery with quality 75
-  if (trimmed.includes('images.unsplash.com')) {
+  if (resolved.includes('images.unsplash.com')) {
     try {
-      const u = new URL(trimmed)
+      const u = new URL(resolved)
       if (!u.searchParams.has('auto')) u.searchParams.set('auto', 'format')
       if (!u.searchParams.has('fit')) u.searchParams.set('fit', 'crop')
       if (!u.searchParams.has('q')) u.searchParams.set('q', '75')
       if (!u.searchParams.has('w')) u.searchParams.set('w', '800')
       return u.toString()
     } catch {
-      return trimmed
+      return resolved
     }
   }
-  return trimmed
+  return resolved
 }
 
 export default function DynamicImage({

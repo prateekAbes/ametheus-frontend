@@ -17,6 +17,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api.ametheus.games/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

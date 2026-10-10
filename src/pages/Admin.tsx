@@ -166,9 +166,11 @@ function BannerImageUploader({
         const res = await uploadMediaFile(file)
         if (res?.url) {
           onChange(res.url)
+          setPreviewSrc(null)
         }
       } catch (err: any) {
         alert(err.message || 'SVG upload failed')
+        setPreviewSrc(null)
       } finally {
         setIsUploading(false)
       }
@@ -230,9 +232,11 @@ function BannerImageUploader({
         const res = await uploadMediaFile(file)
         if (res?.url) {
           onChange(res.url)
+          setPreviewSrc(null)
         }
       } catch (err: any) {
         alert(err.message || 'Image upload failed')
+        setPreviewSrc(null)
       } finally {
         setIsUploading(false)
       }
@@ -478,23 +482,36 @@ export default function Admin() {
   const [tournamentFilter, setTournamentFilter] = useState('ALL')
   const [tournamentSearch, setTournamentSearch] = useState('')
   const [isCreateTourOpen, setIsCreateTourOpen] = useState(false)
-  const [newTour, setNewTour] = useState({
-    title: '',
-    game_id: 'valorant',
-    format: 'Single Elimination · BO3',
-    prize_pool_inr: 25000,
-    entry_fee_inr: 100,
-    max_teams: 16,
-    min_team_size: 5,
-    max_team_size: 5,
-    start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
-    banner_url: '',
-    banner_tablet_url: '',
-    banner_mobile_url: '',
-    logo_url: '',
-    whatsapp_group_url: '',
-    description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+  const [newTour, setNewTour] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('ametheus_admin_draft_new_tour')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return {
+      title: '',
+      game_id: 'valorant',
+      format: 'Single Elimination · BO3',
+      prize_pool_inr: 25000,
+      entry_fee_inr: 100,
+      max_teams: 16,
+      min_team_size: 5,
+      max_team_size: 5,
+      start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
+      banner_url: '',
+      banner_tablet_url: '',
+      banner_mobile_url: '',
+      logo_url: '',
+      whatsapp_group_url: '',
+      description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+    }
   })
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ametheus_admin_draft_new_tour', JSON.stringify(newTour))
+    } catch {}
+  }, [newTour])
+
   const [editingTour, setEditingTour] = useState<Tournament | null>(null)
   const [rosterTour, setRosterTour] = useState<Tournament | null>(null)
   const [rostersList, setRostersList] = useState<any[]>([])
@@ -502,32 +519,44 @@ export default function Admin() {
 
   // GAMES CATALOG Interactive States
   const [isCreateGameOpen, setIsCreateGameOpen] = useState(false)
-  const [newGame, setNewGame] = useState({
-    slug: '',
-    name: '',
-    category: 'FPS',
-    platform: 'PC',
-    tag: 'TACTICAL',
-    is_team_game: true,
-    min_team_size: 5,
-    max_team_size: 5,
-    max_substitutes: 2,
-    entry_fee_inr: 0,
-    prize_pool_inr: 50000,
-    play_url: '',
-    banner_url: '',
-    banner_tablet_url: '',
-    banner_mobile_url: '',
-    logo_url: '',
-    description: '',
-    server_region: 'Mumbai, India',
-    anti_cheat: 'Vanguard / EAC',
-    match_protocol: 'Official Competitive Ruleset',
-    accent_color: '#3ef2ff',
-    status: 'ACTIVE',
-    genre_id: '',
-    genre_name: '',
+  const [newGame, setNewGame] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('ametheus_admin_draft_new_game')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return {
+      slug: '',
+      name: '',
+      category: 'FPS',
+      platform: 'PC',
+      tag: 'TACTICAL',
+      is_team_game: true,
+      min_team_size: 5,
+      max_team_size: 5,
+      max_substitutes: 2,
+      entry_fee_inr: 0,
+      prize_pool_inr: 50000,
+      play_url: '',
+      banner_url: '',
+      banner_tablet_url: '',
+      banner_mobile_url: '',
+      logo_url: '',
+      description: '',
+      server_region: 'Mumbai, India',
+      anti_cheat: 'Vanguard / EAC',
+      match_protocol: 'Official Competitive Ruleset',
+      accent_color: '#3ef2ff',
+      status: 'ACTIVE',
+      genre_id: '',
+      genre_name: '',
+    }
   })
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ametheus_admin_draft_new_game', JSON.stringify(newGame))
+    } catch {}
+  }, [newGame])
   const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [isUploadingGameLogo, setIsUploadingGameLogo] = useState(false)
 
@@ -1375,6 +1404,24 @@ export default function Admin() {
       })
       showToast('Tournament created successfully!')
       setIsCreateTourOpen(false)
+      sessionStorage.removeItem('ametheus_admin_draft_new_tour')
+      setNewTour({
+        title: '',
+        game_id: 'valorant',
+        format: 'Single Elimination · BO3',
+        prize_pool_inr: 25000,
+        entry_fee_inr: 100,
+        max_teams: 16,
+        min_team_size: 5,
+        max_team_size: 5,
+        start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
+        banner_url: '',
+        banner_tablet_url: '',
+        banner_mobile_url: '',
+        logo_url: '',
+        whatsapp_group_url: '',
+        description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+      })
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to create tournament')
@@ -1429,6 +1476,33 @@ export default function Admin() {
       })
       showToast(`Game title ${newGame.name} created!`)
       setIsCreateGameOpen(false)
+      sessionStorage.removeItem('ametheus_admin_draft_new_game')
+      setNewGame({
+        slug: '',
+        name: '',
+        category: 'FPS',
+        platform: 'PC',
+        tag: 'TACTICAL',
+        is_team_game: true,
+        min_team_size: 5,
+        max_team_size: 5,
+        max_substitutes: 2,
+        entry_fee_inr: 0,
+        prize_pool_inr: 50000,
+        play_url: '',
+        banner_url: '',
+        banner_tablet_url: '',
+        banner_mobile_url: '',
+        logo_url: '',
+        description: '',
+        server_region: 'Mumbai, India',
+        anti_cheat: 'Vanguard / EAC',
+        match_protocol: 'Official Competitive Ruleset',
+        accent_color: '#3ef2ff',
+        status: 'ACTIVE',
+        genre_id: '',
+        genre_name: '',
+      })
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to create game')

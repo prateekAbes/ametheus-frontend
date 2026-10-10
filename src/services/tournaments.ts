@@ -73,6 +73,13 @@ export interface NormalizedTournament {
   endDate?: string
   registrationDeadline?: string
   bannerUrl?: string
+  bannerTabletUrl?: string
+  bannerMobileUrl?: string
+  logoUrl?: string
+  banner_url?: string
+  banner_tablet_url?: string
+  banner_mobile_url?: string
+  logo_url?: string
   prizePoolInr: number
   entryFeeInr: number
   rules: string[]
@@ -108,6 +115,11 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
       ? Number((t as any).registeredTeams)
       : 0
 
+  const bannerUrl = t.banner_url || (t as any).bannerUrl
+  const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl
+  const bannerMobileUrl = t.banner_mobile_url || (t as any).bannerMobileUrl
+  const logoUrl = t.logo_url || (t as any).logoUrl
+
   return {
     id: t.id || t._id || t.slug,
     slug: t.slug || t.id,
@@ -124,7 +136,14 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     startDate: t.start_date,
     endDate: t.end_date,
     registrationDeadline: t.registration_deadline,
-    bannerUrl: t.banner_url,
+    bannerUrl,
+    bannerTabletUrl,
+    bannerMobileUrl,
+    logoUrl,
+    banner_url: bannerUrl,
+    banner_tablet_url: bannerTabletUrl,
+    banner_mobile_url: bannerMobileUrl,
+    logo_url: logoUrl,
     prizePoolInr: t.prize_pool_inr || 0,
     entryFeeInr: t.entry_fee_inr || 0,
     rules: parseJsonField(t.rules),

@@ -53,6 +53,10 @@ export interface NormalizedGame {
   bannerTabletUrl?: string
   bannerMobileUrl?: string
   logoUrl: string
+  banner_url?: string
+  banner_tablet_url?: string
+  banner_mobile_url?: string
+  logo_url?: string
   description: string
   serverRegion: string
   antiCheat: string
@@ -71,6 +75,11 @@ export interface NormalizedGame {
 }
 
 export function normalizeGame(game: Game): NormalizedGame {
+  const bannerUrl = game.banner_url || (game as any).bannerUrl || ''
+  const bannerTabletUrl = game.banner_tablet_url || (game as any).bannerTabletUrl
+  const bannerMobileUrl = game.banner_mobile_url || (game as any).bannerMobileUrl
+  const logoUrl = game.logo_url || (game as any).logoUrl || ''
+
   return {
     id: game.id || (game as any)._id,
     slug: game.slug,
@@ -87,8 +96,14 @@ export function normalizeGame(game: Game): NormalizedGame {
     entryFeeInr: game.entry_fee_inr || 0,
     prizePoolInr: game.prize_pool_inr || 0,
     playUrl: game.play_url,
-    bannerUrl: game.banner_url,
-    logoUrl: game.logo_url,
+    bannerUrl,
+    bannerTabletUrl,
+    bannerMobileUrl,
+    logoUrl,
+    banner_url: bannerUrl,
+    banner_tablet_url: bannerTabletUrl,
+    banner_mobile_url: bannerMobileUrl,
+    logo_url: logoUrl,
     description: game.description,
     serverRegion: game.server_region,
     antiCheat: game.anti_cheat,

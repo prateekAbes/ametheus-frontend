@@ -36,6 +36,19 @@ export function resolveMediaUrl(url?: string | null): string {
     }
     return trimmed
   }
+  if (trimmed.startsWith('img_')) {
+    return `${API_BASE_URL}/api/v1/media/${trimmed}`
+  }
+  if (trimmed.startsWith('/media/') || trimmed.startsWith('media/')) {
+    const id = trimmed.replace(/^\/?media\//, '')
+    return `${API_BASE_URL}/api/v1/media/${id}`
+  }
+  if (trimmed.startsWith('/api/v1/')) {
+    return `${API_BASE_URL}${trimmed}`
+  }
+  if (trimmed.startsWith('api/v1/')) {
+    return `${API_BASE_URL}/${trimmed}`
+  }
   if (trimmed.startsWith('/')) {
     return `${API_BASE_URL}${trimmed}`
   }
