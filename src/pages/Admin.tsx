@@ -126,235 +126,8 @@ import { CANONICAL_CATEGORIES } from '../lib/categories'
 import { resolveMediaUrl, apiClient } from '../services/apiClient'
 import { inr } from '../lib/data'
 import { DynamicImage } from '../components/DynamicImage'
-
-function BannerImageUploader({
-  value,
-  onChange,
-  label = 'Banner Image',
-  recommendedRatio = 'universal',
-  recommendedRes = 'Any aspect ratio',
-}: {
-  value: string
-  onChange: (val: string) => void
-  label?: string
-  recommendedRatio?: string
-  recommendedRes?: string
-}) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [warning, setWarning] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
-  const [detectedRatio, setDetectedRatio] = useState<string | null>(null)
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setWarning(null)
-    setInfo(null)
-    setDetectedRatio(null)
-
-    if (file.size > 20 * 1024 * 1024) {
-      setWarning('⚠️ File size exceeds maximum limit of 20MB.')
-      return
-    }
-
-    const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
-    const objectUrl = URL.createObjectURL(file)
-
-    if (isSvg) {
-      setInfo('✓ Vector SVG graphic loaded (infinitely sharp at all resolutions)')
-      setDetectedRatio('Vector SVG')
-      setPreviewSrc(objectUrl)
-      setIsUploading(true)
-      try {
-        const res = await uploadMediaFile(file)
-        if (res?.url) {
-          onChange(res.url)
-          setPreviewSrc(null)
-        }
-      } catch (err: any) {
-        alert(err.message || 'SVG upload failed')
-        setPreviewSrc(null)
-      } finally {
-        setIsUploading(false)
-      }
-      return
-    }
-
-    const imgObj = new Image()
-    imgObj.onload = async () => {
-      const width = imgObj.naturalWidth
-      const height = imgObj.naturalHeight
-      const ratio = width / (height || 1)
-
-      let ratioName = 'Widescreen'
-      if (ratio >= 1.6) ratioName = '16:9 Widescreen'
-      else if (ratio >= 1.2) ratioName = '4:3 Standard'
-      else if (ratio >= 0.88) ratioName = '1:1 Square'
-      else if (ratio >= 0.65) ratioName = '3:4 Portrait'
-      else ratioName = '9:16 Vertical / Story'
-      setDetectedRatio(ratioName)
-
-      if (recommendedRatio === 'universal' || recommendedRatio === 'auto') {
-        setInfo(`✓ Verified: ${width}x${height}px (${ratioName} · ${ratio.toFixed(2)}:1). Adapts cleanly across all layouts.`)
-      } else if (recommendedRatio === '1:1') {
-        if (Math.abs(ratio - 1.0) > 0.25) {
-          setWarning(
-            `⚠️ Note: Image is ${width}x${height} (${ratioName}). Recommended icon ratio is 1:1 square, but it will be contained cleanly.`
-          )
-        } else {
-          setInfo(`✓ Verified: 1:1 square aspect ratio (${width}x${height}px)`)
-        }
-      } else if (recommendedRatio === '3:4') {
-        const targetRatio = 3 / 4
-        if (Math.abs(ratio - targetRatio) > 0.18) {
-          setInfo(
-            `✓ Uploaded: ${width}x${height}px (${ratioName}). Adapts cleanly to 3:4 / 4:5 portrait cards.`
-          )
-        } else {
-          setInfo(`✓ Verified: 3:4 portrait aspect ratio (${width}x${height}px)`)
-        }
-      } else if (recommendedRatio === '4:3') {
-        if (Math.abs(ratio - 4 / 3) > 0.2) {
-          setInfo(
-            `✓ Uploaded: ${width}x${height} (${ratioName}). Will adapt cleanly to tablet layouts.`
-          )
-        } else {
-          setInfo(`✓ Verified: 4:3 tablet aspect ratio (${width}x${height}px)`)
-        }
-      } else if (recommendedRatio === '9:16') {
-        if (Math.abs(ratio - 9 / 16) > 0.15) {
-          setInfo(
-            `✓ Uploaded: ${width}x${height} (${ratioName}). Will adapt cleanly to mobile story layouts.`
-          )
-        } else {
-          setInfo(`✓ Verified: 9:16 vertical mobile aspect ratio (${width}x${height}px)`)
-        }
-      } else if (recommendedRatio === '16:9') {
-        const targetRatio = 16 / 9
-        if (Math.abs(ratio - targetRatio) > 0.18) {
-          setInfo(
-            `✓ Uploaded: ${width}x${height}px (${ratioName}). Adapts cleanly to 16:9 widescreen containers.`
-          )
-        } else {
-          setInfo(`✓ Verified: 16:9 widescreen aspect ratio (${width}x${height}px)`)
-        }
-      } else {
-        setInfo(`✓ Verified: ${width}x${height}px (${ratio.toFixed(2)}:1)`)
-      }
-
-      setPreviewSrc(objectUrl)
-      setIsUploading(true)
-      try {
-        const res = await uploadMediaFile(file)
-        if (res?.url) {
-          onChange(res.url)
-          setPreviewSrc(null)
-        }
-      } catch (err: any) {
-        alert(err.message || 'Image upload failed')
-        setPreviewSrc(null)
-      } finally {
-        setIsUploading(false)
-      }
-    }
-
-    imgObj.onerror = () => {
-      setWarning('Unable to decode image file. Please choose a valid PNG, JPG, WEBP, or SVG image.')
-    }
-
-    imgObj.src = objectUrl
-  }
-
-  const currentDisplay = previewSrc || (value ? resolveMediaUrl(value) : null)
-  const aspectClass =
-    recommendedRatio === '1:1'
-      ? 'aspect-square max-w-[120px]'
-      : recommendedRatio === '9:16'
-      ? 'aspect-[9/16] max-w-[120px]'
-      : recommendedRatio === '3:4'
-      ? 'aspect-[3/4] max-w-[140px]'
-      : recommendedRatio === '4:3'
-      ? 'aspect-[4/3] max-w-[200px]'
-      : 'aspect-[16/9] max-w-sm'
-
-  return (
-    <div className="space-y-1.5 mt-2">
-      <div className="flex items-center justify-between">
-        <label className="text-dim text-[11px] uppercase tracking-wider">{label}</label>
-        <span className="font-mono text-[10px] text-cyan">
-          {recommendedRatio === 'universal' ? 'Universal Adaptive' : `Target: ${recommendedRatio} (${recommendedRes})`}
-        </span>
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="https://... or upload below"
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value)
-            setPreviewSrc(null)
-          }}
-          className="flex-1 border border-white/15 bg-surface p-2.5 font-mono text-xs text-ink outline-none focus:border-cyan"
-        />
-        <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3.5 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan/20 shrink-0 flex items-center justify-center">
-          {isUploading ? 'Uploading...' : 'Upload File'}
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-            className="hidden"
-            disabled={isUploading}
-            onChange={handleFileChange}
-          />
-        </label>
-      </div>
-
-      {warning && (
-        <div className="border border-warn/30 bg-warn/10 p-2 font-mono text-[11px] text-warn">
-          {warning}
-        </div>
-      )}
-      {info && !warning && (
-        <div className="border border-ok/30 bg-ok/10 p-1.5 font-mono text-[11px] text-ok">
-          {info}
-        </div>
-      )}
-
-      {/* Card Aspect Ratio Preview */}
-      {currentDisplay ? (
-        <div className={`relative ${aspectClass} w-full overflow-hidden border border-white/20 bg-surface/50 mt-1`}>
-          <DynamicImage
-            src={currentDisplay}
-            alt="Preview"
-            mode="ambient"
-            className="size-full"
-          />
-          <div className="absolute bottom-1 right-1 bg-void/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-cyan border border-white/10 backdrop-blur-sm z-10">
-            {detectedRatio || (recommendedRatio === 'universal' ? 'Universal Preview' : `${recommendedRatio} Preview`)}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              onChange('')
-              setPreviewSrc(null)
-              setWarning(null)
-              setInfo(null)
-              setDetectedRatio(null)
-            }}
-            className="absolute top-1 right-1 bg-void/85 px-2 py-0.5 font-mono text-[10px] text-live hover:text-white border border-white/10 z-10 cursor-pointer"
-          >
-            Clear
-          </button>
-        </div>
-      ) : (
-        <div className={`flex ${aspectClass} w-full items-center justify-center border border-dashed border-white/15 bg-surface/20 text-dim font-mono text-[10px] mt-1 text-center p-2`}>
-          No {recommendedRatio === '1:1' ? 'Logo' : `${recommendedRatio === 'universal' ? 'Primary' : recommendedRatio} Asset`} Set
-        </div>
-      )}
-    </div>
-  )
-}
+import { BannerImageUploader } from '../components/admin/BannerImageUploader'
+import { MediaArtworkManager } from '../components/admin/MediaArtworkManager'
 
 export function formatAuditTimestamp(raw?: string | null): string {
   if (!raw || raw === 'None' || raw === 'null' || raw === 'undefined' || raw.trim() === '') {
@@ -378,6 +151,7 @@ export function formatAuditTimestamp(raw?: string | null): string {
 
 const TABS = [
   'OVERVIEW',
+  'MEDIA & ARTWORK MANAGER',
   'TOURNAMENTS',
   'LIVE MATCHES',
   'ORGANIZER MATCH REQUESTS',
@@ -558,6 +332,7 @@ export default function Admin() {
       entry_fee_inr: 0,
       prize_pool_inr: 50000,
       play_url: '',
+      poster_url: '',
       banner_url: '',
       banner_tablet_url: '',
       banner_mobile_url: '',
@@ -853,7 +628,7 @@ export default function Admin() {
         getFeaturedTournament().catch(() => null),
         getAdminUpiAccounts().catch(() => []),
         getAdminPayouts().catch(() => []),
-        getAdminSupportTickets({ limit: 100, is_archived: false }).then((r) => r.tickets).catch(() => []),
+        getAdminSupportTickets({ limit: 100, is_archived: false }).then((r) => r?.tickets || []).catch(() => []),
         getRegulations().catch(() => []),
         getEmailSystemStatusAdmin().catch(() => null),
         getDisputes().catch(() => []),
@@ -871,23 +646,23 @@ export default function Admin() {
       ])
 
       if (s) setStats(s)
-      setUsers(u)
-      setPayments(p)
-      setArchivedPayments(pArch)
-      setGames(g)
-      setLogs(l)
-      setAuditTotal(lCount?.total || l.length)
+      setUsers(Array.isArray(u) ? u : ((u as any)?.users || []))
+      setPayments(Array.isArray(p) ? p : ((p as any)?.payments || []))
+      setArchivedPayments(Array.isArray(pArch) ? pArch : [])
+      setGames(Array.isArray(g) ? g : ((g as any)?.games || []))
+      setLogs(Array.isArray(l) ? l : [])
+      setAuditTotal(lCount?.total || (Array.isArray(l) ? l.length : 0))
       setPlatformNotifications(notifs?.items || [])
       setPlatformNotifTotal(notifs?.total || 0)
-      setTournaments(tList)
+      setTournaments(Array.isArray(tList) ? tList : ((tList as any)?.tournaments || []))
       setFeaturedTour(fTour)
-      setUpiAccounts(upiList)
-      setPayouts(payList)
-      setTickets(tixList)
+      setUpiAccounts(Array.isArray(upiList) ? upiList : [])
+      setPayouts(Array.isArray(payList) ? payList : [])
+      setTickets(Array.isArray(tixList) ? tixList : ((tixList as any)?.tickets || []))
       if (sCounts) setSupportTicketCounts(sCounts)
-      setRegulations(regList)
+      setRegulations(Array.isArray(regList) ? regList : [])
       setEmailStatus(eStat)
-      setDisputes(dispList)
+      setDisputes(Array.isArray(dispList) ? dispList : [])
       if (Array.isArray(mAll)) setAdminMatches(mAll)
       setGenres(genreList)
       setAdminReviews(revList)
@@ -1467,6 +1242,7 @@ export default function Admin() {
         max_teams: Number(editingTour.max_teams),
         start_date: editingTour.start_date,
         banner_url: editingTour.banner_url,
+        hero_banner_url: editingTour.hero_banner_url,
         banner_tablet_url: editingTour.banner_tablet_url,
         banner_mobile_url: editingTour.banner_mobile_url,
         logo_url: editingTour.logo_url,
@@ -1487,6 +1263,7 @@ export default function Admin() {
     try {
       await createGame({
         ...newGame,
+        poster_url: newGame.poster_url || undefined,
         genre_id: newGame.genre_id || undefined,
         genre_name: newGame.genre_name || undefined,
         min_team_size: Number(newGame.min_team_size),
@@ -1511,6 +1288,7 @@ export default function Admin() {
         entry_fee_inr: 0,
         prize_pool_inr: 50000,
         play_url: '',
+        poster_url: '',
         banner_url: '',
         banner_tablet_url: '',
         banner_mobile_url: '',
@@ -1546,6 +1324,7 @@ export default function Admin() {
         max_team_size: Number(editingGame.max_team_size),
         entry_fee_inr: Number(editingGame.entry_fee_inr || 0),
         prize_pool_inr: Number(editingGame.prize_pool_inr || 0),
+        poster_url: editingGame.poster_url,
         banner_url: editingGame.banner_url,
         banner_tablet_url: editingGame.banner_tablet_url,
         banner_mobile_url: editingGame.banner_mobile_url,
@@ -1837,7 +1616,7 @@ export default function Admin() {
 
               <Panel className="p-6">
                 <Hud className="text-ok">SUPPORT TICKETS</Hud>
-                <h3 className="mt-2 font-display text-2xl font-black uppercase text-ok">{tickets.length} Active</h3>
+                <h3 className="mt-2 font-display text-2xl font-black uppercase text-ok">{tickets?.length || 0} Active</h3>
                 <p className="text-xs text-dim mt-1 font-mono">Customer inquiries and payment disputes.</p>
                 <div className="mt-4">
                   <button onClick={() => setTab('SUPPORT TICKETS')} className="border border-ok/40 bg-ok/10 px-3 py-1.5 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors">
@@ -1847,6 +1626,16 @@ export default function Admin() {
               </Panel>
             </div>
           </div>
+        )}
+
+        {/* TAB: MEDIA & ARTWORK MANAGER */}
+        {tab === 'MEDIA & ARTWORK MANAGER' && (
+          <MediaArtworkManager
+            games={games}
+            tournaments={tournaments}
+            onRefresh={loadData}
+            showToast={showToast}
+          />
         )}
 
         {/* TAB: TOURNAMENTS */}
@@ -5460,11 +5249,18 @@ export default function Admin() {
                   <div className="space-y-3 border-t border-white/10 pt-3">
                     <div className="font-bold uppercase text-cyan text-[11px]">Tournament Media Assets</div>
                     <BannerImageUploader
-                      label="Tournament Cover Artwork (Target: 1600x900 px · 16:9 Landscape / ~2.34:1 Hero)"
+                      label="Tournament Card Artwork (Target: 1600x900 px · 16:9 Landscape for Cards & Listings)"
                       recommendedRatio="16:9"
-                      recommendedRes="1600x900 (16:9) or 1920x820"
+                      recommendedRes="1600x900"
                       value={editingTour.banner_url || ''}
                       onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
+                    />
+                    <BannerImageUploader
+                      label="Tournament Detail Hero Header (Target: 1920x820 px · ~2.34:1 Panoramic for /tournaments/:id)"
+                      recommendedRatio="universal"
+                      recommendedRes="1920x820"
+                      value={editingTour.hero_banner_url || ''}
+                      onChange={(val) => setEditingTour({ ...editingTour, hero_banner_url: val })}
                     />
                     <BannerImageUploader
                       label="Tournament Logo / Emblem (Target: 256x256 px · 1:1 Square or SVG)"
@@ -5678,10 +5474,17 @@ export default function Admin() {
                 <div className="space-y-3 border-t border-white/10 pt-3">
                   <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
                   <BannerImageUploader
-                    label="Game Catalog Artwork (Target: 900x1200 px · 3:4 Portrait for Cards)"
+                    label="Game Box Art / Poster (Target: 900x1200 px · 3:4 Portrait for Active Games & Catalog Cards)"
                     recommendedRatio="3:4"
                     recommendedRes="900x1200 (3:4)"
-                    value={newGame.banner_url}
+                    value={newGame.poster_url || ''}
+                    onChange={(val) => setNewGame({ ...newGame, poster_url: val })}
+                  />
+                  <BannerImageUploader
+                    label="Game Widescreen Banner (Target: 1600x900 px · 16:9 for Game Detail Hero & Floating Shards)"
+                    recommendedRatio="16:9"
+                    recommendedRes="1600x900 (16:9)"
+                    value={newGame.banner_url || ''}
                     onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
                   />
                   <BannerImageUploader
@@ -5814,9 +5617,16 @@ export default function Admin() {
                 <div className="space-y-3 border-t border-white/10 pt-3">
                   <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
                   <BannerImageUploader
-                    label="Game Catalog Artwork (Target: 900x1200 px · 3:4 Portrait for Cards)"
+                    label="Game Box Art / Poster (Target: 900x1200 px · 3:4 Portrait for Active Games & Catalog Cards)"
                     recommendedRatio="3:4"
                     recommendedRes="900x1200 (3:4)"
+                    value={editingGame.poster_url || ''}
+                    onChange={(val) => setEditingGame((prev) => prev ? { ...prev, poster_url: val } : null)}
+                  />
+                  <BannerImageUploader
+                    label="Game Widescreen Banner (Target: 1600x900 px · 16:9 for Game Detail Hero & Floating Shards)"
+                    recommendedRatio="16:9"
+                    recommendedRes="1600x900 (16:9)"
                     value={editingGame.banner_url || ''}
                     onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
                   />

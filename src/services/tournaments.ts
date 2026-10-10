@@ -36,6 +36,7 @@ export interface Tournament {
   end_date?: string
   registration_deadline?: string
   banner_url?: string
+  hero_banner_url?: string
   banner_tablet_url?: string
   banner_mobile_url?: string
   logo_url?: string
@@ -73,10 +74,12 @@ export interface NormalizedTournament {
   endDate?: string
   registrationDeadline?: string
   bannerUrl?: string
+  heroBannerUrl?: string
   bannerTabletUrl?: string
   bannerMobileUrl?: string
   logoUrl?: string
   banner_url?: string
+  hero_banner_url?: string
   banner_tablet_url?: string
   banner_mobile_url?: string
   logo_url?: string
@@ -116,6 +119,7 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
       : 0
 
   const bannerUrl = t.banner_url || (t as any).bannerUrl || ''
+  const heroBannerUrl = t.hero_banner_url || (t as any).heroBannerUrl || bannerUrl
   const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl || bannerUrl
   const bannerMobileUrl = t.banner_mobile_url || (t as any).bannerMobileUrl || bannerUrl
   const logoUrl = t.logo_url || (t as any).logoUrl || ''
@@ -137,10 +141,12 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     endDate: t.end_date,
     registrationDeadline: t.registration_deadline,
     bannerUrl,
+    heroBannerUrl,
     bannerTabletUrl,
     bannerMobileUrl,
     logoUrl,
     banner_url: bannerUrl,
+    hero_banner_url: heroBannerUrl,
     banner_tablet_url: bannerTabletUrl,
     banner_mobile_url: bannerMobileUrl,
     logo_url: logoUrl,

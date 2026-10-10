@@ -31,9 +31,24 @@ export function LeaderboardPodium({
 
   return (
     <div className="relative mx-auto w-full max-w-4xl py-4 sm:py-6 select-none">
+      {/* Subtle orthogonal dark grid matching reference screenshot */}
+      <div
+        className="pointer-events-none absolute -inset-y-4 -inset-x-8 z-0 opacity-20"
+        aria-hidden="true"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px',
+          maskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 40%, transparent 85%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 40%, transparent 85%)',
+        }}
+      />
+
       {/* Ambient floor glow beneath podium */}
       <div
-        className="pointer-events-none absolute -bottom-6 inset-x-0 h-28 select-none opacity-40"
+        className="pointer-events-none absolute -bottom-6 inset-x-0 h-28 select-none opacity-40 z-0"
         aria-hidden="true"
         style={{
           background: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(37, 217, 242, 0.12), transparent 75%)',

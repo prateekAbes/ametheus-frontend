@@ -65,8 +65,30 @@ export function useAuthContext() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { getToken, isSignedIn: clerkSignedIn, isLoaded: isAuthLoaded } = useAuth()
   const { user, isLoaded: isUserLoaded } = useUser()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      const dev = sessionStorage.getItem('ametheus_dev_role') || localStorage.getItem('ametheus_dev_role')
+      if (dev === 'SUPER_ADMIN') {
+        return {
+          id: 'admin_dev_123',
+          clerk_user_id: 'user_admin_dev_123',
+          email: 'admin@ametheus.gg',
+          username: 'superadmin',
+          display_name: 'Ametheus Super Admin',
+          role: 'SUPER_ADMIN',
+          has_chosen_username: true,
+        } as any
+      }
+    }
+    return null
+  })
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const dev = sessionStorage.getItem('ametheus_dev_role') || localStorage.getItem('ametheus_dev_role')
+      if (dev === 'SUPER_ADMIN') return false
+    }
+    return true
+  })
 
   const isSyncingRef = React.useRef(false)
   const syncedUserIdRef = React.useRef<string | null>(null)
@@ -110,6 +132,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = useCallback(
     async (forceSync = false) => {
+      const devMock = typeof window !== 'undefined' ? (sessionStorage.getItem('ametheus_dev_role') || localStorage.getItem('ametheus_dev_role')) : null
+      if (devMock === 'SUPER_ADMIN') {
+        setProfile({
+          id: 'admin_dev_123',
+          clerk_user_id: 'user_admin_dev_123',
+          email: 'admin@ametheus.gg',
+          username: 'superadmin',
+          display_name: 'Ametheus Super Admin',
+          role: 'SUPER_ADMIN',
+          has_chosen_username: true,
+        } as any)
+        setIsLoading(false)
+        return
+      }
+
       // Wait until Clerk auth state is fully resolved
       if (!isAuthLoaded || !isUserLoaded) return
 

@@ -49,11 +49,11 @@ export function PodiumColumn({
     : isSecond
     ? {
         accentColor: '#94a3b8',
-        strokeColor: 'rgba(255, 255, 255, 0.22)',
+        strokeColor: 'rgba(255, 255, 255, 0.28)',
         borderColor: 'border-l border-white/10',
         nameColor: 'text-white/90',
         hasDivider: true,
-        dividerColor: 'border-white/10',
+        dividerColor: 'border-white/20',
         avatarBorder: 'border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
         pillarGradient: 'from-[#0c1118] via-[#070b10] to-[#030507]',
         topGradientStart: '#18202a',
@@ -62,11 +62,11 @@ export function PodiumColumn({
       }
     : {
         accentColor: '#a8a29e',
-        strokeColor: 'rgba(255, 255, 255, 0.18)',
+        strokeColor: 'rgba(255, 255, 255, 0.24)',
         borderColor: 'border-r border-white/10',
         nameColor: 'text-white/90',
         hasDivider: true,
-        dividerColor: 'border-white/10',
+        dividerColor: 'border-white/20',
         avatarBorder: 'border border-white/15 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
         pillarGradient: 'from-[#0a0e14] via-[#06090e] to-[#020406]',
         topGradientStart: '#161c24',
@@ -265,6 +265,11 @@ export function PodiumColumn({
               isFirst ? theme.borderColor : ''
             } bg-gradient-to-b ${theme.pillarGradient} pt-5 sm:pt-6 pb-6 px-1.5 sm:px-2.5 text-center`}
           >
+            {/* Top divider on Rank 3 matching reference layout */}
+            {isThird && (
+              <div className="w-12 sm:w-16 mx-auto mb-2 sm:mb-2.5 border-b border-white/20" />
+            )}
+
             {/* 1. Rank & Name Inline Monospaced Label */}
             <div className="w-full truncate px-1">
               {isCurrentUser ? (
@@ -289,10 +294,13 @@ export function PodiumColumn({
               <div className="h-2 sm:h-3" />
             )}
 
-            {/* 2. Numerical Metric Score with subtle cyan crest glyph matching reference */}
+            {/* 2. Numerical Metric Score with circular cyan badge matching reference */}
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              <span className="inline-flex items-center justify-center size-3.5 sm:size-4 rounded-full bg-[#25D9F2]/15 text-[#25D9F2] text-[9px] font-mono font-bold select-none" aria-hidden="true">
-                ◈
+              <span className="inline-flex items-center justify-center size-3.5 sm:size-4 shrink-0 text-[#25D9F2] select-none" aria-hidden="true">
+                <svg viewBox="0 0 16 16" className="size-3.5 sm:size-4" fill="none">
+                  <circle cx="8" cy="8" r="6.5" stroke="#25D9F2" strokeWidth="1.4" />
+                  <circle cx="8" cy="8" r="2.2" fill="#25D9F2" />
+                </svg>
               </span>
               <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
                 {scoreValue}

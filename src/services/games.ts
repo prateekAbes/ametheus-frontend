@@ -14,6 +14,7 @@ export interface Game {
   entry_fee_inr?: number
   prize_pool_inr?: number
   play_url?: string
+  poster_url?: string
   banner_url: string
   banner_tablet_url?: string
   banner_mobile_url?: string
@@ -49,6 +50,8 @@ export interface NormalizedGame {
   entryFeeInr: number
   prizePoolInr: number
   playUrl?: string
+  posterUrl?: string
+  poster_url?: string
   bannerUrl: string
   bannerTabletUrl?: string
   bannerMobileUrl?: string
@@ -75,6 +78,7 @@ export interface NormalizedGame {
 }
 
 export function normalizeGame(game: Game): NormalizedGame {
+  const posterUrl = game.poster_url || (game as any).posterUrl || ''
   const bannerUrl = game.banner_url || (game as any).bannerUrl || ''
   const bannerTabletUrl = game.banner_tablet_url || (game as any).bannerTabletUrl || bannerUrl
   const bannerMobileUrl = game.banner_mobile_url || (game as any).bannerMobileUrl || bannerUrl
@@ -96,6 +100,8 @@ export function normalizeGame(game: Game): NormalizedGame {
     entryFeeInr: game.entry_fee_inr || 0,
     prizePoolInr: game.prize_pool_inr || 0,
     playUrl: game.play_url,
+    posterUrl,
+    poster_url: posterUrl,
     bannerUrl,
     bannerTabletUrl,
     bannerMobileUrl,

@@ -82,7 +82,7 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
   const body = (
     <>
       <DynamicImage
-        src={resolveMediaUrl(g.photo || (g as any).bannerUrl || (g as any).banner_url)}
+        src={resolveMediaUrl((g as any).poster_url || (g as any).posterUrl || g.photo || (g as any).bannerUrl || (g as any).banner_url)}
         alt={`${title} artwork`}
         mode="cover"
         className="size-full object-cover object-top opacity-85 grayscale-[25%] transition-transform duration-700 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0"

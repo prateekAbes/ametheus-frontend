@@ -266,6 +266,8 @@ export default function TournamentDetail() {
         <div className="absolute inset-0">
           <DynamicImage
             src={resolveMediaUrl(
+              tourData?.heroBannerUrl ||
+              tourData?.hero_banner_url ||
               tourData?.bannerTabletUrl ||
               tourData?.bannerUrl ||
               tourData?.bannerMobileUrl ||
