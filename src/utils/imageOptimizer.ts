@@ -26,13 +26,19 @@ export async function optimizeImageForUpload(
 ): Promise<File> {
   const {
     maxDimension = 1920,
-    maxSizeBytes = 850 * 1024,
+    maxSizeBytes = 750 * 1024,
     quality = 0.88,
   } = options
 
-  // 1. Vector graphics (SVG): bypass optimization completely to preserve infinite resolution
+  // 1. Vector graphics (SVG): bypass rasterization to preserve infinite vector sharpness.
+  // Validate that SVG itself does not exceed the proxy payload limit.
   const isSvg = file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')
   if (isSvg) {
+    if (file.size > maxSizeBytes) {
+      throw new Error(
+        `SVG file size (${Math.round(file.size / 1024)}KB) exceeds the platform limit of ${Math.round(maxSizeBytes / 1024)}KB. Please simplify vector paths or export as WebP/PNG.`
+      )
+    }
     return file
   }
 
@@ -100,13 +106,7 @@ export async function optimizeImageForUpload(
 
         const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png')
 
-        // If JPEG without alpha, draw clean white background
-        if (!isPng && !file.type.includes('webp')) {
-          ctx.fillStyle = '#000000'
-          ctx.fillRect(0, 0, targetWidth, targetHeight)
-        }
-
-        // Draw image keeping exact proportions
+        // Draw image keeping exact proportions and transparent alpha channel intact
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
 
         const exportBlob = (mime: string, q: number): Promise<Blob | null> => {

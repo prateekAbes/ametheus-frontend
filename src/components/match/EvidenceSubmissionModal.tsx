@@ -29,7 +29,7 @@ export function EvidenceSubmissionModal({ match, isOpen, onClose, onSuccess }: P
       alert('Screenshot exceeds 20MB limit.')
       return
     }
-    const optimized = await optimizeImageForUpload(file, { maxDimension: 1920, maxSizeBytes: 800 * 1024 })
+    const optimized = await optimizeImageForUpload(file, { maxDimension: 1920, maxSizeBytes: 480 * 1024 })
     const reader = new FileReader()
     reader.onload = (event) => {
       const result = event.target?.result as string
