@@ -115,10 +115,10 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
       ? Number((t as any).registeredTeams)
       : 0
 
-  const bannerUrl = t.banner_url || (t as any).bannerUrl
-  const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl
-  const bannerMobileUrl = t.banner_mobile_url || (t as any).bannerMobileUrl
-  const logoUrl = t.logo_url || (t as any).logoUrl
+  const bannerUrl = t.banner_url || (t as any).bannerUrl || ''
+  const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl || bannerUrl
+  const bannerMobileUrl = t.banner_mobile_url || (t as any).bannerMobileUrl || bannerUrl
+  const logoUrl = t.logo_url || (t as any).logoUrl || ''
 
   return {
     id: t.id || t._id || t.slug,

@@ -268,7 +268,9 @@ export default function TournamentDetail() {
             src={resolveMediaUrl(tourData?.bannerUrl)}
             alt={`${title} banner`}
             eager
-            className="h-full w-full object-cover object-[60%_30%] opacity-70"
+            mode="ambient"
+            className="h-full w-full opacity-70 object-contain object-center md:object-[75%_center]"
+            backdropClassName="opacity-30"
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-void via-void/75 to-transparent" />

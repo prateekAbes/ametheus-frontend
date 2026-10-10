@@ -84,9 +84,11 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
       <DynamicImage
         src={resolveMediaUrl(g.photo || (g as any).bannerUrl || (g as any).banner_url)}
         alt={`${title} artwork`}
-        className="absolute inset-0 h-full w-full object-cover opacity-50 grayscale-[50%] transition-[transform,opacity] duration-700 group-hover:scale-105 group-hover:opacity-75"
+        mode="ambient"
+        className="size-full opacity-80 grayscale-[35%] transition-[transform,opacity] duration-700 group-hover:scale-105 group-hover:opacity-95 group-hover:grayscale-0"
+        backdropClassName="opacity-35"
       />
-      <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a 10%, transparent 70%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 15%, transparent 65%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
       <span className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" style={{ background: g.accent }} />
       <div className="absolute left-5 top-5 right-5 flex items-center justify-between gap-3">
         <Hud className="truncate">{i != null && <span className="text-ink">{String(i + 1).padStart(2, '0')} · </span>}{g.genre}</Hud>

@@ -76,8 +76,8 @@ export interface NormalizedGame {
 
 export function normalizeGame(game: Game): NormalizedGame {
   const bannerUrl = game.banner_url || (game as any).bannerUrl || ''
-  const bannerTabletUrl = game.banner_tablet_url || (game as any).bannerTabletUrl
-  const bannerMobileUrl = game.banner_mobile_url || (game as any).bannerMobileUrl
+  const bannerTabletUrl = game.banner_tablet_url || (game as any).bannerTabletUrl || bannerUrl
+  const bannerMobileUrl = game.banner_mobile_url || (game as any).bannerMobileUrl || bannerUrl
   const logoUrl = game.logo_url || (game as any).logoUrl || ''
 
   return {

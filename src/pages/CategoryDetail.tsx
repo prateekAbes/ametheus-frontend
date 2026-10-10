@@ -176,7 +176,9 @@ export default function CategoryDetail() {
                     <DynamicImage
                       src={resolveMediaUrl(g.bannerUrl)}
                       alt={`${g.name} banner`}
-                      className="absolute inset-0 size-full object-cover opacity-45 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-65"
+                      mode="ambient"
+                      className="size-full opacity-45 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-65"
+                      backdropClassName="opacity-30"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
                     <div className="relative z-10 flex items-start justify-between">

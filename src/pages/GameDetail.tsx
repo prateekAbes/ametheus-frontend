@@ -166,7 +166,9 @@ export default function GameDetail() {
           src={resolveMediaUrl(banner)}
           alt={`${name} artwork`}
           eager
-          className="kenburns absolute inset-0 h-full w-full object-cover opacity-50"
+          mode="ambient"
+          className="kenburns h-full w-full opacity-60 object-contain object-center md:object-[75%_center]"
+          backdropClassName="opacity-30"
         />
         <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 15% 100%, ${accent}55, transparent 60%)` }} />
         <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-void/20" />

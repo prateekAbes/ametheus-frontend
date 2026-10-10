@@ -14,6 +14,17 @@ interface DynamicImageProps {
   eager?: boolean
   /** Optional extra wrapper classes (e.g. 'aspect-video', 'h-full w-full'). */
   wrapperClassName?: string
+  /**
+   * Rendering mode:
+   * - 'cover': (default) Standard edge-to-edge cover.
+   * - 'contain': Contained within bounds without cropping.
+   * - 'ambient': Context-aware presentation with a blurred ambient backdrop layer
+   *              and a contained foreground layer. Preserves 100% of the image's original
+   *              aspect ratio and subject content without letterboxing bars or clipping.
+   */
+  mode?: 'cover' | 'contain' | 'ambient'
+  /** Extra class names for ambient background image if mode is 'ambient' */
+  backdropClassName?: string
 }
 
 function optimizeUrl(url?: string | null): string {
@@ -44,6 +55,8 @@ export default function DynamicImage({
   className = '',
   eager = false,
   wrapperClassName,
+  mode = 'cover',
+  backdropClassName,
 }: DynamicImageProps) {
   const optimizedSrc = useMemo(() => optimizeUrl(src), [src])
   const hasSrc = Boolean(optimizedSrc)
@@ -73,6 +86,58 @@ export default function DynamicImage({
 
   const handleError = () => {
     setStatus('error')
+  }
+
+  if (mode === 'ambient') {
+    return (
+      <div className={`relative size-full overflow-hidden select-none ${wrapperClassName || ''}`}>
+        {/* Skeleton while loading */}
+        {status === 'loading' && (
+          <div className="absolute inset-0 size-full animate-pulse bg-white/10" aria-hidden="true" />
+        )}
+
+        {/* Fallback plate */}
+        {(status === 'missing' || status === 'error') && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 border border-white/5 bg-surface/80 p-4 text-center font-mono text-[10px] uppercase tracking-wider text-dim">
+            <svg className="size-5 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m21 15-5-5L5 21" />
+            </svg>
+            <span>{status === 'missing' ? 'Image unavailable' : 'Failed to load'}</span>
+          </div>
+        )}
+
+        {hasSrc && (
+          <>
+            {/* Ambient blurred backdrop layer (fills container smoothly with image palette) */}
+            <img
+              src={optimizedSrc}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              className={`absolute inset-0 size-full object-cover blur-2xl opacity-40 scale-125 pointer-events-none select-none transition-transform duration-700 ${backdropClassName || ''}`}
+            />
+            {/* Foreground focal artwork layer (100% uncropped and contained) */}
+            <img
+              src={optimizedSrc}
+              alt={alt}
+              loading={eager ? 'eager' : 'lazy'}
+              fetchPriority={(eager ? 'high' : 'low') as 'high' | 'low' | 'auto'}
+              decoding="async"
+              onLoad={handleLoad}
+              onError={handleError}
+              className={`relative z-0 size-full object-contain object-center transition-[transform,opacity] duration-300 ${className} ${
+                status === 'success'
+                  ? 'opacity-100'
+                  : 'invisible opacity-0'
+              }`}
+            />
+          </>
+        )}
+      </div>
+    )
   }
 
   const inner = (
@@ -131,3 +196,5 @@ export default function DynamicImage({
   }
   return <>{inner}</>
 }
+
+export { DynamicImage }

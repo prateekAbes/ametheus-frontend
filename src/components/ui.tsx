@@ -271,9 +271,11 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
         <DynamicImage
           src={resolveMediaUrl((t as any).bannerUrl || (t as any).banner_url)}
           alt={`${t.name} banner`}
-          className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
+          mode="ambient"
+          className="size-full opacity-85 transition-transform duration-700 group-hover:scale-105"
+          backdropClassName="opacity-40"
         />
-        <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
           {t.status && (
             <Badge

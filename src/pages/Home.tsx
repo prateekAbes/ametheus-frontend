@@ -307,9 +307,10 @@ function Featured({
                   src={resolveMediaUrl(lead.bannerUrl)}
                   alt={`${lead.title} featured`}
                   eager
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
+                  mode="ambient"
+                  className="size-full transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
                 />
-                <div className="absolute inset-0" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}30, transparent 50%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}30, transparent 50%)` }} />
                 <div className="absolute left-5 top-5 flex items-center gap-3 md:left-7 md:top-7">
                   <Badge s={lead.status} />
                   <span className="border border-white/20 bg-void/80 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
@@ -366,7 +367,8 @@ function Featured({
                       <DynamicImage
                         src={resolveMediaUrl(t.bannerUrl)}
                         alt={`${t.title} thumbnail`}
-                        className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:scale-105 transition-transform"
+                        mode="ambient"
+                        className="size-full opacity-85 group-hover:scale-105 transition-transform"
                       />
                     </div>
                     <div className="flex min-w-0 flex-col justify-between gap-3">
