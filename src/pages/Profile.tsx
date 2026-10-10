@@ -11,7 +11,6 @@ import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import { getAvailableCrests, type Crest as CrestType } from '../services/crests'
 import { updateUserProfile } from '../services/auth'
 import { uploadMediaFile } from '../services/admin'
-import { GoldGemBadge } from '../components/GoldGemBadge'
 
 import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../services/support'
 
@@ -229,9 +228,9 @@ export default function Profile() {
 
           {/* IDENTITY & KEY INFORMATION BLOCK */}
           <div className="flex flex-col justify-end">
-            {/* Metadata & Tier Badge Row */}
+            {/* Metadata & Identity Row */}
             <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
-              <Hud className="text-rose-400 font-bold tracking-widest">◇ ESPORTS IDENTITY</Hud>
+              <Hud className="text-rose-400 font-bold tracking-widest">ESPORTS IDENTITY</Hud>
               <span
                 className={`font-mono text-[9px] uppercase tracking-[0.18em] px-2.5 py-0.5 border ${
                   role === 'SUPER_ADMIN'
@@ -249,13 +248,6 @@ export default function Profile() {
                   VISIBILITY: {profile.privacy_settings.visibility}
                 </span>
               )}
-
-              {/* Integrated "01 GOLD GEM" Collectible Status Badge */}
-              <GoldGemBadge
-                size="sm"
-                label="01 GOLD GEM"
-                sublabel="TIER 01 · ELITE"
-              />
             </div>
 
             {/* Prominent Player Username */}

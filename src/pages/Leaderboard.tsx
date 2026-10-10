@@ -23,6 +23,7 @@ const METRIC_OPTIONS = [
   { id: 'overall', label: 'Overall Standings' },
   { id: 'win_rate', label: 'Highest Win Rate' },
   { id: 'wins', label: 'Most Match Wins' },
+  { id: 'spending', label: 'Highest Spending' },
   { id: 'pc', label: 'PC Competitive' },
   { id: 'mobile', label: 'Mobile Competitive' },
 ]
@@ -224,33 +225,17 @@ export default function Leaderboard() {
             `,
           }}
         />
-        {/* Precision structural grid with radial falloff mask */}
-        <div
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
-            `,
-            backgroundSize: '28px 28px',
-            maskImage: 'radial-gradient(ellipse 90% 85% at 50% 35%, black 40%, transparent 95%)',
-            WebkitMaskImage: 'radial-gradient(ellipse 90% 85% at 50% 35%, black 40%, transparent 95%)',
-          }}
-        />
       </div>
 
       <Container className="relative z-10">
-        {/* LEADERBOARD SECTION HEADING */}
+        {/* RESTRAINED, SOPHISTICATED LEADERBOARD HEADING */}
         <div className="mb-8 md:mb-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="size-2 rounded-full bg-[#22c55e] inline-block shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-            <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#22c55e] font-semibold">
-              Global Standings
-            </span>
-          </div>
-          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-white">
-            LEADERBOARD
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white">
+            Leaderboard
           </h1>
+          <p className="mt-1.5 text-xs sm:text-sm text-white/50 max-w-xl font-mono">
+            Competitive standings and verified ratings across active titles.
+          </p>
         </div>
 
         {/* ============================================================== */}

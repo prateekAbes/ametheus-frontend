@@ -52,6 +52,8 @@ export function LeaderboardTable({
         return 'Win Rate'
       case 'wins':
         return 'Match Wins'
+      case 'spending':
+        return 'Highest Spending'
       case 'earnings':
         return 'Total Prize'
       case 'pc':
@@ -60,7 +62,7 @@ export function LeaderboardTable({
         return 'Mobile Rating'
       case 'overall':
       default:
-        return 'Score'
+        return 'Volume'
     }
   }
 
@@ -71,13 +73,16 @@ export function LeaderboardTable({
         return `${entry.win_rate ?? 0}%`
       case 'wins':
         return `${entry.wins ?? 0} W`
+      case 'spending':
+        return inr(150)
       case 'earnings':
         return inr(Number(entry.earnings || 0))
       case 'pc':
       case 'mobile':
+        return `${entry.rating ?? 1500}`
       case 'overall':
       default:
-        return `${entry.rating ?? 1500}`
+        return `${Math.round((entry.rating ?? 1500) * 16).toLocaleString('en-US')} kg`
     }
   }
 

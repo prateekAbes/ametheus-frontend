@@ -40,26 +40,6 @@ export function LeaderboardPodium({
         }}
       />
 
-      {/* Subtle floor grid line beneath podium */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 overflow-hidden opacity-25 select-none"
-        aria-hidden="true"
-      >
-        <div
-          className="size-full"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, rgba(34, 197, 94, 0.25) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(34, 197, 94, 0.25) 1px, transparent 1px)
-            `,
-            backgroundSize: '32px 16px',
-            transform: 'perspective(400px) rotateX(60deg)',
-            transformOrigin: 'bottom',
-            maskImage: 'linear-gradient(to top, black 20%, transparent 90%)',
-          }}
-        />
-      </div>
-
       {/* PODIUM COLUMNS: Layered 3D Axonometric Blocks matching reference */}
       <div className="relative z-10 flex items-end justify-center w-full max-w-3xl mx-auto px-1 sm:px-3">
         {/* 2nd Place Podium Column (Left, Layered Behind #1) */}

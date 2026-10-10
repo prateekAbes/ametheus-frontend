@@ -252,13 +252,14 @@ function Nav() {
 }
 
 export function Footer() {
-  const { pathname } = useLocation()
-  const isHome = pathname === '/'
-
   const navColumns = [
     ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
     ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
-    ...(!isHome ? [['Outlinks', [['Discord', 'https://discord.gg/VzkfuK7We', true], ['Instagram', 'https://www.instagram.com/official.ametheus', true], ['YouTube', 'https://www.youtube.com/@official.ametheus.goodgame', true]]]] : []),
+    ['Outlinks', [
+      ['Discord', 'https://discord.gg/VzkfuK7We', true],
+      ['Instagram', 'https://www.instagram.com/official.ametheus?rpxt=MWhydnVzeTAyeDUydQ==', true],
+      ['YouTube', 'https://www.youtube.com/channel/UC3_orKHZ9fr1BJjaw0URjSQ', true],
+    ]],
   ] as [string, [string, string, boolean?][]][]
 
   return (

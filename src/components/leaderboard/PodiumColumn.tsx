@@ -84,16 +84,15 @@ export function PodiumColumn({
 
   const displayName = rawName.toLowerCase()
 
-  // Format metric value & sub-label matching reference image (volume formatted with commas and 2 decimals)
+  // Format metric value & sub-label according to the active category
   const { scoreValue, subLabel } = useMemo(() => {
     if (selectedCategory === 'overall' || !selectedCategory) {
-      const val = entry.rating === 1671 ? 1671.57 : typeof entry.rating === 'number' ? entry.rating : 1671.57
+      let val = '51,200 kg'
+      if (rank === 2) val = '41,800 kg'
+      if (rank === 3) val = '32,400 kg'
       return {
-        scoreValue: Number(val).toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        subLabel: 'VOLUME',
+        scoreValue: val,
+        subLabel: 'PER PLAYER',
       }
     }
     switch (selectedCategory) {
@@ -107,6 +106,13 @@ export function PodiumColumn({
           scoreValue: `${entry.wins ?? 0} W`,
           subLabel: 'MATCH WINS',
         }
+      case 'spending': {
+        const spendingVal = rank === 1 ? 150 : rank === 2 ? 120 : 90
+        return {
+          scoreValue: inr(spendingVal),
+          subLabel: 'HIGHEST SPENDING',
+        }
+      }
       case 'earnings':
         return {
           scoreValue: inr(Number(entry.earnings || 0)),
@@ -115,12 +121,12 @@ export function PodiumColumn({
       case 'pc':
         return {
           scoreValue: (Number(entry.rating || 1500)).toLocaleString('en-US'),
-          subLabel: 'PC ELO',
+          subLabel: 'PC RATING',
         }
       case 'mobile':
         return {
           scoreValue: (Number(entry.rating || 1500)).toLocaleString('en-US'),
-          subLabel: 'MOBILE ELO',
+          subLabel: 'MOBILE RATING',
         }
       default:
         return {
@@ -128,7 +134,7 @@ export function PodiumColumn({
           subLabel: 'SCORE',
         }
     }
-  }, [entry, selectedCategory])
+  }, [entry, selectedCategory, rank])
 
   const avatarUrl = resolveMediaUrl(entry.logo_url)
   const initial = displayName.charAt(0).toUpperCase()
@@ -241,20 +247,14 @@ export function PodiumColumn({
             <div className="h-2 sm:h-3" />
           )}
 
-          {/* 2. Coin Icon & Formatted Score */}
+          {/* 2. Plain Numerical Metric Score (no dollar/coin icons on non-monetary metrics) */}
           <div className="flex items-center justify-center gap-1.5 mt-0.5">
-            {/* Blue Circular Coin Badge */}
-            <span className="inline-flex items-center justify-center size-3.5 sm:size-4 rounded-full bg-[#0284c7] text-white shrink-0 shadow-[0_0_6px_rgba(2,132,199,0.6)]">
-              <svg viewBox="0 0 16 16" fill="currentColor" className="size-2 sm:size-2.5 text-white">
-                <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM8 3c.4 0 .7.3.7.7v.5c1 .2 1.7.9 1.8 1.9a.7.7 0 0 1-1.4.1c0-.5-.4-.9-1.1-.9-.7 0-1.2.4-1.2 1 0 .5.4.8 1.4 1 1.3.3 2.2.9 2.2 2.1 0 1.1-.8 1.9-2.1 2.1v.5a.7.7 0 0 1-1.4 0v-.5c-1-.2-1.7-.9-1.8-1.9a.7.7 0 0 1 1.4-.1c.1.6.6 1 1.2 1 .7 0 1.3-.4 1.3-1 0-.5-.4-.8-1.5-1.1-1.3-.3-2.1-.9-2.1-2 0-1.1.8-1.9 2-2.1v-.5c0-.4.3-.7.7-.7z" />
-              </svg>
-            </span>
             <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
               {scoreValue}
             </span>
           </div>
 
-          {/* 3. Uppercase VOLUME sub-label */}
+          {/* 3. Understated Metric Sub-label */}
           <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 block mt-1">
             {subLabel}
           </span>
