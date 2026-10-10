@@ -166,7 +166,7 @@ export function PodiumColumn({
       {/* ============================================================== */}
       {/* 2D ROUNDED AVATAR RESTING DIRECTLY ON TOP SURFACE OF BLOCK    */}
       {/* ============================================================== */}
-      <div className="relative -mb-5 sm:-mb-6 md:-mb-7 z-10 flex flex-col items-center">
+      <div className="relative -mb-8 sm:-mb-9 md:-mb-10 z-10 flex flex-col items-center">
         {isCurrentUser ? (
           <Link
             to="/profile"
@@ -201,63 +201,120 @@ export function PodiumColumn({
       {/* 3D AXONOMETRIC ELEVATED PLATFORM BLOCK                         */}
       {/* ============================================================== */}
       <div className={`w-full flex flex-col relative ${theme.glow}`}>
-        {/* TOP SURFACE: 3D axonometric platform cap with clean facet matching reference */}
+        {/* TOP SURFACE: 3D axonometric platform cap matching reference */}
         <div className="relative w-full overflow-hidden select-none" aria-hidden="true">
-          <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="w-full h-7 sm:h-8 md:h-9 block">
+          <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="w-full h-8 sm:h-9 md:h-11 block">
             <defs>
               <linearGradient id={`podium-top-${rank}`} x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor={theme.topGradientStart} />
                 <stop offset="100%" stopColor={theme.topGradientEnd} />
               </linearGradient>
             </defs>
-            <polygon
-              points="17,2 83,2 100,30 0,30"
-              fill={`url(#podium-top-${rank})`}
-              stroke={theme.strokeColor}
-              strokeWidth={isFirst ? '1.8' : '1.1'}
-            />
+            {isFirst ? (
+              <polygon
+                points="16,3 84,3 100,34 0,34"
+                fill={`url(#podium-top-${rank})`}
+                stroke={theme.strokeColor}
+                strokeWidth="1.8"
+              />
+            ) : isSecond ? (
+              <>
+                {/* Outer Left Facet Top Angle */}
+                <polygon
+                  points="0,10 12,3 12,34 0,34"
+                  fill="#070a0e"
+                  stroke={theme.strokeColor}
+                  strokeWidth="1"
+                />
+                {/* Main Top Platform Surface */}
+                <polygon
+                  points="12,3 90,3 100,34 12,34"
+                  fill={`url(#podium-top-${rank})`}
+                  stroke={theme.strokeColor}
+                  strokeWidth="1.1"
+                />
+              </>
+            ) : (
+              <>
+                {/* Main Top Platform Surface */}
+                <polygon
+                  points="0,3 88,3 88,34 0,34"
+                  fill={`url(#podium-top-${rank})`}
+                  stroke={theme.strokeColor}
+                  strokeWidth="1.1"
+                />
+                {/* Outer Right Facet Top Angle */}
+                <polygon
+                  points="88,3 100,10 100,34 88,34"
+                  fill="#06080c"
+                  stroke={theme.strokeColor}
+                  strokeWidth="1"
+                />
+              </>
+            )}
           </svg>
         </div>
 
-        {/* FRONT PILLAR: Minimal dark polygon face with thin outline matching reference */}
-        <div
-          className={`relative flex flex-col justify-start items-center ${theme.borderColor} bg-gradient-to-b ${theme.pillarGradient} ${heightClasses} pt-5 sm:pt-6 pb-6 px-1.5 sm:px-2.5 text-center`}
-        >
-          {/* 1. Rank & Name Inline Monospaced Label */}
-          <div className="w-full truncate px-1">
-            {isCurrentUser ? (
-              <Link
-                to="/profile"
-                title="View your profile"
-                className={`font-mono text-[8.5px] xs:text-[9.5px] sm:text-xs md:text-sm font-semibold tracking-tighter sm:tracking-tight ${theme.nameColor} hover:underline truncate block`}
-              >
-                [{rank}] {displayName}
-              </Link>
-            ) : (
-              <p className={`font-mono text-[8.5px] xs:text-[9.5px] sm:text-xs md:text-sm font-semibold tracking-tighter sm:tracking-tight ${theme.nameColor} truncate`}>
-                [{rank}] {displayName}
-              </p>
-            )}
-          </div>
-
-          {/* Subtle Divider Line on 2 & 3, negative space on 1 */}
-          {theme.hasDivider ? (
-            <div className={`w-14 sm:w-18 mx-auto my-1.5 sm:my-2 border-b ${theme.dividerColor}`} />
-          ) : (
-            <div className="h-2 sm:h-3" />
+        {/* PILLAR BODY: Substantial vertical faces with true 3D outer facets */}
+        <div className={`w-full flex ${heightClasses} select-none`}>
+          {/* Rank 2: Left Side Outer Facet */}
+          {isSecond && (
+            <div
+              className="w-2.5 sm:w-3.5 md:w-4 shrink-0 bg-gradient-to-b from-[#070a0e] via-[#040609] to-[#020305] border-l border-r border-white/10"
+              aria-hidden="true"
+            />
           )}
 
-          {/* 2. Plain Numerical Metric Score (no dollar/coin icons on non-monetary metrics) */}
-          <div className="flex items-center justify-center gap-1.5 mt-0.5">
-            <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
-              {scoreValue}
+          {/* Front Face Content Container */}
+          <div
+            className={`flex-1 min-w-0 relative flex flex-col justify-start items-center ${
+              isFirst ? theme.borderColor : ''
+            } bg-gradient-to-b ${theme.pillarGradient} pt-5 sm:pt-6 pb-6 px-1.5 sm:px-2.5 text-center`}
+          >
+            {/* 1. Rank & Name Inline Monospaced Label */}
+            <div className="w-full truncate px-1">
+              {isCurrentUser ? (
+                <Link
+                  to="/profile"
+                  title="View your profile"
+                  className={`font-mono text-[8.5px] xs:text-[9.5px] sm:text-xs md:text-sm font-semibold tracking-tighter sm:tracking-tight ${theme.nameColor} hover:underline truncate block`}
+                >
+                  [{rank}] {displayName}
+                </Link>
+              ) : (
+                <p className={`font-mono text-[8.5px] xs:text-[9.5px] sm:text-xs md:text-sm font-semibold tracking-tighter sm:tracking-tight ${theme.nameColor} truncate`}>
+                  [{rank}] {displayName}
+                </p>
+              )}
+            </div>
+
+            {/* Subtle Divider Line on 2 & 3, negative space on 1 */}
+            {theme.hasDivider ? (
+              <div className={`w-14 sm:w-18 mx-auto my-1.5 sm:my-2 border-b ${theme.dividerColor}`} />
+            ) : (
+              <div className="h-2 sm:h-3" />
+            )}
+
+            {/* 2. Plain Numerical Metric Score (no dollar/coin icons on non-monetary metrics) */}
+            <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
+                {scoreValue}
+              </span>
+            </div>
+
+            {/* 3. Understated Metric Sub-label */}
+            <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 block mt-1">
+              {subLabel}
             </span>
           </div>
 
-          {/* 3. Understated Metric Sub-label */}
-          <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 block mt-1">
-            {subLabel}
-          </span>
+          {/* Rank 3: Right Side Outer Facet */}
+          {isThird && (
+            <div
+              className="w-2.5 sm:w-3.5 md:w-4 shrink-0 bg-gradient-to-b from-[#06080c] via-[#030508] to-[#020304] border-l border-r border-white/10"
+              aria-hidden="true"
+            />
+          )}
         </div>
       </div>
     </div>
