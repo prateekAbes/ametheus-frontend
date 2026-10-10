@@ -36,7 +36,7 @@ export function LeaderboardPodium({
         className="pointer-events-none absolute -bottom-6 inset-x-0 h-28 select-none opacity-40"
         aria-hidden="true"
         style={{
-          background: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(34, 197, 94, 0.16), transparent 75%)',
+          background: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(37, 217, 242, 0.12), transparent 75%)',
         }}
       />
 

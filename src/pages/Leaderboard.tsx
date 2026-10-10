@@ -207,21 +207,19 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#10172F] text-white pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
-      {/* Visibly colored dark navy / indigo background with restrained violet variation */}
+    <div className="relative min-h-screen bg-[#080B12] text-[#F1F4FA] pt-24 pb-20 selection:bg-[#22c55e]/30 selection:text-white">
+      {/* Restrained charcoal background with subtle deep navy undertone (#080B12) */}
       <div
         className="pointer-events-none fixed inset-0 select-none overflow-hidden"
         aria-hidden="true"
       >
-        {/* Layered midnight navy, deep blue, dark indigo, and muted violet aura */}
         <div
           className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(ellipse 110% 70% at 50% -10%, #171B3B 0%, transparent 75%),
-              radial-gradient(ellipse 90% 60% at 85% 25%, rgba(48, 32, 79, 0.7) 0%, transparent 70%),
-              radial-gradient(ellipse 85% 55% at 15% 45%, rgba(37, 32, 77, 0.75) 0%, transparent 75%),
-              linear-gradient(180deg, #10172F 0%, #171B3B 40%, #10172F 100%)
+              radial-gradient(ellipse 100% 60% at 50% -5%, #0e1626 0%, transparent 70%),
+              radial-gradient(ellipse 80% 50% at 85% 20%, rgba(14, 22, 38, 0.4) 0%, transparent 60%),
+              linear-gradient(180deg, #080B12 0%, #0B101B 50%, #080B12 100%)
             `,
           }}
         />
@@ -230,10 +228,10 @@ export default function Leaderboard() {
       <Container className="relative z-10">
         {/* RESTRAINED, SOPHISTICATED LEADERBOARD HEADING */}
         <div className="mb-8 md:mb-10">
-          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-[#F1F4FA]">
             Leaderboard
           </h1>
-          <p className="mt-1.5 text-xs sm:text-sm text-white/50 max-w-xl font-mono">
+          <p className="mt-1.5 text-xs sm:text-sm text-[#8995A8] max-w-xl font-mono">
             Competitive standings and verified ratings across active titles.
           </p>
         </div>
@@ -245,8 +243,8 @@ export default function Leaderboard() {
           {/* ============================================================ */}
           {/* LEFT COMPACT SIDEBAR: METRIC SELECTOR ON DESKTOP              */}
           {/* ============================================================ */}
-          <aside className="hidden md:block border border-white/10 bg-black/80 p-3 select-none sticky top-24">
-            <span className="block font-mono text-[10px] uppercase tracking-wider text-white/40 mb-2">
+          <aside className="hidden md:block border border-[#202B3B] bg-[#101724]/90 p-3 select-none sticky top-24 rounded-sm backdrop-blur-sm">
+            <span className="block font-mono text-[10px] uppercase tracking-wider text-[#8995A8] mb-2">
               Metrics
             </span>
             <div className="space-y-1">
@@ -257,10 +255,10 @@ export default function Leaderboard() {
                     key={m.id}
                     type="button"
                     onClick={() => handleSelectCategory(m.id)}
-                    className={`w-full text-left px-2.5 py-1.5 font-mono text-xs transition-colors cursor-pointer ${
+                    className={`w-full text-left px-2.5 py-1.5 font-mono text-xs transition-colors cursor-pointer rounded-sm ${
                       isActive
-                        ? 'bg-white/[0.08] text-[#22c55e] font-bold border-l-2 border-[#22c55e]'
-                        : 'text-white/60 hover:text-white hover:bg-white/[0.03]'
+                        ? 'bg-[#25D9F2]/10 text-[#22c55e] font-bold border-l-2 border-[#22c55e]'
+                        : 'text-[#8995A8] hover:text-[#F1F4FA] hover:bg-white/[0.03]'
                     }`}
                   >
                     {m.label}
@@ -271,14 +269,14 @@ export default function Leaderboard() {
 
             {/* Discipline selector */}
             {displayGames.length > 1 && (
-              <div className="mt-4 pt-3 border-t border-white/10">
-                <span className="block font-mono text-[10px] uppercase tracking-wider text-white/40 mb-1.5">
+              <div className="mt-4 pt-3 border-t border-[#202B3B]">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-[#8995A8] mb-1.5">
                   Discipline
                 </span>
                 <select
                   value={selectedGame}
                   onChange={(e) => handleSelectGame(e.target.value)}
-                  className="w-full bg-black border border-white/15 px-2 py-1 font-mono text-xs text-white focus:border-[#22c55e] outline-none cursor-pointer"
+                  className="w-full bg-[#080B12] border border-[#202B3B] px-2 py-1 font-mono text-xs text-[#F1F4FA] focus:border-[#25D9F2] outline-none cursor-pointer rounded-sm"
                 >
                   <option value="all">All Titles</option>
                   {displayGames.map((g) => (
@@ -294,7 +292,7 @@ export default function Leaderboard() {
           {/* ============================================================ */}
           <main className="min-w-0 w-full space-y-6">
             {/* Mobile horizontal metric selector (screen < md) */}
-            <div className="block md:hidden border-b border-white/10 pb-2">
+            <div className="block md:hidden border-b border-[#202B3B] pb-2">
               <div className="flex overflow-x-auto gap-1">
                 {METRIC_OPTIONS.map((m) => {
                   const isActive = selectedCategory === m.id
@@ -303,10 +301,10 @@ export default function Leaderboard() {
                       key={m.id}
                       type="button"
                       onClick={() => handleSelectCategory(m.id)}
-                      className={`shrink-0 px-2.5 py-1 font-mono text-xs transition-colors ${
+                      className={`shrink-0 px-2.5 py-1 font-mono text-xs transition-colors rounded-sm ${
                         isActive
-                          ? 'bg-white/10 text-[#22c55e] font-bold border-b border-[#22c55e]'
-                          : 'text-white/60 hover:text-white'
+                          ? 'bg-[#25D9F2]/10 text-[#22c55e] font-bold border-b border-[#22c55e]'
+                          : 'text-[#8995A8] hover:text-[#F1F4FA]'
                       }`}
                     >
                       {m.label}
@@ -340,8 +338,8 @@ export default function Leaderboard() {
                 )}
 
                 {/* 2. SEARCH CONTROL PLACED DIRECTLY ABOVE RANKING LIST */}
-                <div className="flex items-center justify-between gap-3 border border-white/10 bg-black/60 px-3 py-2 font-mono">
-                  <span className="text-[11px] uppercase tracking-wider text-white/40">
+                <div className="flex items-center justify-between gap-3 border border-[#202B3B] bg-[#101724]/90 px-3 py-2 font-mono rounded-sm backdrop-blur-sm">
+                  <span className="text-[11px] uppercase tracking-wider text-[#8995A8]">
                     Standings List ({totalEntries})
                   </span>
                   <div className="relative max-w-xs w-full">
@@ -349,8 +347,8 @@ export default function Leaderboard() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => handleSearchChange(e.target.value)}
-                      placeholder="Search player or squad..."
-                      className="w-full bg-black border border-white/15 px-2.5 py-1 text-xs text-white placeholder:text-white/30 focus:border-[#22c55e] outline-none"
+                      placeholder="Search contender..."
+                      className="w-full bg-[#080B12] border border-[#202B3B] px-2.5 py-1 text-xs text-[#F1F4FA] placeholder:text-[#8995A8]/50 focus:border-[#25D9F2] outline-none rounded-sm"
                     />
                   </div>
                 </div>

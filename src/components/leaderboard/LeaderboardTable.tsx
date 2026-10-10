@@ -53,7 +53,7 @@ export function LeaderboardTable({
       case 'wins':
         return 'Match Wins'
       case 'spending':
-        return 'Highest Spending'
+        return 'Total Spent'
       case 'earnings':
         return 'Total Prize'
       case 'pc':
@@ -62,7 +62,7 @@ export function LeaderboardTable({
         return 'Mobile Rating'
       case 'overall':
       default:
-        return 'Volume'
+        return 'Competitive Rating'
     }
   }
 
@@ -74,15 +74,15 @@ export function LeaderboardTable({
       case 'wins':
         return `${entry.wins ?? 0} W`
       case 'spending':
-        return inr(150)
+        return inr(Number(entry.spending ?? 0))
       case 'earnings':
         return inr(Number(entry.earnings || 0))
       case 'pc':
       case 'mobile':
-        return `${entry.rating ?? 1500}`
+        return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
       case 'overall':
       default:
-        return `${Math.round((entry.rating ?? 1500) * 16).toLocaleString('en-US')} kg`
+        return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
     }
   }
 
@@ -91,9 +91,9 @@ export function LeaderboardTable({
       {/* ============================================================== */}
       {/* MINIMAL STANDINGS TABLE / LIST                                  */}
       {/* ============================================================== */}
-      <div className="border border-white/10 bg-black/70 overflow-hidden">
+      <div className="border border-[#202B3B] bg-[#101724]/90 rounded-sm overflow-hidden backdrop-blur-sm">
         {/* Table Head */}
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 bg-white/[0.02] font-mono text-[10px] text-white/40 uppercase tracking-wider">
+        <div className="flex items-center justify-between border-b border-[#202B3B] px-4 py-2 bg-white/[0.02] font-mono text-[10px] text-[#8995A8] uppercase tracking-wider">
           <div className="flex items-center gap-3">
             <span className="w-10 text-center">Rank</span>
             <span>Contender</span>
@@ -102,7 +102,7 @@ export function LeaderboardTable({
         </div>
 
         {/* Table Rows */}
-        <div className="divide-y divide-white/5 font-mono text-xs">
+        <div className="divide-y divide-[#202B3B]/60 font-mono text-xs">
           {entries.map((entry, idx) => {
             const rankNumber =
               entry.rank ||
@@ -224,8 +224,8 @@ export function LeaderboardTable({
       {/* PAGINATION CONTROLS                                             */}
       {/* ============================================================== */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border border-white/10 bg-black/60 px-3 py-2 font-mono text-xs">
-          <span className="text-white/40 text-[11px]">
+        <div className="flex items-center justify-between border border-[#202B3B] bg-[#101724]/90 px-3 py-2 font-mono text-xs rounded-sm backdrop-blur-sm">
+          <span className="text-[#8995A8] text-[11px]">
             #{ladderStartRank}-#{ladderEndRank} of {totalEntries}
           </span>
 
@@ -239,16 +239,16 @@ export function LeaderboardTable({
                 }
               }}
               disabled={currentPage === 1}
-              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
                 currentPage === 1
                   ? 'border-white/5 text-white/20 cursor-not-allowed'
-                  : 'border-white/15 text-white/70 hover:border-white/30 hover:text-white'
+                  : 'border-[#202B3B] text-[#F1F4FA] hover:border-[#25D9F2] hover:text-[#25D9F2]'
               }`}
             >
               Prev
             </button>
 
-            <span className="px-2 text-white/50 text-[10px]">
+            <span className="px-2 text-[#8995A8] text-[10px]">
               {currentPage} / {totalPages}
             </span>
 
@@ -261,10 +261,10 @@ export function LeaderboardTable({
                 }
               }}
               disabled={currentPage === totalPages}
-              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
                 currentPage === totalPages
                   ? 'border-white/5 text-white/20 cursor-not-allowed'
-                  : 'border-white/15 text-white/70 hover:border-white/30 hover:text-white'
+                  : 'border-[#202B3B] text-[#F1F4FA] hover:border-[#25D9F2] hover:text-[#25D9F2]'
               }`}
             >
               Next

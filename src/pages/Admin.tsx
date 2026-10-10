@@ -205,6 +205,15 @@ function BannerImageUploader({
         } else {
           setInfo(`✓ Verified: 1:1 square aspect ratio (${width}x${height}px)`)
         }
+      } else if (recommendedRatio === '3:4') {
+        const targetRatio = 3 / 4
+        if (Math.abs(ratio - targetRatio) > 0.18) {
+          setInfo(
+            `✓ Uploaded: ${width}x${height}px (${ratioName}). Adapts cleanly to 3:4 / 4:5 portrait cards.`
+          )
+        } else {
+          setInfo(`✓ Verified: 3:4 portrait aspect ratio (${width}x${height}px)`)
+        }
       } else if (recommendedRatio === '4:3') {
         if (Math.abs(ratio - 4 / 3) > 0.2) {
           setInfo(
@@ -263,6 +272,8 @@ function BannerImageUploader({
       ? 'aspect-square max-w-[120px]'
       : recommendedRatio === '9:16'
       ? 'aspect-[9/16] max-w-[120px]'
+      : recommendedRatio === '3:4'
+      ? 'aspect-[3/4] max-w-[140px]'
       : recommendedRatio === '4:3'
       ? 'aspect-[4/3] max-w-[200px]'
       : 'aspect-[16/9] max-w-sm'
@@ -5315,16 +5326,16 @@ export default function Admin() {
                   <div className="space-y-3 border-t border-white/10 pt-3">
                     <div className="font-bold uppercase text-cyan text-[11px]">Tournament Media Assets</div>
                     <BannerImageUploader
-                      label="Primary Cover Artwork (Universal — Any Aspect Ratio)"
-                      recommendedRatio="universal"
-                      recommendedRes="Any aspect ratio"
+                      label="Tournament Cover Artwork (Target: 1600x900 px · 16:9 Landscape / ~2.34:1 Hero)"
+                      recommendedRatio="16:9"
+                      recommendedRes="1600x900 (16:9) or 1920x820"
                       value={newTour.banner_url}
                       onChange={(val) => setNewTour({ ...newTour, banner_url: val })}
                     />
                     <BannerImageUploader
-                      label="Tournament Logo / Emblem (1:1 Square or SVG)"
+                      label="Tournament Logo / Emblem (Target: 256x256 px · 1:1 Square or SVG)"
                       recommendedRatio="1:1"
-                      recommendedRes="512x512"
+                      recommendedRes="256x256"
                       value={newTour.logo_url}
                       onChange={(val) => setNewTour({ ...newTour, logo_url: val })}
                     />
@@ -5449,16 +5460,16 @@ export default function Admin() {
                   <div className="space-y-3 border-t border-white/10 pt-3">
                     <div className="font-bold uppercase text-cyan text-[11px]">Tournament Media Assets</div>
                     <BannerImageUploader
-                      label="Primary Cover Artwork (Universal — Any Aspect Ratio)"
-                      recommendedRatio="universal"
-                      recommendedRes="Any aspect ratio"
+                      label="Tournament Cover Artwork (Target: 1600x900 px · 16:9 Landscape / ~2.34:1 Hero)"
+                      recommendedRatio="16:9"
+                      recommendedRes="1600x900 (16:9) or 1920x820"
                       value={editingTour.banner_url || ''}
                       onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
                     />
                     <BannerImageUploader
-                      label="Tournament Logo / Emblem (1:1 Square or SVG)"
+                      label="Tournament Logo / Emblem (Target: 256x256 px · 1:1 Square or SVG)"
                       recommendedRatio="1:1"
-                      recommendedRes="512x512"
+                      recommendedRes="256x256"
                       value={editingTour.logo_url || ''}
                       onChange={(val) => setEditingTour({ ...editingTour, logo_url: val })}
                     />
@@ -5667,16 +5678,16 @@ export default function Admin() {
                 <div className="space-y-3 border-t border-white/10 pt-3">
                   <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
                   <BannerImageUploader
-                    label="Primary Game Artwork (Universal — Any Aspect Ratio)"
-                    recommendedRatio="universal"
-                    recommendedRes="Any aspect ratio"
+                    label="Game Catalog Artwork (Target: 900x1200 px · 3:4 Portrait for Cards)"
+                    recommendedRatio="3:4"
+                    recommendedRes="900x1200 (3:4)"
                     value={newGame.banner_url}
                     onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
                   />
                   <BannerImageUploader
-                    label="Game Logo / Icon (1:1 Square or SVG)"
+                    label="Game Logo / Icon (Target: 256x256 px · 1:1 Square or SVG)"
                     recommendedRatio="1:1"
-                    recommendedRes="512x512"
+                    recommendedRes="256x256"
                     value={newGame.logo_url}
                     onChange={(val) => setNewGame({ ...newGame, logo_url: val })}
                   />
@@ -5803,16 +5814,16 @@ export default function Admin() {
                 <div className="space-y-3 border-t border-white/10 pt-3">
                   <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
                   <BannerImageUploader
-                    label="Primary Game Artwork (Universal — Any Aspect Ratio)"
-                    recommendedRatio="universal"
-                    recommendedRes="Any aspect ratio"
+                    label="Game Catalog Artwork (Target: 900x1200 px · 3:4 Portrait for Cards)"
+                    recommendedRatio="3:4"
+                    recommendedRes="900x1200 (3:4)"
                     value={editingGame.banner_url || ''}
                     onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
                   />
                   <BannerImageUploader
-                    label="Game Logo / Icon (1:1 Square or SVG)"
+                    label="Game Logo / Icon (Target: 256x256 px · 1:1 Square or SVG)"
                     recommendedRatio="1:1"
-                    recommendedRes="512x512"
+                    recommendedRes="256x256"
                     value={editingGame.logo_url || ''}
                     onChange={(val) => setEditingGame((prev) => prev ? { ...prev, logo_url: val } : null)}
                   />

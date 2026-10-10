@@ -261,20 +261,25 @@ export default function TournamentDetail() {
   return (
     <div className="bg-void text-ink pb-36" style={{ ['--acc' as string]: accent }}>
       {/* Hero */}
-      <section className="relative isolate flex min-h-[100svh] items-end overflow-hidden bg-void md:min-h-[92svh]">
+      <section className="relative isolate flex min-h-[520px] md:min-h-[600px] max-h-[820px] items-end overflow-hidden bg-void">
         <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 70% 20%, ${accent}30, transparent 60%)` }} />
         <div className="absolute inset-0">
           <DynamicImage
-            src={resolveMediaUrl(tourData?.bannerUrl)}
+            src={resolveMediaUrl(
+              tourData?.bannerTabletUrl ||
+              tourData?.bannerUrl ||
+              tourData?.bannerMobileUrl ||
+              g?.photo ||
+              'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1920&auto=format&fit=crop'
+            )}
             alt={`${title} banner`}
             eager
-            mode="ambient"
-            className="h-full w-full opacity-70 object-contain object-center md:object-[75%_center]"
-            backdropClassName="opacity-30"
+            mode="cover"
+            className="size-full opacity-65 object-cover object-center md:object-[75%_center]"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-void via-void/75 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-void via-void/30 to-void/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-void via-void/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-transparent to-void/30" />
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/3 opacity-40" />
 
         <Container className="relative w-full pb-16 pt-36 md:pb-24">

@@ -15,6 +15,7 @@ export interface LeaderboardEntry {
   losses: number
   rating: number
   earnings: number
+  spending?: number
   form: string[]
   is_verified: boolean
   category: string

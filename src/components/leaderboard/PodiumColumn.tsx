@@ -86,16 +86,12 @@ export function PodiumColumn({
 
   // Format metric value & sub-label according to the active category
   const { scoreValue, subLabel } = useMemo(() => {
-    if (selectedCategory === 'overall' || !selectedCategory) {
-      let val = '51,200 kg'
-      if (rank === 2) val = '41,800 kg'
-      if (rank === 3) val = '32,400 kg'
-      return {
-        scoreValue: val,
-        subLabel: 'PER PLAYER',
-      }
-    }
     switch (selectedCategory) {
+      case 'overall':
+        return {
+          scoreValue: (Number(entry.rating || 1500)).toLocaleString('en-US'),
+          subLabel: 'RATING',
+        }
       case 'win_rate':
         return {
           scoreValue: `${entry.win_rate ?? 0}%`,
@@ -106,13 +102,11 @@ export function PodiumColumn({
           scoreValue: `${entry.wins ?? 0} W`,
           subLabel: 'MATCH WINS',
         }
-      case 'spending': {
-        const spendingVal = rank === 1 ? 150 : rank === 2 ? 120 : 90
+      case 'spending':
         return {
-          scoreValue: inr(spendingVal),
-          subLabel: 'HIGHEST SPENDING',
+          scoreValue: inr(Number(entry.spending || 0)),
+          subLabel: 'TOTAL SPENT',
         }
-      }
       case 'earnings':
         return {
           scoreValue: inr(Number(entry.earnings || 0)),
@@ -131,10 +125,10 @@ export function PodiumColumn({
       default:
         return {
           scoreValue: (Number(entry.rating || 1500)).toLocaleString('en-US'),
-          subLabel: 'SCORE',
+          subLabel: 'RATING',
         }
     }
-  }, [entry, selectedCategory, rank])
+  }, [entry, selectedCategory])
 
   const avatarUrl = resolveMediaUrl(entry.logo_url)
   const initial = displayName.charAt(0).toUpperCase()
@@ -295,8 +289,11 @@ export function PodiumColumn({
               <div className="h-2 sm:h-3" />
             )}
 
-            {/* 2. Plain Numerical Metric Score (no dollar/coin icons on non-monetary metrics) */}
+            {/* 2. Numerical Metric Score with subtle cyan crest glyph matching reference */}
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <span className="inline-flex items-center justify-center size-3.5 sm:size-4 rounded-full bg-[#25D9F2]/15 text-[#25D9F2] text-[9px] font-mono font-bold select-none" aria-hidden="true">
+                ◈
+              </span>
               <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
                 {scoreValue}
               </span>

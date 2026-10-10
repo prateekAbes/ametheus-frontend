@@ -256,10 +256,12 @@ export function Media({ id, w = 1000, alt = '', className = '', eager, sizes = '
  * Long names clamp to 2 lines with balanced wrapping; title size steps down by length.
  */
 export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament> & Pick<Tournament, 'id' | 'name'>; wide?: boolean; tilt?: boolean }) {
-  const g = t.game ? gameBy(t.game) : undefined
+  const gameKey = (t as any).game || (t as any).gameSlug || (t as any).game_slug || (t as any).gameId || (t as any).game_id
+  const g = gameKey ? gameBy(gameKey) : undefined
   const accent = g?.accent ?? '#3ef2ff'
   const long = t.name.length > 28
   const meta = [t.date, g?.squad, t.format].filter(Boolean).join(' · ')
+  const bannerSrc = (t as any).bannerUrl || (t as any).banner_url || (t as any).bannerTabletUrl || (t as any).banner_tablet_url || (t as any).bannerMobileUrl || (t as any).banner_mobile_url || g?.photo || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop'
   const stats = [
     t.prize != null && ['Prize', inr(t.prize), accent],
     t.entry != null && ['Entry', t.entry ? inr(t.entry) : 'FREE'],
@@ -269,11 +271,10 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
     <Link to={`/tournaments/${t.id}`} className={`group relative flex h-full flex-col overflow-hidden border border-white/10 bg-surface transition-colors duration-300 hover:border-white/25`}>
       <div className={`relative overflow-hidden bg-graphite ${wide ? 'aspect-[16/8]' : 'aspect-[16/9]'}`}>
         <DynamicImage
-          src={resolveMediaUrl((t as any).bannerUrl || (t as any).banner_url)}
+          src={resolveMediaUrl(bannerSrc)}
           alt={`${t.name} banner`}
-          mode="ambient"
-          className="size-full opacity-85 transition-transform duration-700 group-hover:scale-105"
-          backdropClassName="opacity-40"
+          mode="cover"
+          className="size-full object-cover object-center opacity-85 transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
