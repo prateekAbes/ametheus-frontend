@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router'
 import { getGameBySlug, normalizeGame, NormalizedGame } from '../services/games'
 import { getTournaments, normalizeTournament, NormalizedTournament } from '../services/tournaments'
@@ -79,12 +79,37 @@ export default function GameDetail() {
     }
   }, [slug])
 
-  const name = gameData?.name || fallback.name
-  const short = gameData?.tag || fallback.short
+  // Resolve dynamic canonical game title from actual game record
+  const gameTitle = useMemo(() => {
+    const rawName = (gameData?.name || fallback.name || '').trim()
+    const targetSlug = (slug || gameData?.slug || fallback.slug || '').toLowerCase()
+
+    if (targetSlug === 'bgmi' || rawName.toLowerCase() === 'battlegrounds mobile india') {
+      return 'BGMI'
+    }
+    if (targetSlug === 'valorant') {
+      return 'Valorant'
+    }
+    return rawName || fallback.name || 'Game'
+  }, [gameData?.name, fallback.name, slug, gameData?.slug, fallback.slug])
+
+  // Normalize platform to clean single label, avoiding redundant OS/sub-platform tags
+  const cleanPlatform = useMemo(() => {
+    const raw = (gameData?.platform || fallback.platform || '').trim()
+    const lower = raw.toLowerCase()
+    if (lower.includes('mobile') || lower.includes('android') || lower.includes('ios')) {
+      return 'Mobile'
+    }
+    if (lower.includes('pc') || lower.includes('windows')) {
+      return 'PC'
+    }
+    return raw || 'Multi-platform'
+  }, [gameData?.platform, fallback.platform])
+
+  const name = gameTitle
   const desc = gameData?.description || fallback.desc
   const line = gameData?.announcementText || fallback.line
-  const genre = gameData?.category || fallback.genre
-  const platform = gameData?.platform || fallback.platform
+  const genre = gameData?.genreName || gameData?.category || fallback.genre || 'Esports'
   const accent = gameData?.accentColor || fallback.accent
   const mediaCfg = (gameData as any)?.media_config || (gameData as any)?.mediaConfig
   const bannerCfg = mediaCfg?.banner
@@ -167,7 +192,7 @@ export default function GameDetail() {
             <span>/</span>
             <Link to="/games" className="hover:text-cyan transition-colors">GAMES</Link>
             <span>/</span>
-            <span className="text-ink font-bold uppercase tracking-wider">{name}</span>
+            <span className="text-ink font-bold uppercase tracking-wider">{gameTitle}</span>
           </div>
         </Container>
       </div>
@@ -176,7 +201,7 @@ export default function GameDetail() {
       <section className="relative flex min-h-[85svh] items-end overflow-hidden bg-void">
         <DynamicImage
           src={resolveMediaUrl(bannerSrc)}
-          alt={`${name} artwork`}
+          alt={`${gameTitle} artwork`}
           eager
           mode={bannerFit}
           focalPoint={bannerFocal}
@@ -193,15 +218,14 @@ export default function GameDetail() {
           <div className="mb-6 flex flex-wrap items-center gap-4">
             <span className="h-px w-12" style={{ background: accent }} />
             <Hud className="text-ink">
-              {genre} · {platform}
+              {genre}
             </Hud>
-            <Badge s="active" label="Official Circuit" />
           </div>
           <h1
             className="reveal font-display text-[clamp(3.5rem,14vw,14rem)] font-black uppercase leading-[0.78]"
             style={{ textShadow: `0 0 80px ${accent}55` }}
           >
-            {short}
+            {gameTitle}
           </h1>
           <p className="mt-6 max-w-xl text-lg text-ink/75 font-sans">{desc}</p>
           <div className="mt-10 flex flex-wrap items-center gap-8">
@@ -209,7 +233,7 @@ export default function GameDetail() {
               View Brackets
             </Cta>
             <Stat k="Squad size" v={`${minSize}–${maxSize}P`} accent={accent} />
-            <Stat k="Platform" v={platform} />
+            <Stat k="Platform" v={cleanPlatform} />
             <Stat k="Total Circuit Prize" v={inr(totalPrizePool)} accent="#f59e0b" />
           </div>
         </Container>
@@ -220,7 +244,7 @@ export default function GameDetail() {
         <Container>
           <SectionHead
             idx="01"
-            kicker={short}
+            kicker={gameTitle}
             title="Active Tournaments"
             size="md"
             sub="Official sanctioned tournaments currently open for registration or live in action."
@@ -236,7 +260,7 @@ export default function GameDetail() {
               <EmptyState
                 code="00"
                 title="No active brackets right now"
-                body={`No ${short} tournaments are currently open for registration. Check upcoming events below.`}
+                body={`No ${gameTitle} tournaments are currently open for registration. Check upcoming events below.`}
                 cta="All Tournaments"
                 to="/tournaments"
               />
@@ -266,7 +290,7 @@ export default function GameDetail() {
               <EmptyState
                 code="404"
                 title="Nothing scheduled yet"
-                body={`New ${short} tournaments drop weekly. Keep an eye on platform announcements.`}
+                body={`New ${gameTitle} tournaments drop weekly. Keep an eye on platform announcements.`}
                 cta="Browse All Tournaments"
                 to="/tournaments"
               />
@@ -302,8 +326,8 @@ export default function GameDetail() {
             <div>
               <SectionHead
                 idx="04"
-                kicker={`${short} Standings`}
-                title={<>{short} <span className="text-cyan">Leaderboard</span></>}
+                kicker={`${gameTitle} Standings`}
+                title={<>{gameTitle} <span className="text-cyan">Leaderboard</span></>}
                 size="md"
                 sub={`Verified contender Elo ratings, match wins, and cash earnings specifically in ${name}.`}
               />
@@ -440,7 +464,7 @@ export default function GameDetail() {
           <dl className="grid grid-cols-2 gap-px self-end bg-white/10 lg:col-span-7">
             {[
               ['Genre', genre],
-              ['Platform', platform],
+              ['Platform', cleanPlatform],
               ['Squad Format', `${maxSize} Player Team (${minSize}-${maxSize})`],
               ['Region', 'India (Mumbai Dedicated)'],
               ['Server Protocol', 'Custom Room / Dedicated Arbitrated'],

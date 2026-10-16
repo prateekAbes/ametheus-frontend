@@ -256,24 +256,18 @@ function Featured({
   const leadGame = gameBy(lead.gameId)
   const displayGameName = lead.gameName || leadGame.name || 'Esports'
 
-  // Lead tournament artwork directly from tournament's own canonical mediaConfig
+  // Lead tournament artwork directly from tournament's own canonical mediaConfig (Media & Artwork Manager)
   const leadMedia = (lead as any).mediaConfig || (lead as any).media_config
   const leadFeaturedCfg = leadMedia?.featured_banner || leadMedia?.card
-  const featuredPlacement = placements.find((p) => p.placement_key === 'homepage_featured_tournament')
 
-  const leadAssetUrl =
-    leadFeaturedCfg?.asset_url ||
-    featuredPlacement?.asset_url ||
-    lead.heroBannerUrl ||
-    lead.bannerUrl
+  // Source of truth: only explicitly configured managed artwork; no unmanaged or hardcoded image fallbacks
+  const leadAssetUrl = (leadFeaturedCfg?.asset_url || '').trim()
   const leadFocalPoint =
     leadFeaturedCfg && typeof leadFeaturedCfg.focal_x === 'number' && typeof leadFeaturedCfg.focal_y === 'number'
       ? { x: leadFeaturedCfg.focal_x, y: leadFeaturedCfg.focal_y }
-      : featuredPlacement && typeof featuredPlacement.focal_x === 'number' && typeof featuredPlacement.focal_y === 'number'
-      ? { x: featuredPlacement.focal_x, y: featuredPlacement.focal_y }
       : undefined
-  const leadZoom = leadFeaturedCfg?.zoom || featuredPlacement?.zoom
-  const leadFitMode = leadFeaturedCfg?.fit_mode || featuredPlacement?.fit_mode || 'cover'
+  const leadZoom = leadFeaturedCfg?.zoom
+  const leadFitMode = leadFeaturedCfg?.fit_mode || 'cover'
 
   return (
     <section className="py-24 md:py-32">
@@ -360,7 +354,7 @@ function Featured({
                   >
                     <div className="relative aspect-video overflow-hidden bg-void">
                       <DynamicImage
-                        src={resolveMediaUrl(sideCfg?.asset_url || t.bannerUrl)}
+                        src={resolveMediaUrl(sideCfg?.asset_url || '')}
                         alt={`${t.title} thumbnail`}
                         mode={sideCfg?.fit_mode === 'contain' ? 'contain' : 'cover'}
                         focalPoint={sideFocal}

@@ -182,33 +182,22 @@ export async function getTournaments(params?: {
 
 export async function getFeaturedTournament(): Promise<Tournament | null> {
   try {
+    // Authoritative backend API is the single source of truth across all browsers
     const res = await apiClient<Tournament>('/tournaments/featured')
     if (res && (res.id || res.slug)) return res
   } catch {
     // API endpoint might not be available or 404
   }
-  // Check local stored configuration if set by admin
-  try {
-    const savedId = localStorage.getItem('ametheus_homepage_featured_tournament_id')
-    if (savedId && savedId !== 'none') {
-      return await getTournamentBySlug(savedId)
-    }
-  } catch {}
   return null
 }
 
 export async function setFeaturedTournament(id: string): Promise<any> {
   try {
-    localStorage.setItem('ametheus_homepage_featured_tournament_id', id)
+    localStorage.removeItem('ametheus_homepage_featured_tournament_id')
   } catch {}
-  try {
-    return await apiClient(`/tournaments/${id}/feature`, {
-      method: 'POST',
-    })
-  } catch {
-    // Return success if stored locally
-    return { status: 'success', featured_tournament_id: id }
-  }
+  return await apiClient(`/tournaments/${id}/feature`, {
+    method: 'POST',
+  })
 }
 
 export async function getTournamentBySlug(slugOrId: string): Promise<Tournament> {

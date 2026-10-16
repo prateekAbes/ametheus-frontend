@@ -345,7 +345,7 @@ export default function Games() {
                           }`}
                         >
                           <Hud className="block text-cyan uppercase tracking-widest text-xs">
-                            Canonical Discipline · {activeGamesForGenre.length} Active Competitive {activeGamesForGenre.length === 1 ? 'Title' : 'Titles'}
+                            {activeGamesForGenre.length} Active Competitive {activeGamesForGenre.length === 1 ? 'Title' : 'Titles'}
                           </Hud>
                           <h2 className="mt-2 font-display text-5xl md:text-7xl xl:text-8xl font-black uppercase leading-[0.85] text-ink">
                             {gn.name}

@@ -20,10 +20,8 @@ interface PodiumColumnProps {
  * - Symmetrical perspective top surface for #1 with thin cyan highlight outline (#3ef2ff).
  * - Subtle neutral borders on #2 and #3 top surfaces.
  * - Square 1:1 avatars resting directly on top surfaces, uniform size across all 3 platforms.
- * - Clean 3-line layout on the flat vertical front face:
- *     Line 1: [#rank] PlayerName
- *     Line 2: Bold numerical metric value
- *     Line 3: Small uppercase sub-label
+ * - Prestigious, exclusive #1 rank presentation with recognition description and balanced score prominence.
+ * - Clean front face text layout preserving authentic data and typography tokens.
  */
 export function PodiumColumn({
   entry,
@@ -38,7 +36,7 @@ export function PodiumColumn({
 
   // Height proportions matching reference (100% : 73% : 50%)
   const heightClasses = isFirst
-    ? 'h-56 sm:h-64 md:h-76 lg:h-84'
+    ? 'h-60 sm:h-70 md:h-82 lg:h-90'
     : isSecond
     ? 'h-40 sm:h-48 md:h-56 lg:h-62'
     : 'h-28 sm:h-32 md:h-38 lg:h-42'
@@ -48,9 +46,9 @@ export function PodiumColumn({
         platformBg: 'bg-gradient-to-b from-[#0c121d] via-[#080d16] to-[#04060a]',
         platformBorder: 'border-l border-r border-b border-white/20',
         rankText: 'text-cyan font-bold',
-        nameColor: 'text-white font-bold',
-        scoreColor: 'text-white',
-        scoreSize: 'text-base sm:text-xl md:text-2xl',
+        nameColor: 'text-white font-black',
+        scoreColor: 'text-white/90',
+        scoreSize: 'text-sm sm:text-base md:text-lg font-bold',
         elevation: 'z-20 shadow-[0_20px_50px_rgba(0,0,0,0.85)]',
       }
     : isSecond
@@ -59,8 +57,8 @@ export function PodiumColumn({
         platformBorder: 'border-l border-b border-white/15',
         rankText: 'text-white/70 font-bold',
         nameColor: 'text-white/90 font-bold',
-        scoreColor: 'text-white/90',
-        scoreSize: 'text-sm sm:text-lg md:text-xl',
+        scoreColor: 'text-white/80',
+        scoreSize: 'text-xs sm:text-sm md:text-base font-semibold',
         elevation: 'z-10',
       }
     : {
@@ -68,8 +66,8 @@ export function PodiumColumn({
         platformBorder: 'border-r border-b border-white/15',
         rankText: 'text-white/60 font-bold',
         nameColor: 'text-white/80 font-bold',
-        scoreColor: 'text-white/80',
-        scoreSize: 'text-xs sm:text-base md:text-lg',
+        scoreColor: 'text-white/70',
+        scoreSize: 'text-xs sm:text-sm md:text-base font-semibold',
         elevation: 'z-10',
       }
 
@@ -86,28 +84,32 @@ export function PodiumColumn({
   const displayName = rawName.trim()
 
   // Format metric value & sub-label according to the active category
-  const { scoreValue, subLabel } = useMemo(() => {
+  const { scoreValue, subLabel, championRecognition } = useMemo(() => {
     switch (selectedCategory) {
       case 'spending':
         return {
           scoreValue: inr(Number(entry.spending || 0)),
           subLabel: 'TOTAL SPENT',
+          championRecognition: 'Leading circuit patron commanding top tournament commitments across Ametheus.',
         }
       case 'win_rate':
         return {
           scoreValue: `${entry.win_rate ?? 0}%`,
           subLabel: 'WIN RATE',
+          championRecognition: 'Premier contender with highest verified victory efficiency in competitive play.',
         }
       case 'wins':
         return {
           scoreValue: `${(entry.wins ?? 0).toLocaleString()} WINS`,
           subLabel: 'MATCH WINS',
+          championRecognition: 'Foremost match victor dominating competitive tournament fixtures.',
         }
       case 'overall':
       default:
         return {
           scoreValue: (Number(entry.rating || 1500)).toLocaleString('en-US'),
           subLabel: 'RATING',
+          championRecognition: 'Reigning contender holding the premier standing across sanctioned tournament play.',
         }
     }
   }, [entry, selectedCategory])
@@ -217,45 +219,79 @@ export function PodiumColumn({
 
       {/* ============================================================== */}
       {/* FLAT VERTICAL FRONT FACE                                       */}
-      {/* 3-line layout: [#rank] PlayerName | Bold Value | Sub-label     */}
+      {/* Prestigious #1 treatment with recognition & balanced rating    */}
       {/* ============================================================== */}
       <div
-        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} pt-3 sm:pt-4 md:pt-6 pb-4 sm:pb-6 px-1.5 sm:px-3 text-center`}
+        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} pt-3 sm:pt-4 md:pt-5 pb-4 sm:pb-5 px-1.5 sm:px-3 text-center`}
       >
-        {/* Line 1: [#rank] PlayerName */}
-        <div className="w-full flex items-center justify-center gap-1.5 px-1 truncate">
-          <span className={`font-mono text-xs sm:text-sm shrink-0 ${theme.rankText}`}>
-            [#{rank}]
-          </span>
-          {isCurrentUser ? (
-            <Link
-              to="/profile"
-              title="View your profile"
-              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} hover:text-cyan transition-colors truncate block`}
-            >
-              {displayName}
-            </Link>
-          ) : (
-            <span
-              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} truncate block`}
-            >
-              {displayName}
-            </span>
-          )}
-        </div>
+        {isFirst ? (
+          /* Prestigious #1 Leaderboard Apex Lockup */
+          <div className="w-full flex flex-col items-center">
+            {/* Exclusive Rank #1 Achievement Pill */}
+            <div className="inline-flex items-center justify-center gap-1.5 px-2.5 py-0.5 rounded-xs border border-cyan/40 bg-gradient-to-r from-cyan/20 via-cyan/10 to-transparent shadow-[0_0_15px_rgba(62,242,255,0.18)] mb-1.5">
+              <span className="font-mono text-[10px] sm:text-xs text-cyan/70 font-bold tracking-wider">#</span>
+              <span className="font-mono text-xs sm:text-sm font-black text-cyan tracking-tight">1</span>
+              <span className="h-2.5 w-px bg-cyan/35 mx-0.5" />
+              <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-cyan/95 font-bold">
+                CHAMPION
+              </span>
+            </div>
 
-        {/* Line 2: Bold Numerical Metric Value directly below username */}
-        <div className="mt-2 sm:mt-3 md:mt-4">
+            {/* Top Contender Name */}
+            <div className="w-full truncate px-1">
+              {isCurrentUser ? (
+                <Link
+                  to="/profile"
+                  title="View your profile"
+                  className="font-display text-sm sm:text-base md:text-lg font-black tracking-wide text-white hover:text-cyan transition-colors truncate block drop-shadow-[0_2px_8px_rgba(62,242,255,0.2)]"
+                >
+                  {displayName}
+                </Link>
+              ) : (
+                <span className="font-display text-sm sm:text-base md:text-lg font-black tracking-wide text-white truncate block drop-shadow-[0_2px_8px_rgba(62,242,255,0.2)]">
+                  {displayName}
+                </span>
+              )}
+            </div>
+
+            {/* Meaningful, rich supporting recognition text */}
+            <p className="mt-1 px-1 text-[10px] sm:text-xs font-sans text-ink/75 max-w-[210px] sm:max-w-[240px] leading-snug">
+              {championRecognition}
+            </p>
+          </div>
+        ) : (
+          /* Clean Stair Ranks (#2 and #3) */
+          <div className="w-full flex items-center justify-center gap-1.5 px-1 truncate">
+            <span className={`font-mono text-xs sm:text-sm shrink-0 ${theme.rankText}`}>
+              [#{rank}]
+            </span>
+            {isCurrentUser ? (
+              <Link
+                to="/profile"
+                title="View your profile"
+                className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} hover:text-cyan transition-colors truncate block`}
+              >
+                {displayName}
+              </Link>
+            ) : (
+              <span
+                className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} truncate block`}
+              >
+                {displayName}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Metric Value & Sub-label with balanced, refined visual prominence */}
+        <div className="mt-auto pt-2 pb-0.5 flex flex-col items-center">
+          {isFirst && <div className="w-10 sm:w-14 border-t border-white/10 mb-1.5" />}
           <span
-            className={`font-mono ${theme.scoreSize} font-black tracking-tight ${theme.scoreColor} block`}
+            className={`font-mono ${theme.scoreSize} tracking-tight ${theme.scoreColor} block`}
           >
             {scoreValue}
           </span>
-        </div>
-
-        {/* Line 3: Small Uppercase Metric Sub-label */}
-        <div className="mt-0.5 sm:mt-1">
-          <span className="font-mono text-[9px] sm:text-[10px] md:text-xs uppercase tracking-widest text-[#8995A8] block">
+          <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-[#8995A8] mt-0.5 block">
             {subLabel}
           </span>
         </div>
