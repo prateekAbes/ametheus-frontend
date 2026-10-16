@@ -12,7 +12,6 @@ import { getGames, Game as ApiGame } from '../services/games'
 import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
 import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
-  GAMES,
   CATALOG,
   HERO_SLIDES,
   HERO_SPOTLIGHT,
@@ -32,13 +31,6 @@ import { resolveMediaUrl } from '../services/apiClient'
 import { getPlacements, PlacementConfig } from '../services/admin'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
-
-const SLOTS = [
-  { key: 'homepage_hero_slot_1', cls: 'left-[4%] top-[18%] w-[22vw] h-[30vh] [clip-path:polygon(0_8%,100%_0,92%_100%,4%_92%)]', d: 18 },
-  { key: 'homepage_hero_slot_2', cls: 'right-[6%] top-[14%] w-[18vw] h-[36vh] [clip-path:polygon(10%_0,100%_6%,100%_100%,0_88%)]', d: -24 },
-  { key: 'homepage_hero_slot_3', cls: 'left-[14%] bottom-[10%] w-[16vw] h-[22vh] [clip-path:polygon(0_0,90%_10%,100%_100%,6%_90%)]', d: -12 },
-  { key: 'homepage_hero_slot_4', cls: 'right-[16%] bottom-[14%] w-[20vw] h-[24vh] [clip-path:polygon(6%_4%,100%_0,94%_96%,0_100%)]', d: 28 },
-]
 
 export default function Home() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([])
@@ -112,7 +104,6 @@ export default function Home() {
         placements={placements}
       />
       <Upcoming tournaments={eligibleUpcoming} loading={loading} />
-      <GameShowcase games={games} />
       <Why />
       <FinalCta liveCount={liveCount} />
     </>
@@ -169,7 +160,6 @@ function Hero({
         .from('[data-h="title"]', { yPercent: 30, scale: 1.12, opacity: 0, duration: 1.6 })
         .from('[data-h="tag"]', { y: 18, opacity: 0, duration: 1 }, '<0.2')
         .from('[data-h="cta"]', { y: 24, opacity: 0, stagger: 0.08, duration: 0.9 }, '<0.15')
-        .from('[data-h="shard"]', { opacity: 0, scale: 0.8, stagger: 0.1, duration: 1.3 }, '<-0.3')
       if (!isMobile()) {
         const st = { trigger: ref.current, start: 'top top', end: 'bottom top', scrub: true }
         gsap.to('[data-h="stage"]', { yPercent: 18, opacity: 0.25, ease: 'none', scrollTrigger: st })
@@ -195,63 +185,6 @@ function Hero({
           <Scene3D particles={isMobile() ? 500 : 1200} />
         </Suspense>
       )}
-
-      {SLOTS.map((slot, k) => {
-        const g = games[k] || (GAMES as any)[k % GAMES.length]
-        const mediaCfg = (g as any)?.media_config || (g as any)?.mediaConfig
-        const floatingCfg = mediaCfg?.homepage_hero_floating || mediaCfg?.catalog_card
-        const placement = placements.find((p) => p.placement_key === slot.key)
-
-        const assetUrl =
-          floatingCfg?.asset_url ||
-          placement?.asset_url ||
-          g?.banner_url ||
-          g?.logo_url ||
-          (g as any)?.photo
-        const focalPoint =
-          floatingCfg && typeof floatingCfg.focal_x === 'number' && typeof floatingCfg.focal_y === 'number'
-            ? { x: floatingCfg.focal_x, y: floatingCfg.focal_y }
-            : placement && typeof placement.focal_x === 'number' && typeof placement.focal_y === 'number'
-            ? { x: placement.focal_x, y: placement.focal_y }
-            : undefined
-        const zoom = floatingCfg?.zoom || placement?.zoom
-        const fitMode = floatingCfg?.fit_mode || placement?.fit_mode || 'cover'
-        const linkTo = g?.slug ? `/games/${g.slug}` : (g?.id ? `/games/${g.id}` : (placement?.target_id ? `/games/${placement.target_id}` : '/games'))
-        const tag = g?.tag || g?.name || `Arena 0${k + 1}`
-
-        return (
-          <Link
-            data-h="shard"
-            key={slot.key}
-            to={linkTo}
-            className={`group absolute hidden md:block ${slot.cls} overflow-hidden bg-surface`}
-            style={{
-              translate: `calc(var(--px) * ${slot.d}px) calc(var(--py) * ${slot.d}px)`,
-              transition: 'translate .6s cubic-bezier(.2,.7,.1,1)',
-            }}
-          >
-            <DynamicImage
-              src={resolveMediaUrl(assetUrl)}
-              alt={`${tag} world fragment`}
-              eager
-              mode={fitMode}
-              focalPoint={focalPoint}
-              zoom={zoom}
-              className={`h-full w-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'} opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0`}
-            />
-            <div
-              className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60"
-              style={{ background: `linear-gradient(180deg, transparent 35%, ${g?.accent_color || (g as any)?.accent || '#3ef2ff'}66)` }}
-            />
-            <Hud className="absolute bottom-3 left-4 text-ink">
-              {tag}{' '}
-              <span className="inline-block transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">
-                ↗
-              </span>
-            </Hud>
-          </Link>
-        )
-      })}
 
       <div data-h="stage" className="relative z-10 flex h-full w-full max-w-full flex-col items-center justify-center px-4 text-center overflow-x-hidden">
         <h1
@@ -340,7 +273,7 @@ function Featured({
       ? { x: featuredPlacement.focal_x, y: featuredPlacement.focal_y }
       : undefined
   const leadZoom = leadFeaturedCfg?.zoom || featuredPlacement?.zoom
-  const leadFitMode = leadFeaturedCfg?.fit_mode || featuredPlacement?.fit_mode || 'ambient'
+  const leadFitMode = leadFeaturedCfg?.fit_mode || featuredPlacement?.fit_mode || 'cover'
 
   return (
     <section className="py-24 md:py-32">
@@ -574,83 +507,6 @@ function Upcoming({
   )
 }
 
-function GameShowcase({ games = [] }: { games?: ApiGame[] }) {
-  const displayGames: any[] = games.length > 0 ? games.slice(0, 8) : CATALOG.slice(0, 8)
-
-  return (
-    <section className="py-24 md:py-32 border-t border-white/5 bg-void">
-      <Container>
-        <SectionHead
-          className="in-view"
-          idx="03"
-          kicker="Game Showcase"
-          title={<>{displayGames.length} Games.<br /><span className="text-cyan">One Arena.</span></>}
-          right={<Cta ghost small to="/games">Explore all games</Cta>}
-        />
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {displayGames.map((g, i) => {
-            const mediaCfg = (g as any).media_config || (g as any).mediaConfig
-            const showcaseCfg = mediaCfg?.showcase_card
-            const photoSrc =
-              showcaseCfg?.asset_url ||
-              (g as any).poster_url ||
-              (g as any).posterUrl ||
-              g.photo ||
-              (g as any).banner_url ||
-              (g as any).bannerUrl
-            const focalPoint =
-              showcaseCfg && typeof showcaseCfg.focal_x === 'number' && typeof showcaseCfg.focal_y === 'number'
-                ? { x: showcaseCfg.focal_x, y: showcaseCfg.focal_y }
-                : undefined
-            const title = g.name || g.short || 'Game'
-            const genre = g.genre || g.tag || 'ESPORTS'
-            const line = g.line || g.description || 'Competitive tournament title'
-            const accent = g.accent_color || g.accent || '#3ef2ff'
-
-            return (
-              <Link
-                key={g.slug || i}
-                to={`/games/${g.slug}`}
-                className={`group relative h-[420px] overflow-hidden border border-white/10 transition-all duration-300 hover:border-cyan/50 hover:shadow-[0_0_30px_rgba(62,242,255,0.15)] ${
-                  i % 2 ? 'lg:mt-16' : ''
-                }`}
-              >
-                <DynamicImage
-                  src={resolveMediaUrl(photoSrc)}
-                  alt={title}
-                  mode={showcaseCfg?.fit_mode || 'cover'}
-                  focalPoint={focalPoint}
-                  zoom={showcaseCfg?.zoom}
-                  className="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110"
-                />
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background: `linear-gradient(to top, #05060a 20%, transparent 65%), linear-gradient(140deg, ${accent}40, transparent 50%)`,
-                  }}
-                />
-                <div className="absolute inset-x-5 bottom-5">
-                  <Hud>{genre}</Hud>
-                  <p
-                    className="font-display text-4xl font-black uppercase transition-colors group-hover:text-cyan"
-                    style={{ color: accent }}
-                  >
-                    {title}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-sm text-ink/70">{line}</p>
-                  <span className="mt-3 inline-flex items-center gap-1 font-mono text-[11px] text-cyan uppercase tracking-wider transition-transform group-hover:translate-x-1">
-                    Enter world →
-                  </span>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </Container>
-    </section>
-  )
-}
-
 const WHY = [
   ['Multiple games', 'BGMI, Valorant, Free Fire, and COD Mobile today, with new worlds unlocking regularly.'],
   ['Multiple tournaments', 'Daily scrims, weekly cups, and seasonal leagues with transparent prize pools.'],
@@ -663,7 +519,7 @@ function Why() {
   return (
     <section className="relative overflow-hidden bg-graphite py-24 md:py-36">
       <Container>
-        <SectionHead idx="04" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
+        <SectionHead idx="03" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
         <ol className="mt-16">
           {WHY.map(([t, b], i) => (
             <li key={t} className={`group grid items-baseline gap-4 border-t border-white/10 py-8 md:grid-cols-12 md:py-10 ${i % 2 ? 'md:pl-[12%]' : ''}`}>

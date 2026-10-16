@@ -272,8 +272,7 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
     (t as any).banner_tablet_url ||
     (t as any).bannerMobileUrl ||
     (t as any).banner_mobile_url ||
-    g?.photo ||
-    'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop'
+    ''
 
   const focalPoint =
     cardCfg && typeof cardCfg.focal_x === 'number' && typeof cardCfg.focal_y === 'number'

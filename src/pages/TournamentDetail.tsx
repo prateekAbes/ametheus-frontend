@@ -280,8 +280,7 @@ export default function TournamentDetail() {
               tourData?.bannerTabletUrl ||
               tourData?.bannerUrl ||
               tourData?.bannerMobileUrl ||
-              g?.photo ||
-              'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1920&auto=format&fit=crop'
+              ''
             )}
             alt={`${title} banner`}
             eager

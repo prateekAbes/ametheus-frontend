@@ -5,7 +5,6 @@ import {
   isEntryDisqualified,
 } from '../../services/leaderboard'
 import { PodiumColumn } from './PodiumColumn'
-import { PodiumParticleBackground } from './PodiumParticleBackground'
 
 interface LeaderboardPodiumProps {
   topEntries: LeaderboardEntry[]
@@ -31,10 +30,7 @@ export function LeaderboardPodium({
   const top3 = topEntries[2] || null
 
   return (
-    <div className="relative mx-auto w-full max-w-4xl pt-6 pb-2 select-none">
-      {/* Interactive starry particle field behind podium only */}
-      <PodiumParticleBackground />
-
+    <div className="relative mx-auto w-full max-w-4xl pt-4 pb-2 select-none">
       {/* CLEAN STAIR-LIKE PODIUM: 2nd (Left), 1st (Center, Tallest), 3rd (Right, Shortest) */}
       <div className="relative z-10 flex items-end justify-center w-full max-w-2xl mx-auto px-2 sm:px-4 gap-2 sm:gap-3 md:gap-4">
         {/* 2nd Place Step (Left) */}

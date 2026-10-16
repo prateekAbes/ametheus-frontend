@@ -126,13 +126,8 @@ export default function DynamicImage({
 
         {/* Fallback plate */}
         {(status === 'missing' || status === 'error') && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 border border-white/5 bg-surface/80 p-4 text-center font-mono text-[10px] uppercase tracking-wider text-dim">
-            <svg className="size-5 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
-            <span>{status === 'missing' ? 'Image unavailable' : 'Failed to load'}</span>
+          <div className="absolute inset-0 flex items-center justify-center border border-white/5 bg-[#0a0e17] p-4 text-center font-mono text-[11px] uppercase tracking-wider text-dim/70 select-none">
+            <span>No image available</span>
           </div>
         )}
 
@@ -182,21 +177,9 @@ export default function DynamicImage({
       {/* Lightweight fallback plate */}
       {(status === 'missing' || status === 'error') && (
         <div
-          className={`flex flex-col items-center justify-center gap-1.5 border border-white/5 bg-surface/80 p-4 text-center font-mono text-[10px] uppercase tracking-wider text-dim ${className}`}
+          className={`flex items-center justify-center border border-white/5 bg-[#0a0e17] p-4 text-center font-mono text-[11px] uppercase tracking-wider text-dim/70 select-none ${className}`}
         >
-          <svg
-            className="size-5 text-white/20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="m21 15-5-5L5 21" />
-          </svg>
-          <span>{status === 'missing' ? 'Image unavailable' : 'Failed to load'}</span>
+          <span>No image available</span>
         </div>
       )}
 

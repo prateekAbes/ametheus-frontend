@@ -6,7 +6,6 @@ import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import DynamicImage from '../components/DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
 import { useMatchTicker, type TickerEvent } from '../hooks/useMatchTicker'
-import { LiveTickerBar } from '../components/match/LiveTickerBar'
 import { MatchLobbyModal } from '../components/match/MatchLobbyModal'
 import { EvidenceSubmissionModal } from '../components/match/EvidenceSubmissionModal'
 
@@ -303,7 +302,7 @@ export default function Matches() {
     [fetchMatchesData]
   )
 
-  const { isConnected, latestEvent } = useMatchTicker(handleTickerEvent)
+  useMatchTicker(handleTickerEvent)
 
   const list = matches.filter(
     (m) => m.status === tab.toLowerCase() && (game === 'All Games' || m.game === GMAP[game])
@@ -313,14 +312,12 @@ export default function Matches() {
   return (
     <>
       <PageHero
-        kicker={liveCount > 0 ? `◉ ${liveCount} matches live now` : 'Competitive Arena'}
+        kicker={liveCount > 0 ? `◉ ${liveCount} matches live now` : '◇ Fixtures & Results'}
         title="MATCHES"
+        sub="Track live matches, upcoming fixtures, and completed results across Ametheus."
         variant="matches"
         accent="#ff3b4e"
       />
-
-      {/* Live WebSocket Telemetry Ticker */}
-      <LiveTickerBar isConnected={isConnected} latestEvent={latestEvent} />
 
       <Container className="py-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -332,7 +329,7 @@ export default function Matches() {
           {isLoading ? (
             <div className="border border-white/10 bg-surface/50 p-16 text-center">
               <div className="inline-block size-8 animate-spin rounded-full border-2 border-cyan border-t-transparent mb-4" />
-              <Hud className="text-cyan">Querying match arena servers...</Hud>
+              <Hud className="text-cyan">Loading matches...</Hud>
             </div>
           ) : list.length === 0 ? (
             <EmptyState

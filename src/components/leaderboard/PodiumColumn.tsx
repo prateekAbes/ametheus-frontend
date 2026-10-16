@@ -14,11 +14,11 @@ interface PodiumColumnProps {
 }
 
 /**
- * Clean, flat geometric stair-step podium column.
- * - Simple geometric flat surfaces; NO 3D axonometric SVG polygons, no bulky layers.
- * - Profile presentation with square avatar, name, rank, metrics.
- * - Clean neutral styling: NO blue outline around avatars, NO blue glowing borders around platforms.
- * - Height hierarchy: 1st tallest (center), 2nd medium (left), 3rd shortest (right).
+ * Minimal, dark geometric stair-step podium column inspired by the reference layout.
+ * - Simple flat surfaces with clear stair-like height silhouette.
+ * - Clean square avatars with neutral, understated borders (no blue outlines).
+ * - Upgraded player typography (crisp font-display names, clear #1, #2, #3 labels).
+ * - No bulky 3D angles, neon glowing outlines, crowns, or decorative distractions.
  */
 export function PodiumColumn({
   entry,
@@ -31,42 +31,48 @@ export function PodiumColumn({
   const isSecond = rank === 2
   const isThird = rank === 3
 
-  // Clean stair-step height hierarchy: #1 tallest in center, #2 medium on left, #3 shortest on right
+  // Stair-step height hierarchy: #1 tallest in center, #2 medium on left, #3 shortest on right
   const heightClasses = isFirst
-    ? 'h-56 sm:h-64 md:h-72'
+    ? 'h-54 sm:h-64 md:h-72'
     : isSecond
-    ? 'h-42 sm:h-48 md:h-54'
-    : 'h-32 sm:h-38 md:h-44'
+    ? 'h-40 sm:h-48 md:h-54'
+    : 'h-30 sm:h-36 md:h-42'
 
-  // Refined minimal dark theme with neutral, subtle borders (NO blue outlines / glowing borders)
+  // Restrained differences in platform height, background tone, and borders (no blue/neon glows)
   const theme = isFirst
     ? {
-        rankBadgeBg: 'bg-white/10 text-white border-white/20',
-        platformBg: 'bg-gradient-to-b from-[#141d2c] via-[#0d1420] to-[#070b12]',
+        platformBg: 'bg-[#121824]',
         platformBorder: 'border-t border-l border-r border-white/20',
+        rankBadge: 'bg-white/15 text-white border-white/30',
+        rankText: 'text-white',
         nameColor: 'text-white font-bold',
-        scoreColor: 'text-white font-black',
-        avatarBorder: 'border border-white/25',
+        scoreColor: 'text-white font-bold',
+        avatarSize: 'size-16 sm:size-20 md:size-22',
+        avatarBorder: 'border border-white/30',
       }
     : isSecond
     ? {
-        rankBadgeBg: 'bg-white/5 text-white/80 border-white/10',
-        platformBg: 'bg-gradient-to-b from-[#101724] via-[#0b101a] to-[#06090e]',
+        platformBg: 'bg-[#0d131d]',
         platformBorder: 'border-t border-l border-r border-white/10',
+        rankBadge: 'bg-white/10 text-white/90 border-white/20',
+        rankText: 'text-white/85',
         nameColor: 'text-white/90 font-semibold',
-        scoreColor: 'text-white/95 font-bold',
+        scoreColor: 'text-white/90 font-bold',
+        avatarSize: 'size-14 sm:size-16 md:size-18',
         avatarBorder: 'border border-white/15',
       }
     : {
-        rankBadgeBg: 'bg-white/5 text-white/70 border-white/10',
-        platformBg: 'bg-gradient-to-b from-[#0e141f] via-[#090d16] to-[#05080c]',
+        platformBg: 'bg-[#090e16]',
         platformBorder: 'border-t border-l border-r border-white/10',
-        nameColor: 'text-white/80 font-semibold',
-        scoreColor: 'text-white/90 font-bold',
+        rankBadge: 'bg-white/5 text-white/80 border-white/10',
+        rankText: 'text-white/75',
+        nameColor: 'text-white/85 font-semibold',
+        scoreColor: 'text-white/85 font-bold',
+        avatarSize: 'size-14 sm:size-16 md:size-18',
         avatarBorder: 'border border-white/15',
       }
 
-  // Canonical username resolution
+  // Canonical username resolution (preserving proper casing)
   const rawName =
     entry.name &&
     !entry.name.toLowerCase().startsWith('player_') &&
@@ -76,7 +82,7 @@ export function PodiumColumn({
       ? entry.captain.replace('@', '')
       : entry.name || 'Contender'
 
-  const displayName = rawName.toLowerCase()
+  const displayName = rawName.trim()
 
   // Format metric value & sub-label according to the active category
   const { scoreValue, subLabel } = useMemo(() => {
@@ -90,6 +96,11 @@ export function PodiumColumn({
         return {
           scoreValue: `${entry.win_rate ?? 0}%`,
           subLabel: 'WIN RATE',
+        }
+      case 'wins':
+        return {
+          scoreValue: `${(entry.wins ?? 0).toLocaleString()} WINS`,
+          subLabel: 'MATCH WINS',
         }
       case 'overall':
       default:
@@ -110,13 +121,10 @@ export function PodiumColumn({
       className="size-full object-cover rounded-none"
     />
   ) : (
-    <div className="flex size-full items-center justify-center font-mono font-bold text-white/80 bg-[#141b24] rounded-none">
+    <div className="flex size-full items-center justify-center font-display font-bold text-white/85 bg-[#141b24] rounded-none">
       {initial}
     </div>
   )
-
-  // Square 1:1 aspect ratio across all three podium players
-  const avatarSizeClasses = 'size-16 sm:size-18 md:size-20 aspect-square'
 
   return (
     <div
@@ -126,20 +134,20 @@ export function PodiumColumn({
     >
       {/* ============================================================== */}
       {/* SQUARE 1:1 AVATAR CENTERED ABOVE PLATFORM                     */}
-      {/* Minimal neutral border: NO blue outline or glowing halo       */}
+      {/* Clean neutral border; no blue outline or neon halos            */}
       {/* ============================================================== */}
-      <div className="relative mb-3 sm:mb-4 md:mb-5 z-10 flex flex-col items-center">
+      <div className="relative mb-3 sm:mb-4 z-10 flex flex-col items-center">
         {isCurrentUser ? (
           <Link
             to="/profile"
             title="View your profile"
-            className={`relative block ${avatarSizeClasses} rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
+            className={`relative block ${theme.avatarSize} aspect-square rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
           >
             {avatarContent}
           </Link>
         ) : (
           <div
-            className={`relative block ${avatarSizeClasses} rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
+            className={`relative block ${theme.avatarSize} aspect-square rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
           >
             {avatarContent}
           </div>
@@ -147,45 +155,44 @@ export function PodiumColumn({
 
         {/* Current user marker */}
         {isCurrentUser && (
-          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-white text-black rounded-sm shadow-sm">
+          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-white text-black rounded-xs shadow-xs">
             YOU
           </span>
         )}
         {/* Disqualified marker */}
         {isDisqualified && (
-          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-rose-500/80 text-white rounded-sm">
+          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-rose-500/90 text-white rounded-xs">
             DQ
           </span>
         )}
       </div>
 
       {/* ============================================================== */}
-      {/* SIMPLE GEOMETRIC FLAT STAIR-STEP PLATFORM                      */}
-      {/* Flat surface, clean neutral borders, no 3D axonometric angles  */}
+      {/* GEOMETRIC STAIR-STEP PLATFORM (Mostly Flat Surfaces)           */}
       {/* ============================================================== */}
       <div
-        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} rounded-t-sm pt-4 sm:pt-6 pb-6 px-1.5 sm:px-3 text-center`}
+        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} rounded-t-sm pt-3 sm:pt-5 pb-5 px-1.5 sm:px-3 text-center`}
       >
-        {/* Rank Badge */}
+        {/* Crisp Rank Badge */}
         <span
-          className={`inline-flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-sm border ${theme.rankBadgeBg} mb-2`}
+          className={`inline-flex items-center justify-center font-mono text-xs sm:text-sm font-bold px-2 py-0.5 rounded-xs border ${theme.rankBadge} mb-2`}
         >
           #{rank}
         </span>
 
-        {/* Contender Name */}
+        {/* Player Name with Upgraded Typography */}
         <div className="w-full truncate px-1">
           {isCurrentUser ? (
             <Link
               to="/profile"
               title="View your profile"
-              className={`font-mono text-[10px] xs:text-xs sm:text-sm tracking-tight ${theme.nameColor} hover:underline truncate block`}
+              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} hover:text-cyan transition-colors truncate block`}
             >
               {displayName}
             </Link>
           ) : (
             <p
-              className={`font-mono text-[10px] xs:text-xs sm:text-sm tracking-tight ${theme.nameColor} truncate`}
+              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} truncate`}
             >
               {displayName}
             </p>
@@ -193,16 +200,16 @@ export function PodiumColumn({
         </div>
 
         {/* Subtle Divider */}
-        <div className="w-12 sm:w-16 mx-auto my-2 sm:my-3 border-b border-white/10" />
+        <div className="w-10 sm:w-14 mx-auto my-2 sm:my-3 border-b border-white/10" />
 
-        {/* Numerical Metric Score & Sub-label */}
+        {/* Compact Numerical Metric Score & Sub-label */}
         <div className="flex flex-col items-center justify-center mt-auto pb-1">
           <span
-            className={`font-mono text-sm sm:text-base md:text-lg tracking-tight ${theme.scoreColor}`}
+            className={`font-mono text-xs sm:text-sm md:text-base tracking-tight ${theme.scoreColor}`}
           >
             {scoreValue}
           </span>
-          <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-[#8995A8] mt-0.5">
+          <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-widest text-[#8995A8] mt-0.5">
             {subLabel}
           </span>
         </div>

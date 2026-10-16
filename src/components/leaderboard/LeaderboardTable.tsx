@@ -58,6 +58,8 @@ export function LeaderboardTable({
         return 'Total Spent'
       case 'win_rate':
         return 'Win Rate'
+      case 'wins':
+        return 'Match Wins'
       case 'overall':
       default:
         return 'Rating'
@@ -71,6 +73,8 @@ export function LeaderboardTable({
         return inr(Number(entry.spending ?? 0))
       case 'win_rate':
         return `${entry.win_rate ?? 0}%`
+      case 'wins':
+        return `${(entry.wins ?? 0).toLocaleString()} Wins`
       case 'overall':
       default:
         return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
@@ -105,8 +109,8 @@ export function LeaderboardTable({
             const avatarUrl = resolveMediaUrl(entry.avatar_url || entry.logo_url)
             const rowKey = entry.id ? `entry-${entry.id}` : `rank-${rankNumber}-${entry.name}`
 
-            // Canonical username display
-            const displayName =
+            // Canonical username display with proper capitalization
+            const rawName =
               entry.name &&
               !entry.name.toLowerCase().startsWith('player_') &&
               !entry.name.toLowerCase().startsWith('user_')
@@ -115,6 +119,7 @@ export function LeaderboardTable({
                 ? entry.captain.replace('@', '')
                 : entry.name || 'Contender'
 
+            const displayName = rawName.trim()
             const initial = displayName.charAt(0).toUpperCase()
 
             return (
@@ -130,7 +135,7 @@ export function LeaderboardTable({
               >
                 {/* Left: Rank & Contender (with square avatar) */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-10 text-center font-bold text-white/40 shrink-0">
+                  <span className="w-9 sm:w-11 text-center font-mono text-xs font-semibold text-white/50 shrink-0">
                     #{String(rankNumber).padStart(2, '0')}
                   </span>
 
@@ -145,7 +150,7 @@ export function LeaderboardTable({
                             className="size-full object-cover rounded-none"
                           />
                         ) : (
-                          <div className="flex size-full items-center justify-center font-bold text-white/80 bg-white/5 text-[10px]">
+                          <div className="flex size-full items-center justify-center font-display font-bold text-white/80 bg-white/5 text-[11px]">
                             {initial}
                           </div>
                         )}
@@ -160,35 +165,35 @@ export function LeaderboardTable({
                           className="size-full object-cover rounded-none"
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center font-bold text-white/80 bg-white/5 text-[10px]">
+                        <div className="flex size-full items-center justify-center font-display font-bold text-white/80 bg-white/5 text-[11px]">
                           {initial}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Player Name */}
+                  {/* Player Name with Clean Typography */}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 truncate">
                       {isCurrent ? (
                         <Link
                           to="/profile"
-                          className="font-bold text-white hover:underline truncate"
+                          className="font-display font-bold text-xs sm:text-sm text-white hover:text-cyan transition-colors truncate"
                         >
                           {displayName}
                         </Link>
                       ) : (
-                        <span className="font-bold text-white/90 truncate">
+                        <span className="font-display font-semibold text-xs sm:text-sm text-white/95 truncate">
                           {displayName}
                         </span>
                       )}
                       {entry.tag && (
-                        <span className="text-[10px] text-white/35 shrink-0">
+                        <span className="font-mono text-[10px] text-white/40 shrink-0">
                           [{entry.tag}]
                         </span>
                       )}
                       {isCurrent && (
-                        <span className="px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-white text-black rounded-sm shrink-0">
+                        <span className="px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-white text-black rounded-xs shrink-0">
                           YOU
                         </span>
                       )}
@@ -203,7 +208,7 @@ export function LeaderboardTable({
 
                 {/* Right: Metric Value ONLY */}
                 <div className="text-right shrink-0 pl-3">
-                  <span className="font-bold text-white">
+                  <span className="font-mono font-bold text-xs sm:text-sm text-white tracking-tight">
                     {getMetricValue(entry)}
                   </span>
                 </div>

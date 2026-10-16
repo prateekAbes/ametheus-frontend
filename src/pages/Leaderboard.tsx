@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
-import { Container, Hud } from '../components/ui'
+import { Container } from '../components/ui'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getLeaderboardEntries,
@@ -12,11 +12,13 @@ import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable'
 import { LeaderboardSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
 import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmptyState'
 import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErrorState'
+import { LeaderboardParticleBackground } from '../components/leaderboard/LeaderboardParticleBackground'
 
 const METRIC_TABS = [
   { id: 'overall', label: 'Overall Standing' },
   { id: 'spending', label: 'Highest Spending' },
   { id: 'win_rate', label: 'Win Rate' },
+  { id: 'wins', label: 'Match Wins' },
 ] as const
 
 type MetricId = (typeof METRIC_TABS)[number]['id']
@@ -118,79 +120,73 @@ export default function Leaderboard() {
       style={{ backgroundColor: '#05060A' }}
     >
       {/* ============================================================== */}
-      {/* SUBTLE DARK-BLUE TINT CONCENTRATED TOWARD UPPER-RIGHT CORNER   */}
+      {/* EXTENDED SUBTLE BLUE ATMOSPHERIC TINT DOWN THE RIGHT SIDE     */}
       {/* ============================================================== */}
       <div
-        className="pointer-events-none absolute top-0 right-0 w-[60vw] max-w-[800px] h-[600px] select-none"
+        className="pointer-events-none absolute top-0 right-0 w-[75vw] max-w-[1100px] h-[1200px] select-none"
         aria-hidden="true"
         style={{
           background:
-            'radial-gradient(ellipse 65% 55% at 92% 8%, rgba(16, 38, 76, 0.32) 0%, rgba(10, 24, 48, 0.12) 45%, rgba(5, 6, 10, 0) 75%)',
+            'radial-gradient(ellipse 70% 60% at 85% 15%, rgba(16, 42, 85, 0.28) 0%, rgba(10, 26, 54, 0.14) 40%, rgba(6, 16, 36, 0.05) 70%, rgba(5, 6, 10, 0) 100%)',
         }}
       />
 
-      <Container className="pt-10 sm:pt-14 pb-24 relative z-10">
-        {/* ============================================================== */}
-        {/* LEADERBOARD HEADING AND TYPOGRAPHY                             */}
-        {/* Large, prominent heading matching Tournaments & major pages     */}
-        {/* ============================================================== */}
-        <div className="mb-10 sm:mb-14">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="h-px w-10 bg-white/30" />
-            <Hud className="text-white/60">Competitive Circuit</Hud>
-          </div>
-          <h1 className="font-display text-[clamp(2.75rem,7vw,5.5rem)] sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase leading-[0.88] tracking-tight text-white">
-            Leaderboard
-          </h1>
-          <p className="mt-4 max-w-xl font-mono text-xs sm:text-sm text-[#8995A8] tracking-wide">
-            Authoritative player standings and competitive rankings across sanctioned tournament circuits
-          </p>
-        </div>
+      {/* ============================================================== */}
+      {/* UPPER SECTION: Heading, Metric Tabs, Podium & Starry Particles */}
+      {/* Particles drift seamlessly from behind heading down to divider */}
+      {/* ============================================================== */}
+      <section className="relative overflow-hidden">
+        {/* Full-coverage particle background across entire upper section */}
+        <LeaderboardParticleBackground />
 
-        {/* ============================================================== */}
-        {/* RETAINED METRIC CATEGORIES ONLY: 3 TABS                         */}
-        {/* Overall Standing | Highest Spending | Win Rate                 */}
-        {/* ============================================================== */}
-        <div className="flex items-center justify-start gap-2 mb-10">
-          <div className="inline-flex items-center gap-1.5 p-1 bg-[#0c121d]/90 border border-white/10 rounded-sm backdrop-blur-sm">
-            {METRIC_TABS.map((tab) => {
-              const isActive = metric === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setMetric(tab.id)
-                    setPage(1)
-                  }}
-                  className={`px-4 py-2 font-mono text-xs font-bold uppercase transition-all rounded-sm cursor-pointer ${
-                    isActive
-                      ? 'bg-white/15 text-white border border-white/25 shadow-sm'
-                      : 'text-[#8995A8] hover:text-white hover:bg-white/5 border border-transparent'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
+        <Container className="pt-10 sm:pt-14 pb-8 sm:pb-12 relative z-10">
+          {/* LEADERBOARD HEADING AND TYPOGRAPHY (Matching Tournaments page scale) */}
+          <div className="mb-10 sm:mb-14">
+            <h1 className="font-display text-[clamp(3.5rem,11vw,9.5rem)] font-black uppercase leading-[0.82] tracking-tight text-white">
+              LEADERBOARD
+            </h1>
+            <p className="mt-5 max-w-xl text-base sm:text-lg text-ink/75 font-sans">
+              Authoritative player standings and competitive rankings across sanctioned tournament circuits.
+            </p>
           </div>
-        </div>
 
-        {/* ============================================================== */}
-        {/* LEADERBOARD CONTENT: LOADING / ERROR / EMPTY / STANDINGS       */}
-        {/* ============================================================== */}
-        {loading ? (
-          <LeaderboardSkeleton />
-        ) : error ? (
-          <LeaderboardErrorState onRetry={fetchLeaderboardData} />
-        ) : entries.length === 0 ? (
-          <LeaderboardEmptyState
-            hasFilters={metric !== 'overall'}
-            onResetFilters={handleResetFilters}
-          />
-        ) : (
-          <div>
-            {/* Top-3 Stair-Like Podium with Interactive Starry Particle Background */}
+          {/* 4 METRIC CATEGORIES: Overall Standing | Highest Spending | Win Rate | Match Wins */}
+          <div className="flex items-center justify-start gap-2 mb-10">
+            <div className="inline-flex items-center gap-1.5 p-1 bg-[#0c121d]/90 border border-white/10 rounded-sm backdrop-blur-sm">
+              {METRIC_TABS.map((tab) => {
+                const isActive = metric === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setMetric(tab.id)
+                      setPage(1)
+                    }}
+                    className={`px-4 py-2 font-mono text-xs font-bold uppercase transition-all rounded-sm cursor-pointer ${
+                      isActive
+                        ? 'bg-white/15 text-white border border-white/25 shadow-sm'
+                        : 'text-[#8995A8] hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Top-3 Podium / Loading / Error / Empty States */}
+          {loading ? (
+            <LeaderboardSkeleton />
+          ) : error ? (
+            <LeaderboardErrorState onRetry={fetchLeaderboardData} />
+          ) : entries.length === 0 ? (
+            <LeaderboardEmptyState
+              hasFilters={metric !== 'overall'}
+              onResetFilters={handleResetFilters}
+            />
+          ) : (
             <LeaderboardPodium
               topEntries={topThree}
               selectedCategory={metric}
@@ -198,41 +194,49 @@ export default function Leaderboard() {
               currentUsername={profile?.username}
               disqualifiedIds={disqualifiedIds}
             />
+          )}
+        </Container>
+      </section>
 
-            {/* Subtle Horizontal Divider Separating Podium & Challengers List */}
-            {ladderEntries.length > 0 && (
-              <>
-                <div className="w-full max-w-4xl mx-auto my-12 sm:my-16 border-b border-white/10" />
+      {/* ============================================================== */}
+      {/* SUBTLE HORIZONTAL DIVIDER SEPARATING PODIUM & CHALLENGERS LIST */}
+      {/* Particle field strictly terminates at this line                */}
+      {/* ============================================================== */}
+      {!loading && !error && entries.length > 0 && ladderEntries.length > 0 && (
+        <div className="w-full max-w-4xl mx-auto my-12 sm:my-16 border-b border-white/10 relative z-10" />
+      )}
 
-                {/* Player Rankings List (Ranks 4+) */}
-                <div className="space-y-4 max-w-4xl mx-auto">
-                  <div className="flex items-center justify-between pb-1">
-                    <h2 className="font-display text-base sm:text-lg uppercase font-bold text-white tracking-wide">
-                      Challengers Ladder
-                    </h2>
-                    <span className="font-mono text-xs text-[#8995A8]">
-                      {entries.length} contenders ranked
-                    </span>
-                  </div>
+      {/* ============================================================== */}
+      {/* LOWER SECTION: Challengers List (Ranks 4+)                      */}
+      {/* Clean, quiet, dark background with zero particles              */}
+      {/* ============================================================== */}
+      {!loading && !error && entries.length > 0 && ladderEntries.length > 0 && (
+        <Container className="pb-24 relative z-10">
+          <div className="space-y-4 max-w-4xl mx-auto">
+            <div className="flex items-center justify-between pb-1">
+              <h2 className="font-display text-base sm:text-lg uppercase font-bold text-white tracking-wide">
+                Challengers Ladder
+              </h2>
+              <span className="font-mono text-xs text-[#8995A8]">
+                {entries.length} contenders ranked
+              </span>
+            </div>
 
-                  <LeaderboardTable
-                    entries={paginatedLadderEntries}
-                    selectedCategory={metric}
-                    currentPage={page}
-                    totalPages={totalPages}
-                    totalEntries={totalLadderEntries}
-                    pageSize={pageSize}
-                    onPageChange={setPage}
-                    currentUserId={profile?.id}
-                    currentUsername={profile?.username}
-                    disqualifiedIds={disqualifiedIds}
-                  />
-                </div>
-              </>
-            )}
+            <LeaderboardTable
+              entries={paginatedLadderEntries}
+              selectedCategory={metric}
+              currentPage={page}
+              totalPages={totalPages}
+              totalEntries={totalLadderEntries}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              currentUserId={profile?.id}
+              currentUsername={profile?.username}
+              disqualifiedIds={disqualifiedIds}
+            />
           </div>
-        )}
-      </Container>
+        </Container>
+      )}
     </div>
   )
 }

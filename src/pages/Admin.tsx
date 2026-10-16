@@ -5189,47 +5189,6 @@ export default function Admin() {
                     <label className="text-dim">Start Date & Time (UTC/Local)</label>
                     <input required type="datetime-local" value={newTour.start_date} onChange={(e) => setNewTour({ ...newTour, start_date: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                   </div>
-                  <div className="space-y-3 border-t border-white/10 pt-3">
-                    <div className="font-bold uppercase text-cyan text-[11px]">Tournament Media Assets</div>
-                    <BannerImageUploader
-                      label="Tournament Cover Artwork (Target: 1600x900 px · 16:9 Landscape / ~2.34:1 Hero)"
-                      recommendedRatio="16:9"
-                      recommendedRes="1600x900 (16:9) or 1920x820"
-                      value={newTour.banner_url}
-                      onChange={(val) => setNewTour({ ...newTour, banner_url: val })}
-                    />
-                    <BannerImageUploader
-                      label="Tournament Logo / Emblem (Target: 256x256 px · 1:1 Square or SVG)"
-                      recommendedRatio="1:1"
-                      recommendedRes="256x256"
-                      value={newTour.logo_url}
-                      onChange={(val) => setNewTour({ ...newTour, logo_url: val })}
-                    />
-                    <details className="border border-white/10 bg-surface/30 p-2.5">
-                      <summary className="cursor-pointer text-[11px] font-mono uppercase tracking-wider text-dim hover:text-cyan">
-                        Optional: Art-Directed Device Overrides
-                      </summary>
-                      <div className="mt-2.5 space-y-3 pt-2 border-t border-white/5">
-                        <p className="text-[10px] text-dim font-mono">
-                          Only upload these if you have distinct art-directed compositions specifically cropped for tablet or vertical mobile story formats. Otherwise, the primary artwork above automatically adapts cleanly to all layouts.
-                        </p>
-                        <BannerImageUploader
-                          label="Tablet Banner (4:3 Medium)"
-                          recommendedRatio="4:3"
-                          recommendedRes="1600x1200"
-                          value={newTour.banner_tablet_url}
-                          onChange={(val) => setNewTour({ ...newTour, banner_tablet_url: val })}
-                        />
-                        <BannerImageUploader
-                          label="Mobile Story Banner (9:16 Vertical)"
-                          recommendedRatio="9:16"
-                          recommendedRes="1080x1920"
-                          value={newTour.banner_mobile_url}
-                          onChange={(val) => setNewTour({ ...newTour, banner_mobile_url: val })}
-                        />
-                      </div>
-                    </details>
-                  </div>
                   <div>
                     <label className="text-dim">Official WhatsApp Group / Community Link</label>
                     <input
@@ -5322,54 +5281,6 @@ export default function Admin() {
                       <label className="text-dim">Entry Fee (₹)</label>
                       <input required type="number" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                     </div>
-                  </div>
-                  <div className="space-y-3 border-t border-white/10 pt-3">
-                    <div className="font-bold uppercase text-cyan text-[11px]">Tournament Media Assets</div>
-                    <BannerImageUploader
-                      label="Tournament Card Artwork (Target: 1600x900 px · 16:9 Landscape for Cards & Listings)"
-                      recommendedRatio="16:9"
-                      recommendedRes="1600x900"
-                      value={editingTour.banner_url || ''}
-                      onChange={(val) => setEditingTour({ ...editingTour, banner_url: val })}
-                    />
-                    <BannerImageUploader
-                      label="Tournament Detail Hero Header (Target: 1920x820 px · ~2.34:1 Panoramic for /tournaments/:id)"
-                      recommendedRatio="universal"
-                      recommendedRes="1920x820"
-                      value={editingTour.hero_banner_url || ''}
-                      onChange={(val) => setEditingTour({ ...editingTour, hero_banner_url: val })}
-                    />
-                    <BannerImageUploader
-                      label="Tournament Logo / Emblem (Target: 256x256 px · 1:1 Square or SVG)"
-                      recommendedRatio="1:1"
-                      recommendedRes="256x256"
-                      value={editingTour.logo_url || ''}
-                      onChange={(val) => setEditingTour({ ...editingTour, logo_url: val })}
-                    />
-                    <details className="border border-white/10 bg-surface/30 p-2.5">
-                      <summary className="cursor-pointer text-[11px] font-mono uppercase tracking-wider text-dim hover:text-cyan">
-                        Optional: Art-Directed Device Overrides
-                      </summary>
-                      <div className="mt-2.5 space-y-3 pt-2 border-t border-white/5">
-                        <p className="text-[10px] text-dim font-mono">
-                          Only upload these if you have distinct art-directed compositions specifically cropped for tablet or vertical mobile story formats. Otherwise, the primary artwork above automatically adapts cleanly to all layouts.
-                        </p>
-                        <BannerImageUploader
-                          label="Tablet Banner (4:3 Medium)"
-                          recommendedRatio="4:3"
-                          recommendedRes="1600x1200"
-                          value={editingTour.banner_tablet_url || ''}
-                          onChange={(val) => setEditingTour({ ...editingTour, banner_tablet_url: val })}
-                        />
-                        <BannerImageUploader
-                          label="Mobile Story Banner (9:16 Vertical)"
-                          recommendedRatio="9:16"
-                          recommendedRes="1080x1920"
-                          value={editingTour.banner_mobile_url || ''}
-                          onChange={(val) => setEditingTour({ ...editingTour, banner_mobile_url: val })}
-                        />
-                      </div>
-                    </details>
                   </div>
                   <div>
                     <label className="text-dim">Official WhatsApp Group / Community Link</label>
@@ -5548,54 +5459,6 @@ export default function Admin() {
                   <label className="text-dim">Anti-Cheat System</label>
                   <input required placeholder="e.g. Easy Anti-Cheat" value={newGame.anti_cheat} onChange={(e) => setNewGame({ ...newGame, anti_cheat: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                 </div>
-                <div className="space-y-3 border-t border-white/10 pt-3">
-                  <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
-                  <BannerImageUploader
-                    label="Game Box Art / Poster (Target: 900x1200 px · 3:4 Portrait for Active Games & Catalog Cards)"
-                    recommendedRatio="3:4"
-                    recommendedRes="900x1200 (3:4)"
-                    value={newGame.poster_url || ''}
-                    onChange={(val) => setNewGame({ ...newGame, poster_url: val })}
-                  />
-                  <BannerImageUploader
-                    label="Game Widescreen Banner (Target: 1600x900 px · 16:9 for Game Detail Hero & Floating Shards)"
-                    recommendedRatio="16:9"
-                    recommendedRes="1600x900 (16:9)"
-                    value={newGame.banner_url || ''}
-                    onChange={(val) => setNewGame({ ...newGame, banner_url: val })}
-                  />
-                  <BannerImageUploader
-                    label="Game Logo / Icon (Target: 256x256 px · 1:1 Square or SVG)"
-                    recommendedRatio="1:1"
-                    recommendedRes="256x256"
-                    value={newGame.logo_url}
-                    onChange={(val) => setNewGame({ ...newGame, logo_url: val })}
-                  />
-                  <details className="border border-white/10 bg-surface/30 p-2.5">
-                    <summary className="cursor-pointer text-[11px] font-mono uppercase tracking-wider text-dim hover:text-cyan">
-                      Optional: Art-Directed Device Overrides
-                    </summary>
-                    <div className="mt-2.5 space-y-3 pt-2 border-t border-white/5">
-                      <p className="text-[10px] text-dim font-mono">
-                        Only upload these if you have distinct art-directed compositions specifically cropped for tablet or vertical mobile formats. Otherwise, the primary artwork above automatically adapts cleanly to all layouts.
-                      </p>
-                      <BannerImageUploader
-                        label="Tablet Game Banner (4:3 Medium)"
-                        recommendedRatio="4:3"
-                        recommendedRes="1600x1200"
-                        value={newGame.banner_tablet_url}
-                        onChange={(val) => setNewGame({ ...newGame, banner_tablet_url: val })}
-                      />
-                      <BannerImageUploader
-                        label="Mobile Game Banner (9:16 Vertical)"
-                        recommendedRatio="9:16"
-                        recommendedRes="1080x1920"
-                        value={newGame.banner_mobile_url}
-                        onChange={(val) => setNewGame({ ...newGame, banner_mobile_url: val })}
-                      />
-                    </div>
-                  </details>
-                </div>
                 <div>
                   <label className="text-dim">Description</label>
                   <textarea rows={3} value={newGame.description} onChange={(e) => setNewGame({ ...newGame, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
@@ -5690,54 +5553,6 @@ export default function Admin() {
                 <div>
                   <label className="text-dim">Anti-Cheat</label>
                   <input required value={editingGame.anti_cheat} onChange={(e) => setEditingGame({ ...editingGame, anti_cheat: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                </div>
-                <div className="space-y-3 border-t border-white/10 pt-3">
-                  <div className="font-bold uppercase text-cyan text-[11px]">Game Media Assets</div>
-                  <BannerImageUploader
-                    label="Game Box Art / Poster (Target: 900x1200 px · 3:4 Portrait for Active Games & Catalog Cards)"
-                    recommendedRatio="3:4"
-                    recommendedRes="900x1200 (3:4)"
-                    value={editingGame.poster_url || ''}
-                    onChange={(val) => setEditingGame((prev) => prev ? { ...prev, poster_url: val } : null)}
-                  />
-                  <BannerImageUploader
-                    label="Game Widescreen Banner (Target: 1600x900 px · 16:9 for Game Detail Hero & Floating Shards)"
-                    recommendedRatio="16:9"
-                    recommendedRes="1600x900 (16:9)"
-                    value={editingGame.banner_url || ''}
-                    onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_url: val } : null)}
-                  />
-                  <BannerImageUploader
-                    label="Game Logo / Icon (Target: 256x256 px · 1:1 Square or SVG)"
-                    recommendedRatio="1:1"
-                    recommendedRes="256x256"
-                    value={editingGame.logo_url || ''}
-                    onChange={(val) => setEditingGame((prev) => prev ? { ...prev, logo_url: val } : null)}
-                  />
-                  <details className="border border-white/10 bg-surface/30 p-2.5">
-                    <summary className="cursor-pointer text-[11px] font-mono uppercase tracking-wider text-dim hover:text-cyan">
-                      Optional: Art-Directed Device Overrides
-                    </summary>
-                    <div className="mt-2.5 space-y-3 pt-2 border-t border-white/5">
-                      <p className="text-[10px] text-dim font-mono">
-                        Only upload these if you have distinct art-directed compositions specifically cropped for tablet or vertical mobile formats. Otherwise, the primary artwork above automatically adapts cleanly to all layouts.
-                      </p>
-                      <BannerImageUploader
-                        label="Tablet Game Banner (4:3 Medium)"
-                        recommendedRatio="4:3"
-                        recommendedRes="1600x1200"
-                        value={editingGame.banner_tablet_url || ''}
-                        onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_tablet_url: val } : null)}
-                      />
-                      <BannerImageUploader
-                        label="Mobile Game Banner (9:16 Vertical)"
-                        recommendedRatio="9:16"
-                        recommendedRes="1080x1920"
-                        value={editingGame.banner_mobile_url || ''}
-                        onChange={(val) => setEditingGame((prev) => prev ? { ...prev, banner_mobile_url: val } : null)}
-                      />
-                    </div>
-                  </details>
                 </div>
                 <div>
                   <label className="text-dim">Description</label>
