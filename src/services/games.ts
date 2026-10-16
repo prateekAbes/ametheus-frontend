@@ -34,6 +34,7 @@ export interface Game {
   teams_count?: number
   genre_id?: string
   genre_name?: string
+  media_config?: Record<string, any>
 }
 
 export interface NormalizedGame {
@@ -75,6 +76,8 @@ export interface NormalizedGame {
   teamsCount?: number
   genreId?: string
   genreName?: string
+  media_config?: Record<string, any>
+  mediaConfig?: Record<string, any>
 }
 
 export function normalizeGame(game: Game): NormalizedGame {
@@ -83,6 +86,7 @@ export function normalizeGame(game: Game): NormalizedGame {
   const bannerTabletUrl = game.banner_tablet_url || (game as any).bannerTabletUrl || bannerUrl
   const bannerMobileUrl = game.banner_mobile_url || (game as any).bannerMobileUrl || bannerUrl
   const logoUrl = game.logo_url || (game as any).logoUrl || ''
+  const mediaConfig = game.media_config || (game as any).mediaConfig || {}
 
   return {
     id: game.id || (game as any)._id,
@@ -123,6 +127,8 @@ export function normalizeGame(game: Game): NormalizedGame {
     heroMediaEnabled: game.hero_media_enabled ?? false,
     gallery: game.gallery || [],
     teamsCount: game.teams_count,
+    media_config: mediaConfig,
+    mediaConfig,
   }
 }
 

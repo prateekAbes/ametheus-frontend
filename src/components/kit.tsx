@@ -79,13 +79,31 @@ export { Modal } from './Modal'
 export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; feature?: boolean }) {
   const soon = g.status === 'soon'
   const title = g.name || g.short
+  const mediaCfg = (g as any).mediaConfig || (g as any).media_config
+  const cardCfg = mediaCfg?.catalog_card
+
+  const imageSrc =
+    cardCfg?.asset_url ||
+    (g as any).poster_url ||
+    (g as any).posterUrl ||
+    g.photo ||
+    (g as any).bannerUrl ||
+    (g as any).banner_url
+
+  const focalPoint =
+    cardCfg && typeof cardCfg.focal_x === 'number' && typeof cardCfg.focal_y === 'number'
+      ? { x: cardCfg.focal_x, y: cardCfg.focal_y }
+      : undefined
+
   const body = (
     <>
       <DynamicImage
-        src={resolveMediaUrl((g as any).poster_url || (g as any).posterUrl || g.photo || (g as any).bannerUrl || (g as any).banner_url)}
+        src={resolveMediaUrl(imageSrc)}
         alt={`${title} artwork`}
-        mode="cover"
-        className="size-full object-cover object-top opacity-85 grayscale-[25%] transition-transform duration-700 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0"
+        mode={cardCfg?.fit_mode || 'cover'}
+        focalPoint={focalPoint}
+        zoom={cardCfg?.zoom}
+        className="size-full object-cover opacity-85 grayscale-[25%] transition-transform duration-700 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0"
       />
       <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 15%, transparent 65%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
       <span className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" style={{ background: g.accent }} />

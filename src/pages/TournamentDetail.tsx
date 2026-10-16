@@ -258,6 +258,14 @@ export default function TournamentDetail() {
     ]
   }, [tourData?.rules])
 
+  const mediaCfg = (tourData as any)?.mediaConfig || (tourData as any)?.media_config
+  const heroCfg = mediaCfg?.hero
+
+  const heroFocalPoint =
+    heroCfg && typeof heroCfg.focal_x === 'number' && typeof heroCfg.focal_y === 'number'
+      ? { x: heroCfg.focal_x, y: heroCfg.focal_y }
+      : undefined
+
   return (
     <div className="bg-void text-ink pb-36" style={{ ['--acc' as string]: accent }}>
       {/* Hero */}
@@ -266,6 +274,7 @@ export default function TournamentDetail() {
         <div className="absolute inset-0">
           <DynamicImage
             src={resolveMediaUrl(
+              heroCfg?.asset_url ||
               tourData?.heroBannerUrl ||
               tourData?.hero_banner_url ||
               tourData?.bannerTabletUrl ||
@@ -276,8 +285,10 @@ export default function TournamentDetail() {
             )}
             alt={`${title} banner`}
             eager
-            mode="cover"
-            className="size-full opacity-65 object-cover object-center md:object-[75%_center]"
+            mode={heroCfg?.fit_mode || "cover"}
+            focalPoint={heroFocalPoint}
+            zoom={heroCfg?.zoom}
+            className="size-full opacity-65 object-cover"
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-void via-void/80 to-transparent" />

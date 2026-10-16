@@ -25,6 +25,12 @@ interface DynamicImageProps {
   mode?: 'cover' | 'contain' | 'ambient'
   /** Extra class names for ambient background image if mode is 'ambient' */
   backdropClassName?: string
+  /** Focal point coordinate percentages (0-100) for intelligent crop alignment */
+  focalPoint?: { x: number; y: number }
+  /** Zoom scale multiplier (e.g. 1.0 to 3.0) */
+  zoom?: number
+  /** Additional custom inline styles */
+  style?: React.CSSProperties
 }
 
 function optimizeUrl(url?: string | null): string {
@@ -57,9 +63,26 @@ export default function DynamicImage({
   wrapperClassName,
   mode = 'cover',
   backdropClassName,
+  focalPoint,
+  zoom,
+  style,
 }: DynamicImageProps) {
   const optimizedSrc = useMemo(() => optimizeUrl(src), [src])
   const hasSrc = Boolean(optimizedSrc)
+
+  const computedImageStyle = useMemo<React.CSSProperties>(() => {
+    const s: React.CSSProperties = { ...style }
+    if (focalPoint && typeof focalPoint.x === 'number' && typeof focalPoint.y === 'number') {
+      s.objectPosition = `${focalPoint.x}% ${focalPoint.y}%`
+    }
+    if (typeof zoom === 'number' && zoom !== 1) {
+      s.transform = s.transform ? `${s.transform} scale(${zoom})` : `scale(${zoom})`
+      s.transformOrigin = focalPoint
+        ? `${focalPoint.x}% ${focalPoint.y}%`
+        : 'center center'
+    }
+    return s
+  }, [focalPoint, zoom, style])
 
   const [status, setStatus] = useState<ImageStatus>(() => {
     if (!hasSrc) return 'missing'
@@ -128,6 +151,7 @@ export default function DynamicImage({
               decoding="async"
               onLoad={handleLoad}
               onError={handleError}
+              style={computedImageStyle}
               className={`relative z-0 size-full object-contain object-center transition-[transform,opacity] duration-300 ${className} ${
                 status === 'success'
                   ? 'opacity-100'
@@ -181,7 +205,8 @@ export default function DynamicImage({
           decoding="async"
           onLoad={handleLoad}
           onError={handleError}
-          className={`${className} transition-opacity duration-300 ${
+          style={computedImageStyle}
+          className={`${className} transition-[transform,opacity] duration-300 ${
             status === 'success'
               ? 'opacity-100'
               : 'invisible absolute inset-0 size-0 overflow-hidden pointer-events-none opacity-0'

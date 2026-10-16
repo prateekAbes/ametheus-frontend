@@ -231,6 +231,7 @@ export default function Admin() {
   const [platformNotifTotal, setPlatformNotifTotal] = useState<number>(0)
   const [platformNotifFilterType, setPlatformNotifFilterType] = useState<string>('ALL')
   const [platformNotifSearch, setPlatformNotifSearch] = useState<string>('')
+  const [platformNotifSelectedUserId, setPlatformNotifSelectedUserId] = useState<string>('')
   const [isDispatchingNotif, setIsDispatchingNotif] = useState<boolean>(false)
   const [newNotifAudience, setNewNotifAudience] = useState<'ALL_USERS' | 'SELECTED_USERS'>('ALL_USERS')
   const [newNotifUserIds, setNewNotifUserIds] = useState<string>('')
@@ -865,13 +866,15 @@ export default function Admin() {
     }
   }
 
-  const fetchPlatformNotifications = async () => {
+  const fetchPlatformNotifications = async (userIdOverride?: string) => {
     try {
+      const activeUserId = userIdOverride !== undefined ? userIdOverride : platformNotifSelectedUserId
       const res = await getAdminPlatformNotifications({
         limit: 50,
         skip: 0,
         search: platformNotifSearch.trim() || undefined,
         notification_type: platformNotifFilterType !== 'ALL' ? platformNotifFilterType : undefined,
+        user_id: activeUserId.trim() || undefined,
       })
       setPlatformNotifications(res.items || [])
       setPlatformNotifTotal(res.total || 0)
@@ -3282,8 +3285,13 @@ export default function Admin() {
         {/* TAB 7: SUPPORT TICKETS */}
         {tab === 'SUPPORT TICKETS' && (() => {
           const filteredTickets = tickets.filter((t) => {
-            if (supportShowArchived && !t.is_archived) return false
-            if (!supportShowArchived && t.is_archived) return false
+            const isTicketArchived = Boolean(
+              t.is_archived === true ||
+              String(t.is_archived).toLowerCase() === 'true' ||
+              t.status === 'ARCHIVED'
+            )
+            if (supportShowArchived && !isTicketArchived) return false
+            if (!supportShowArchived && isTicketArchived) return false
             if (!supportSearchTerm) return true
             const term = supportSearchTerm.toLowerCase()
             return (
@@ -3418,7 +3426,11 @@ export default function Admin() {
                     ) : (
                       filteredTickets.map((t) => {
                         const tid = t.ticket_id || t.id
-                        const isArchived = t.is_archived || t.status === 'ARCHIVED'
+                        const isArchived = Boolean(
+                          t.is_archived === true ||
+                          String(t.is_archived).toLowerCase() === 'true' ||
+                          t.status === 'ARCHIVED'
+                        )
                         return (
                           <tr key={tid} className="hover:bg-white/[0.02] transition-colors">
                             <td className="p-3 font-bold text-cyan">
@@ -3574,6 +3586,11 @@ export default function Admin() {
                           <div className="space-y-2">
                             {u.tickets?.map((t: any) => {
                               const msgCount = t.messages?.length || 0
+                              const isCurrentlyArchived = Boolean(
+                                t.is_archived === true ||
+                                String(t.is_archived).toLowerCase() === 'true' ||
+                                t.status === 'ARCHIVED'
+                              )
                               return (
                                 <div
                                   key={t.id || t.ticket_id}
@@ -3629,7 +3646,6 @@ export default function Admin() {
                                     <button
                                       onClick={async () => {
                                         const tid = t.id || t.ticket_id
-                                        const isCurrentlyArchived = t.is_archived || t.status === 'ARCHIVED'
                                         try {
                                           if (isCurrentlyArchived) {
                                             await restoreSupportTicket(tid)
@@ -3644,12 +3660,12 @@ export default function Admin() {
                                         }
                                       }}
                                       className={`border px-2.5 py-1.5 font-mono text-xs uppercase transition-colors ${
-                                        t.is_archived || t.status === 'ARCHIVED'
+                                        isCurrentlyArchived
                                           ? 'border-ok/30 bg-ok/10 text-ok hover:bg-ok/20'
                                           : 'border-white/10 text-dim hover:text-ink hover:border-white/30'
                                       }`}
                                     >
-                                      {t.is_archived || t.status === 'ARCHIVED' ? 'Restore' : 'Archive'}
+                                      {isCurrentlyArchived ? 'Restore' : 'Archive'}
                                     </button>
                                   </div>
                                 </div>
@@ -4247,8 +4263,53 @@ export default function Admin() {
               <div className="lg:col-span-2 space-y-4">
                 <Panel className="p-6 font-mono text-xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-                    <h3 className="font-display text-xl font-bold uppercase text-ink">Dispatched Notifications History</h3>
-                    <div className="flex items-center gap-2">
+                    <div>
+                      <h3 className="font-display text-xl font-bold uppercase text-ink">Dispatched Notifications History</h3>
+                      {platformNotifSelectedUserId && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-cyan">
+                            Filtered by User: {(() => {
+                              const match = users.find((u) => u.id === platformNotifSelectedUserId || u.clerk_user_id === platformNotifSelectedUserId || (u as any)._id === platformNotifSelectedUserId)
+                              return match ? `${match.username || match.display_name} (${match.email || match.id})` : platformNotifSelectedUserId
+                            })()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlatformNotifSelectedUserId('')
+                              fetchPlatformNotifications('')
+                            }}
+                            className="text-[10px] text-dim hover:text-warn uppercase underline cursor-pointer"
+                          >
+                            Clear Filter
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Compact User Selector */}
+                      <select
+                        value={platformNotifSelectedUserId}
+                        onChange={(e) => {
+                          const uid = e.target.value
+                          setPlatformNotifSelectedUserId(uid)
+                          fetchPlatformNotifications(uid)
+                        }}
+                        className="border border-white/15 bg-surface p-1.5 text-ink outline-none text-[11px] max-w-[200px]"
+                        title="Filter history by user"
+                      >
+                        <option value="">All Users (Global History)</option>
+                        {users.map((u) => {
+                          const uid = u.id || u.clerk_user_id || (u as any)._id
+                          const name = u.username || u.display_name || u.email || uid
+                          return (
+                            <option key={uid} value={uid}>
+                              {name} {u.email ? `(${u.email})` : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+
                       <select
                         value={platformNotifFilterType}
                         onChange={(e) => {
@@ -4268,7 +4329,7 @@ export default function Admin() {
                       </select>
                       <button
                         type="button"
-                        onClick={fetchPlatformNotifications}
+                        onClick={() => fetchPlatformNotifications()}
                         className="border border-white/20 px-2.5 py-1.5 text-[11px] uppercase hover:text-cyan hover:border-cyan transition-colors"
                       >
                         Refresh
@@ -4278,7 +4339,9 @@ export default function Admin() {
 
                   {platformNotifications.length === 0 ? (
                     <div className="border border-dashed border-white/15 p-8 text-center text-dim">
-                      NO PLATFORM NOTIFICATIONS RECORDED YET.
+                      {platformNotifSelectedUserId
+                        ? 'NO NOTIFICATIONS RECORDED FOR THE SELECTED USER.'
+                        : 'NO PLATFORM NOTIFICATIONS RECORDED YET.'}
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
@@ -4303,7 +4366,21 @@ export default function Admin() {
                             </div>
                             <p className="text-dim text-[11px] leading-relaxed">{n.message}</p>
                             <div className="flex items-center justify-between text-[10px] text-dim pt-1 border-t border-white/5">
-                              <span>Recipient: {n.user_id ? `User #${n.user_id.slice(0, 8)}` : 'Broadcast (All Users)'}</span>
+                              <span>
+                                Recipient:{' '}
+                                {n.user_id ? (() => {
+                                  const u = users.find((usr) => usr.id === n.user_id || usr.clerk_user_id === n.user_id || (usr as any)._id === n.user_id)
+                                  return u ? (
+                                    <span className="text-ink font-semibold">
+                                      {u.username || u.display_name} <span className="text-dim">({u.email || n.user_id})</span>
+                                    </span>
+                                  ) : (
+                                    `User #${n.user_id.slice(0, 8)}`
+                                  )
+                                })() : (
+                                  'Broadcast (All Users)'
+                                )}
+                              </span>
                               {n.link && <span className="text-cyan">Link: {n.link}</span>}
                             </div>
                           </div>
@@ -6144,7 +6221,11 @@ export default function Admin() {
                   <button
                     onClick={async () => {
                       const tid = activeTicketThread.id || activeTicketThread.ticket_id
-                      const isCurrentlyArchived = Boolean(activeTicketThread.is_archived)
+                      const isCurrentlyArchived = Boolean(
+                        activeTicketThread.is_archived === true ||
+                        String(activeTicketThread.is_archived).toLowerCase() === 'true' ||
+                        activeTicketThread.status === 'ARCHIVED'
+                      )
                       try {
                         if (isCurrentlyArchived) {
                           await restoreSupportTicket(tid)
@@ -6160,12 +6241,22 @@ export default function Admin() {
                       }
                     }}
                     className={`border px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${
-                      activeTicketThread.is_archived
+                      Boolean(
+                        activeTicketThread.is_archived === true ||
+                        String(activeTicketThread.is_archived).toLowerCase() === 'true' ||
+                        activeTicketThread.status === 'ARCHIVED'
+                      )
                         ? 'border-ok/40 bg-ok/10 text-ok hover:bg-ok/20'
                         : 'border-white/15 bg-surface text-dim hover:text-ink hover:border-white/30'
                     }`}
                   >
-                    {activeTicketThread.is_archived ? 'Restore Ticket' : 'Archive Ticket'}
+                    {Boolean(
+                      activeTicketThread.is_archived === true ||
+                      String(activeTicketThread.is_archived).toLowerCase() === 'true' ||
+                      activeTicketThread.status === 'ARCHIVED'
+                    )
+                      ? 'Restore Ticket'
+                      : 'Archive Ticket'}
                   </button>
 
                   <button

@@ -55,6 +55,7 @@ export interface Tournament {
   registration_status?: string
   whatsapp_group_url?: string
   server_region?: string
+  media_config?: Record<string, any>
 }
 
 export interface NormalizedTournament {
@@ -93,6 +94,8 @@ export interface NormalizedTournament {
   matchesSummary: TournamentMatchSummary[]
   isRegistered?: boolean
   isFeatured?: boolean
+  media_config?: Record<string, any>
+  mediaConfig?: Record<string, any>
 }
 
 export function normalizeTournament(t: Tournament): NormalizedTournament {
@@ -123,6 +126,7 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
   const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl || bannerUrl
   const bannerMobileUrl = t.banner_mobile_url || (t as any).bannerMobileUrl || bannerUrl
   const logoUrl = t.logo_url || (t as any).logoUrl || ''
+  const mediaConfig = t.media_config || (t as any).mediaConfig || {}
 
   return {
     id: t.id || t._id || t.slug,
@@ -160,6 +164,8 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     matchesSummary: t.matches_summary || [],
     isRegistered: t.is_registered,
     isFeatured: Boolean(t.is_featured ?? (t as any).isFeatured),
+    media_config: mediaConfig,
+    mediaConfig,
   }
 }
 

@@ -261,7 +261,25 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
   const accent = g?.accent ?? '#3ef2ff'
   const long = t.name.length > 28
   const meta = [t.date, g?.squad, t.format].filter(Boolean).join(' · ')
-  const bannerSrc = (t as any).bannerUrl || (t as any).banner_url || (t as any).bannerTabletUrl || (t as any).banner_tablet_url || (t as any).bannerMobileUrl || (t as any).banner_mobile_url || g?.photo || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop'
+  const mediaCfg = (t as any).mediaConfig || (t as any).media_config
+  const cardCfg = mediaCfg?.card
+
+  const bannerSrc =
+    cardCfg?.asset_url ||
+    (t as any).bannerUrl ||
+    (t as any).banner_url ||
+    (t as any).bannerTabletUrl ||
+    (t as any).banner_tablet_url ||
+    (t as any).bannerMobileUrl ||
+    (t as any).banner_mobile_url ||
+    g?.photo ||
+    'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop'
+
+  const focalPoint =
+    cardCfg && typeof cardCfg.focal_x === 'number' && typeof cardCfg.focal_y === 'number'
+      ? { x: cardCfg.focal_x, y: cardCfg.focal_y }
+      : undefined
+
   const stats = [
     t.prize != null && ['Prize', inr(t.prize), accent],
     t.entry != null && ['Entry', t.entry ? inr(t.entry) : 'FREE'],
@@ -273,8 +291,10 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
         <DynamicImage
           src={resolveMediaUrl(bannerSrc)}
           alt={`${t.name} banner`}
-          mode="cover"
-          className="size-full object-cover object-center opacity-85 transition-transform duration-700 group-hover:scale-105"
+          mode={cardCfg?.fit_mode || 'cover'}
+          focalPoint={focalPoint}
+          zoom={cardCfg?.zoom}
+          className="size-full object-cover opacity-85 transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #12141d, transparent 65%), linear-gradient(120deg, ${accent}33, transparent 50%)` }} />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">

@@ -322,6 +322,7 @@ export async function getAdminPlatformNotifications(params?: {
   notification_type?: string
   category?: string
   is_archived?: boolean
+  user_id?: string
   limit?: number
   skip?: number
 }): Promise<{ items: PlatformNotificationItem[]; total: number }> {
@@ -330,6 +331,7 @@ export async function getAdminPlatformNotifications(params?: {
   if (params?.notification_type && params.notification_type !== 'ALL') q.append('notification_type', params.notification_type)
   if (params?.category && params.category !== 'ALL') q.append('category', params.category)
   if (params?.is_archived) q.append('is_archived', 'true')
+  if (params?.user_id) q.append('user_id', params.user_id)
   if (params?.limit) q.append('limit', String(params.limit))
   if (params?.skip) q.append('skip', String(params.skip))
   return apiClient<{ items: PlatformNotificationItem[]; total: number }>(`/admin/notifications?${q.toString()}`)
@@ -624,3 +626,82 @@ export async function completeTournamentAdmin(id: string): Promise<any> {
     method: 'POST',
   })
 }
+
+// ============================================================================
+// SITE & PAGE IMAGE PLACEMENTS SYSTEM
+// ============================================================================
+
+export interface PlacementConfig {
+  id?: string
+  placement_key: string
+  page: string
+  section: string
+  slot_name: string
+  asset_url?: string | null
+  target_id?: string | null
+  focal_x: number
+  focal_y: number
+  zoom: number
+  fit_mode: 'cover' | 'contain' | 'ambient'
+  target_aspect_ratio: string
+  target_ratio_value?: number
+  recommended_resolution: string
+  min_width: number
+  min_height: number
+  description?: string
+  is_active?: boolean
+  metadata?: Record<string, any>
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MediaLibraryItem {
+  id: string
+  url: string
+  filename: string
+  content_type: string
+  size: number
+  created_at?: string
+}
+
+export async function getPlacements(params?: { page?: string; section?: string }): Promise<PlacementConfig[]> {
+  const q = new URLSearchParams()
+  if (params?.page) q.append('page', params.page)
+  if (params?.section) q.append('section', params.section)
+  return apiClient<PlacementConfig[]>(`/placements?${q.toString()}`)
+}
+
+export async function getPlacement(placementKey: string): Promise<PlacementConfig> {
+  return apiClient<PlacementConfig>(`/placements/${placementKey}`)
+}
+
+export async function updatePlacement(
+  placementKey: string,
+  payload: Partial<PlacementConfig>
+): Promise<PlacementConfig> {
+  return apiClient<PlacementConfig>(`/placements/${placementKey}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function clearPlacementAsset(placementKey: string): Promise<PlacementConfig> {
+  return apiClient<PlacementConfig>(`/placements/${placementKey}/asset`, {
+    method: 'DELETE',
+  })
+}
+
+export async function listMediaFiles(params?: {
+  search?: string
+  limit?: number
+  skip?: number
+}): Promise<{ items: MediaLibraryItem[]; total: number; skip: number; limit: number }> {
+  const q = new URLSearchParams()
+  if (params?.search) q.append('search', params.search)
+  if (params?.limit) q.append('limit', String(params.limit))
+  if (params?.skip) q.append('skip', String(params.skip))
+  return apiClient<{ items: MediaLibraryItem[]; total: number; skip: number; limit: number }>(
+    `/media?${q.toString()}`
+  )
+}
+

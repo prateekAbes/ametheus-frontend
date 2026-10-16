@@ -29,20 +29,22 @@ import { gsap, isMobile, reducedMotion } from '../lib/motion'
 import DynamicImage from '../components/DynamicImage'
 import { TournamentCardSkeleton } from '../components/Skeleton'
 import { resolveMediaUrl } from '../services/apiClient'
+import { getPlacements, PlacementConfig } from '../services/admin'
 
 const Scene3D = lazy(() => import('../components/Scene3D'))
 
 const SLOTS = [
-  { cls: 'left-[4%] top-[18%] w-[22vw] h-[30vh] [clip-path:polygon(0_8%,100%_0,92%_100%,4%_92%)]', d: 18 },
-  { cls: 'right-[6%] top-[14%] w-[18vw] h-[36vh] [clip-path:polygon(10%_0,100%_6%,100%_100%,0_88%)]', d: -24 },
-  { cls: 'left-[14%] bottom-[10%] w-[16vw] h-[22vh] [clip-path:polygon(0_0,90%_10%,100%_100%,6%_90%)]', d: -12 },
-  { cls: 'right-[16%] bottom-[14%] w-[20vw] h-[24vh] [clip-path:polygon(6%_4%,100%_0,94%_96%,0_100%)]', d: 28 },
+  { key: 'homepage_hero_slot_1', cls: 'left-[4%] top-[18%] w-[22vw] h-[30vh] [clip-path:polygon(0_8%,100%_0,92%_100%,4%_92%)]', d: 18 },
+  { key: 'homepage_hero_slot_2', cls: 'right-[6%] top-[14%] w-[18vw] h-[36vh] [clip-path:polygon(10%_0,100%_6%,100%_100%,0_88%)]', d: -24 },
+  { key: 'homepage_hero_slot_3', cls: 'left-[14%] bottom-[10%] w-[16vw] h-[22vh] [clip-path:polygon(0_0,90%_10%,100%_100%,6%_90%)]', d: -12 },
+  { key: 'homepage_hero_slot_4', cls: 'right-[16%] bottom-[14%] w-[20vw] h-[24vh] [clip-path:polygon(6%_4%,100%_0,94%_96%,0_100%)]', d: 28 },
 ]
 
 export default function Home() {
   const [tournaments, setTournaments] = useState<NormalizedTournament[]>([])
   const [featuredTour, setFeaturedTour] = useState<NormalizedTournament | null>(null)
   const [games, setGames] = useState<ApiGame[]>([])
+  const [placements, setPlacements] = useState<PlacementConfig[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,12 +53,16 @@ export default function Home() {
       getTournaments().catch(() => []),
       getGames().catch(() => []),
       getFeaturedTournament().catch(() => null),
-    ]).then(([tList, gList, fTour]) => {
+      getPlacements({ page: 'homepage' }).catch(() => []),
+    ]).then(([tList, gList, fTour, pList]) => {
       if (!isMounted) return
       setTournaments(tList.map(normalizeTournament))
       setGames(gList)
       if (fTour) {
         setFeaturedTour(normalizeTournament(fTour))
+      }
+      if (pList) {
+        setPlacements(pList)
       }
       setLoading(false)
     })
@@ -98,12 +104,15 @@ export default function Home() {
         activeCount={activeTournaments.length}
         gameCount={gameCount}
         games={games}
+        placements={placements}
       />
       <Featured
         tournaments={tournaments}
         featuredTournament={featuredTour}
+        placements={placements}
       />
       <Upcoming tournaments={eligibleUpcoming} loading={loading} />
+      <GameShowcase games={games} />
       <Why />
       <FinalCta liveCount={liveCount} />
     </>
@@ -114,16 +123,15 @@ function Hero({
   activeCount,
   gameCount,
   games = [],
+  placements = [],
 }: {
   activeCount: number
   gameCount: number
   games?: ApiGame[]
+  placements?: PlacementConfig[]
 }) {
   const { isSignedIn } = useAuthContext()
   const ref = useRef<HTMLElement>(null)
-  const shards = games
-    .filter((g) => g.banner_url || g.logo_url)
-    .slice(0, SLOTS.length)
   const scene = !reducedMotion()
 
   useEffect(() => {
@@ -188,35 +196,52 @@ function Hero({
         </Suspense>
       )}
 
-      {shards.map((g, k) => (
-        <Link
-          data-h="shard"
-          key={g.slug}
-          to={`/games/${g.slug}`}
-          className={`group absolute hidden md:block ${SLOTS[k].cls} overflow-hidden bg-surface`}
-          style={{
-            translate: `calc(var(--px) * ${SLOTS[k].d}px) calc(var(--py) * ${SLOTS[k].d}px)`,
-            transition: 'translate .6s cubic-bezier(.2,.7,.1,1)',
-          }}
-        >
-          <DynamicImage
-            src={resolveMediaUrl(g.banner_url || g.logo_url)}
-            alt={`${g.name} world fragment`}
-            eager
-            className="h-full w-full object-cover opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0"
-          />
-          <div
-            className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60"
-            style={{ background: `linear-gradient(180deg, transparent 35%, ${g.accent_color || '#3ef2ff'}66)` }}
-          />
-          <Hud className="absolute bottom-3 left-4 text-ink">
-            {g.tag || g.name}{' '}
-            <span className="inline-block transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">
-              ↗
-            </span>
-          </Hud>
-        </Link>
-      ))}
+      {SLOTS.map((slot, k) => {
+        const placement = placements.find((p) => p.placement_key === slot.key)
+        const g = games[k] || (GAMES as any)[k % GAMES.length]
+        const assetUrl = placement?.asset_url || g?.banner_url || g?.logo_url || (g as any)?.photo
+        const focalPoint =
+          placement && typeof placement.focal_x === 'number' && typeof placement.focal_y === 'number'
+            ? { x: placement.focal_x, y: placement.focal_y }
+            : undefined
+        const zoom = placement?.zoom
+        const fitMode = placement?.fit_mode || 'cover'
+        const linkTo = placement?.target_id ? `/games/${placement.target_id}` : (g?.slug ? `/games/${g.slug}` : '/games')
+        const tag = g?.tag || g?.name || `Arena 0${k + 1}`
+
+        return (
+          <Link
+            data-h="shard"
+            key={slot.key}
+            to={linkTo}
+            className={`group absolute hidden md:block ${slot.cls} overflow-hidden bg-surface`}
+            style={{
+              translate: `calc(var(--px) * ${slot.d}px) calc(var(--py) * ${slot.d}px)`,
+              transition: 'translate .6s cubic-bezier(.2,.7,.1,1)',
+            }}
+          >
+            <DynamicImage
+              src={resolveMediaUrl(assetUrl)}
+              alt={`${tag} world fragment`}
+              eager
+              mode={fitMode}
+              focalPoint={focalPoint}
+              zoom={zoom}
+              className="h-full w-full object-cover opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0"
+            />
+            <div
+              className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60"
+              style={{ background: `linear-gradient(180deg, transparent 35%, ${g?.accent_color || (g as any)?.accent || '#3ef2ff'}66)` }}
+            />
+            <Hud className="absolute bottom-3 left-4 text-ink">
+              {tag}{' '}
+              <span className="inline-block transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">
+                ↗
+              </span>
+            </Hud>
+          </Link>
+        )
+      })}
 
       <div data-h="stage" className="relative z-10 flex h-full w-full max-w-full flex-col items-center justify-center px-4 text-center overflow-x-hidden">
         <h1
@@ -268,9 +293,11 @@ function Hero({
 function Featured({
   tournaments,
   featuredTournament,
+  placements = [],
 }: {
   tournaments: NormalizedTournament[]
   featuredTournament?: NormalizedTournament | null
+  placements?: PlacementConfig[]
 }) {
   if (!tournaments.length && !featuredTournament) return null
 
@@ -285,6 +312,19 @@ function Featured({
 
   const leadGame = gameBy(lead.gameId)
   const displayGameName = lead.gameName || leadGame.name || 'Esports'
+
+  // Dynamic placement override
+  const featuredPlacement = placements.find((p) => p.placement_key === 'homepage_featured_tournament')
+  const leadAssetUrl =
+    featuredPlacement?.asset_url || (lead as any).mediaConfig?.card?.asset_url || lead.bannerUrl
+  const leadFocalPoint =
+    featuredPlacement && typeof featuredPlacement.focal_x === 'number' && typeof featuredPlacement.focal_y === 'number'
+      ? { x: featuredPlacement.focal_x, y: featuredPlacement.focal_y }
+      : (lead as any).mediaConfig?.card?.focal_x != null && (lead as any).mediaConfig?.card?.focal_y != null
+      ? { x: (lead as any).mediaConfig.card.focal_x, y: (lead as any).mediaConfig.card.focal_y }
+      : undefined
+  const leadZoom = featuredPlacement?.zoom || (lead as any).mediaConfig?.card?.zoom
+  const leadFitMode = featuredPlacement?.fit_mode || (lead as any).mediaConfig?.card?.fit_mode || 'ambient'
 
   return (
     <section className="py-24 md:py-32">
@@ -304,10 +344,12 @@ function Featured({
                 style={{ background: `linear-gradient(135deg, ${leadGame.accent}33, #0c0e15 60%)` }}
               >
                 <DynamicImage
-                  src={resolveMediaUrl(lead.bannerUrl)}
+                  src={resolveMediaUrl(leadAssetUrl)}
                   alt={`${lead.title} featured`}
                   eager
-                  mode="ambient"
+                  mode={leadFitMode}
+                  focalPoint={leadFocalPoint}
+                  zoom={leadZoom}
                   className="size-full transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
                 />
                 <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}30, transparent 50%)` }} />
@@ -357,6 +399,12 @@ function Featured({
               {side.map((t, idx) => {
                 const g = gameBy(t.gameId)
                 const sideGameName = t.gameName || g.short
+                const sideCfg = (t as any).mediaConfig?.card
+                const sideFocal =
+                  sideCfg && typeof sideCfg.focal_x === 'number' && typeof sideCfg.focal_y === 'number'
+                    ? { x: sideCfg.focal_x, y: sideCfg.focal_y }
+                    : undefined
+
                 return (
                   <Link
                     key={t.id}
@@ -365,9 +413,11 @@ function Featured({
                   >
                     <div className="relative aspect-[4/5] overflow-hidden sm:aspect-[4/3] bg-surface">
                       <DynamicImage
-                        src={resolveMediaUrl(t.bannerUrl)}
+                        src={resolveMediaUrl(sideCfg?.asset_url || t.bannerUrl)}
                         alt={`${t.title} thumbnail`}
-                        mode="ambient"
+                        mode={sideCfg?.fit_mode || 'ambient'}
+                        focalPoint={sideFocal}
+                        zoom={sideCfg?.zoom}
                         className="size-full opacity-85 group-hover:scale-105 transition-transform"
                       />
                     </div>
@@ -506,6 +556,83 @@ function Upcoming({
   )
 }
 
+function GameShowcase({ games = [] }: { games?: ApiGame[] }) {
+  const displayGames: any[] = games.length > 0 ? games.slice(0, 8) : CATALOG.slice(0, 8)
+
+  return (
+    <section className="py-24 md:py-32 border-t border-white/5 bg-void">
+      <Container>
+        <SectionHead
+          className="in-view"
+          idx="03"
+          kicker="Placement 7 · Game Showcase"
+          title={<>{displayGames.length} Games.<br /><span className="text-cyan">One Arena.</span></>}
+          right={<Cta ghost small to="/games">Explore all games</Cta>}
+        />
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {displayGames.map((g, i) => {
+            const mediaCfg = (g as any).media_config || (g as any).mediaConfig
+            const showcaseCfg = mediaCfg?.showcase_card
+            const photoSrc =
+              showcaseCfg?.asset_url ||
+              (g as any).poster_url ||
+              (g as any).posterUrl ||
+              g.photo ||
+              (g as any).banner_url ||
+              (g as any).bannerUrl
+            const focalPoint =
+              showcaseCfg && typeof showcaseCfg.focal_x === 'number' && typeof showcaseCfg.focal_y === 'number'
+                ? { x: showcaseCfg.focal_x, y: showcaseCfg.focal_y }
+                : undefined
+            const title = g.name || g.short || 'Game'
+            const genre = g.genre || g.tag || 'ESPORTS'
+            const line = g.line || g.description || 'Competitive tournament title'
+            const accent = g.accent_color || g.accent || '#3ef2ff'
+
+            return (
+              <Link
+                key={g.slug || i}
+                to={`/games/${g.slug}`}
+                className={`group relative h-[420px] overflow-hidden border border-white/10 transition-all duration-300 hover:border-cyan/50 hover:shadow-[0_0_30px_rgba(62,242,255,0.15)] ${
+                  i % 2 ? 'lg:mt-16' : ''
+                }`}
+              >
+                <DynamicImage
+                  src={resolveMediaUrl(photoSrc)}
+                  alt={title}
+                  mode={showcaseCfg?.fit_mode || 'cover'}
+                  focalPoint={focalPoint}
+                  zoom={showcaseCfg?.zoom}
+                  className="absolute inset-0 h-full w-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-110"
+                />
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: `linear-gradient(to top, #05060a 20%, transparent 65%), linear-gradient(140deg, ${accent}40, transparent 50%)`,
+                  }}
+                />
+                <div className="absolute inset-x-5 bottom-5">
+                  <Hud>{genre}</Hud>
+                  <p
+                    className="font-display text-4xl font-black uppercase transition-colors group-hover:text-cyan"
+                    style={{ color: accent }}
+                  >
+                    {title}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm text-ink/70">{line}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 font-mono text-[11px] text-cyan uppercase tracking-wider transition-transform group-hover:translate-x-1">
+                    Enter world →
+                  </span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </Container>
+    </section>
+  )
+}
+
 const WHY = [
   ['Multiple games', 'BGMI, Valorant, Free Fire, and COD Mobile today, with new worlds unlocking regularly.'],
   ['Multiple tournaments', 'Daily scrims, weekly cups, and seasonal leagues with transparent prize pools.'],
@@ -518,7 +645,7 @@ function Why() {
   return (
     <section className="relative overflow-hidden bg-graphite py-24 md:py-36">
       <Container>
-        <SectionHead idx="03" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
+        <SectionHead idx="04" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
         <ol className="mt-16">
           {WHY.map(([t, b], i) => (
             <li key={t} className={`group grid items-baseline gap-4 border-t border-white/10 py-8 md:grid-cols-12 md:py-10 ${i % 2 ? 'md:pl-[12%]' : ''}`}>
