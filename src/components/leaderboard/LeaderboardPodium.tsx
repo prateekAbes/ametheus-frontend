@@ -5,6 +5,7 @@ import {
   isEntryDisqualified,
 } from '../../services/leaderboard'
 import { PodiumColumn } from './PodiumColumn'
+import { PodiumParticleBackground } from './PodiumParticleBackground'
 
 interface LeaderboardPodiumProps {
   topEntries: LeaderboardEntry[]
@@ -30,35 +31,14 @@ export function LeaderboardPodium({
   const top3 = topEntries[2] || null
 
   return (
-    <div className="relative mx-auto w-full max-w-4xl py-4 sm:py-6 select-none">
-      {/* Subtle orthogonal dark grid matching reference screenshot */}
-      <div
-        className="pointer-events-none absolute -inset-y-4 -inset-x-8 z-0 opacity-20"
-        aria-hidden="true"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px',
-          maskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 40%, transparent 85%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 75% 65% at 50% 45%, black 40%, transparent 85%)',
-        }}
-      />
+    <div className="relative mx-auto w-full max-w-4xl pt-6 pb-2 select-none">
+      {/* Interactive starry particle field behind podium only */}
+      <PodiumParticleBackground />
 
-      {/* Ambient floor glow beneath podium */}
-      <div
-        className="pointer-events-none absolute -bottom-6 inset-x-0 h-28 select-none opacity-40 z-0"
-        aria-hidden="true"
-        style={{
-          background: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(37, 217, 242, 0.12), transparent 75%)',
-        }}
-      />
-
-      {/* PODIUM COLUMNS: Layered 3D Axonometric Blocks matching reference */}
-      <div className="relative z-10 flex items-end justify-center w-full max-w-3xl mx-auto px-1 sm:px-3">
-        {/* 2nd Place Podium Column (Left, Layered Behind #1) */}
-        <div className="flex-1 relative z-10 -mr-2 sm:-mr-4 md:-mr-6 min-w-0">
+      {/* CLEAN STAIR-LIKE PODIUM: 2nd (Left), 1st (Center, Tallest), 3rd (Right, Shortest) */}
+      <div className="relative z-10 flex items-end justify-center w-full max-w-2xl mx-auto px-2 sm:px-4 gap-2 sm:gap-3 md:gap-4">
+        {/* 2nd Place Step (Left) */}
+        <div className="flex-1 relative z-10 min-w-0">
           {top2 ? (
             <PodiumColumn
               entry={top2}
@@ -68,7 +48,7 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top2, disqualifiedIds)}
             />
           ) : (
-            <div className="h-44 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40">
+            <div className="h-44 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40 rounded-t-sm">
               <span className="font-mono text-[9px] text-white/30 uppercase">
                 #2 Vacant
               </span>
@@ -76,8 +56,8 @@ export function LeaderboardPodium({
           )}
         </div>
 
-        {/* 1st Place Podium Column (Center, Foreground & Tallest) */}
-        <div className="flex-[1.14] relative z-20 min-w-0">
+        {/* 1st Place Step (Center, Tallest) */}
+        <div className="flex-[1.12] relative z-20 min-w-0">
           {top1 ? (
             <PodiumColumn
               entry={top1}
@@ -89,8 +69,8 @@ export function LeaderboardPodium({
           ) : null}
         </div>
 
-        {/* 3rd Place Podium Column (Right, Layered Behind #1) */}
-        <div className="flex-1 relative z-10 -ml-2 sm:-ml-4 md:-ml-6 min-w-0">
+        {/* 3rd Place Step (Right, Shortest) */}
+        <div className="flex-1 relative z-10 min-w-0">
           {top3 ? (
             <PodiumColumn
               entry={top3}
@@ -100,7 +80,7 @@ export function LeaderboardPodium({
               isDisqualified={isEntryDisqualified(top3, disqualifiedIds)}
             />
           ) : (
-            <div className="h-36 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40">
+            <div className="h-32 border border-dashed border-white/10 flex items-center justify-center p-2 text-center bg-black/40 rounded-t-sm">
               <span className="font-mono text-[9px] text-white/30 uppercase">
                 #3 Vacant
               </span>

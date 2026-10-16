@@ -22,6 +22,12 @@ interface LeaderboardTableProps {
   disqualifiedIds?: Set<string>
 }
 
+/**
+ * Clean, minimal row-based standings list for Rank 4 and below.
+ * - Square avatar images with subtle neutral borders
+ * - Clear, responsive stats matching active category
+ * - No blue outlines or neon highlights
+ */
 export function LeaderboardTable({
   entries,
   selectedCategory,
@@ -48,38 +54,23 @@ export function LeaderboardTable({
   // Primary metric column title matching active metric only
   const getMetricHeader = () => {
     switch (selectedCategory) {
-      case 'win_rate':
-        return 'Win Rate'
-      case 'wins':
-        return 'Match Wins'
       case 'spending':
         return 'Total Spent'
-      case 'earnings':
-        return 'Total Prize'
-      case 'pc':
-        return 'PC Rating'
-      case 'mobile':
-        return 'Mobile Rating'
+      case 'win_rate':
+        return 'Win Rate'
       case 'overall':
       default:
-        return 'Competitive Rating'
+        return 'Rating'
     }
   }
 
   // Format the single metric value for each row
   const getMetricValue = (entry: LeaderboardEntry) => {
     switch (selectedCategory) {
-      case 'win_rate':
-        return `${entry.win_rate ?? 0}%`
-      case 'wins':
-        return `${entry.wins ?? 0} W`
       case 'spending':
         return inr(Number(entry.spending ?? 0))
-      case 'earnings':
-        return inr(Number(entry.earnings || 0))
-      case 'pc':
-      case 'mobile':
-        return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
+      case 'win_rate':
+        return `${entry.win_rate ?? 0}%`
       case 'overall':
       default:
         return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
@@ -87,13 +78,13 @@ export function LeaderboardTable({
   }
 
   return (
-    <div id="standings-ladder" className="w-full scroll-mt-20 space-y-3">
+    <div id="standings-ladder" className="w-full scroll-mt-20 space-y-4">
       {/* ============================================================== */}
-      {/* MINIMAL STANDINGS TABLE / LIST                                  */}
+      {/* MINIMAL STANDINGS TABLE / LIST (RANKS 4+)                      */}
       {/* ============================================================== */}
-      <div className="border border-[#202B3B] bg-[#101724]/90 rounded-sm overflow-hidden backdrop-blur-sm">
+      <div className="border border-white/10 bg-[#0c121d]/85 rounded-sm overflow-hidden backdrop-blur-sm">
         {/* Table Head */}
-        <div className="flex items-center justify-between border-b border-[#202B3B] px-4 py-2 bg-white/[0.02] font-mono text-[10px] text-[#8995A8] uppercase tracking-wider">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-6 py-2.5 bg-white/[0.02] font-mono text-[10px] text-[#8995A8] uppercase tracking-wider">
           <div className="flex items-center gap-3">
             <span className="w-10 text-center">Rank</span>
             <span>Contender</span>
@@ -102,7 +93,7 @@ export function LeaderboardTable({
         </div>
 
         {/* Table Rows */}
-        <div className="divide-y divide-[#202B3B]/60 font-mono text-xs">
+        <div className="divide-y divide-white/5 font-mono text-xs">
           {entries.map((entry, idx) => {
             const rankNumber =
               entry.rank ||
@@ -116,7 +107,9 @@ export function LeaderboardTable({
 
             // Canonical username display
             const displayName =
-              entry.name && !entry.name.toLowerCase().startsWith('player_') && !entry.name.toLowerCase().startsWith('user_')
+              entry.name &&
+              !entry.name.toLowerCase().startsWith('player_') &&
+              !entry.name.toLowerCase().startsWith('user_')
                 ? entry.name
                 : entry.captain
                 ? entry.captain.replace('@', '')
@@ -127,9 +120,9 @@ export function LeaderboardTable({
             return (
               <div
                 key={rowKey}
-                className={`flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
+                className={`flex items-center justify-between px-4 sm:px-6 py-3 transition-colors hover:bg-white/[0.02] ${
                   isCurrent
-                    ? 'bg-[#25D9F2]/10 border-l-2 border-l-[#25D9F2]'
+                    ? 'bg-white/[0.05] border-l-2 border-l-white/60'
                     : isDqEntry
                     ? 'opacity-40'
                     : ''
@@ -137,14 +130,14 @@ export function LeaderboardTable({
               >
                 {/* Left: Rank & Contender (with square avatar) */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-10 text-center font-bold text-white/50 shrink-0">
+                  <span className="w-10 text-center font-bold text-white/40 shrink-0">
                     #{String(rankNumber).padStart(2, '0')}
                   </span>
 
-                  {/* Square Profile Picture */}
+                  {/* Square Profile Picture (Neutral border, no blue glow) */}
                   {isCurrent ? (
                     <Link to="/profile" title="View your profile" className="shrink-0">
-                      <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-[#25D9F2]/50 bg-black">
+                      <div className="size-8 sm:size-9 shrink-0 overflow-hidden rounded-none border border-white/20 bg-[#0d131a]">
                         {avatarUrl ? (
                           <DynamicImage
                             src={avatarUrl}
@@ -159,7 +152,7 @@ export function LeaderboardTable({
                       </div>
                     </Link>
                   ) : (
-                    <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-white/15 bg-black">
+                    <div className="size-8 sm:size-9 shrink-0 overflow-hidden rounded-none border border-white/10 bg-[#0d131a]">
                       {avatarUrl ? (
                         <DynamicImage
                           src={avatarUrl}
@@ -176,31 +169,31 @@ export function LeaderboardTable({
 
                   {/* Player Name */}
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 truncate">
+                    <div className="flex items-center gap-2 truncate">
                       {isCurrent ? (
                         <Link
                           to="/profile"
-                          className="font-bold uppercase text-white hover:text-[#25D9F2] transition-colors truncate"
+                          className="font-bold text-white hover:underline truncate"
                         >
                           {displayName}
                         </Link>
                       ) : (
-                        <span className="font-bold uppercase text-white truncate">
+                        <span className="font-bold text-white/90 truncate">
                           {displayName}
                         </span>
                       )}
                       {entry.tag && (
-                        <span className="text-[10px] text-white/40 shrink-0">
+                        <span className="text-[10px] text-white/35 shrink-0">
                           [{entry.tag}]
                         </span>
                       )}
                       {isCurrent && (
-                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-[#25D9F2] text-black shrink-0">
+                        <span className="px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-white text-black rounded-sm shrink-0">
                           YOU
                         </span>
                       )}
                       {isDqEntry && (
-                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40 shrink-0">
+                        <span className="px-1 py-0.5 font-mono text-[7px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40 shrink-0">
                           DQ
                         </span>
                       )}
@@ -224,7 +217,7 @@ export function LeaderboardTable({
       {/* PAGINATION CONTROLS                                             */}
       {/* ============================================================== */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border border-[#202B3B] bg-[#101724]/90 px-3 py-2 font-mono text-xs rounded-sm backdrop-blur-sm">
+        <div className="flex items-center justify-between border border-white/10 bg-[#0c121d]/80 px-4 py-2.5 font-mono text-xs rounded-sm backdrop-blur-sm">
           <span className="text-[#8995A8] text-[11px]">
             #{ladderStartRank}-#{ladderEndRank} of {totalEntries}
           </span>
@@ -239,10 +232,10 @@ export function LeaderboardTable({
                 }
               }}
               disabled={currentPage === 1}
-              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
+              className={`px-3 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
                 currentPage === 1
                   ? 'border-white/5 text-white/20 cursor-not-allowed'
-                  : 'border-[#202B3B] text-[#F1F4FA] hover:border-[#25D9F2] hover:text-[#25D9F2]'
+                  : 'border-white/10 text-white hover:border-white/30 hover:bg-white/5'
               }`}
             >
               Prev
@@ -261,10 +254,10 @@ export function LeaderboardTable({
                 }
               }}
               disabled={currentPage === totalPages}
-              className={`px-2.5 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
+              className={`px-3 py-1 uppercase font-bold text-[10px] border transition-colors cursor-pointer rounded-sm ${
                 currentPage === totalPages
                   ? 'border-white/5 text-white/20 cursor-not-allowed'
-                  : 'border-[#202B3B] text-[#F1F4FA] hover:border-[#25D9F2] hover:text-[#25D9F2]'
+                  : 'border-white/10 text-white hover:border-white/30 hover:bg-white/5'
               }`}
             >
               Next
