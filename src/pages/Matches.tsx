@@ -335,7 +335,7 @@ export default function Matches() {
             <EmptyState
               code="0:0"
               title={`No ${tab.toLowerCase()} matches`}
-              body="The arena is quiet for this filter. Switch games or check another tab."
+              body="No matches currently found for this filter. Switch games or check another tab."
               cta="Browse Tournaments"
               to="/tournaments"
             />

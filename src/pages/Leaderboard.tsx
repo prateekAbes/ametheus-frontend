@@ -142,7 +142,7 @@ export default function Leaderboard() {
         <Container className="pt-10 sm:pt-14 pb-8 sm:pb-12 relative z-10">
           {/* LEADERBOARD HEADING AND TYPOGRAPHY (Matching Tournaments page scale) */}
           <div className="mb-10 sm:mb-14">
-            <h1 className="font-display text-[clamp(3.5rem,11vw,9.5rem)] font-black uppercase leading-[0.82] tracking-tight text-white">
+            <h1 className="font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white">
               LEADERBOARD
             </h1>
             <p className="mt-5 max-w-xl text-base sm:text-lg text-ink/75 font-sans">

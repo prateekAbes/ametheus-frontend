@@ -14,11 +14,16 @@ interface PodiumColumnProps {
 }
 
 /**
- * Minimal, dark geometric stair-step podium column inspired by the reference layout.
- * - Simple flat surfaces with clear stair-like height silhouette.
- * - Clean square avatars with neutral, understated borders (no blue outlines).
- * - Upgraded player typography (crisp font-display names, clear #1, #2, #3 labels).
- * - No bulky 3D angles, neon glowing outlines, crowns, or decorative distractions.
+ * Geometric, dark flat-fronted podium platform with perspective top surface.
+ * Reconstructed strictly to match the authoritative reference screenshot:
+ * - 3-level stair height proportions (Center #1 tallest 100%, Left #2 ~73%, Right #3 ~50%).
+ * - Symmetrical perspective top surface for #1 with thin cyan highlight outline (#3ef2ff).
+ * - Subtle neutral borders on #2 and #3 top surfaces.
+ * - Square 1:1 avatars resting directly on top surfaces, uniform size across all 3 platforms.
+ * - Clean 3-line layout on the flat vertical front face:
+ *     Line 1: [#rank] PlayerName
+ *     Line 2: Bold numerical metric value
+ *     Line 3: Small uppercase sub-label
  */
 export function PodiumColumn({
   entry,
@@ -31,45 +36,41 @@ export function PodiumColumn({
   const isSecond = rank === 2
   const isThird = rank === 3
 
-  // Stair-step height hierarchy: #1 tallest in center, #2 medium on left, #3 shortest on right
+  // Height proportions matching reference (100% : 73% : 50%)
   const heightClasses = isFirst
-    ? 'h-54 sm:h-64 md:h-72'
+    ? 'h-56 sm:h-64 md:h-76 lg:h-84'
     : isSecond
-    ? 'h-40 sm:h-48 md:h-54'
-    : 'h-30 sm:h-36 md:h-42'
+    ? 'h-40 sm:h-48 md:h-56 lg:h-62'
+    : 'h-28 sm:h-32 md:h-38 lg:h-42'
 
-  // Restrained differences in platform height, background tone, and borders (no blue/neon glows)
   const theme = isFirst
     ? {
-        platformBg: 'bg-[#121824]',
-        platformBorder: 'border-t border-l border-r border-white/20',
-        rankBadge: 'bg-white/15 text-white border-white/30',
-        rankText: 'text-white',
+        platformBg: 'bg-gradient-to-b from-[#0c121d] via-[#080d16] to-[#04060a]',
+        platformBorder: 'border-l border-r border-b border-white/20',
+        rankText: 'text-cyan font-bold',
         nameColor: 'text-white font-bold',
-        scoreColor: 'text-white font-bold',
-        avatarSize: 'size-16 sm:size-20 md:size-22',
-        avatarBorder: 'border border-white/30',
+        scoreColor: 'text-white',
+        scoreSize: 'text-base sm:text-xl md:text-2xl',
+        elevation: 'z-20 shadow-[0_20px_50px_rgba(0,0,0,0.85)]',
       }
     : isSecond
     ? {
-        platformBg: 'bg-[#0d131d]',
-        platformBorder: 'border-t border-l border-r border-white/10',
-        rankBadge: 'bg-white/10 text-white/90 border-white/20',
-        rankText: 'text-white/85',
-        nameColor: 'text-white/90 font-semibold',
-        scoreColor: 'text-white/90 font-bold',
-        avatarSize: 'size-14 sm:size-16 md:size-18',
-        avatarBorder: 'border border-white/15',
+        platformBg: 'bg-gradient-to-b from-[#090e16] via-[#060910] to-[#030508]',
+        platformBorder: 'border-l border-b border-white/15',
+        rankText: 'text-white/70 font-bold',
+        nameColor: 'text-white/90 font-bold',
+        scoreColor: 'text-white/90',
+        scoreSize: 'text-sm sm:text-lg md:text-xl',
+        elevation: 'z-10',
       }
     : {
-        platformBg: 'bg-[#090e16]',
-        platformBorder: 'border-t border-l border-r border-white/10',
-        rankBadge: 'bg-white/5 text-white/80 border-white/10',
-        rankText: 'text-white/75',
-        nameColor: 'text-white/85 font-semibold',
-        scoreColor: 'text-white/85 font-bold',
-        avatarSize: 'size-14 sm:size-16 md:size-18',
-        avatarBorder: 'border border-white/15',
+        platformBg: 'bg-gradient-to-b from-[#070a10] via-[#05080e] to-[#020306]',
+        platformBorder: 'border-r border-b border-white/15',
+        rankText: 'text-white/60 font-bold',
+        nameColor: 'text-white/80 font-bold',
+        scoreColor: 'text-white/80',
+        scoreSize: 'text-xs sm:text-base md:text-lg',
+        elevation: 'z-10',
       }
 
   // Canonical username resolution (preserving proper casing)
@@ -121,34 +122,30 @@ export function PodiumColumn({
       className="size-full object-cover rounded-none"
     />
   ) : (
-    <div className="flex size-full items-center justify-center font-display font-bold text-white/85 bg-[#141b24] rounded-none">
+    <div className="flex size-full items-center justify-center font-display font-bold text-white/85 bg-[#141b24] rounded-none text-base sm:text-lg md:text-xl">
       {initial}
     </div>
   )
 
   return (
     <div
-      className={`group relative flex flex-col items-center justify-end select-none w-full ${
-        isFirst ? 'z-20' : 'z-10'
-      }`}
+      className={`group relative flex flex-col items-center justify-end select-none w-full ${theme.elevation}`}
     >
       {/* ============================================================== */}
-      {/* SQUARE 1:1 AVATAR CENTERED ABOVE PLATFORM                     */}
-      {/* Clean neutral border; no blue outline or neon halos            */}
+      {/* SQUARE 1:1 AVATAR RESTING DIRECTLY ON TOP SURFACE              */}
+      {/* Consistent dimensions across all 3 platforms, thin clean border */}
       {/* ============================================================== */}
-      <div className="relative mb-3 sm:mb-4 z-10 flex flex-col items-center">
+      <div className="relative -mb-3 sm:-mb-4 md:-mb-5 z-30 flex flex-col items-center">
         {isCurrentUser ? (
           <Link
             to="/profile"
             title="View your profile"
-            className={`relative block ${theme.avatarSize} aspect-square rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
+            className="relative block size-16 sm:size-20 md:size-22 aspect-square rounded-none border border-white/20 bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105"
           >
             {avatarContent}
           </Link>
         ) : (
-          <div
-            className={`relative block ${theme.avatarSize} aspect-square rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
-          >
+          <div className="relative block size-16 sm:size-20 md:size-22 aspect-square rounded-none border border-white/20 bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105">
             {avatarContent}
           </div>
         )}
@@ -168,20 +165,68 @@ export function PodiumColumn({
       </div>
 
       {/* ============================================================== */}
-      {/* GEOMETRIC STAIR-STEP PLATFORM (Mostly Flat Surfaces)           */}
+      {/* PERSPECTIVE TOP SURFACE (Tilted plane)                         */}
+      {/* Center #1: Thin sharp cyan highlight outline (#3ef2ff)         */}
+      {/* Left #2 & Right #3: Subtle neutral white/20 outline             */}
+      {/* ============================================================== */}
+      <div className="w-full relative z-20">
+        {isFirst ? (
+          <svg
+            viewBox="0 0 100 28"
+            preserveAspectRatio="none"
+            className="w-full h-7 sm:h-9 md:h-11 block overflow-visible"
+          >
+            <polygon
+              points="10,0 90,0 100,28 0,28"
+              fill="#0d141e"
+              stroke="#3ef2ff"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        ) : isSecond ? (
+          <svg
+            viewBox="0 0 100 28"
+            preserveAspectRatio="none"
+            className="w-full h-6 sm:h-8 md:h-10 block overflow-visible"
+          >
+            <polygon
+              points="14,0 100,0 100,28 0,28"
+              fill="#090e16"
+              stroke="rgba(255, 255, 255, 0.2)"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        ) : (
+          <svg
+            viewBox="0 0 100 28"
+            preserveAspectRatio="none"
+            className="w-full h-5 sm:h-7 md:h-9 block overflow-visible"
+          >
+            <polygon
+              points="0,0 86,0 100,28 0,28"
+              fill="#070a10"
+              stroke="rgba(255, 255, 255, 0.2)"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        )}
+      </div>
+
+      {/* ============================================================== */}
+      {/* FLAT VERTICAL FRONT FACE                                       */}
+      {/* 3-line layout: [#rank] PlayerName | Bold Value | Sub-label     */}
       {/* ============================================================== */}
       <div
-        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} rounded-t-sm pt-3 sm:pt-5 pb-5 px-1.5 sm:px-3 text-center`}
+        className={`w-full flex flex-col justify-start items-center ${heightClasses} ${theme.platformBg} ${theme.platformBorder} pt-3 sm:pt-4 md:pt-6 pb-4 sm:pb-6 px-1.5 sm:px-3 text-center`}
       >
-        {/* Crisp Rank Badge */}
-        <span
-          className={`inline-flex items-center justify-center font-mono text-xs sm:text-sm font-bold px-2 py-0.5 rounded-xs border ${theme.rankBadge} mb-2`}
-        >
-          #{rank}
-        </span>
-
-        {/* Player Name with Upgraded Typography */}
-        <div className="w-full truncate px-1">
+        {/* Line 1: [#rank] PlayerName */}
+        <div className="w-full flex items-center justify-center gap-1.5 px-1 truncate">
+          <span className={`font-mono text-xs sm:text-sm shrink-0 ${theme.rankText}`}>
+            [#{rank}]
+          </span>
           {isCurrentUser ? (
             <Link
               to="/profile"
@@ -191,25 +236,26 @@ export function PodiumColumn({
               {displayName}
             </Link>
           ) : (
-            <p
-              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} truncate`}
+            <span
+              className={`font-display text-xs sm:text-sm md:text-base tracking-normal ${theme.nameColor} truncate block`}
             >
               {displayName}
-            </p>
+            </span>
           )}
         </div>
 
-        {/* Subtle Divider */}
-        <div className="w-10 sm:w-14 mx-auto my-2 sm:my-3 border-b border-white/10" />
-
-        {/* Compact Numerical Metric Score & Sub-label */}
-        <div className="flex flex-col items-center justify-center mt-auto pb-1">
+        {/* Line 2: Bold Numerical Metric Value directly below username */}
+        <div className="mt-2 sm:mt-3 md:mt-4">
           <span
-            className={`font-mono text-xs sm:text-sm md:text-base tracking-tight ${theme.scoreColor}`}
+            className={`font-mono ${theme.scoreSize} font-black tracking-tight ${theme.scoreColor} block`}
           >
             {scoreValue}
           </span>
-          <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-widest text-[#8995A8] mt-0.5">
+        </div>
+
+        {/* Line 3: Small Uppercase Metric Sub-label */}
+        <div className="mt-0.5 sm:mt-1">
+          <span className="font-mono text-[9px] sm:text-[10px] md:text-xs uppercase tracking-widest text-[#8995A8] block">
             {subLabel}
           </span>
         </div>
