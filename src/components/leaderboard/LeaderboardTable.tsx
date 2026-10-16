@@ -8,6 +8,7 @@ import {
 import { resolveMediaUrl } from '../../services/apiClient'
 import DynamicImage from '../DynamicImage'
 import { inr } from '../../lib/data'
+import { MetricTokenIcon } from './MetricTokenIcon'
 
 interface LeaderboardTableProps {
   entries: LeaderboardEntry[]
@@ -51,11 +52,11 @@ export function LeaderboardTable({
       ? Math.min(pageSize, totalEntries)
       : Math.min(currentPage * pageSize, totalEntries)
 
-  // Primary metric column title matching active metric only
+  // Primary metric column title matching active metric
   const getMetricHeader = () => {
     switch (selectedCategory) {
       case 'spending':
-        return 'Total Spent'
+        return 'Volume'
       case 'win_rate':
         return 'Win Rate'
       case 'wins':
@@ -74,7 +75,7 @@ export function LeaderboardTable({
       case 'win_rate':
         return `${entry.win_rate ?? 0}%`
       case 'wins':
-        return `${(entry.wins ?? 0).toLocaleString()} Wins`
+        return (entry.wins ?? 0).toLocaleString()
       case 'overall':
       default:
         return `${(entry.rating ?? 1500).toLocaleString('en-US')}`
@@ -136,7 +137,7 @@ export function LeaderboardTable({
                 {/* Left: Rank & Contender (with square avatar) */}
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-9 sm:w-11 text-center font-mono text-xs font-semibold text-white/50 shrink-0">
-                    #{String(rankNumber).padStart(2, '0')}
+                    [{rankNumber}]
                   </span>
 
                   {/* Square Profile Picture (Neutral border, no blue glow) */}
@@ -206,8 +207,9 @@ export function LeaderboardTable({
                   </div>
                 </div>
 
-                {/* Right: Metric Value ONLY */}
-                <div className="text-right shrink-0 pl-3">
+                {/* Right: Metric Value with Blue Token Symbol */}
+                <div className="flex items-center justify-end gap-1.5 shrink-0 pl-3">
+                  <MetricTokenIcon className="size-3 sm:size-3.5" />
                   <span className="font-mono font-bold text-xs sm:text-sm text-white tracking-tight">
                     {getMetricValue(entry)}
                   </span>
