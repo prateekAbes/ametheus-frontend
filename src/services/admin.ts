@@ -595,9 +595,34 @@ export async function uploadMediaFile(file: File): Promise<{
   data_url: string
   filename: string
 }> {
-  const optimized = await optimizeImageForUpload(file, { maxDimension: 1920, maxSizeBytes: 850 * 1024 })
+  // If the file is within the 20MB platform limit, upload directly to preserve
+  // exact original pixels, format (JPEG, PNG, WebP, SVG), and color fidelity.
+  let uploadPayload: File = file
+  if (file.size > 20 * 1024 * 1024) {
+    uploadPayload = await optimizeImageForUpload(file, {
+      maxDimension: 2560,
+      maxSizeBytes: 18 * 1024 * 1024,
+      preserveFormat: true,
+    })
+  }
+
+  // Ensure file has appropriate MIME type if missing from the browser
+  if (!uploadPayload.type || uploadPayload.type === 'application/octet-stream') {
+    const fn = uploadPayload.name.toLowerCase()
+    let inferredType = 'image/jpeg'
+    if (fn.endsWith('.png')) inferredType = 'image/png'
+    else if (fn.endsWith('.webp')) inferredType = 'image/webp'
+    else if (fn.endsWith('.svg')) inferredType = 'image/svg+xml'
+    else if (fn.endsWith('.gif')) inferredType = 'image/gif'
+
+    uploadPayload = new File([uploadPayload], uploadPayload.name, {
+      type: inferredType,
+      lastModified: uploadPayload.lastModified || Date.now(),
+    })
+  }
+
   const formData = new FormData()
-  formData.append('file', optimized)
+  formData.append('file', uploadPayload)
   return apiClient<{
     status: string
     id: string

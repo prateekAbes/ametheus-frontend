@@ -54,6 +54,96 @@ function parseTargetRatio(ratioStr?: string): number {
   return 16 / 9
 }
 
+async function detectFileFormat(file: File): Promise<{
+  format: 'JPEG' | 'PNG' | 'WEBP' | 'GIF' | 'SVG' | 'UNKNOWN'
+  mime: string
+  isCorrupted: boolean
+}> {
+  const ext = file.name.split('.').pop()?.toUpperCase() || ''
+  const mime = (file.type || '').toLowerCase()
+
+  try {
+    const slice = file.slice(0, 32)
+    const buffer = await slice.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+
+    // JPEG: 0xFF, 0xD8
+    if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8) {
+      return { format: 'JPEG', mime: 'image/jpeg', isCorrupted: false }
+    }
+
+    // PNG: 0x89, 0x50, 0x4E, 0x47
+    if (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4E &&
+      bytes[3] === 0x47
+    ) {
+      return { format: 'PNG', mime: 'image/png', isCorrupted: false }
+    }
+
+    // WebP: RIFF....WEBP
+    if (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    ) {
+      return { format: 'WEBP', mime: 'image/webp', isCorrupted: false }
+    }
+
+    // GIF: GIF87a or GIF89a
+    if (
+      bytes.length >= 6 &&
+      bytes[0] === 0x47 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46
+    ) {
+      return { format: 'GIF', mime: 'image/gif', isCorrupted: false }
+    }
+
+    // SVG: text check
+    const text = new TextDecoder('utf-8').decode(bytes)
+    if (text.includes('<svg') || text.includes('<?xml')) {
+      return { format: 'SVG', mime: 'image/svg+xml', isCorrupted: false }
+    }
+
+    // Check if filename claims to be an image but bytes are completely invalid
+    const isImageExt = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'SVG'].includes(ext)
+    const isImageMime = mime.startsWith('image/')
+    if (isImageExt || isImageMime) {
+      return { format: 'UNKNOWN', mime: mime || 'application/octet-stream', isCorrupted: true }
+    }
+  } catch (err) {
+    console.warn('[CropFocalEditor] Failed to inspect magic bytes', err)
+  }
+
+  // Fallback to extension/MIME if slice fails
+  if (ext === 'JPG' || ext === 'JPEG' || mime.includes('jpeg') || mime.includes('jpg')) {
+    return { format: 'JPEG', mime: 'image/jpeg', isCorrupted: false }
+  }
+  if (ext === 'PNG' || mime.includes('png')) {
+    return { format: 'PNG', mime: 'image/png', isCorrupted: false }
+  }
+  if (ext === 'WEBP' || mime.includes('webp')) {
+    return { format: 'WEBP', mime: 'image/webp', isCorrupted: false }
+  }
+  if (ext === 'SVG' || mime.includes('svg')) {
+    return { format: 'SVG', mime: 'image/svg+xml', isCorrupted: false }
+  }
+  if (ext === 'GIF' || mime.includes('gif')) {
+    return { format: 'GIF', mime: 'image/gif', isCorrupted: false }
+  }
+
+  return { format: 'UNKNOWN', mime: mime || 'application/octet-stream', isCorrupted: false }
+}
+
 export function CropFocalEditor({
   value = '',
   onChangeAsset,
@@ -92,6 +182,8 @@ export function CropFocalEditor({
 
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false)
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
   const [naturalMeta, setNaturalMeta] = useState<ImageNaturalMeta | null>(null)
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
   const [isDragging, setIsDragging] = useState(false)
@@ -103,16 +195,47 @@ export function CropFocalEditor({
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const resolvedUrl = useMemo(() => resolveMediaUrl(value), [value])
-
-  // Inspect natural image dimensions whenever resolvedUrl changes
+  // Clean up object URL when component unmounts or preview changes
   useEffect(() => {
-    if (!resolvedUrl) {
+    return () => {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl)
+      }
+    }
+  }, [localPreviewUrl])
+
+  const resolvedUrl = useMemo(() => resolveMediaUrl(value), [value])
+  const displayUrl = localPreviewUrl || resolvedUrl
+
+  // Form input accept attribute: ensures .jpg, .jpeg, and upper/lowercase variants are visible in OS dialogs
+  const acceptAttribute = useMemo(() => {
+    const tokens: string[] = []
+    for (const f of effectiveAcceptedFormats) {
+      const upper = f.toUpperCase()
+      if (upper === 'JPEG' || upper === 'JPG') {
+        tokens.push('.jpg', '.jpeg', '.JPG', '.JPEG', 'image/jpeg', 'image/jpg')
+      } else if (upper === 'PNG') {
+        tokens.push('.png', '.PNG', 'image/png')
+      } else if (upper === 'WEBP') {
+        tokens.push('.webp', '.WEBP', 'image/webp')
+      } else if (upper === 'SVG') {
+        tokens.push('.svg', '.SVG', 'image/svg+xml')
+      } else {
+        tokens.push(`.${f.toLowerCase()}`)
+      }
+    }
+    return Array.from(new Set(tokens)).join(',')
+  }, [effectiveAcceptedFormats])
+
+  // Inspect natural image dimensions whenever displayUrl changes
+  useEffect(() => {
+    if (!displayUrl) {
       setNaturalMeta(null)
+      setImageLoadError(false)
       return
     }
+    setImageLoadError(false)
     const img = new Image()
-    img.crossOrigin = 'anonymous'
     img.onload = () => {
       const w = img.naturalWidth
       const h = img.naturalHeight
@@ -136,37 +259,53 @@ export function CropFocalEditor({
     }
     img.onerror = () => {
       setNaturalMeta(null)
+      setImageLoadError(true)
     }
-    img.src = resolvedUrl
-  }, [resolvedUrl])
+    img.src = displayUrl
+  }, [displayUrl])
 
-  // Target-specific file upload validation handler
+  // Target-specific file upload validation handler with magic bytes & instant preview
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadError(null)
+    setImageLoadError(false)
 
-    // 1. Format validation
+    // 1. Format validation using binary magic bytes and extension
+    const detected = await detectFileFormat(file)
+
+    if (detected.isCorrupted) {
+      setUploadError(
+        'Corrupted or invalid file. The selected file does not contain valid image data.'
+      )
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
     const ext = file.name.split('.').pop()?.toUpperCase() || ''
-    const mime = file.type.toLowerCase()
-    const isSvgAccepted = effectiveAcceptedFormats.includes('SVG')
-    const isSvg = ext === 'SVG' || mime.includes('svg')
-    const isPng = ext === 'PNG' || mime.includes('png')
-    const isJpg = ext === 'JPG' || ext === 'JPEG' || mime.includes('jpeg')
-    const isWebp = ext === 'WEBP' || mime.includes('webp')
+    const acceptsJpeg = effectiveAcceptedFormats.some(
+      (f) => f.toUpperCase() === 'JPEG' || f.toUpperCase() === 'JPG'
+    )
+    const acceptsPng = effectiveAcceptedFormats.some((f) => f.toUpperCase() === 'PNG')
+    const acceptsWebp = effectiveAcceptedFormats.some((f) => f.toUpperCase() === 'WEBP')
+    const acceptsSvg = effectiveAcceptedFormats.some((f) => f.toUpperCase() === 'SVG')
 
     const isFormatValid =
-      (isSvg && isSvgAccepted) ||
-      (isPng && effectiveAcceptedFormats.includes('PNG')) ||
-      (isJpg && effectiveAcceptedFormats.includes('JPEG')) ||
-      (isWebp && effectiveAcceptedFormats.includes('WEBP'))
+      (detected.format === 'JPEG' && acceptsJpeg) ||
+      (detected.format === 'PNG' && acceptsPng) ||
+      (detected.format === 'WEBP' && acceptsWebp) ||
+      (detected.format === 'SVG' && acceptsSvg) ||
+      (detected.format === 'GIF' && acceptsPng)
 
-    if (!isFormatValid && ext) {
+    if (!isFormatValid) {
+      const formatLabel =
+        detected.format === 'UNKNOWN' ? `.${ext.toLowerCase() || 'unknown'}` : detected.format
       setUploadError(
-        `Unsupported format (.${ext.toLowerCase()}). Accepted formats: ${effectiveAcceptedFormats.join(
+        `Unsupported format (${formatLabel}). This target accepts: ${effectiveAcceptedFormats.join(
           ', '
         )}.`
       )
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
@@ -176,17 +315,26 @@ export function CropFocalEditor({
       setUploadError(
         `File size (${sizeMb} MB) exceeds the ${effectiveMaxSizeLabel} upload limit.`
       )
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
+    // 3. Create immediate local preview so the user sees the image right away
+    const tempUrl = URL.createObjectURL(file)
+    setLocalPreviewUrl(tempUrl)
     setIsUploading(true)
+
     try {
       const res = await uploadMediaFile(file)
       if (res?.url && onChangeAsset) {
         onChangeAsset(res.url)
       }
+      setLocalPreviewUrl(null)
+      URL.revokeObjectURL(tempUrl)
     } catch (err: any) {
-      setUploadError(err.message || 'Image upload failed')
+      setUploadError(err.message || 'Image upload failed. Please verify the backend connection.')
+      setLocalPreviewUrl(null)
+      URL.revokeObjectURL(tempUrl)
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -352,7 +500,7 @@ export function CropFocalEditor({
         <input
           ref={fileInputRef}
           type="file"
-          accept={effectiveAcceptedFormats.map((f) => `.${f.toLowerCase()}`).join(',')}
+          accept={acceptAttribute}
           className="hidden"
           onChange={handleFileUpload}
         />
@@ -433,7 +581,7 @@ export function CropFocalEditor({
       )}
 
       {/* View Mode Toggle: Interactive Canvas vs Contextual Preview */}
-      {value && (
+      {(value || localPreviewUrl) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div className="flex items-center gap-1 bg-surface p-0.5 rounded border border-white/10">
             <button
@@ -475,7 +623,7 @@ export function CropFocalEditor({
       )}
 
       {/* Main Interactive Work Area */}
-      {value ? (
+      {(value || localPreviewUrl) ? (
         activeTab === 'editor' ? (
           <div className="space-y-4">
             {/* Interactive Focal Canvas */}
@@ -495,10 +643,32 @@ export function CropFocalEditor({
               >
                 {/* Visual Image */}
                 <img
-                  src={resolvedUrl}
+                  src={displayUrl}
                   alt="Focal calibration"
                   className="size-full object-contain pointer-events-none select-none"
+                  onError={() => setImageLoadError(true)}
                 />
+
+                {/* Uploading progress overlay */}
+                {isUploading && (
+                  <div className="absolute inset-0 bg-void/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-30">
+                    <div className="size-6 border-2 border-cyan border-t-transparent rounded-full animate-spin" />
+                    <span className="font-mono text-xs text-cyan uppercase font-bold tracking-wider">
+                      Uploading image...
+                    </span>
+                  </div>
+                )}
+
+                {/* Image loading failure plate */}
+                {imageLoadError && !isUploading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center bg-surface/90 text-red-300 font-mono text-xs z-20">
+                    <AlertTriangle className="size-6 text-red-400" />
+                    <p className="font-bold">Failed to load image preview</p>
+                    <p className="text-[11px] text-dim max-w-xs">
+                      The image could not be loaded from storage. Check your network or upload a replacement asset.
+                    </p>
+                  </div>
+                )}
 
                 {/* Grid Overlay Guide (Rule of Thirds) */}
                 {effectiveAllowFocal && (
@@ -740,7 +910,7 @@ export function CropFocalEditor({
                 }}
               >
                 <DynamicImage
-                  src={value}
+                  src={localPreviewUrl || value}
                   alt="Contextual preview"
                   mode={fitMode}
                   focalPoint={focalPoint}

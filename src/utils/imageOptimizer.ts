@@ -18,6 +18,8 @@ export interface ImageOptimizationOptions {
   maxSizeBytes?: number
   /** Initial compression quality from 0.0 to 1.0. Default is 0.88. */
   quality?: number
+  /** Whether to preserve original format (e.g. JPEG -> JPEG, PNG -> PNG) rather than converting to WebP. Default is true. */
+  preserveFormat?: boolean
 }
 
 export async function optimizeImageForUpload(
@@ -28,6 +30,7 @@ export async function optimizeImageForUpload(
     maxDimension = 1920,
     maxSizeBytes = 750 * 1024,
     quality = 0.88,
+    preserveFormat = true,
   } = options
 
   // 1. Vector graphics (SVG): bypass rasterization to preserve infinite vector sharpness.
@@ -105,6 +108,11 @@ export async function optimizeImageForUpload(
         ctx.imageSmoothingQuality = 'high'
 
         const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png')
+        const isJpg =
+          file.type === 'image/jpeg' ||
+          file.type === 'image/jpg' ||
+          file.name.toLowerCase().endsWith('.jpg') ||
+          file.name.toLowerCase().endsWith('.jpeg')
 
         // Draw image keeping exact proportions and transparent alpha channel intact
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
@@ -115,15 +123,28 @@ export async function optimizeImageForUpload(
           })
         }
 
-        // Prefer WebP for high quality & small footprint (supported by all modern browsers and our backend)
+        // Determine target format: strictly preserve original if requested or if JPEG/PNG
         let targetMime = 'image/webp'
         let targetExt = '.webp'
+        if (preserveFormat || isJpg || isPng) {
+          if (isJpg) {
+            targetMime = 'image/jpeg'
+            targetExt = '.jpg'
+          } else if (isPng) {
+            targetMime = 'image/png'
+            targetExt = '.png'
+          }
+        }
         let currentQuality = quality
 
         let blob = await exportBlob(targetMime, currentQuality)
-        if (!blob || blob.type !== 'image/webp') {
-          // Fallback if browser doesn't export WebP
-          if (isPng) {
+        if (!blob || blob.type !== targetMime) {
+          // Fallback if browser doesn't export selected MIME
+          if (isJpg) {
+            targetMime = 'image/jpeg'
+            targetExt = '.jpg'
+            blob = await exportBlob(targetMime, currentQuality)
+          } else if (isPng) {
             targetMime = 'image/png'
             targetExt = '.png'
             blob = await exportBlob(targetMime, currentQuality)
