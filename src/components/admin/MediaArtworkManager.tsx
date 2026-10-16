@@ -272,17 +272,17 @@ function GamesArtworkSection({
             focal_x: cfg.homepage_hero_floating?.focal_x ?? 50,
             focal_y: cfg.homepage_hero_floating?.focal_y ?? 50,
             zoom: cfg.homepage_hero_floating?.zoom ?? 1,
-            fit_mode: cfg.homepage_hero_floating?.fit_mode || 'cover',
+            fit_mode: cfg.homepage_hero_floating?.fit_mode || 'contain',
           },
           catalog_card: {
-            asset_url: cfg.catalog_card?.asset_url || selectedGame.poster_url || '',
+            asset_url: cfg.catalog_card?.asset_url || selectedGame.poster_url || selectedGame.banner_url || '',
             focal_x: cfg.catalog_card?.focal_x ?? 50,
             focal_y: cfg.catalog_card?.focal_y ?? 50,
             zoom: cfg.catalog_card?.zoom ?? 1,
             fit_mode: cfg.catalog_card?.fit_mode || 'cover',
           },
           coming_soon_catalog_card: {
-            asset_url: cfg.coming_soon_catalog_card?.asset_url || selectedGame.poster_url || '',
+            asset_url: cfg.coming_soon_catalog_card?.asset_url || selectedGame.poster_url || selectedGame.banner_url || '',
             focal_x: cfg.coming_soon_catalog_card?.focal_x ?? 50,
             focal_y: cfg.coming_soon_catalog_card?.focal_y ?? 50,
             zoom: cfg.coming_soon_catalog_card?.zoom ?? 1,
@@ -293,10 +293,10 @@ function GamesArtworkSection({
             focal_x: cfg.banner?.focal_x ?? 50,
             focal_y: cfg.banner?.focal_y ?? 50,
             zoom: cfg.banner?.zoom ?? 1,
-            fit_mode: cfg.banner?.fit_mode || 'cover',
+            fit_mode: cfg.banner?.fit_mode || 'ambient',
           },
           showcase_card: {
-            asset_url: cfg.showcase_card?.asset_url || selectedGame.poster_url || '',
+            asset_url: cfg.showcase_card?.asset_url || selectedGame.poster_url || selectedGame.banner_url || '',
             focal_x: cfg.showcase_card?.focal_x ?? 50,
             focal_y: cfg.showcase_card?.focal_y ?? 50,
             zoom: cfg.showcase_card?.zoom ?? 1,
@@ -311,11 +311,11 @@ function GamesArtworkSection({
   }, [selectedGame])
 
   const currentConfig = gameMediaState[currentGameId] || {
-    homepage_hero_floating: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    catalog_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    coming_soon_catalog_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    banner: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    showcase_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    homepage_hero_floating: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'contain' },
+    catalog_card: { asset_url: selectedGame?.poster_url || selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    coming_soon_catalog_card: { asset_url: selectedGame?.poster_url || selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    banner: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'ambient' },
+    showcase_card: { asset_url: selectedGame?.poster_url || selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     logo: { asset_url: selectedGame?.logo_url || '' },
   }
 
@@ -471,6 +471,7 @@ function GamesArtworkSection({
                   return (
                     <CropFocalEditor
                       key={role.id}
+                      roleSpec={role}
                       value={slotConfig.asset_url || ''}
                       onChangeAsset={(url) => updateSlot(role.slotKey, 'asset_url', url)}
                       focalPoint={{
@@ -483,7 +484,7 @@ function GamesArtworkSection({
                       }}
                       zoom={slotConfig.zoom ?? 1}
                       onChangeZoom={(z) => updateSlot(role.slotKey, 'zoom', z)}
-                      fitMode={slotConfig.fit_mode || 'cover'}
+                      fitMode={slotConfig.fit_mode || role.defaultFitMode || 'cover'}
                       onChangeFitMode={(m) => updateSlot(role.slotKey, 'fit_mode', m)}
                       targetAspectRatio={role.aspectRatio}
                       recommendedResolution={role.recommendedResolution}
@@ -836,6 +837,7 @@ function TournamentsArtworkSection({
                   return (
                     <CropFocalEditor
                       key={role.id}
+                      roleSpec={role}
                       value={slotConfig.asset_url || ''}
                       onChangeAsset={(url) => updateSlot(role.slotKey, 'asset_url', url)}
                       focalPoint={{
@@ -848,7 +850,7 @@ function TournamentsArtworkSection({
                       }}
                       zoom={slotConfig.zoom ?? 1}
                       onChangeZoom={(z) => updateSlot(role.slotKey, 'zoom', z)}
-                      fitMode={slotConfig.fit_mode || 'cover'}
+                      fitMode={slotConfig.fit_mode || role.defaultFitMode || 'cover'}
                       onChangeFitMode={(m) => updateSlot(role.slotKey, 'fit_mode', m)}
                       targetAspectRatio={role.aspectRatio}
                       recommendedResolution={role.recommendedResolution}

@@ -8,11 +8,15 @@ import {
   Eye,
   CheckCircle2,
   AlertTriangle,
+  Info,
   Sparkles,
+  ShieldAlert,
+  Layers,
 } from 'lucide-react'
 import { uploadMediaFile } from '../../services/admin'
 import { resolveMediaUrl } from '../../services/apiClient'
 import DynamicImage from '../DynamicImage'
+import { ArtworkRoleDefinition } from '../../lib/artworkRegistry'
 
 export interface CropFocalEditorProps {
   value?: string
@@ -23,6 +27,7 @@ export interface CropFocalEditorProps {
   onChangeZoom?: (z: number) => void
   fitMode?: 'cover' | 'contain' | 'ambient'
   onChangeFitMode?: (m: 'cover' | 'contain' | 'ambient') => void
+  roleSpec?: ArtworkRoleDefinition
   targetAspectRatio?: string
   recommendedResolution?: string
   slotLabel?: string
@@ -41,7 +46,9 @@ interface ImageNaturalMeta {
 function parseTargetRatio(ratioStr?: string): number {
   if (!ratioStr) return 16 / 9
   if (ratioStr.includes(':')) {
-    const [w, h] = ratioStr.split(':').map(Number)
+    const parts = ratioStr.split(':')
+    const w = parseFloat(parts[0])
+    const h = parseFloat(parts[1])
     if (w && h) return w / h
   }
   return 16 / 9
@@ -56,6 +63,7 @@ export function CropFocalEditor({
   onChangeZoom,
   fitMode = 'cover',
   onChangeFitMode,
+  roleSpec,
   targetAspectRatio = '16:9',
   recommendedResolution = 'Universal',
   slotLabel,
@@ -63,11 +71,34 @@ export function CropFocalEditor({
   previewType = 'game_card',
   onOpenMediaLibrary,
 }: CropFocalEditorProps) {
+  // Derive effective target specifications from roleSpec or fallback props
+  const effectiveTargetRatio = roleSpec?.aspectRatio || targetAspectRatio
+  const effectiveRecommendedResolution = roleSpec?.recommendedResolution || recommendedResolution
+  const effectiveSlotLabel = roleSpec?.name || slotLabel || 'Artwork Container'
+  const effectiveSlotDescription = roleSpec?.description || slotDescription
+  const effectivePreviewType = roleSpec?.previewType || previewType
+  const effectiveAcceptedFormats = roleSpec?.acceptedFormats || ['PNG', 'JPEG', 'WEBP']
+  const effectiveMaxSizeBytes = roleSpec?.maxSizeBytes || 25 * 1024 * 1024
+  const effectiveMaxSizeLabel = roleSpec?.maxSizeLabel || '25 MB'
+  const effectiveMinWidth = roleSpec?.minWidth || 600
+  const effectiveMinHeight = roleSpec?.minHeight || 400
+  const effectiveTransparency = roleSpec?.transparency || 'not_recommended'
+  const effectiveTransparencyNotice = roleSpec?.transparencyNotice
+  const effectiveAllowCrop = roleSpec?.allowCrop ?? true
+  const effectiveAllowFocal = roleSpec?.allowFocalPoint ?? true
+  const effectiveAllowZoom = roleSpec?.allowZoom ?? true
+  const effectiveAllowedFitModes = roleSpec?.allowedFitModes || ['cover', 'contain', 'ambient']
+  const effectiveSafeArea = roleSpec?.safeAreaGuide
+
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [naturalMeta, setNaturalMeta] = useState<ImageNaturalMeta | null>(null)
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
   const [isDragging, setIsDragging] = useState(false)
+  const [showSafeArea, setShowSafeArea] = useState<boolean>(true)
+  const [showCheckerboard, setShowCheckerboard] = useState<boolean>(
+    effectiveTransparency === 'supported'
+  )
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -109,14 +140,42 @@ export function CropFocalEditor({
     img.src = resolvedUrl
   }, [resolvedUrl])
 
-  // File Upload Handler
+  // Target-specific file upload validation handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadError(null)
 
-    if (file.size > 25 * 1024 * 1024) {
-      setUploadError('File size exceeds 25MB limit.')
+    // 1. Format validation
+    const ext = file.name.split('.').pop()?.toUpperCase() || ''
+    const mime = file.type.toLowerCase()
+    const isSvgAccepted = effectiveAcceptedFormats.includes('SVG')
+    const isSvg = ext === 'SVG' || mime.includes('svg')
+    const isPng = ext === 'PNG' || mime.includes('png')
+    const isJpg = ext === 'JPG' || ext === 'JPEG' || mime.includes('jpeg')
+    const isWebp = ext === 'WEBP' || mime.includes('webp')
+
+    const isFormatValid =
+      (isSvg && isSvgAccepted) ||
+      (isPng && effectiveAcceptedFormats.includes('PNG')) ||
+      (isJpg && effectiveAcceptedFormats.includes('JPEG')) ||
+      (isWebp && effectiveAcceptedFormats.includes('WEBP'))
+
+    if (!isFormatValid && ext) {
+      setUploadError(
+        `Unsupported format (.${ext.toLowerCase()}). Accepted formats: ${effectiveAcceptedFormats.join(
+          ', '
+        )}.`
+      )
+      return
+    }
+
+    // 2. Upload size validation
+    if (file.size > effectiveMaxSizeBytes) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1)
+      setUploadError(
+        `File size (${sizeMb} MB) exceeds the ${effectiveMaxSizeLabel} upload limit.`
+      )
       return
     }
 
@@ -148,6 +207,7 @@ export function CropFocalEditor({
   }
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!effectiveAllowFocal) return
     setIsDragging(true)
     updateFocalFromEvent(e)
   }
@@ -158,6 +218,7 @@ export function CropFocalEditor({
         updateFocalFromEvent(e)
       }
     }
+
     const handleMouseUp = () => {
       if (isDragging) setIsDragging(false)
     }
@@ -172,51 +233,117 @@ export function CropFocalEditor({
     }
   }, [isDragging])
 
-  // Target ratio comparison check
-  const ratioDelta = useMemo(() => {
+  // Aspect ratio comparison check based on target policy
+  const ratioValidation = useMemo(() => {
     if (!naturalMeta) return null
-    const target = parseTargetRatio(targetAspectRatio)
-    return Math.abs(naturalMeta.aspectRatio - target)
-  }, [naturalMeta, targetAspectRatio])
 
-  const ratioStatus = useMemo(() => {
-    if (!naturalMeta) return null
-    if (ratioDelta !== null && ratioDelta < 0.15) {
+    if (roleSpec?.ratioPolicy === 'flexible') {
+      const min = roleSpec.minRatio || 0.7
+      const max = roleSpec.maxRatio || 1.55
+      const isWithin = naturalMeta.aspectRatio >= min && naturalMeta.aspectRatio <= max
+      if (isWithin) {
+        return {
+          type: 'success' as const,
+          message: `Flexible ratio approved: ${naturalMeta.ratioName} (${naturalMeta.aspectRatio.toFixed(
+            2
+          )}:1). Preserves full subject without forced cropping.`,
+        }
+      }
       return {
-        type: 'success',
-        message: `Native match (${naturalMeta.ratioName} · ${naturalMeta.aspectRatio.toFixed(2)}:1)`,
+        type: 'info' as const,
+        message: `Non-standard ratio (${naturalMeta.aspectRatio.toFixed(
+          2
+        )}:1). Centered contain mode will scale cleanly without cropping.`,
+      }
+    }
+
+    // Fixed ratio comparison
+    const target = roleSpec?.targetRatioValue || parseTargetRatio(effectiveTargetRatio)
+    const delta = Math.abs(naturalMeta.aspectRatio - target)
+
+    if (delta < 0.1) {
+      return {
+        type: 'success' as const,
+        message: `Native aspect ratio match: ${naturalMeta.ratioName} (${naturalMeta.aspectRatio.toFixed(
+          2
+        )}:1). Fits ${effectiveTargetRatio} container cleanly.`,
       }
     }
     return {
-      type: 'warning',
-      message: `Image is ${naturalMeta.ratioName} (${naturalMeta.aspectRatio.toFixed(2)}:1). Container is ${targetAspectRatio}. Focal & Zoom positioning handles framing cleanly.`,
+      type: 'info' as const,
+      message: `Image is ${naturalMeta.ratioName} (${naturalMeta.aspectRatio.toFixed(
+        2
+      )}:1). Container is ${effectiveTargetRatio} (${effectiveRecommendedResolution}). Adjust the Focal Point Reticle below to position the key subject.`,
     }
-  }, [naturalMeta, ratioDelta, targetAspectRatio])
+  }, [naturalMeta, roleSpec, effectiveTargetRatio, effectiveRecommendedResolution])
+
+  // Resolution dimension validation
+  const dimensionValidation = useMemo(() => {
+    if (!naturalMeta) return null
+    const isBelowMin =
+      naturalMeta.width < effectiveMinWidth || naturalMeta.height < effectiveMinHeight
+    if (isBelowMin) {
+      return {
+        type: 'warning' as const,
+        message: `Insufficient dimensions: ${naturalMeta.width} × ${naturalMeta.height} px. Minimum required: ${effectiveMinWidth} × ${effectiveMinHeight} px for clean rendering.`,
+      }
+    }
+    return {
+      type: 'success' as const,
+      message: `Resolution verified: ${naturalMeta.width} × ${naturalMeta.height} px (Meets minimum ${effectiveMinWidth} × ${effectiveMinHeight} px).`,
+    }
+  }, [naturalMeta, effectiveMinWidth, effectiveMinHeight])
 
   const handleReset = () => {
     if (onChangeFocalPoint) onChangeFocalPoint({ x: 50, y: 50 })
     if (onChangeZoom) onChangeZoom(1)
-    if (onChangeFitMode) onChangeFitMode('cover')
+    if (onChangeFitMode) onChangeFitMode(roleSpec?.defaultFitMode || 'cover')
   }
 
   return (
     <div className="rounded-lg border border-white/10 bg-void/60 p-4 space-y-4">
-      {/* Header Info */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-        <div>
-          {slotLabel && (
+      {/* Header Info & Target Specifications Bar */}
+      <div className="flex flex-col gap-2 border-b border-white/10 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
             <h4 className="font-display text-sm font-bold uppercase tracking-wider text-ink flex items-center gap-2">
               <Sparkles className="size-3.5 text-cyan" />
-              {slotLabel}
+              {effectiveSlotLabel}
             </h4>
-          )}
-          {slotDescription && <p className="font-mono text-xs text-dim mt-0.5">{slotDescription}</p>}
+            {effectiveSlotDescription && (
+              <p className="font-mono text-xs text-dim mt-0.5">{effectiveSlotDescription}</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+            <span className="bg-white/5 border border-white/10 px-2 py-0.5 text-dim uppercase rounded-xs">
+              Ratio: <strong className="text-cyan font-bold">{effectiveTargetRatio}</strong>
+            </span>
+            <span className="bg-white/5 border border-white/10 px-2 py-0.5 text-dim uppercase rounded-xs">
+              Rec: <strong className="text-ink font-semibold">{effectiveRecommendedResolution}</strong>
+            </span>
+            <span className="bg-white/5 border border-white/10 px-2 py-0.5 text-dim uppercase rounded-xs">
+              Min: <strong className="text-dim">{effectiveMinWidth}×{effectiveMinHeight}</strong>
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 text-dim uppercase">
-            Target: <strong className="text-cyan font-bold">{targetAspectRatio}</strong> ({recommendedResolution})
+        {/* Target Transparency & Format Badges */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[10px]">
+          <span className="text-dim">
+            Accepted: <strong className="text-white/80">{effectiveAcceptedFormats.join(', ')}</strong> (Max {effectiveMaxSizeLabel})
           </span>
+          {effectiveTransparency === 'supported' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan/10 border border-cyan/30 text-cyan rounded-xs font-semibold">
+              <Layers className="size-3" />
+              Transparency Supported (PNG / WebP)
+            </span>
+          )}
+          {effectiveTransparencyNotice && (
+            <span className="text-[#8995A8] text-[10px] hidden md:inline">
+              • {effectiveTransparencyNotice}
+            </span>
+          )}
         </div>
       </div>
 
@@ -225,7 +352,7 @@ export function CropFocalEditor({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept={effectiveAcceptedFormats.map((f) => `.${f.toLowerCase()}`).join(',')}
           className="hidden"
           onChange={handleFileUpload}
         />
@@ -261,6 +388,7 @@ export function CropFocalEditor({
         )}
       </div>
 
+      {/* Upload Error Message */}
       {uploadError && (
         <div className="flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/30 text-red-300 font-mono text-xs">
           <AlertTriangle className="size-4 shrink-0" />
@@ -268,32 +396,45 @@ export function CropFocalEditor({
         </div>
       )}
 
-      {/* Dimension & Aspect Ratio Inspector Status */}
+      {/* Target-Specific Image Dimension & Ratio Validation Status */}
       {naturalMeta && (
-        <div
-          className={`flex items-center justify-between gap-3 px-3 py-2 rounded border font-mono text-xs ${
-            ratioStatus?.type === 'success'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-              : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {ratioStatus?.type === 'success' ? (
-              <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-            ) : (
+        <div className="space-y-1.5 font-mono text-xs">
+          {/* Ratio Check Message */}
+          {ratioValidation && (
+            <div
+              className={`flex items-center justify-between gap-3 px-3 py-2 rounded border ${
+                ratioValidation.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-cyan/10 border-cyan/30 text-cyan'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {ratioValidation.type === 'success' ? (
+                  <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <Info className="size-4 shrink-0 text-cyan" />
+                )}
+                <span>{ratioValidation.message}</span>
+              </div>
+              <div className="text-[11px] font-bold shrink-0 opacity-80">
+                {naturalMeta.width} × {naturalMeta.height}px
+              </div>
+            </div>
+          )}
+
+          {/* Dimension Check Message */}
+          {dimensionValidation && dimensionValidation.type === 'warning' && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded border bg-amber-500/10 border-amber-500/30 text-amber-300">
               <AlertTriangle className="size-4 shrink-0 text-amber-400" />
-            )}
-            <span>{ratioStatus?.message}</span>
-          </div>
-          <div className="text-[11px] font-bold shrink-0 opacity-80">
-            {naturalMeta.width} × {naturalMeta.height}px
-          </div>
+              <span>{dimensionValidation.message}</span>
+            </div>
+          )}
         </div>
       )}
 
       {/* View Mode Toggle: Interactive Canvas vs Contextual Preview */}
       {value && (
-        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div className="flex items-center gap-1 bg-surface p-0.5 rounded border border-white/10">
             <button
               type="button"
@@ -305,7 +446,7 @@ export function CropFocalEditor({
               }`}
             >
               <Crosshair className="size-3.5" />
-              Focal Point Canvas
+              Focal & Crop Canvas
             </button>
             <button
               type="button"
@@ -325,10 +466,10 @@ export function CropFocalEditor({
             type="button"
             onClick={handleReset}
             className="flex items-center gap-1 font-mono text-[11px] text-dim hover:text-ink transition-colors cursor-pointer"
-            title="Reset focal point and zoom"
+            title="Reset focal point, zoom, and fit mode to defaults"
           >
             <RefreshCw className="size-3" />
-            Reset
+            Reset to Defaults
           </button>
         </div>
       )}
@@ -342,7 +483,15 @@ export function CropFocalEditor({
               <div
                 ref={canvasRef}
                 onMouseDown={handleMouseDown}
-                className="relative w-full max-h-[380px] h-[300px] flex items-center justify-center cursor-crosshair overflow-hidden"
+                className={`relative w-full max-h-[380px] h-[300px] flex items-center justify-center overflow-hidden ${
+                  effectiveAllowFocal ? 'cursor-crosshair' : 'cursor-default'
+                }`}
+                style={{
+                  background:
+                    showCheckerboard && effectiveTransparency === 'supported'
+                      ? 'repeating-conic-gradient(#181822 0% 25%, #101018 0% 50%) 50% / 20px 20px'
+                      : undefined,
+                }}
               >
                 {/* Visual Image */}
                 <img
@@ -352,127 +501,140 @@ export function CropFocalEditor({
                 />
 
                 {/* Grid Overlay Guide (Rule of Thirds) */}
-                <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-20 border border-white/10">
-                  <div className="border-r border-b border-white/20" />
-                  <div className="border-r border-b border-white/20" />
-                  <div className="border-b border-white/20" />
-                  <div className="border-r border-b border-white/20" />
-                  <div className="border-r border-b border-white/20" />
-                  <div className="border-b border-white/20" />
-                  <div className="border-r border-white/20" />
-                  <div className="border-r border-white/20" />
-                  <div />
-                </div>
+                {effectiveAllowFocal && (
+                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-20 border border-white/10">
+                    <div className="border-r border-b border-white/20" />
+                    <div className="border-r border-b border-white/20" />
+                    <div className="border-b border-white/20" />
+                    <div className="border-r border-b border-white/20" />
+                    <div className="border-r border-b border-white/20" />
+                    <div className="border-b border-white/20" />
+                    <div className="border-r border-b border-white/20" />
+                    <div className="border-r border-b border-white/20" />
+                    <div />
+                  </div>
+                )}
 
                 {/* Reticle / Focal Point Crosshair Indicator */}
-                <div
-                  className="absolute pointer-events-none transition-transform duration-75"
-                  style={{
-                    left: `${focalPoint.x}%`,
-                    top: `${focalPoint.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <div className="size-8 rounded-full border-2 border-cyan bg-cyan/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse" />
-                    <div className="absolute size-2 rounded-full bg-white shadow-sm" />
-                    <span className="absolute left-6 -top-2 whitespace-nowrap rounded bg-void/90 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan border border-cyan/40">
-                      {focalPoint.x}%, {focalPoint.y}%
-                    </span>
+                {effectiveAllowFocal && (
+                  <div
+                    className="absolute pointer-events-none transition-transform duration-75"
+                    style={{
+                      left: `${focalPoint.x}%`,
+                      top: `${focalPoint.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div className="relative flex items-center justify-center">
+                      <div className="size-8 rounded-full border-2 border-cyan bg-cyan/20 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse" />
+                      <div className="absolute size-2 rounded-full bg-white shadow-sm" />
+                      <span className="absolute left-6 -top-2 whitespace-nowrap rounded bg-void/90 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan border border-cyan/40">
+                        {focalPoint.x}%, {focalPoint.y}%
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Quick instructions bar */}
               <div className="flex items-center justify-between px-3 py-1.5 bg-surface/90 border-t border-white/10 font-mono text-[10px] text-dim">
-                <span>Click or drag anywhere on the image to set the focal focus reticle</span>
-                <span className="text-cyan font-semibold">
-                  Active Focal: X: {focalPoint.x}% · Y: {focalPoint.y}%
+                <span>
+                  {effectiveAllowFocal
+                    ? 'Click or drag anywhere on the canvas to set the focal focus reticle'
+                    : 'Fixed emblem / icon: scales centered without focal cropping'}
                 </span>
+                {effectiveAllowFocal && (
+                  <span className="text-cyan font-semibold">
+                    Active Focal: X: {focalPoint.x}% · Y: {focalPoint.y}%
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Precision Controls Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-surface/40 rounded border border-white/5">
-              {/* Focal X Slider */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-dim">Focal Point X (Horiz)</span>
-                  <span className="text-cyan font-bold">{focalPoint.x}%</span>
+            {effectiveAllowFocal && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-surface/40 rounded border border-white/5">
+                {/* Focal X Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between font-mono text-xs">
+                    <span className="text-dim">Focal Point X (Horiz)</span>
+                    <span className="text-cyan font-bold">{focalPoint.x}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={focalPoint.x}
+                    onChange={(e) =>
+                      onChangeFocalPoint &&
+                      onChangeFocalPoint({ ...focalPoint, x: Number(e.target.value) })
+                    }
+                    className="w-full accent-cyan cursor-pointer"
+                  />
+                  <div className="flex justify-between font-mono text-[9px] text-dim">
+                    <span>0% (Left)</span>
+                    <span>50% (Center)</span>
+                    <span>100% (Right)</span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={focalPoint.x}
-                  onChange={(e) =>
-                    onChangeFocalPoint &&
-                    onChangeFocalPoint({ ...focalPoint, x: Number(e.target.value) })
-                  }
-                  className="w-full accent-cyan cursor-pointer"
-                />
-                <div className="flex justify-between font-mono text-[9px] text-dim">
-                  <span>0% (Left)</span>
-                  <span>50% (Center)</span>
-                  <span>100% (Right)</span>
-                </div>
-              </div>
 
-              {/* Focal Y Slider */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-dim">Focal Point Y (Vert)</span>
-                  <span className="text-cyan font-bold">{focalPoint.y}%</span>
+                {/* Focal Y Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between font-mono text-xs">
+                    <span className="text-dim">Focal Point Y (Vert)</span>
+                    <span className="text-cyan font-bold">{focalPoint.y}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={focalPoint.y}
+                    onChange={(e) =>
+                      onChangeFocalPoint &&
+                      onChangeFocalPoint({ ...focalPoint, y: Number(e.target.value) })
+                    }
+                    className="w-full accent-cyan cursor-pointer"
+                  />
+                  <div className="flex justify-between font-mono text-[9px] text-dim">
+                    <span>0% (Top)</span>
+                    <span>50% (Center)</span>
+                    <span>100% (Bottom)</span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={focalPoint.y}
-                  onChange={(e) =>
-                    onChangeFocalPoint &&
-                    onChangeFocalPoint({ ...focalPoint, y: Number(e.target.value) })
-                  }
-                  className="w-full accent-cyan cursor-pointer"
-                />
-                <div className="flex justify-between font-mono text-[9px] text-dim">
-                  <span>0% (Top)</span>
-                  <span>50% (Center)</span>
-                  <span>100% (Bottom)</span>
-                </div>
-              </div>
 
-              {/* Zoom & Fit Mode */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-dim flex items-center gap-1">
-                    <ZoomIn className="size-3" /> Zoom Scale
-                  </span>
-                  <span className="text-cyan font-bold">{zoom.toFixed(2)}x</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="3"
-                  step="0.05"
-                  value={zoom}
-                  onChange={(e) => onChangeZoom && onChangeZoom(Number(e.target.value))}
-                  className="w-full accent-cyan cursor-pointer"
-                />
-                <div className="flex justify-between font-mono text-[9px] text-dim">
-                  <span>1.0x (Normal)</span>
-                  <span>2.0x</span>
-                  <span>3.0x (Max)</span>
+                {/* Zoom & Fit Mode */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between font-mono text-xs">
+                    <span className="text-dim flex items-center gap-1">
+                      <ZoomIn className="size-3" /> Zoom Scale
+                    </span>
+                    <span className="text-cyan font-bold">{zoom.toFixed(2)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.05"
+                    disabled={!effectiveAllowZoom}
+                    value={zoom}
+                    onChange={(e) => onChangeZoom && onChangeZoom(Number(e.target.value))}
+                    className="w-full accent-cyan cursor-pointer disabled:opacity-40"
+                  />
+                  <div className="flex justify-between font-mono text-[9px] text-dim">
+                    <span>1.0x (Normal)</span>
+                    <span>2.0x</span>
+                    <span>3.0x (Max)</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Fit Mode and Presets Row */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs text-dim">Fit Mode:</span>
                 <div className="inline-flex rounded-sm border border-white/10 bg-surface/60 p-0.5">
-                  {(['cover', 'contain', 'ambient'] as const).map((m) => (
+                  {effectiveAllowedFitModes.map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -487,54 +649,95 @@ export function CropFocalEditor({
                     </button>
                   ))}
                 </div>
+                {effectiveTransparency === 'supported' && fitMode === 'contain' && (
+                  <span className="font-mono text-[10px] text-cyan/90">
+                    (Recommended for transparent silhouettes)
+                  </span>
+                )}
               </div>
 
               {/* Quick Focal Presets */}
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-dim">Presets:</span>
-                {[
-                  { label: 'Center', x: 50, y: 50 },
-                  { label: 'Top', x: 50, y: 20 },
-                  { label: 'Bottom', x: 50, y: 80 },
-                  { label: 'Left', x: 20, y: 50 },
-                  { label: 'Right', x: 80, y: 50 },
-                ].map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => onChangeFocalPoint && onChangeFocalPoint({ x: p.x, y: p.y })}
-                    className="px-2 py-0.5 rounded font-mono text-[10px] bg-white/5 hover:bg-white/10 text-dim hover:text-ink border border-white/10 transition-colors cursor-pointer"
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              {effectiveAllowFocal && (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] text-dim">Presets:</span>
+                  {[
+                    { label: 'Center', x: 50, y: 50 },
+                    { label: 'Top', x: 50, y: 20 },
+                    { label: 'Bottom', x: 50, y: 80 },
+                    { label: 'Left', x: 20, y: 50 },
+                    { label: 'Right', x: 80, y: 50 },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => onChangeFocalPoint && onChangeFocalPoint({ x: p.x, y: p.y })}
+                      className="px-2 py-0.5 rounded font-mono text-[10px] bg-white/5 hover:bg-white/10 text-dim hover:text-ink border border-white/10 transition-colors cursor-pointer"
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
           /* Live Component Preview Simulator */
-          <div className="p-4 bg-void/80 rounded border border-white/10 flex flex-col items-center justify-center min-h-[320px]">
-            <div className="w-full max-w-[420px] space-y-2">
-              <div className="flex items-center justify-between font-mono text-xs text-dim">
-                <span>Simulated live container ({targetAspectRatio})</span>
-                <span className="text-cyan font-bold">{previewType.toUpperCase()}</span>
-              </div>
+          <div className="p-4 bg-void/80 rounded border border-white/10 flex flex-col items-center justify-center min-h-[340px] space-y-3">
+            {/* Preview Toolbar */}
+            <div className="w-full max-w-[460px] flex items-center justify-between font-mono text-xs text-dim pb-1 border-b border-white/10">
+              <span className="flex items-center gap-1.5">
+                <span>Simulated Container:</span>
+                <strong className="text-cyan font-bold">{effectiveTargetRatio}</strong>
+              </span>
 
-              {/* Preview container rendering with DynamicImage */}
+              <div className="flex items-center gap-3">
+                {effectiveTransparency === 'supported' && (
+                  <label className="flex items-center gap-1 text-[11px] cursor-pointer hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={showCheckerboard}
+                      onChange={(e) => setShowCheckerboard(e.target.checked)}
+                      className="accent-cyan cursor-pointer"
+                    />
+                    <span>Checkerboard</span>
+                  </label>
+                )}
+                {effectiveSafeArea && (
+                  <label className="flex items-center gap-1 text-[11px] cursor-pointer hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={showSafeArea}
+                      onChange={(e) => setShowSafeArea(e.target.checked)}
+                      className="accent-cyan cursor-pointer"
+                    />
+                    <span>Safe Areas</span>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Target-Specific Preview Container */}
+            <div className="w-full max-w-[460px] flex justify-center">
               <div
-                className={`relative w-full overflow-hidden rounded border border-white/20 bg-surface shadow-2xl ${
-                  previewType === 'game_card'
-                    ? 'aspect-[4/5]'
-                    : previewType === 'tournament_card'
-                    ? 'aspect-video'
-                    : previewType === 'showcase_card'
-                    ? 'aspect-[3/4]'
-                    : previewType === 'hero_shard'
-                    ? 'aspect-video -rotate-1 skew-x-1'
-                    : previewType === 'square'
-                    ? 'aspect-square'
-                    : 'aspect-video'
+                className={`relative w-full overflow-hidden rounded border border-white/20 shadow-2xl transition-all ${
+                  effectivePreviewType === 'game_card'
+                    ? 'aspect-[4/5] max-w-[340px] bg-graphite'
+                    : effectivePreviewType === 'showcase_card'
+                    ? 'aspect-[3/4] max-w-[320px] h-[390px] bg-surface'
+                    : effectivePreviewType === 'banner'
+                    ? 'aspect-[16/9] w-full bg-void'
+                    : effectivePreviewType === 'hero_shard'
+                    ? 'aspect-[4/3] max-w-[340px] [clip-path:polygon(0_8%,100%_0,92%_100%,4%_92%)] bg-surface'
+                    : effectivePreviewType === 'square'
+                    ? 'aspect-square max-w-[260px] bg-surface'
+                    : 'aspect-video w-full bg-surface'
                 }`}
+                style={{
+                  background:
+                    showCheckerboard && effectiveTransparency === 'supported'
+                      ? 'repeating-conic-gradient(#1a1a24 0% 25%, #101018 0% 50%) 50% / 20px 20px'
+                      : undefined,
+                }}
               >
                 <DynamicImage
                   src={value}
@@ -545,27 +748,61 @@ export function CropFocalEditor({
                   className="size-full"
                 />
 
-                {/* Realistic mock badges and title overlays */}
-                <div className="absolute inset-0 bg-gradient-to-t from-void via-void/20 to-transparent pointer-events-none" />
-                <div className="absolute top-3 left-3 flex items-center gap-2">
+                {/* Safe Area Overlays */}
+                {showSafeArea && effectiveSafeArea && (
+                  <div className="absolute inset-0 pointer-events-none z-20">
+                    {/* Top UI Hazard Zone */}
+                    <div
+                      className="absolute inset-x-0 top-0 bg-red-500/15 border-b border-red-500/40 flex items-center justify-between px-3 font-mono text-[9px] text-red-300 font-bold uppercase tracking-wider"
+                      style={{ height: `${effectiveSafeArea.topPercent}%` }}
+                    >
+                      <span>Top UI Zone</span>
+                      <ShieldAlert className="size-3 text-red-400" />
+                    </div>
+                    {/* Bottom UI Hazard Zone */}
+                    <div
+                      className="absolute inset-x-0 bottom-0 bg-red-500/15 border-t border-red-500/40 flex items-center justify-between px-3 font-mono text-[9px] text-red-300 font-bold uppercase tracking-wider"
+                      style={{ height: `${effectiveSafeArea.bottomPercent}%` }}
+                    >
+                      <span>Title &amp; CTA Zone</span>
+                      <ShieldAlert className="size-3 text-red-400" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Realistic mock badges and title overlays based on preview type */}
+                <div className="absolute inset-0 bg-gradient-to-t from-void via-void/25 to-transparent pointer-events-none z-10" />
+
+                {/* Top Corner Badge */}
+                <div className="absolute top-3 left-3 flex items-center gap-2 z-10 pointer-events-none">
                   <span className="px-2 py-0.5 font-mono text-[9px] font-bold uppercase bg-cyan text-void rounded-xs shadow">
                     LIVE
                   </span>
                   <span className="px-2 py-0.5 font-mono text-[9px] uppercase bg-black/60 backdrop-blur-md text-white border border-white/10 rounded-xs">
-                    {targetAspectRatio}
+                    {effectiveTargetRatio}
                   </span>
                 </div>
-                <div className="absolute bottom-3 left-3 right-3">
-                  <div className="font-display text-sm font-black uppercase text-ink tracking-wider">
-                    {slotLabel || 'Artwork Container'}
+
+                {/* Bottom Card / Banner Content Preview */}
+                <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none">
+                  <div className="font-display text-sm font-black uppercase text-ink tracking-wider truncate">
+                    {effectiveSlotLabel}
                   </div>
-                  <div className="font-mono text-[10px] text-cyan flex items-center justify-between mt-1">
+                  <div className="font-mono text-[10px] text-cyan flex items-center justify-between mt-0.5">
                     <span>Focal: {focalPoint.x}%, {focalPoint.y}%</span>
-                    <span>Zoom: {zoom.toFixed(2)}x</span>
+                    <span>Mode: {fitMode}</span>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Safe Area Explanation */}
+            {showSafeArea && effectiveSafeArea && (
+              <p className="font-mono text-[10px] text-dim max-w-md text-center">
+                <span className="text-amber-400 font-semibold">Safe Area Guide: </span>
+                {effectiveSafeArea.description}
+              </p>
+            )}
           </div>
         )
       ) : (

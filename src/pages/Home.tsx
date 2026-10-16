@@ -237,7 +237,7 @@ function Hero({
               mode={fitMode}
               focalPoint={focalPoint}
               zoom={zoom}
-              className="h-full w-full object-cover opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0"
+              className={`h-full w-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'} opacity-45 grayscale transition-[opacity,filter,transform] duration-700 group-hover:scale-110 group-hover:opacity-90 group-hover:grayscale-0`}
             />
             <div
               className="absolute inset-0 transition-opacity duration-500 group-hover:opacity-60"

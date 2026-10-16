@@ -72,6 +72,11 @@ export default function DynamicImage({
 
   const computedImageStyle = useMemo<React.CSSProperties>(() => {
     const s: React.CSSProperties = { ...style }
+    if (mode === 'contain') {
+      s.objectFit = 'contain'
+    } else if (mode === 'cover') {
+      s.objectFit = 'cover'
+    }
     if (focalPoint && typeof focalPoint.x === 'number' && typeof focalPoint.y === 'number') {
       s.objectPosition = `${focalPoint.x}% ${focalPoint.y}%`
     }
@@ -82,7 +87,7 @@ export default function DynamicImage({
         : 'center center'
     }
     return s
-  }, [focalPoint, zoom, style])
+  }, [mode, focalPoint, zoom, style])
 
   const [status, setStatus] = useState<ImageStatus>(() => {
     if (!hasSrc) return 'missing'
