@@ -80,7 +80,7 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
   const soon = g.status === 'soon'
   const title = g.name || g.short
   const mediaCfg = (g as any).mediaConfig || (g as any).media_config
-  const cardCfg = mediaCfg?.catalog_card
+  const cardCfg = soon ? (mediaCfg?.coming_soon_catalog_card || mediaCfg?.catalog_card) : mediaCfg?.catalog_card
 
   const imageSrc =
     cardCfg?.asset_url ||

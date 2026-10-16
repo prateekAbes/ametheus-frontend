@@ -111,7 +111,7 @@ export function LeaderboardTable({
                 : (currentPage - 1) * pageSize + idx + 1)
             const isDqEntry = isEntryDisqualified(entry, disqualifiedIds)
             const isCurrent = isEntryCurrentUser(entry, currentUserId, currentUsername)
-            const avatarUrl = resolveMediaUrl(entry.logo_url)
+            const avatarUrl = resolveMediaUrl(entry.avatar_url || entry.logo_url)
             const rowKey = entry.id ? `entry-${entry.id}` : `rank-${rankNumber}-${entry.name}`
 
             // Canonical username display
@@ -129,7 +129,7 @@ export function LeaderboardTable({
                 key={rowKey}
                 className={`flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
                   isCurrent
-                    ? 'bg-[#22c55e]/10 border-l-2 border-l-[#22c55e]'
+                    ? 'bg-[#25D9F2]/10 border-l-2 border-l-[#25D9F2]'
                     : isDqEntry
                     ? 'opacity-40'
                     : ''
@@ -144,7 +144,7 @@ export function LeaderboardTable({
                   {/* Square Profile Picture */}
                   {isCurrent ? (
                     <Link to="/profile" title="View your profile" className="shrink-0">
-                      <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-[#22c55e]/50 bg-black">
+                      <div className="size-7 sm:size-8 shrink-0 overflow-hidden rounded-none border border-[#25D9F2]/50 bg-black">
                         {avatarUrl ? (
                           <DynamicImage
                             src={avatarUrl}
@@ -180,7 +180,7 @@ export function LeaderboardTable({
                       {isCurrent ? (
                         <Link
                           to="/profile"
-                          className="font-bold uppercase text-white hover:text-[#22c55e] transition-colors truncate"
+                          className="font-bold uppercase text-white hover:text-[#25D9F2] transition-colors truncate"
                         >
                           {displayName}
                         </Link>
@@ -195,7 +195,7 @@ export function LeaderboardTable({
                         </span>
                       )}
                       {isCurrent && (
-                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-[#22c55e] text-black shrink-0">
+                        <span className="px-1 py-0.2 font-mono text-[7px] uppercase font-bold bg-[#25D9F2] text-black shrink-0">
                           YOU
                         </span>
                       )}

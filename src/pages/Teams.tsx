@@ -128,8 +128,7 @@ export default function Teams() {
           </div>
         ) : !hasTeam ? (
           <div>
-            <Hud className="text-cyan">◇ No squad detected</Hud>
-            <h1 className="reveal mt-4 font-display text-[clamp(3.5rem,12vw,11rem)] font-black uppercase leading-[0.8]">
+            <h1 className="reveal font-display text-[clamp(3.5rem,12vw,11rem)] font-black uppercase leading-[0.8]">
               Build your<br /><span className="outline-text">squad</span>
             </h1>
             <p className="mt-6 max-w-lg text-lg text-dim">

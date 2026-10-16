@@ -86,7 +86,16 @@ export default function GameDetail() {
   const genre = gameData?.category || fallback.genre
   const platform = gameData?.platform || fallback.platform
   const accent = gameData?.accentColor || fallback.accent
-  const banner = gameData?.bannerUrl || ''
+  const mediaCfg = (gameData as any)?.media_config || (gameData as any)?.mediaConfig
+  const bannerCfg = mediaCfg?.banner
+  const bannerSrc = bannerCfg?.asset_url || gameData?.bannerUrl || ''
+  const bannerFocal =
+    bannerCfg && typeof bannerCfg.focal_x === 'number' && typeof bannerCfg.focal_y === 'number'
+      ? { x: bannerCfg.focal_x, y: bannerCfg.focal_y }
+      : undefined
+  const bannerZoom = bannerCfg?.zoom
+  const bannerFit = bannerCfg?.fit_mode || 'ambient'
+
   const minSize = gameData?.minTeamSize || 4
   const maxSize = gameData?.maxTeamSize || fallback.size
   const antiCheat = gameData?.antiCheat || 'Server-Side Platform Guard'
@@ -107,6 +116,7 @@ export default function GameDetail() {
       max: t.maxTeams,
       region: 'India',
       format: t.format,
+      mediaConfig: t.mediaConfig || t.media_config,
     }))
 
   // Upcoming Scheduled Events
@@ -124,6 +134,7 @@ export default function GameDetail() {
       max: t.maxTeams,
       region: 'India',
       format: t.format,
+      mediaConfig: t.mediaConfig || t.media_config,
     }))
 
   // Completed Tournaments & Archives
@@ -141,6 +152,7 @@ export default function GameDetail() {
       max: t.maxTeams,
       region: 'India',
       format: t.format,
+      mediaConfig: t.mediaConfig || t.media_config,
     }))
 
   const totalPrizePool = tournaments.reduce((acc, t) => acc + (t.prizePoolInr || 0), 0)
@@ -163,10 +175,12 @@ export default function GameDetail() {
       {/* 2. Game Hero Section */}
       <section className="relative flex min-h-[85svh] items-end overflow-hidden bg-void">
         <DynamicImage
-          src={resolveMediaUrl(banner)}
+          src={resolveMediaUrl(bannerSrc)}
           alt={`${name} artwork`}
           eager
-          mode="ambient"
+          mode={bannerFit}
+          focalPoint={bannerFocal}
+          zoom={bannerZoom}
           className="kenburns h-full w-full opacity-60 object-contain object-center md:object-[75%_center]"
           backdropClassName="opacity-30"
         />

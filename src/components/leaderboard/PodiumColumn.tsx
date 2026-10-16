@@ -31,20 +31,20 @@ export function PodiumColumn({
     ? 'h-42 sm:h-48 md:h-54'
     : 'h-32 sm:h-38 md:h-44'
 
-  // Refined theme matching reference image: dark monolithic body with neon green #1 cap & subtle wireframe for #2 & #3
+  // Refined Ametheus theme: dark monolithic body with cyan #1 cap & balanced wireframe for #2 & #3
   const theme = isFirst
     ? {
-        accentColor: '#22c55e',
-        strokeColor: '#22c55e',
-        borderColor: 'border-l border-r border-[#22c55e]/60',
-        nameColor: 'text-[#22c55e]',
+        accentColor: '#25D9F2',
+        strokeColor: '#25D9F2',
+        borderColor: 'border-l border-r border-[#25D9F2]/50',
+        nameColor: 'text-[#25D9F2]',
         hasDivider: false,
         dividerColor: 'border-transparent',
-        avatarBorder: 'border border-[#22c55e]/60 shadow-[0_0_14px_rgba(34,197,94,0.3)]',
-        pillarGradient: 'from-[#0e141c] via-[#090d14] to-[#040609]',
-        topGradientStart: '#18241d',
-        topGradientEnd: '#0d1510',
-        glow: 'shadow-[0_16px_36px_-8px_rgba(34,197,94,0.18)]',
+        avatarBorder: 'border-2 border-[#25D9F2] shadow-[0_0_16px_rgba(37,217,242,0.35)]',
+        pillarGradient: 'from-[#0e1d2e] via-[#09131f] to-[#04080e]',
+        topGradientStart: '#13283f',
+        topGradientEnd: '#0a1725',
+        glow: 'shadow-[0_16px_36px_-8px_rgba(37,217,242,0.22)]',
       }
     : isSecond
     ? {
@@ -53,28 +53,28 @@ export function PodiumColumn({
         borderColor: 'border-l border-white/10',
         nameColor: 'text-white/90',
         hasDivider: true,
-        dividerColor: 'border-white/20',
-        avatarBorder: 'border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
-        pillarGradient: 'from-[#0c1118] via-[#070b10] to-[#030507]',
-        topGradientStart: '#18202a',
-        topGradientEnd: '#0e141c',
+        dividerColor: 'border-white/15',
+        avatarBorder: 'border border-white/25 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
+        pillarGradient: 'from-[#0f1722] via-[#090f17] to-[#03060a]',
+        topGradientStart: '#15202e',
+        topGradientEnd: '#0b121c',
         glow: 'shadow-[0_12px_28px_-8px_rgba(0,0,0,0.5)]',
       }
     : {
         accentColor: '#a8a29e',
         strokeColor: 'rgba(255, 255, 255, 0.24)',
         borderColor: 'border-r border-white/10',
-        nameColor: 'text-white/90',
+        nameColor: 'text-white/85',
         hasDivider: true,
-        dividerColor: 'border-white/20',
-        avatarBorder: 'border border-white/15 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
-        pillarGradient: 'from-[#0a0e14] via-[#06090e] to-[#020406]',
-        topGradientStart: '#161c24',
-        topGradientEnd: '#0d1218',
+        dividerColor: 'border-white/15',
+        avatarBorder: 'border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
+        pillarGradient: 'from-[#0d141e] via-[#080d14] to-[#020407]',
+        topGradientStart: '#131c26',
+        topGradientEnd: '#090e15',
         glow: 'shadow-[0_12px_28px_-8px_rgba(0,0,0,0.5)]',
       }
 
-  // Canonical username resolution: lowercase to match reference
+  // Canonical username resolution
   const rawName =
     entry.name && !entry.name.toLowerCase().startsWith('player_') && !entry.name.toLowerCase().startsWith('user_')
       ? entry.name
@@ -130,26 +130,23 @@ export function PodiumColumn({
     }
   }, [entry, selectedCategory])
 
-  const avatarUrl = resolveMediaUrl(entry.logo_url)
+  const avatarUrl = resolveMediaUrl(entry.avatar_url || entry.logo_url)
   const initial = displayName.charAt(0).toUpperCase()
 
   const avatarContent = avatarUrl ? (
     <DynamicImage
       src={avatarUrl}
       alt={`${displayName} avatar`}
-      className="size-full object-cover rounded-lg"
+      className="size-full object-cover rounded-none"
     />
   ) : (
-    <div className="flex size-full items-center justify-center font-mono font-bold text-white/80 bg-[#141b24] rounded-lg">
+    <div className="flex size-full items-center justify-center font-mono font-bold text-white/80 bg-[#141b24] rounded-none">
       {initial}
     </div>
   )
 
-  const avatarSizeClasses = isFirst
-    ? 'size-16 sm:size-20 md:size-22'
-    : isSecond
-    ? 'size-14 sm:size-17 md:size-19'
-    : 'size-13 sm:size-15 md:size-17'
+  // Square 1:1 aspect ratio with identical dimensions across all three players (Part D3)
+  const avatarSizeClasses = 'size-16 sm:size-18 md:size-20 aspect-square'
 
   return (
     <div
@@ -158,20 +155,20 @@ export function PodiumColumn({
       }`}
     >
       {/* ============================================================== */}
-      {/* 2D ROUNDED AVATAR RESTING DIRECTLY ON TOP SURFACE OF BLOCK    */}
+      {/* SQUARE 1:1 AVATAR CENTERED ABOVE PLATFORM WITH CLEAR SEPARATION */}
       {/* ============================================================== */}
-      <div className="relative -mb-8 sm:-mb-9 md:-mb-10 z-10 flex flex-col items-center">
+      <div className="relative mb-3 sm:mb-4 md:mb-5 z-10 flex flex-col items-center">
         {isCurrentUser ? (
           <Link
             to="/profile"
             title="View your profile"
-            className={`relative block ${avatarSizeClasses} rounded-lg ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
+            className={`relative block ${avatarSizeClasses} rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
           >
             {avatarContent}
           </Link>
         ) : (
           <div
-            className={`relative block ${avatarSizeClasses} rounded-lg ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
+            className={`relative block ${avatarSizeClasses} rounded-none ${theme.avatarBorder} bg-[#0d131a] overflow-hidden transition-transform group-hover:scale-105`}
           >
             {avatarContent}
           </div>
@@ -179,13 +176,13 @@ export function PodiumColumn({
 
         {/* Current user marker */}
         {isCurrentUser && (
-          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-[#22c55e] text-black shadow-[0_0_8px_rgba(34,197,94,0.6)] rounded">
+          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-[#25D9F2] text-black shadow-[0_0_8px_rgba(37,217,242,0.6)] rounded-sm">
             YOU
           </span>
         )}
         {/* Disqualified marker */}
         {isDisqualified && (
-          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-rose-500/80 text-white rounded">
+          <span className="absolute -top-2.5 px-1.5 py-0.5 font-mono text-[7px] uppercase font-bold bg-rose-500/80 text-white rounded-sm">
             DQ
           </span>
         )}
@@ -294,23 +291,16 @@ export function PodiumColumn({
               <div className="h-2 sm:h-3" />
             )}
 
-            {/* 2. Numerical Metric Score with circular cyan badge matching reference */}
-            <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              <span className="inline-flex items-center justify-center size-3.5 sm:size-4 shrink-0 text-[#25D9F2] select-none" aria-hidden="true">
-                <svg viewBox="0 0 16 16" className="size-3.5 sm:size-4" fill="none">
-                  <circle cx="8" cy="8" r="6.5" stroke="#25D9F2" strokeWidth="1.4" />
-                  <circle cx="8" cy="8" r="2.2" fill="#25D9F2" />
-                </svg>
-              </span>
+            {/* 2. Numerical Metric Score */}
+            <div className="flex flex-col items-center justify-center mt-1">
               <span className="font-mono text-xs sm:text-sm md:text-base font-bold tracking-tight text-white">
                 {scoreValue}
               </span>
+              {/* 3. Understated Metric Sub-label */}
+              <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-[#8995A8] mt-0.5">
+                {subLabel}
+              </span>
             </div>
-
-            {/* 3. Understated Metric Sub-label */}
-            <span className="font-mono text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 block mt-1">
-              {subLabel}
-            </span>
           </div>
 
           {/* Rank 3: Right Side Outer Facet */}

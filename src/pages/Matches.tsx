@@ -313,9 +313,8 @@ export default function Matches() {
   return (
     <>
       <PageHero
-        kicker={`◉ ${liveCount} matches live right now`}
+        kicker={liveCount > 0 ? `◉ ${liveCount} matches live now` : 'Competitive Arena'}
         title="MATCHES"
-        sub="Every round, every clutch, every scoreline — streamed and tracked in real time."
         variant="matches"
         accent="#ff3b4e"
       />

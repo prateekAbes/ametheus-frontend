@@ -262,7 +262,7 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
   const long = t.name.length > 28
   const meta = [t.date, g?.squad, t.format].filter(Boolean).join(' · ')
   const mediaCfg = (t as any).mediaConfig || (t as any).media_config
-  const cardCfg = mediaCfg?.card
+  const cardCfg = mediaCfg?.upcoming_card || mediaCfg?.card
 
   const bannerSrc =
     cardCfg?.asset_url ||

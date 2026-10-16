@@ -35,7 +35,7 @@ export function LeaderboardErrorState({ onRetry }: LeaderboardErrorStateProps) {
       <button
         type="button"
         onClick={onRetry}
-        className="mt-6 border border-white/20 bg-surface/80 px-5 py-2 font-mono text-xs uppercase font-bold text-ink hover:border-[#3dff9a] hover:text-[#3dff9a] transition-colors cursor-pointer"
+        className="mt-6 border border-white/20 bg-surface/80 px-5 py-2 font-mono text-xs uppercase font-bold text-ink hover:border-[#25D9F2] hover:text-[#25D9F2] transition-colors cursor-pointer"
       >
         Retry Synchronization ↻
       </button>

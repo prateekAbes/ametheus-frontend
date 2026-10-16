@@ -94,6 +94,8 @@ export default function Games() {
           tournaments: 0,
           genreId: norm.genreId,
           genreName: norm.genreName,
+          mediaConfig: norm.mediaConfig,
+          media_config: norm.media_config,
         }
       })
   }, [apiGames])
@@ -117,6 +119,8 @@ export default function Games() {
           photo: norm.bannerUrl || norm.logoUrl || '',
           status: 'soon' as const,
           tournaments: 0,
+          mediaConfig: norm.mediaConfig,
+          media_config: norm.media_config,
         }
       })
   }, [apiGames])
@@ -177,7 +181,6 @@ export default function Games() {
       <PageHero
         kicker={`${String(activeGamesCatalog.length).padStart(2, '0')} live worlds`}
         title={<>Explore<br />Games</>}
-        sub="CHOOSE YOUR BATTLEGROUND. Master your mechanics, build a roster, and climb the competitive ladder."
         variant="games"
         accent="#8b5cff"
       />

@@ -1,41 +1,40 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router'
 import {
-  Sparkles,
-  Layers,
   Gamepad2,
   Trophy,
   FolderOpen,
-  FileText,
   Search,
   Check,
   Copy,
   ExternalLink,
   UploadCloud,
   ChevronRight,
-  Eye,
   Save,
   Trash2,
   X,
-  Compass,
+  AlertTriangle,
+  Star,
+  Layers,
 } from 'lucide-react'
 import { Game } from '../../services/games'
 import { Tournament } from '../../services/tournaments'
 import {
   updateGame,
-  getPlacements,
-  updatePlacement,
-  clearPlacementAsset,
   listMediaFiles,
   uploadMediaFile,
-  PlacementConfig,
+  deleteMediaFile,
   MediaLibraryItem,
 } from '../../services/admin'
 import { updateTournamentOrganizer } from '../../services/organizer'
-import { Panel, Hud, Badge } from '../ui'
+import { Panel } from '../ui'
 import { resolveMediaUrl } from '../../services/apiClient'
-import DynamicImage from '../DynamicImage'
 import CropFocalEditor from './CropFocalEditor'
+import {
+  GAME_ARTWORK_ROLES,
+  TOURNAMENT_ARTWORK_ROLES,
+  ArtworkRoleDefinition,
+} from '../../lib/artworkRegistry'
 
 interface MediaArtworkManagerProps {
   games: Game[]
@@ -44,9 +43,8 @@ interface MediaArtworkManagerProps {
   showToast: (msg: string) => void
 }
 
-type MainTab = 'HOMEPAGE' | 'GAMES' | 'TOURNAMENTS' | 'LIBRARY' | 'SPECS'
+type MainTab = 'GAMES' | 'TOURNAMENTS' | 'LIBRARY'
 
-// Helper to format file size
 function formatBytes(bytes?: number): string {
   if (!bytes || bytes === 0) return '0 B'
   const k = 1024
@@ -114,12 +112,11 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-4xl max-h-[85vh] flex flex-col bg-surface border border-white/20 rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 bg-void/50">
           <div className="flex items-center gap-2.5">
             <FolderOpen className="size-5 text-cyan" />
             <h3 className="font-display text-lg font-bold uppercase text-ink">
-              Media Library Asset Selector
+              Select Managed Asset from Media Library
             </h3>
           </div>
           <button
@@ -130,13 +127,12 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
           </button>
         </div>
 
-        {/* Action bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-white/10 bg-void/30">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-dim" />
             <input
               type="text"
-              placeholder="Filter by filename..."
+              placeholder="Search assets by filename..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-surface/80 border border-white/15 pl-9 pr-3 py-1.5 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
@@ -163,11 +159,10 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
           </div>
         </div>
 
-        {/* Media Grid */}
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <div className="flex items-center justify-center py-16 font-mono text-xs text-dim animate-pulse">
-              Loading library assets...
+              Loading media library assets...
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center text-dim">
@@ -194,7 +189,7 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
                     />
                     <div className="absolute inset-0 bg-cyan/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <span className="px-2 py-1 bg-cyan text-void font-mono text-[10px] font-bold uppercase rounded shadow">
-                        Select Asset
+                        Use This Asset
                       </span>
                     </div>
                   </div>
@@ -204,7 +199,11 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
                     </div>
                     <div className="flex items-center justify-between font-mono text-[9px] text-dim mt-1">
                       <span>{formatBytes(item.size)}</span>
-                      <span>{item.content_type?.split('/')[1] || 'img'}</span>
+                      <span>
+                        {item.width && item.height
+                          ? `${item.width}×${item.height}`
+                          : item.content_type?.split('/')[1] || 'img'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -218,277 +217,9 @@ function MediaLibraryModal({ isOpen, onClose, onSelect, showToast }: MediaLibrar
 }
 
 /* =========================================================================
-   HOMEPAGE PLACEMENTS MANAGER
-   (Placement 1: 4 Hero Floating Shards, Placement 2: Featured Tournament, Placement 7: Game Showcase)
+   GAMES ARTWORK SECTION (Active Games & Coming Soon Games)
    ========================================================================= */
-function HomepagePlacementsManager({
-  tournaments,
-  games,
-  showToast,
-}: {
-  tournaments: Tournament[]
-  games: Game[]
-  showToast: (msg: string) => void
-}) {
-  const [placements, setPlacements] = useState<PlacementConfig[]>([])
-  const [loading, setLoading] = useState(false)
-  const [savingKey, setSavingKey] = useState<string | null>(null)
-  const [pickerSlotKey, setPickerSlotKey] = useState<string | null>(null)
-
-  const fetchPlacements = async () => {
-    setLoading(true)
-    try {
-      const data = await getPlacements({ page: 'homepage' })
-      setPlacements(data || [])
-    } catch (err: any) {
-      console.error('Failed to load homepage placements', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchPlacements()
-  }, [])
-
-  const getPlacementByKey = (key: string): PlacementConfig => {
-    const existing = placements.find((p) => p.placement_key === key)
-    if (existing) return existing
-    return {
-      placement_key: key,
-      page: 'homepage',
-      section: key.includes('hero') ? 'hero' : 'featured_tournament',
-      slot_name: key,
-      asset_url: '',
-      focal_x: 50,
-      focal_y: 50,
-      zoom: 1,
-      fit_mode: 'cover',
-      target_aspect_ratio: key.includes('hero') ? '16:9' : '16:10',
-      recommended_resolution: key.includes('hero') ? '1600x900' : '1600x1000',
-      min_width: 800,
-      min_height: 500,
-    }
-  }
-
-  const handleUpdateLocalPlacement = (key: string, updates: Partial<PlacementConfig>) => {
-    setPlacements((prev) => {
-      const index = prev.findIndex((p) => p.placement_key === key)
-      if (index >= 0) {
-        const copy = [...prev]
-        copy[index] = { ...copy[index], ...updates }
-        return copy
-      } else {
-        const fresh = getPlacementByKey(key)
-        return [...prev, { ...fresh, ...updates }]
-      }
-    })
-  }
-
-  const handleSavePlacement = async (key: string) => {
-    const current = getPlacementByKey(key)
-    setSavingKey(key)
-    try {
-      await updatePlacement(key, {
-        asset_url: current.asset_url,
-        focal_x: current.focal_x,
-        focal_y: current.focal_y,
-        zoom: current.zoom,
-        fit_mode: current.fit_mode,
-        target_aspect_ratio: current.target_aspect_ratio,
-        recommended_resolution: current.recommended_resolution,
-      })
-      showToast(`Placement slot "${current.slot_name || key}" saved and live!`)
-      fetchPlacements()
-    } catch (err: any) {
-      alert(err.message || `Failed to save placement ${key}`)
-    } finally {
-      setSavingKey(null)
-    }
-  }
-
-  const heroShards = [
-    {
-      key: 'homepage_hero_slot_1',
-      title: 'Slot 1: Top-Left Floating Shard',
-      desc: 'Floating artwork panel positioned top-left behind the hero sphere composition.',
-      tilt: '-rotate-2 -skew-x-2',
-    },
-    {
-      key: 'homepage_hero_slot_2',
-      title: 'Slot 2: Bottom-Left Floating Shard',
-      desc: 'Floating artwork panel positioned bottom-left behind the hero sphere composition.',
-      tilt: 'rotate-1 skew-y-1',
-    },
-    {
-      key: 'homepage_hero_slot_3',
-      title: 'Slot 3: Top-Right Floating Shard',
-      desc: 'Floating artwork panel positioned top-right behind the hero sphere composition.',
-      tilt: 'rotate-2 skew-x-2',
-    },
-    {
-      key: 'homepage_hero_slot_4',
-      title: 'Slot 4: Bottom-Right Floating Shard',
-      desc: 'Floating artwork panel positioned bottom-right behind the hero sphere composition.',
-      tilt: '-rotate-1 -skew-y-1',
-    },
-  ]
-
-  return (
-    <div className="space-y-8">
-      {/* Placement 1: Homepage Hero Floating Artwork Panels */}
-      <Panel className="p-6 space-y-6 border-white/10">
-        <div className="border-b border-white/10 pb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs px-2 py-0.5 bg-cyan/20 text-cyan border border-cyan/40 font-bold uppercase rounded-xs">
-                Placement 1
-              </span>
-              <h3 className="font-display text-2xl font-black uppercase text-ink">
-                Homepage Hero Floating Artwork Panels (4 Slots)
-              </h3>
-            </div>
-            <p className="font-mono text-xs text-dim mt-1">
-              Floating angular artwork cards orbiting the central 3D hero composition. Independent upload,
-              crop focal reticle, zoom scale, and responsive perspective preservation.
-            </p>
-          </div>
-          <div className="font-mono text-xs text-dim bg-white/5 border border-white/10 px-3 py-1.5 rounded">
-            Target: <strong className="text-cyan">16:9 Widescreen</strong> (1600×900 px)
-          </div>
-        </div>
-
-        {/* 4 Hero Shards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {heroShards.map((slot) => {
-            const p = getPlacementByKey(slot.key)
-            return (
-              <div key={slot.key} className="space-y-3 p-4 bg-void/50 border border-white/10 rounded-lg">
-                <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                  <span className="font-display text-sm font-bold uppercase text-ink">
-                    {slot.title}
-                  </span>
-                  <button
-                    onClick={() => handleSavePlacement(slot.key)}
-                    disabled={savingKey === slot.key}
-                    className="flex items-center gap-1.5 px-3 py-1 font-mono text-xs font-bold uppercase bg-cyan text-void rounded hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <Save className="size-3.5" />
-                    {savingKey === slot.key ? 'Saving...' : 'Save Slot'}
-                  </button>
-                </div>
-
-                <CropFocalEditor
-                  value={p.asset_url || ''}
-                  onChangeAsset={(url) => handleUpdateLocalPlacement(slot.key, { asset_url: url })}
-                  focalPoint={{ x: p.focal_x ?? 50, y: p.focal_y ?? 50 }}
-                  onChangeFocalPoint={(fp) =>
-                    handleUpdateLocalPlacement(slot.key, { focal_x: fp.x, focal_y: fp.y })
-                  }
-                  zoom={p.zoom ?? 1}
-                  onChangeZoom={(z) => handleUpdateLocalPlacement(slot.key, { zoom: z })}
-                  fitMode={p.fit_mode ?? 'cover'}
-                  onChangeFitMode={(m) => handleUpdateLocalPlacement(slot.key, { fit_mode: m })}
-                  targetAspectRatio="16:9"
-                  recommendedResolution="1600x900"
-                  slotLabel={slot.title}
-                  slotDescription={slot.desc}
-                  previewType="hero_shard"
-                  onOpenMediaLibrary={() => setPickerSlotKey(slot.key)}
-                />
-              </div>
-            )
-          })}
-        </div>
-      </Panel>
-
-      {/* Placement 2: Homepage Featured Tournament Card */}
-      <Panel className="p-6 space-y-6 border-white/10">
-        <div className="border-b border-white/10 pb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs px-2 py-0.5 bg-cyan/20 text-cyan border border-cyan/40 font-bold uppercase rounded-xs">
-                Placement 2
-              </span>
-              <h3 className="font-display text-2xl font-black uppercase text-ink">
-                Homepage Featured Tournament (Lead Hero & Side Thumbnails)
-              </h3>
-            </div>
-            <p className="font-mono text-xs text-dim mt-1">
-              The primary featured tournament spotlight card on the homepage. Lead hero banner displays
-              at 16:10 aspect ratio with focal calibration.
-            </p>
-          </div>
-          <div className="font-mono text-xs text-dim bg-white/5 border border-white/10 px-3 py-1.5 rounded">
-            Target: <strong className="text-cyan">16:10 Aspect</strong> (1600×1000 px)
-          </div>
-        </div>
-
-        {(() => {
-          const featuredPlacementKey = 'homepage_featured_tournament'
-          const p = getPlacementByKey(featuredPlacementKey)
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-dim">
-                  Custom Featured Tournament Artwork Slot:
-                </span>
-                <button
-                  onClick={() => handleSavePlacement(featuredPlacementKey)}
-                  disabled={savingKey === featuredPlacementKey}
-                  className="flex items-center gap-1.5 px-3 py-1 font-mono text-xs font-bold uppercase bg-cyan text-void rounded hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Save className="size-3.5" />
-                  {savingKey === featuredPlacementKey ? 'Saving...' : 'Save Featured Slot'}
-                </button>
-              </div>
-
-              <CropFocalEditor
-                value={p.asset_url || ''}
-                onChangeAsset={(url) =>
-                  handleUpdateLocalPlacement(featuredPlacementKey, { asset_url: url })
-                }
-                focalPoint={{ x: p.focal_x ?? 50, y: p.focal_y ?? 50 }}
-                onChangeFocalPoint={(fp) =>
-                  handleUpdateLocalPlacement(featuredPlacementKey, { focal_x: fp.x, focal_y: fp.y })
-                }
-                zoom={p.zoom ?? 1}
-                onChangeZoom={(z) => handleUpdateLocalPlacement(featuredPlacementKey, { zoom: z })}
-                fitMode={p.fit_mode ?? 'cover'}
-                onChangeFitMode={(m) =>
-                  handleUpdateLocalPlacement(featuredPlacementKey, { fit_mode: m })
-                }
-                targetAspectRatio="16:10"
-                recommendedResolution="1600x1000"
-                slotLabel="Featured Tournament Lead Hero"
-                slotDescription="Displays as the centerpiece banner on the homepage featured tournament section."
-                previewType="tournament_card"
-                onOpenMediaLibrary={() => setPickerSlotKey(featuredPlacementKey)}
-              />
-            </div>
-          )
-        })()}
-      </Panel>
-
-      {/* Media Library Picker Modal */}
-      <MediaLibraryModal
-        isOpen={pickerSlotKey !== null}
-        onClose={() => setPickerSlotKey(null)}
-        onSelect={(url) => {
-          if (pickerSlotKey) {
-            handleUpdateLocalPlacement(pickerSlotKey, { asset_url: url })
-          }
-        }}
-        showToast={showToast}
-      />
-    </div>
-  )
-}
-
-/* =========================================================================
-   GAMES ARTWORK MANAGER (Placement 3: Active Games Catalog, Placement 5: Coming Soon, Detail Banner)
-   ========================================================================= */
-function GamesArtworkManager({
+function GamesArtworkSection({
   games,
   onRefresh,
   showToast,
@@ -497,26 +228,25 @@ function GamesArtworkManager({
   onRefresh: () => void
   showToast: (msg: string) => void
 }) {
-  const [catalogSubTab, setCatalogSubTab] = useState<'ACTIVE' | 'COMING_SOON'>('ACTIVE')
+  const [filterMode, setFilterMode] = useState<'ACTIVE' | 'COMING_SOON'>('ACTIVE')
   const [search, setSearch] = useState('')
   const [selectedGameId, setSelectedGameId] = useState<string>(games[0]?.id || games[0]?.slug || '')
   const [savingGameId, setSavingGameId] = useState<string | null>(null)
   const [pickerSlot, setPickerSlot] = useState<string | null>(null)
 
-  // Local editing copy per game
   const [gameMediaState, setGameMediaState] = useState<Record<string, any>>({})
 
   const filteredGames = useMemo(() => {
     return games.filter((g) => {
       const isComingSoon = g.status === 'COMING_SOON' || g.status === 'MAINTENANCE'
-      const matchesTab = catalogSubTab === 'ACTIVE' ? !isComingSoon : isComingSoon
+      const matchesTab = filterMode === 'ACTIVE' ? !isComingSoon : isComingSoon
       const matchesSearch =
         !search.trim() ||
         g.name.toLowerCase().includes(search.toLowerCase()) ||
         g.slug.toLowerCase().includes(search.toLowerCase())
       return matchesTab && matchesSearch
     })
-  }, [games, catalogSubTab, search])
+  }, [games, filterMode, search])
 
   const selectedGame = useMemo(() => {
     return (
@@ -529,7 +259,6 @@ function GamesArtworkManager({
 
   const currentGameId = selectedGame ? selectedGame.id || selectedGame.slug : ''
 
-  // Initialize local media state when selectedGame changes
   useEffect(() => {
     if (!selectedGame) return
     const id = selectedGame.id || selectedGame.slug
@@ -538,12 +267,26 @@ function GamesArtworkManager({
       setGameMediaState((prev) => ({
         ...prev,
         [id]: {
+          homepage_hero_floating: {
+            asset_url: cfg.homepage_hero_floating?.asset_url || selectedGame.banner_url || '',
+            focal_x: cfg.homepage_hero_floating?.focal_x ?? 50,
+            focal_y: cfg.homepage_hero_floating?.focal_y ?? 50,
+            zoom: cfg.homepage_hero_floating?.zoom ?? 1,
+            fit_mode: cfg.homepage_hero_floating?.fit_mode || 'cover',
+          },
           catalog_card: {
             asset_url: cfg.catalog_card?.asset_url || selectedGame.poster_url || '',
             focal_x: cfg.catalog_card?.focal_x ?? 50,
             focal_y: cfg.catalog_card?.focal_y ?? 50,
             zoom: cfg.catalog_card?.zoom ?? 1,
             fit_mode: cfg.catalog_card?.fit_mode || 'cover',
+          },
+          coming_soon_catalog_card: {
+            asset_url: cfg.coming_soon_catalog_card?.asset_url || selectedGame.poster_url || '',
+            focal_x: cfg.coming_soon_catalog_card?.focal_x ?? 50,
+            focal_y: cfg.coming_soon_catalog_card?.focal_y ?? 50,
+            zoom: cfg.coming_soon_catalog_card?.zoom ?? 1,
+            fit_mode: cfg.coming_soon_catalog_card?.fit_mode || 'cover',
           },
           banner: {
             asset_url: cfg.banner?.asset_url || selectedGame.banner_url || '',
@@ -568,7 +311,9 @@ function GamesArtworkManager({
   }, [selectedGame])
 
   const currentConfig = gameMediaState[currentGameId] || {
+    homepage_hero_floating: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     catalog_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    coming_soon_catalog_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     banner: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     showcase_card: { asset_url: selectedGame?.poster_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     logo: { asset_url: selectedGame?.logo_url || '' },
@@ -593,7 +338,7 @@ function GamesArtworkManager({
         logo_url: cfg.logo?.asset_url || selectedGame.logo_url,
         media_config: cfg,
       })
-      showToast(`Artwork and focal alignment for "${selectedGame.name}" updated successfully!`)
+      showToast(`Artwork for "${selectedGame.name}" successfully updated!`)
       onRefresh()
     } catch (err: any) {
       alert(err.message || `Failed to update artwork for ${selectedGame.name}`)
@@ -602,30 +347,39 @@ function GamesArtworkManager({
     }
   }
 
+  // Active roles for this game based on status
+  const rolesToDisplay = useMemo(() => {
+    const isComingSoon = selectedGame?.status === 'COMING_SOON' || selectedGame?.status === 'MAINTENANCE'
+    return GAME_ARTWORK_ROLES.filter((r) => {
+      if (r.id === 'game.active_catalog_card') return !isComingSoon
+      if (r.id === 'game.coming_soon_catalog_card') return isComingSoon
+      return true
+    })
+  }, [selectedGame])
+
   return (
     <div className="space-y-6">
-      {/* Top Filter and Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setCatalogSubTab('ACTIVE')}
-            className={`px-3 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
-              catalogSubTab === 'ACTIVE'
-                ? 'bg-cyan text-void font-bold'
+            onClick={() => setFilterMode('ACTIVE')}
+            className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+              filterMode === 'ACTIVE'
+                ? 'bg-cyan text-void font-bold shadow-sm'
                 : 'bg-surface/50 text-dim hover:text-ink border border-white/10'
             }`}
           >
-            Placement 3: Active Games Catalog ({games.filter((g) => g.status !== 'COMING_SOON').length})
+            Active Games ({games.filter((g) => g.status !== 'COMING_SOON' && g.status !== 'MAINTENANCE').length})
           </button>
           <button
-            onClick={() => setCatalogSubTab('COMING_SOON')}
-            className={`px-3 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
-              catalogSubTab === 'COMING_SOON'
-                ? 'bg-cyan text-void font-bold'
+            onClick={() => setFilterMode('COMING_SOON')}
+            className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+              filterMode === 'COMING_SOON'
+                ? 'bg-cyan text-void font-bold shadow-sm'
                 : 'bg-surface/50 text-dim hover:text-ink border border-white/10'
             }`}
           >
-            Placement 5: Coming Soon Games ({games.filter((g) => g.status === 'COMING_SOON').length})
+            Coming Soon Games ({games.filter((g) => g.status === 'COMING_SOON' || g.status === 'MAINTENANCE').length})
           </button>
         </div>
 
@@ -633,45 +387,47 @@ function GamesArtworkManager({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-dim" />
           <input
             type="text"
-            placeholder="Search game titles..."
+            placeholder="Search games by title..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface border border-white/15 pl-8 pr-3 py-1 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
+            className="w-full bg-surface border border-white/15 pl-8 pr-3 py-1.5 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
           />
         </div>
       </div>
 
-      {/* Main Two-Column Layout: Left game selector sidebar, Right focal editor */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Game Titles List */}
-        <div className="lg:col-span-1 space-y-2 max-h-[700px] overflow-y-auto pr-1">
-          {filteredGames.map((g) => {
-            const isSelected = (g.id || g.slug) === currentGameId
-            return (
-              <div
-                key={g.id || g.slug}
-                onClick={() => setSelectedGameId(g.id || g.slug)}
-                className={`p-3 rounded border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                  isSelected
-                    ? 'border-cyan bg-cyan/10 text-ink shadow-md'
-                    : 'border-white/10 bg-surface/30 hover:border-white/20 text-dim hover:text-ink'
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="font-display text-sm font-bold uppercase truncate">{g.name}</div>
-                  <div className="font-mono text-[10px] text-dim">{g.slug}</div>
+        <div className="lg:col-span-1 space-y-2 max-h-[720px] overflow-y-auto pr-1">
+          {filteredGames.length === 0 ? (
+            <div className="p-6 text-center text-dim font-mono text-xs border border-white/10 rounded">
+              No games found in this view.
+            </div>
+          ) : (
+            filteredGames.map((g) => {
+              const isSelected = (g.id || g.slug) === currentGameId
+              return (
+                <div
+                  key={g.id || g.slug}
+                  onClick={() => setSelectedGameId(g.id || g.slug)}
+                  className={`p-3 rounded border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                    isSelected
+                      ? 'border-cyan bg-cyan/10 text-ink shadow-md'
+                      : 'border-white/10 bg-surface/30 hover:border-white/20 text-dim hover:text-ink'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-display text-sm font-bold uppercase truncate">{g.name}</div>
+                    <div className="font-mono text-[10px] text-dim">{g.slug}</div>
+                  </div>
+                  <ChevronRight className={`size-4 shrink-0 ${isSelected ? 'text-cyan' : 'opacity-30'}`} />
                 </div>
-                <ChevronRight className={`size-4 shrink-0 ${isSelected ? 'text-cyan' : 'opacity-30'}`} />
-              </div>
-            )
-          })}
+              )
+            })
+          )}
         </div>
 
-        {/* Selected Game Editor */}
         {selectedGame ? (
           <div className="lg:col-span-3 space-y-6">
-            <Panel className="p-5 space-y-6 border-white/10">
-              {/* Selected Game Header */}
+            <Panel className="p-6 space-y-6 border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -694,7 +450,7 @@ function GamesArtworkManager({
                     target="_blank"
                     className="font-mono text-xs text-cyan hover:underline uppercase flex items-center gap-1"
                   >
-                    <span>View Page</span>
+                    <span>View Game Page</span>
                     <ExternalLink className="size-3" />
                   </Link>
                   <button
@@ -708,96 +464,46 @@ function GamesArtworkManager({
                 </div>
               </div>
 
-              {/* Slot 1: Catalog Box Art (Placement 3 & 5: 4:5 Portrait) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.catalog_card?.asset_url}
-                  onChangeAsset={(url) => updateSlot('catalog_card', 'asset_url', url)}
-                  focalPoint={{
-                    x: currentConfig.catalog_card?.focal_x ?? 50,
-                    y: currentConfig.catalog_card?.focal_y ?? 50,
-                  }}
-                  onChangeFocalPoint={(fp) => {
-                    updateSlot('catalog_card', 'focal_x', fp.x)
-                    updateSlot('catalog_card', 'focal_y', fp.y)
-                  }}
-                  zoom={currentConfig.catalog_card?.zoom ?? 1}
-                  onChangeZoom={(z) => updateSlot('catalog_card', 'zoom', z)}
-                  fitMode={currentConfig.catalog_card?.fit_mode || 'cover'}
-                  onChangeFitMode={(m) => updateSlot('catalog_card', 'fit_mode', m)}
-                  targetAspectRatio="4:5"
-                  recommendedResolution="900x1125"
-                  slotLabel="1. Catalog Card Artwork (Placement 3 & 5)"
-                  slotDescription="Used on /games catalog and homepage active games grid. Target ratio is 4:5 portrait."
-                  previewType="game_card"
-                  onOpenMediaLibrary={() => setPickerSlot('catalog_card')}
-                />
-              </div>
-
-              {/* Slot 2: Game Detail Widescreen Banner (16:9 Landscape) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.banner?.asset_url}
-                  onChangeAsset={(url) => updateSlot('banner', 'asset_url', url)}
-                  focalPoint={{
-                    x: currentConfig.banner?.focal_x ?? 50,
-                    y: currentConfig.banner?.focal_y ?? 50,
-                  }}
-                  onChangeFocalPoint={(fp) => {
-                    updateSlot('banner', 'focal_x', fp.x)
-                    updateSlot('banner', 'focal_y', fp.y)
-                  }}
-                  zoom={currentConfig.banner?.zoom ?? 1}
-                  onChangeZoom={(z) => updateSlot('banner', 'zoom', z)}
-                  fitMode={currentConfig.banner?.fit_mode || 'cover'}
-                  onChangeFitMode={(m) => updateSlot('banner', 'fit_mode', m)}
-                  targetAspectRatio="16:9"
-                  recommendedResolution="1600x900"
-                  slotLabel="2. Game Detail Header Banner"
-                  slotDescription="Used as the panoramic header on the individual game detail page (/games/:slug)."
-                  previewType="banner"
-                  onOpenMediaLibrary={() => setPickerSlot('banner')}
-                />
-              </div>
-
-              {/* Slot 3: Homepage Showcase Card (Placement 7: 3:4 Portrait) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.showcase_card?.asset_url}
-                  onChangeAsset={(url) => updateSlot('showcase_card', 'asset_url', url)}
-                  focalPoint={{
-                    x: currentConfig.showcase_card?.focal_x ?? 50,
-                    y: currentConfig.showcase_card?.focal_y ?? 50,
-                  }}
-                  onChangeFocalPoint={(fp) => {
-                    updateSlot('showcase_card', 'focal_x', fp.x)
-                    updateSlot('showcase_card', 'focal_y', fp.y)
-                  }}
-                  zoom={currentConfig.showcase_card?.zoom ?? 1}
-                  onChangeZoom={(z) => updateSlot('showcase_card', 'zoom', z)}
-                  fitMode={currentConfig.showcase_card?.fit_mode || 'cover'}
-                  onChangeFitMode={(m) => updateSlot('showcase_card', 'fit_mode', m)}
-                  targetAspectRatio="3:4"
-                  recommendedResolution="900x1200"
-                  slotLabel="3. Homepage Game Showcase Card (Placement 7)"
-                  slotDescription="Staggered cards rendered in '8 Games. One Arena.' on the homepage."
-                  previewType="showcase_card"
-                  onOpenMediaLibrary={() => setPickerSlot('showcase_card')}
-                />
-              </div>
-
-              {/* Slot 4: Emblem / Logo (1:1 Square) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.logo?.asset_url}
-                  onChangeAsset={(url) => updateSlot('logo', 'asset_url', url)}
-                  targetAspectRatio="1:1"
-                  recommendedResolution="256x256"
-                  slotLabel="4. Game Emblem / Icon (1:1)"
-                  slotDescription="Square game badge or SVG emblem used in tournament match headers and selectors."
-                  previewType="square"
-                  onOpenMediaLibrary={() => setPickerSlot('logo')}
-                />
+              {/* Render each canonical artwork role */}
+              <div className="space-y-6">
+                {rolesToDisplay.map((role) => {
+                  const slotConfig = currentConfig[role.slotKey] || {}
+                  return (
+                    <CropFocalEditor
+                      key={role.id}
+                      value={slotConfig.asset_url || ''}
+                      onChangeAsset={(url) => updateSlot(role.slotKey, 'asset_url', url)}
+                      focalPoint={{
+                        x: slotConfig.focal_x ?? 50,
+                        y: slotConfig.focal_y ?? 50,
+                      }}
+                      onChangeFocalPoint={(fp) => {
+                        updateSlot(role.slotKey, 'focal_x', fp.x)
+                        updateSlot(role.slotKey, 'focal_y', fp.y)
+                      }}
+                      zoom={slotConfig.zoom ?? 1}
+                      onChangeZoom={(z) => updateSlot(role.slotKey, 'zoom', z)}
+                      fitMode={slotConfig.fit_mode || 'cover'}
+                      onChangeFitMode={(m) => updateSlot(role.slotKey, 'fit_mode', m)}
+                      targetAspectRatio={role.aspectRatio}
+                      recommendedResolution={role.recommendedResolution}
+                      slotLabel={role.name}
+                      slotDescription={role.description}
+                      previewType={
+                        role.slotKey === 'homepage_hero_floating'
+                          ? 'hero_shard'
+                          : role.slotKey === 'catalog_card' || role.slotKey === 'coming_soon_catalog_card'
+                          ? 'game_card'
+                          : role.slotKey === 'showcase_card'
+                          ? 'showcase_card'
+                          : role.slotKey === 'logo'
+                          ? 'square'
+                          : 'banner'
+                      }
+                      onOpenMediaLibrary={() => setPickerSlot(role.slotKey)}
+                    />
+                  )
+                })}
               </div>
             </Panel>
           </div>
@@ -808,7 +514,6 @@ function GamesArtworkManager({
         )}
       </div>
 
-      {/* Media Library Picker Modal */}
       <MediaLibraryModal
         isOpen={pickerSlot !== null}
         onClose={() => setPickerSlot(null)}
@@ -824,9 +529,9 @@ function GamesArtworkManager({
 }
 
 /* =========================================================================
-   TOURNAMENTS ARTWORK MANAGER (Placement 4: Upcoming Tournaments, Placement 6: Main Tournaments)
+   TOURNAMENTS ARTWORK SECTION (All, Featured, Upcoming)
    ========================================================================= */
-function TournamentsArtworkManager({
+function TournamentsArtworkSection({
   tournaments,
   onRefresh,
   showToast,
@@ -835,7 +540,7 @@ function TournamentsArtworkManager({
   onRefresh: () => void
   showToast: (msg: string) => void
 }) {
-  const [tournamentSubTab, setTournamentSubTab] = useState<'UPCOMING' | 'ALL'>('UPCOMING')
+  const [filterMode, setFilterMode] = useState<'ALL' | 'FEATURED' | 'UPCOMING'>('ALL')
   const [search, setSearch] = useState('')
   const [selectedTourId, setSelectedTourId] = useState<string>(
     tournaments[0]?.id || tournaments[0]?.slug || ''
@@ -847,15 +552,21 @@ function TournamentsArtworkManager({
 
   const filteredTournaments = useMemo(() => {
     return tournaments.filter((t) => {
+      const isFeatured = Boolean(t.is_featured || (t as any).isFeatured)
       const isUpcoming = t.status === 'UPCOMING' || t.status === 'REGISTRATION_OPEN'
-      const matchesTab = tournamentSubTab === 'UPCOMING' ? isUpcoming : true
+
+      let matchesFilter = true
+      if (filterMode === 'FEATURED') matchesFilter = isFeatured
+      else if (filterMode === 'UPCOMING') matchesFilter = isUpcoming
+
       const matchesSearch =
         !search.trim() ||
         t.title.toLowerCase().includes(search.toLowerCase()) ||
         (t.slug && t.slug.toLowerCase().includes(search.toLowerCase()))
-      return matchesTab && matchesSearch
+
+      return matchesFilter && matchesSearch
     })
-  }, [tournaments, tournamentSubTab, search])
+  }, [tournaments, filterMode, search])
 
   const selectedTournament = useMemo(() => {
     return (
@@ -890,6 +601,27 @@ function TournamentsArtworkManager({
             zoom: cfg.hero?.zoom ?? 1,
             fit_mode: cfg.hero?.fit_mode || 'cover',
           },
+          featured_banner: {
+            asset_url: cfg.featured_banner?.asset_url || selectedTournament.banner_url || '',
+            focal_x: cfg.featured_banner?.focal_x ?? 50,
+            focal_y: cfg.featured_banner?.focal_y ?? 50,
+            zoom: cfg.featured_banner?.zoom ?? 1,
+            fit_mode: cfg.featured_banner?.fit_mode || 'ambient',
+          },
+          also_on_circuit: {
+            asset_url: cfg.also_on_circuit?.asset_url || selectedTournament.banner_url || '',
+            focal_x: cfg.also_on_circuit?.focal_x ?? 50,
+            focal_y: cfg.also_on_circuit?.focal_y ?? 50,
+            zoom: cfg.also_on_circuit?.zoom ?? 1,
+            fit_mode: cfg.also_on_circuit?.fit_mode || 'cover',
+          },
+          upcoming_card: {
+            asset_url: cfg.upcoming_card?.asset_url || selectedTournament.banner_url || '',
+            focal_x: cfg.upcoming_card?.focal_x ?? 50,
+            focal_y: cfg.upcoming_card?.focal_y ?? 50,
+            zoom: cfg.upcoming_card?.zoom ?? 1,
+            fit_mode: cfg.upcoming_card?.fit_mode || 'cover',
+          },
           logo: {
             asset_url: cfg.logo?.asset_url || selectedTournament.logo_url || '',
           },
@@ -901,6 +633,9 @@ function TournamentsArtworkManager({
   const currentConfig = tourMediaState[currentTourId] || {
     card: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     hero: { asset_url: selectedTournament?.hero_banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    featured_banner: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'ambient' },
+    also_on_circuit: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    upcoming_card: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
     logo: { asset_url: selectedTournament?.logo_url || '' },
   }
 
@@ -910,6 +645,24 @@ function TournamentsArtworkManager({
       tourCopy[slotKey] = { ...(tourCopy[slotKey] || {}), [field]: value }
       return { ...prev, [currentTourId]: tourCopy }
     })
+  }
+
+  const handleToggleFeatured = async () => {
+    if (!selectedTournament) return
+    const isFeat = Boolean(selectedTournament.is_featured || (selectedTournament as any).isFeatured)
+    try {
+      await updateTournamentOrganizer(currentTourId, {
+        is_featured: !isFeat,
+      })
+      showToast(
+        !isFeat
+          ? `"${selectedTournament.title}" is now set as the Homepage Featured Tournament!`
+          : `"${selectedTournament.title}" unmarked from featured.`
+      )
+      onRefresh()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update featured status')
+    }
   }
 
   const handleSaveTournamentMedia = async () => {
@@ -934,28 +687,37 @@ function TournamentsArtworkManager({
 
   return (
     <div className="space-y-6">
-      {/* Top Filter and Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setTournamentSubTab('UPCOMING')}
-            className={`px-3 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
-              tournamentSubTab === 'UPCOMING'
-                ? 'bg-cyan text-void font-bold'
+            onClick={() => setFilterMode('ALL')}
+            className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+              filterMode === 'ALL'
+                ? 'bg-cyan text-void font-bold shadow-sm'
                 : 'bg-surface/50 text-dim hover:text-ink border border-white/10'
             }`}
           >
-            Placement 4: Upcoming Tournaments ({tournaments.filter((t) => t.status === 'UPCOMING' || t.status === 'REGISTRATION_OPEN').length})
+            All Tournaments ({tournaments.length})
           </button>
           <button
-            onClick={() => setTournamentSubTab('ALL')}
-            className={`px-3 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
-              tournamentSubTab === 'ALL'
-                ? 'bg-cyan text-void font-bold'
+            onClick={() => setFilterMode('FEATURED')}
+            className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+              filterMode === 'FEATURED'
+                ? 'bg-cyan text-void font-bold shadow-sm'
                 : 'bg-surface/50 text-dim hover:text-ink border border-white/10'
             }`}
           >
-            Placement 6: Main Tournaments Page ({tournaments.length})
+            Featured Tournaments ({tournaments.filter((t) => t.is_featured || (t as any).isFeatured).length})
+          </button>
+          <button
+            onClick={() => setFilterMode('UPCOMING')}
+            className={`px-3.5 py-1.5 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+              filterMode === 'UPCOMING'
+                ? 'bg-cyan text-void font-bold shadow-sm'
+                : 'bg-surface/50 text-dim hover:text-ink border border-white/10'
+            }`}
+          >
+            Upcoming Tournaments ({tournaments.filter((t) => t.status === 'UPCOMING' || t.status === 'REGISTRATION_OPEN').length})
           </button>
         </div>
 
@@ -963,44 +725,51 @@ function TournamentsArtworkManager({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-dim" />
           <input
             type="text"
-            placeholder="Search tournament title..."
+            placeholder="Search tournaments by title..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface border border-white/15 pl-8 pr-3 py-1 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
+            className="w-full bg-surface border border-white/15 pl-8 pr-3 py-1.5 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
           />
         </div>
       </div>
 
-      {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Tournament List */}
-        <div className="lg:col-span-1 space-y-2 max-h-[700px] overflow-y-auto pr-1">
-          {filteredTournaments.map((t) => {
-            const isSelected = (t.id || t.slug) === currentTourId
-            return (
-              <div
-                key={t.id || t.slug}
-                onClick={() => setSelectedTourId(t.id || t.slug)}
-                className={`p-3 rounded border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                  isSelected
-                    ? 'border-cyan bg-cyan/10 text-ink shadow-md'
-                    : 'border-white/10 bg-surface/30 hover:border-white/20 text-dim hover:text-ink'
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="font-display text-sm font-bold uppercase truncate">{t.title}</div>
-                  <div className="font-mono text-[10px] text-dim">{t.slug}</div>
+        <div className="lg:col-span-1 space-y-2 max-h-[720px] overflow-y-auto pr-1">
+          {filteredTournaments.length === 0 ? (
+            <div className="p-6 text-center text-dim font-mono text-xs border border-white/10 rounded">
+              No tournaments found in this view.
+            </div>
+          ) : (
+            filteredTournaments.map((t) => {
+              const isSelected = (t.id || t.slug) === currentTourId
+              const isFeat = Boolean(t.is_featured || (t as any).isFeatured)
+              return (
+                <div
+                  key={t.id || t.slug}
+                  onClick={() => setSelectedTourId(t.id || t.slug)}
+                  className={`p-3 rounded border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                    isSelected
+                      ? 'border-cyan bg-cyan/10 text-ink shadow-md'
+                      : 'border-white/10 bg-surface/30 hover:border-white/20 text-dim hover:text-ink'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <div className="font-display text-sm font-bold uppercase truncate">{t.title}</div>
+                      {isFeat && <Star className="size-3 text-cyan fill-cyan shrink-0" />}
+                    </div>
+                    <div className="font-mono text-[10px] text-dim">{t.slug}</div>
+                  </div>
+                  <ChevronRight className={`size-4 shrink-0 ${isSelected ? 'text-cyan' : 'opacity-30'}`} />
                 </div>
-                <ChevronRight className={`size-4 shrink-0 ${isSelected ? 'text-cyan' : 'opacity-30'}`} />
-              </div>
-            )
-          })}
+              )
+            })
+          )}
         </div>
 
-        {/* Selected Tournament Editor */}
         {selectedTournament ? (
           <div className="lg:col-span-3 space-y-6">
-            <Panel className="p-5 space-y-6 border-white/10">
+            <Panel className="p-6 space-y-6 border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1010,9 +779,14 @@ function TournamentsArtworkManager({
                     <span className="font-mono text-[10px] text-cyan border border-cyan/30 px-1.5 py-0.5 uppercase">
                       {selectedTournament.status || 'ACTIVE'}
                     </span>
+                    {Boolean(selectedTournament.is_featured || (selectedTournament as any).isFeatured) && (
+                      <span className="font-mono text-[10px] bg-cyan/20 text-cyan border border-cyan/40 px-1.5 py-0.5 uppercase font-bold flex items-center gap-1">
+                        <Star className="size-2.5 fill-cyan" /> Featured on Homepage
+                      </span>
+                    )}
                   </div>
                   <p className="font-mono text-xs text-dim mt-1">
-                    Slug: <span className="text-white/80">{selectedTournament.slug}</span> · Prize:{' '}
+                    Slug: <span className="text-white/80">{selectedTournament.slug}</span> · Prize Pool:{' '}
                     <span className="text-ok font-bold">
                       ₹{(selectedTournament.prize_pool_inr || 0).toLocaleString('en-IN')}
                     </span>
@@ -1020,6 +794,21 @@ function TournamentsArtworkManager({
                 </div>
 
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleToggleFeatured}
+                    type="button"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-bold uppercase rounded border transition-all cursor-pointer ${
+                      selectedTournament.is_featured || (selectedTournament as any).isFeatured
+                        ? 'border-cyan bg-cyan/20 text-cyan hover:bg-cyan/30'
+                        : 'border-white/20 bg-white/5 text-dim hover:text-ink hover:border-white/30'
+                    }`}
+                  >
+                    <Star className="size-3.5" />
+                    {selectedTournament.is_featured || (selectedTournament as any).isFeatured
+                      ? 'Featured'
+                      : 'Mark as Featured'}
+                  </button>
+
                   <Link
                     to={`/tournaments/${selectedTournament.id || selectedTournament.slug}`}
                     target="_blank"
@@ -1028,6 +817,7 @@ function TournamentsArtworkManager({
                     <span>View Page</span>
                     <ExternalLink className="size-3" />
                   </Link>
+
                   <button
                     onClick={handleSaveTournamentMedia}
                     disabled={savingTourId === currentTourId}
@@ -1039,70 +829,42 @@ function TournamentsArtworkManager({
                 </div>
               </div>
 
-              {/* Slot 1: Listing Card Artwork (Placement 4 & 6: 16:9 Landscape) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.card?.asset_url}
-                  onChangeAsset={(url) => updateSlot('card', 'asset_url', url)}
-                  focalPoint={{
-                    x: currentConfig.card?.focal_x ?? 50,
-                    y: currentConfig.card?.focal_y ?? 50,
-                  }}
-                  onChangeFocalPoint={(fp) => {
-                    updateSlot('card', 'focal_x', fp.x)
-                    updateSlot('card', 'focal_y', fp.y)
-                  }}
-                  zoom={currentConfig.card?.zoom ?? 1}
-                  onChangeZoom={(z) => updateSlot('card', 'zoom', z)}
-                  fitMode={currentConfig.card?.fit_mode || 'cover'}
-                  onChangeFitMode={(m) => updateSlot('card', 'fit_mode', m)}
-                  targetAspectRatio="16:9"
-                  recommendedResolution="1600x900"
-                  slotLabel="1. Tournament Listing Card Artwork (Placement 4 & 6)"
-                  slotDescription="Used for cards on /tournaments and homepage upcoming tournament cards."
-                  previewType="tournament_card"
-                  onOpenMediaLibrary={() => setPickerSlot('card')}
-                />
-              </div>
-
-              {/* Slot 2: Detail Panoramic Hero Header (1920x820) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.hero?.asset_url}
-                  onChangeAsset={(url) => updateSlot('hero', 'asset_url', url)}
-                  focalPoint={{
-                    x: currentConfig.hero?.focal_x ?? 50,
-                    y: currentConfig.hero?.focal_y ?? 50,
-                  }}
-                  onChangeFocalPoint={(fp) => {
-                    updateSlot('hero', 'focal_x', fp.x)
-                    updateSlot('hero', 'focal_y', fp.y)
-                  }}
-                  zoom={currentConfig.hero?.zoom ?? 1}
-                  onChangeZoom={(z) => updateSlot('hero', 'zoom', z)}
-                  fitMode={currentConfig.hero?.fit_mode || 'cover'}
-                  onChangeFitMode={(m) => updateSlot('hero', 'fit_mode', m)}
-                  targetAspectRatio="16:9"
-                  recommendedResolution="1920x820"
-                  slotLabel="2. Tournament Detail Page Panoramic Hero Header"
-                  slotDescription="Large immersive panoramic hero background banner on /tournaments/:id."
-                  previewType="banner"
-                  onOpenMediaLibrary={() => setPickerSlot('hero')}
-                />
-              </div>
-
-              {/* Slot 3: Crest / Logo (1:1 Square) */}
-              <div className="space-y-2">
-                <CropFocalEditor
-                  value={currentConfig.logo?.asset_url}
-                  onChangeAsset={(url) => updateSlot('logo', 'asset_url', url)}
-                  targetAspectRatio="1:1"
-                  recommendedResolution="256x256"
-                  slotLabel="3. Tournament Crest / Emblem (1:1)"
-                  slotDescription="Crest used in brackets, match cards, and registration summary."
-                  previewType="square"
-                  onOpenMediaLibrary={() => setPickerSlot('logo')}
-                />
+              {/* Render each canonical tournament role */}
+              <div className="space-y-6">
+                {TOURNAMENT_ARTWORK_ROLES.map((role) => {
+                  const slotConfig = currentConfig[role.slotKey] || {}
+                  return (
+                    <CropFocalEditor
+                      key={role.id}
+                      value={slotConfig.asset_url || ''}
+                      onChangeAsset={(url) => updateSlot(role.slotKey, 'asset_url', url)}
+                      focalPoint={{
+                        x: slotConfig.focal_x ?? 50,
+                        y: slotConfig.focal_y ?? 50,
+                      }}
+                      onChangeFocalPoint={(fp) => {
+                        updateSlot(role.slotKey, 'focal_x', fp.x)
+                        updateSlot(role.slotKey, 'focal_y', fp.y)
+                      }}
+                      zoom={slotConfig.zoom ?? 1}
+                      onChangeZoom={(z) => updateSlot(role.slotKey, 'zoom', z)}
+                      fitMode={slotConfig.fit_mode || 'cover'}
+                      onChangeFitMode={(m) => updateSlot(role.slotKey, 'fit_mode', m)}
+                      targetAspectRatio={role.aspectRatio}
+                      recommendedResolution={role.recommendedResolution}
+                      slotLabel={role.name}
+                      slotDescription={role.description}
+                      previewType={
+                        role.slotKey === 'card' || role.slotKey === 'upcoming_card'
+                          ? 'tournament_card'
+                          : role.slotKey === 'logo'
+                          ? 'square'
+                          : 'banner'
+                      }
+                      onOpenMediaLibrary={() => setPickerSlot(role.slotKey)}
+                    />
+                  )
+                })}
               </div>
             </Panel>
           </div>
@@ -1128,21 +890,31 @@ function TournamentsArtworkManager({
 }
 
 /* =========================================================================
-   MEDIA LIBRARY BROWSER TAB
+   MEDIA LIBRARY SECTION (Uploaded Database-Managed Assets & Permanent Deletion)
    ========================================================================= */
-function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }) {
+function MediaLibrarySection({ showToast }: { showToast: (msg: string) => void }) {
   const [items, setItems] = useState<MediaLibraryItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [entityFilter, setEntityFilter] = useState<'ALL' | 'game' | 'tournament'>('ALL')
+  const [formatFilter, setFormatFilter] = useState<string>('ALL')
   const [isUploading, setIsUploading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [deletingItem, setDeletingItem] = useState<MediaLibraryItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchAssets = async () => {
     setLoading(true)
     try {
-      const res = await listMediaFiles({ search: search.trim() || undefined, limit: 60 })
+      const res = await listMediaFiles({
+        search: search.trim() || undefined,
+        entity_type: entityFilter !== 'ALL' ? entityFilter : undefined,
+        content_type: formatFilter !== 'ALL' ? formatFilter : undefined,
+        limit: 100,
+      })
       setItems(res?.items || [])
       setTotal(res?.total || 0)
     } catch (err: any) {
@@ -1154,7 +926,7 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
 
   useEffect(() => {
     fetchAssets()
-  }, [search])
+  }, [search, entityFilter, formatFilter])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1163,7 +935,7 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
     try {
       const res = await uploadMediaFile(file)
       if (res?.url) {
-        showToast(`Image "${file.name}" uploaded successfully!`)
+        showToast(`Image "${file.name}" uploaded successfully to Media Library!`)
         fetchAssets()
       }
     } catch (err: any) {
@@ -1181,20 +953,34 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return
+    setIsDeleting(true)
+    try {
+      await deleteMediaFile(deletingItem.id, true)
+      showToast(`Asset "${deletingItem.filename}" was permanently deleted.`)
+      setDeletingItem(null)
+      fetchAssets()
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete asset')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <Panel className="p-6 space-y-6 border-white/10">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <FolderOpen className="size-5 text-cyan" />
             <h3 className="font-display text-2xl font-black uppercase text-ink">
-              Platform Media Library ({total} Assets)
+              Platform Media Library ({total} Uploaded Assets)
             </h3>
           </div>
           <p className="font-mono text-xs text-dim mt-1">
-            Global repository of uploaded images stored in the MongoDB GridFS media database.
-            Re-use existing assets across any placement slot without duplicate file uploads.
+            Global repository of uploaded assets registered in the database. Manage, reuse,
+            inspect active references, and permanently delete assets with reference safety.
           </p>
         </div>
 
@@ -1217,16 +1003,52 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-dim" />
-        <input
-          type="text"
-          placeholder="Search by filename or keyword..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-surface border border-white/15 pl-9 pr-3 py-2 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
-        />
+      {/* Filter and Search Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Entity filter */}
+          <div className="inline-flex rounded-sm border border-white/10 bg-surface/60 p-0.5">
+            {[
+              { id: 'ALL', label: 'All Assets' },
+              { id: 'game', label: 'Game Artwork' },
+              { id: 'tournament', label: 'Tournament Artwork' },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setEntityFilter(f.id as any)}
+                className={`px-3 py-1 font-mono text-xs uppercase tracking-wider rounded-xs transition-colors cursor-pointer ${
+                  entityFilter === f.id ? 'bg-cyan text-void font-bold' : 'text-dim hover:text-ink'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Format filter */}
+          <select
+            value={formatFilter}
+            onChange={(e) => setFormatFilter(e.target.value)}
+            className="bg-surface border border-white/15 px-3 py-1.5 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
+          >
+            <option value="ALL">All Formats</option>
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG / JPG</option>
+            <option value="webp">WEBP</option>
+            <option value="svg">SVG Vector</option>
+          </select>
+        </div>
+
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-dim" />
+          <input
+            type="text"
+            placeholder="Search by filename or title..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-surface border border-white/15 pl-9 pr-3 py-1.5 font-mono text-xs text-ink rounded outline-none focus:border-cyan"
+          />
+        </div>
       </div>
 
       {/* Assets Grid */}
@@ -1236,63 +1058,168 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
         </div>
       ) : items.length === 0 ? (
         <div className="py-20 text-center text-dim font-mono text-xs border border-white/10 rounded">
-          No media assets found. Upload images to populate your library.
+          No media assets found matching the selected filters.
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="group border border-white/10 hover:border-cyan/50 bg-void/50 rounded overflow-hidden flex flex-col justify-between transition-all hover:shadow-lg hover:shadow-cyan/10"
-            >
-              <div className="aspect-video w-full bg-black/60 relative overflow-hidden">
-                <img
-                  src={resolveMediaUrl(item.url)}
-                  alt={item.filename}
-                  className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                />
-              </div>
+          {items.map((item) => {
+            const references = item.references || []
+            const inUse = references.length > 0
 
-              <div className="p-3 border-t border-white/5 space-y-2">
-                <div className="font-mono text-xs text-ink font-semibold truncate" title={item.filename}>
-                  {item.filename}
-                </div>
-                <div className="flex items-center justify-between font-mono text-[10px] text-dim">
-                  <span>{formatBytes(item.size)}</span>
-                  <span>{item.content_type?.split('/')[1]?.toUpperCase() || 'IMG'}</span>
+            return (
+              <div
+                key={item.id}
+                className="group border border-white/10 hover:border-cyan/50 bg-void/50 rounded overflow-hidden flex flex-col justify-between transition-all hover:shadow-lg hover:shadow-cyan/10"
+              >
+                <div className="aspect-video w-full bg-black/60 relative overflow-hidden">
+                  <img
+                    src={resolveMediaUrl(item.url)}
+                    alt={item.filename}
+                    className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  {inUse ? (
+                    <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-xs font-mono text-[9px] font-bold uppercase bg-emerald-500/90 text-white backdrop-blur-sm shadow">
+                      In Use ({references.length})
+                    </span>
+                  ) : (
+                    <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-xs font-mono text-[9px] font-bold uppercase bg-white/20 text-dim backdrop-blur-sm">
+                      Unassigned
+                    </span>
+                  )}
                 </div>
 
-                <div className="pt-1 flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleCopy(item.id, item.url)}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 font-mono text-[10px] uppercase bg-white/5 hover:bg-white/10 text-dim hover:text-ink border border-white/10 rounded transition-colors cursor-pointer"
-                  >
-                    {copiedId === item.id ? (
-                      <>
-                        <Check className="size-3 text-cyan" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-3" />
-                        <span>Copy URL</span>
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href={resolveMediaUrl(item.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 font-mono text-[10px] bg-white/5 hover:bg-white/10 text-dim hover:text-cyan border border-white/10 rounded transition-colors"
-                    title="Open Full Image"
-                  >
-                    <ExternalLink className="size-3" />
-                  </a>
+                <div className="p-3 border-t border-white/5 space-y-2">
+                  <div className="font-mono text-xs text-ink font-semibold truncate" title={item.filename}>
+                    {item.filename}
+                  </div>
+
+                  {/* Reference indicator */}
+                  {inUse && (
+                    <div className="space-y-0.5">
+                      {references.slice(0, 2).map((ref, idx) => (
+                        <div
+                          key={idx}
+                          className="font-mono text-[10px] text-cyan truncate flex items-center gap-1"
+                          title={`${ref.entity_name} (${ref.role})`}
+                        >
+                          <span className="size-1 rounded-full bg-cyan shrink-0" />
+                          <span className="truncate">{ref.entity_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between font-mono text-[10px] text-dim">
+                    <span>{formatBytes(item.size)}</span>
+                    <span>
+                      {item.width && item.height
+                        ? `${item.width}×${item.height}`
+                        : item.content_type?.split('/')[1]?.toUpperCase() || 'IMG'}
+                    </span>
+                  </div>
+
+                  <div className="pt-1 flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleCopy(item.id, item.url)}
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 font-mono text-[10px] uppercase bg-white/5 hover:bg-white/10 text-dim hover:text-ink border border-white/10 rounded transition-colors cursor-pointer"
+                    >
+                      {copiedId === item.id ? (
+                        <>
+                          <Check className="size-3 text-cyan" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                    <a
+                      href={resolveMediaUrl(item.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 font-mono text-[10px] bg-white/5 hover:bg-white/10 text-dim hover:text-cyan border border-white/10 rounded transition-colors"
+                      title="Open full image"
+                    >
+                      <ExternalLink className="size-3" />
+                    </a>
+                    <button
+                      onClick={() => setDeletingItem(item)}
+                      className="p-1 font-mono text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded transition-colors cursor-pointer"
+                      title="Permanently Delete Asset"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal with Reference Safety Checking */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-surface border border-white/20 rounded-lg p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-2.5 text-red-400 border-b border-white/10 pb-3">
+              <AlertTriangle className="size-5 shrink-0" />
+              <h4 className="font-display text-base font-bold uppercase text-ink">
+                Permanent Asset Deletion
+              </h4>
             </div>
-          ))}
+
+            <div className="space-y-3 font-mono text-xs">
+              <p className="text-dim">
+                Are you sure you want to permanently delete the image file{' '}
+                <strong className="text-ink">"{deletingItem.filename}"</strong>?
+              </p>
+
+              {deletingItem.references && deletingItem.references.length > 0 ? (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded space-y-1 text-red-300">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="size-3.5" />
+                    <span>This asset is currently in active use across {deletingItem.references.length} placement(s):</span>
+                  </div>
+                  <ul className="list-disc list-inside text-[11px] opacity-90 pl-1 space-y-0.5">
+                    {deletingItem.references.map((r, i) => (
+                      <li key={i}>
+                        {r.entity_name} ({r.role})
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] pt-1 text-white/70">
+                    Confirming deletion will safely clear these references and permanently purge the binary file from database storage.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2.5 bg-white/5 border border-white/10 rounded text-dim text-[11px]">
+                  ✓ This asset is unassigned. Deleting will permanently remove it from database storage.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                disabled={isDeleting}
+                className="px-3 py-1.5 font-mono text-xs uppercase bg-white/5 hover:bg-white/10 text-dim hover:text-ink border border-white/15 rounded cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-3.5 py-1.5 font-mono text-xs uppercase font-bold bg-red-600 hover:bg-red-500 text-white rounded cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Confirm Permanent Deletion'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Panel>
@@ -1300,125 +1227,7 @@ function MediaLibraryBrowser({ showToast }: { showToast: (msg: string) => void }
 }
 
 /* =========================================================================
-   SPECIFICATIONS MANIFEST TAB
-   ========================================================================= */
-function SpecsManifestView() {
-  const specs = [
-    {
-      num: 1,
-      placement: 'Placement 1: Homepage Hero Floating Artwork',
-      field: 'placements/homepage_hero_slot_1..4',
-      ratio: '16:9 Landscape',
-      dimensions: '1600 × 900 px',
-      usage: '4 floating angular shard panels orbiting central 3D hero composition on Homepage.',
-      notes: 'Preserves 3D perspective & rotation; focal point X/Y% and zoom calibrated in Admin.',
-    },
-    {
-      num: 2,
-      placement: 'Placement 2: Homepage Featured Tournament',
-      field: 'placements/homepage_featured_tournament',
-      ratio: '16:10 Aspect',
-      dimensions: '1600 × 1000 px',
-      usage: 'Primary featured tournament lead hero card and side thumbnails on Homepage.',
-      notes: 'Admin tournament selector or custom artwork assignment; no clipping.',
-    },
-    {
-      num: 3,
-      placement: 'Placement 3: Active Games Catalog',
-      field: 'Game.media_config.catalog_card (poster_url)',
-      ratio: '4:5 Portrait',
-      dimensions: '900 × 1125 px',
-      usage: 'Game cards on /games catalog and homepage active games listing.',
-      notes: 'Contains badges, title, and platform tags; focal reticle prevents cropping player heads.',
-    },
-    {
-      num: 4,
-      placement: 'Placement 4: Upcoming Tournaments',
-      field: 'Tournament.media_config.card (banner_url)',
-      ratio: '16:9 Widescreen',
-      dimensions: '1280 × 720 px',
-      usage: 'Upcoming tournament listing cards on Homepage & Tournaments page.',
-      notes: 'Full-bleed widescreen banner with prize pool overlay and status badge.',
-    },
-    {
-      num: 5,
-      placement: 'Placement 5: Coming Soon Games Catalog',
-      field: 'Game.media_config.catalog_card',
-      ratio: '4:5 Portrait',
-      dimensions: '900 × 1125 px',
-      usage: 'Upcoming locked game worlds on /games catalog.',
-      notes: 'Seamless asset preservation when game status transitions from Coming Soon to Active.',
-    },
-    {
-      num: 6,
-      placement: 'Placement 6: Main Tournaments Page',
-      field: 'Tournament.media_config.hero & .card',
-      ratio: '16:9 Card / 2.34:1 Hero',
-      dimensions: '1600 × 900 / 1920 × 820 px',
-      usage: 'Main /tournaments catalog listing cards & /tournaments/:id panoramic hero banner.',
-      notes: 'Independent thumbnail card and panoramic detail background artwork.',
-    },
-    {
-      num: 7,
-      placement: 'Placement 7: Homepage Game Showcase',
-      field: 'Game.media_config.showcase_card',
-      ratio: '3:4 Portrait',
-      dimensions: '900 × 1200 px',
-      usage: 'Staggered vertical cards in "8 Games. One Arena." on Homepage.',
-      notes: 'Displays game title, platform tags, description, and "Enter world →" action.',
-    },
-  ]
-
-  return (
-    <Panel className="p-6 space-y-6 border-cyan/30 bg-cyan/[0.02]">
-      <div className="border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-5 text-cyan" />
-          <h3 className="font-display text-2xl font-black uppercase text-cyan">
-            Ametheus Master Artwork Specification Manifest
-          </h3>
-        </div>
-        <p className="font-mono text-xs text-dim mt-1">
-          Complete engineering reference covering all 7 placement categories, aspect ratios, target resolutions,
-          and component integrations across the platform.
-        </p>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-left font-mono text-xs border border-white/10">
-          <thead>
-            <tr className="bg-white/5 border-b border-white/10 text-cyan uppercase">
-              <th className="p-3">#</th>
-              <th className="p-3">Placement / Component</th>
-              <th className="p-3">Database Target</th>
-              <th className="p-3">Aspect Ratio</th>
-              <th className="p-3">Target Dimensions</th>
-              <th className="p-3">Component Usage & Behavior</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5 text-dim">
-            {specs.map((s) => (
-              <tr key={s.num} className="hover:bg-white/[0.02]">
-                <td className="p-3 text-white font-bold">{s.num}</td>
-                <td className="p-3 text-ink font-bold">{s.placement}</td>
-                <td className="p-3 text-cyan">{s.field}</td>
-                <td className="p-3 text-white">{s.ratio}</td>
-                <td className="p-3 text-cyan">{s.dimensions}</td>
-                <td className="p-3">
-                  <div className="text-white/80">{s.usage}</div>
-                  <div className="text-[10px] text-dim mt-0.5">{s.notes}</div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  )
-}
-
-/* =========================================================================
-   MAIN MEDIA ARTWORK MANAGER COMPONENT
+   MAIN MEDIA ARTWORK MANAGER COMPONENT (3 Primary Sections)
    ========================================================================= */
 export function MediaArtworkManager({
   games,
@@ -1426,33 +1235,30 @@ export function MediaArtworkManager({
   onRefresh,
   showToast,
 }: MediaArtworkManagerProps) {
-  const [activeTab, setActiveTab] = useState<MainTab>('HOMEPAGE')
+  const [activeTab, setActiveTab] = useState<MainTab>('GAMES')
 
   return (
     <div className="mt-8 space-y-6">
-      {/* Top Main Navigation Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
             <span className="size-2.5 bg-cyan rounded-full animate-pulse" />
             <h2 className="font-display text-3xl font-black uppercase text-ink">
-              Image Management System
+              Media & Artwork Manager
             </h2>
           </div>
           <p className="font-mono text-xs text-dim mt-1 max-w-3xl">
-            Centralized dynamic asset controller with visual crop focal calibration, real container ratio
-            inspection, zoom adjustments, and component-accurate live previews across all 7 platform placements.
+            Manage canonical artwork for Games and Tournaments across all frontend placements, or browse
+            the database Media Library with reference tracking and safe permanent deletion.
           </p>
         </div>
 
-        {/* Organized Navigation Tabs */}
+        {/* Exactly 3 primary navigation sections as requested in Part B1 */}
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { id: 'HOMEPAGE', label: '1. Homepage', icon: Compass },
-            { id: 'GAMES', label: '2. Games', icon: Gamepad2 },
-            { id: 'TOURNAMENTS', label: '3. Tournaments', icon: Trophy },
-            { id: 'LIBRARY', label: '4. Media Library', icon: FolderOpen },
-            { id: 'SPECS', label: '5. Specifications Manifest', icon: FileText },
+            { id: 'GAMES', label: '1. Games', icon: Gamepad2 },
+            { id: 'TOURNAMENTS', label: '2. Tournaments', icon: Trophy },
+            { id: 'LIBRARY', label: '3. Media Library', icon: FolderOpen },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -1460,7 +1266,7 @@ export function MediaArtworkManager({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as MainTab)}
-                className={`flex items-center gap-2 px-3.5 py-2 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 font-mono text-xs uppercase tracking-wider rounded transition-all cursor-pointer ${
                   isActive
                     ? 'bg-cyan text-void font-bold shadow-lg shadow-cyan/20'
                     : 'border border-white/10 bg-surface/50 text-dim hover:text-ink hover:border-white/20'
@@ -1475,16 +1281,8 @@ export function MediaArtworkManager({
       </div>
 
       {/* Tab Panels */}
-      {activeTab === 'HOMEPAGE' && (
-        <HomepagePlacementsManager
-          tournaments={tournaments}
-          games={games}
-          showToast={showToast}
-        />
-      )}
-
       {activeTab === 'GAMES' && (
-        <GamesArtworkManager
+        <GamesArtworkSection
           games={games}
           onRefresh={onRefresh}
           showToast={showToast}
@@ -1492,16 +1290,14 @@ export function MediaArtworkManager({
       )}
 
       {activeTab === 'TOURNAMENTS' && (
-        <TournamentsArtworkManager
+        <TournamentsArtworkSection
           tournaments={tournaments}
           onRefresh={onRefresh}
           showToast={showToast}
         />
       )}
 
-      {activeTab === 'LIBRARY' && <MediaLibraryBrowser showToast={showToast} />}
-
-      {activeTab === 'SPECS' && <SpecsManifestView />}
+      {activeTab === 'LIBRARY' && <MediaLibrarySection showToast={showToast} />}
     </div>
   )
 }

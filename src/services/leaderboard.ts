@@ -9,6 +9,7 @@ export interface LeaderboardEntry {
   game_name?: string
   captain?: string
   logo_url?: string
+  avatar_url?: string
   win_rate: number
   matches_played: number
   wins: number
@@ -50,6 +51,8 @@ export interface LeaderboardCategory {
 
 export async function getLeaderboardEntries(params?: {
   category?: string
+  metric?: string
+  platform?: string
   game?: string
   search?: string
   limit?: number
@@ -58,6 +61,8 @@ export async function getLeaderboardEntries(params?: {
 }): Promise<LeaderboardEntry[]> {
   const q = new URLSearchParams()
   if (params?.category) q.set('category', params.category)
+  if (params?.metric) q.set('metric', params.metric)
+  if (params?.platform && params.platform !== 'all') q.set('platform', params.platform)
   if (params?.game && params.game !== 'all') q.set('game', params.game)
   if (params?.search) q.set('search', params.search)
   if (params?.limit) q.set('limit', String(params.limit))

@@ -655,13 +655,25 @@ export interface PlacementConfig {
   updated_at?: string
 }
 
+export interface MediaReference {
+  entity_type: 'game' | 'tournament'
+  entity_id: string
+  entity_name: string
+  role: string
+  field: string
+}
+
 export interface MediaLibraryItem {
   id: string
   url: string
   filename: string
   content_type: string
   size: number
+  width?: number | null
+  height?: number | null
   created_at?: string
+  references?: MediaReference[]
+  in_use?: boolean
 }
 
 export async function getPlacements(params?: { page?: string; section?: string }): Promise<PlacementConfig[]> {
@@ -693,15 +705,40 @@ export async function clearPlacementAsset(placementKey: string): Promise<Placeme
 
 export async function listMediaFiles(params?: {
   search?: string
+  entity_type?: string
+  content_type?: string
   limit?: number
   skip?: number
 }): Promise<{ items: MediaLibraryItem[]; total: number; skip: number; limit: number }> {
   const q = new URLSearchParams()
   if (params?.search) q.append('search', params.search)
+  if (params?.entity_type) q.append('entity_type', params.entity_type)
+  if (params?.content_type) q.append('content_type', params.content_type)
   if (params?.limit) q.append('limit', String(params.limit))
   if (params?.skip) q.append('skip', String(params.skip))
   return apiClient<{ items: MediaLibraryItem[]; total: number; skip: number; limit: number }>(
     `/media?${q.toString()}`
+  )
+}
+
+export async function getMediaReferences(
+  mediaId: string
+): Promise<{ media_id: string; in_use: boolean; references: MediaReference[] }> {
+  return apiClient<{ media_id: string; in_use: boolean; references: MediaReference[] }>(
+    `/media/${mediaId}/references`
+  )
+}
+
+export async function deleteMediaFile(
+  mediaId: string,
+  force: boolean = false
+): Promise<{ status: string; message: string; cleared_references_count: number }> {
+  const q = force ? '?force=true' : ''
+  return apiClient<{ status: string; message: string; cleared_references_count: number }>(
+    `/media/${mediaId}${q}`,
+    {
+      method: 'DELETE',
+    }
   )
 }
 

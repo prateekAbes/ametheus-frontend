@@ -197,16 +197,26 @@ function Hero({
       )}
 
       {SLOTS.map((slot, k) => {
-        const placement = placements.find((p) => p.placement_key === slot.key)
         const g = games[k] || (GAMES as any)[k % GAMES.length]
-        const assetUrl = placement?.asset_url || g?.banner_url || g?.logo_url || (g as any)?.photo
+        const mediaCfg = (g as any)?.media_config || (g as any)?.mediaConfig
+        const floatingCfg = mediaCfg?.homepage_hero_floating || mediaCfg?.catalog_card
+        const placement = placements.find((p) => p.placement_key === slot.key)
+
+        const assetUrl =
+          floatingCfg?.asset_url ||
+          placement?.asset_url ||
+          g?.banner_url ||
+          g?.logo_url ||
+          (g as any)?.photo
         const focalPoint =
-          placement && typeof placement.focal_x === 'number' && typeof placement.focal_y === 'number'
+          floatingCfg && typeof floatingCfg.focal_x === 'number' && typeof floatingCfg.focal_y === 'number'
+            ? { x: floatingCfg.focal_x, y: floatingCfg.focal_y }
+            : placement && typeof placement.focal_x === 'number' && typeof placement.focal_y === 'number'
             ? { x: placement.focal_x, y: placement.focal_y }
             : undefined
-        const zoom = placement?.zoom
-        const fitMode = placement?.fit_mode || 'cover'
-        const linkTo = placement?.target_id ? `/games/${placement.target_id}` : (g?.slug ? `/games/${g.slug}` : '/games')
+        const zoom = floatingCfg?.zoom || placement?.zoom
+        const fitMode = floatingCfg?.fit_mode || placement?.fit_mode || 'cover'
+        const linkTo = g?.slug ? `/games/${g.slug}` : (g?.id ? `/games/${g.id}` : (placement?.target_id ? `/games/${placement.target_id}` : '/games'))
         const tag = g?.tag || g?.name || `Arena 0${k + 1}`
 
         return (
@@ -313,18 +323,24 @@ function Featured({
   const leadGame = gameBy(lead.gameId)
   const displayGameName = lead.gameName || leadGame.name || 'Esports'
 
-  // Dynamic placement override
+  // Lead tournament artwork directly from tournament's own canonical mediaConfig
+  const leadMedia = (lead as any).mediaConfig || (lead as any).media_config
+  const leadFeaturedCfg = leadMedia?.featured_banner || leadMedia?.card
   const featuredPlacement = placements.find((p) => p.placement_key === 'homepage_featured_tournament')
+
   const leadAssetUrl =
-    featuredPlacement?.asset_url || (lead as any).mediaConfig?.card?.asset_url || lead.bannerUrl
+    leadFeaturedCfg?.asset_url ||
+    featuredPlacement?.asset_url ||
+    lead.heroBannerUrl ||
+    lead.bannerUrl
   const leadFocalPoint =
-    featuredPlacement && typeof featuredPlacement.focal_x === 'number' && typeof featuredPlacement.focal_y === 'number'
+    leadFeaturedCfg && typeof leadFeaturedCfg.focal_x === 'number' && typeof leadFeaturedCfg.focal_y === 'number'
+      ? { x: leadFeaturedCfg.focal_x, y: leadFeaturedCfg.focal_y }
+      : featuredPlacement && typeof featuredPlacement.focal_x === 'number' && typeof featuredPlacement.focal_y === 'number'
       ? { x: featuredPlacement.focal_x, y: featuredPlacement.focal_y }
-      : (lead as any).mediaConfig?.card?.focal_x != null && (lead as any).mediaConfig?.card?.focal_y != null
-      ? { x: (lead as any).mediaConfig.card.focal_x, y: (lead as any).mediaConfig.card.focal_y }
       : undefined
-  const leadZoom = featuredPlacement?.zoom || (lead as any).mediaConfig?.card?.zoom
-  const leadFitMode = featuredPlacement?.fit_mode || (lead as any).mediaConfig?.card?.fit_mode || 'ambient'
+  const leadZoom = leadFeaturedCfg?.zoom || featuredPlacement?.zoom
+  const leadFitMode = leadFeaturedCfg?.fit_mode || featuredPlacement?.fit_mode || 'ambient'
 
   return (
     <section className="py-24 md:py-32">
@@ -399,7 +415,8 @@ function Featured({
               {side.map((t, idx) => {
                 const g = gameBy(t.gameId)
                 const sideGameName = t.gameName || g.short
-                const sideCfg = (t as any).mediaConfig?.card
+                const sideMedia = (t as any).mediaConfig || (t as any).media_config
+                const sideCfg = sideMedia?.also_on_circuit || sideMedia?.card
                 const sideFocal =
                   sideCfg && typeof sideCfg.focal_x === 'number' && typeof sideCfg.focal_y === 'number'
                     ? { x: sideCfg.focal_x, y: sideCfg.focal_y }
@@ -486,6 +503,7 @@ function Upcoming({
     region: 'India',
     format: t.format,
     bannerUrl: t.bannerUrl,
+    mediaConfig: t.mediaConfig || (t as any).media_config,
   }))
 
   return (
@@ -565,7 +583,7 @@ function GameShowcase({ games = [] }: { games?: ApiGame[] }) {
         <SectionHead
           className="in-view"
           idx="03"
-          kicker="Placement 7 · Game Showcase"
+          kicker="Game Showcase"
           title={<>{displayGames.length} Games.<br /><span className="text-cyan">One Arena.</span></>}
           right={<Cta ghost small to="/games">Explore all games</Cta>}
         />

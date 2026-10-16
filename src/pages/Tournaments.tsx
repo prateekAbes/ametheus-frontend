@@ -127,6 +127,7 @@ export default function Tournaments() {
         format: nt.format,
         bannerUrl: nt.bannerUrl,
         isRegistered: registeredIds.has(nt.id) || registeredIds.has(nt.slug) || !!nt.isRegistered,
+        mediaConfig: nt.mediaConfig || nt.media_config,
       })
     )
   }, [tournaments, games, registeredIds, selectedGame, selectedStatus, search])

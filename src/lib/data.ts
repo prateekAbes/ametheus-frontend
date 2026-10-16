@@ -28,7 +28,7 @@ export const gameBy = (key?: string) => {
 }
 
 export type TStatus = 'open' | 'upcoming' | 'live' | 'completed' | 'cancelled'
-export type Tournament = { id: string; game: string; name: string; prize: number; entry: number; status: TStatus; date: string; teams: number; max: number; region: string; format: string; isRegistered?: boolean; banner_url?: string; bannerUrl?: string; logo_url?: string; logoUrl?: string }
+export type Tournament = { id: string; game: string; name: string; prize: number; entry: number; status: TStatus; date: string; teams: number; max: number; region: string; format: string; isRegistered?: boolean; banner_url?: string; bannerUrl?: string; logo_url?: string; logoUrl?: string; media_config?: Record<string, any>; mediaConfig?: Record<string, any> }
 export const TOURNAMENTS: Tournament[] = [
   { id: 'bgmi-monsoon-cup', game: 'bgmi', name: 'Monsoon Cup S2', prize: 50000, entry: 100, status: 'open', date: '12 Oct 2026', teams: 48, max: 64, region: 'India', format: '6 Maps · TPP' },
   { id: 'val-ascent-series', game: 'valorant', name: 'Ascent Series', prize: 75000, entry: 250, status: 'open', date: '18 Oct 2026', teams: 22, max: 32, region: 'India / South Asia', format: 'Single Elim · BO3' },
@@ -90,7 +90,7 @@ export const FEATURED_IDS = ['val-ascent-series', 'bgmi-monsoon-cup', 'ff-infern
 export const featured = () => FEATURED_IDS.map((id) => TOURNAMENTS.find((t) => t.id === id)).filter(Boolean) as Tournament[]
 
 /** Full game catalog — active worlds + locked ones. New games are appended here; every grid adapts. */
-export type CatalogGame = { slug: string; short: string; name: string; genre: string; platform: string; accent: string; photo?: string; status: 'active' | 'soon'; tournaments: number }
+export type CatalogGame = { slug: string; short: string; name: string; genre: string; platform: string; accent: string; photo?: string; status: 'active' | 'soon'; tournaments: number; media_config?: Record<string, any>; mediaConfig?: Record<string, any> }
 const SOON_META: Record<string, [string, string, string]> = {
   CS2: ['Tactical FPS', 'PC', '#f5a524'],
   'Rocket League': ['Vehicle Sports', 'PC · Console', '#2f8cff'],

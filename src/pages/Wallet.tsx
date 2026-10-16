@@ -159,7 +159,7 @@ export default function Wallet() {
     <div className="relative min-h-screen bg-void pb-28 pt-32 overflow-hidden">
       <EsportsHeroVisual variant="wallet" accent="#10b981" />
       <Container className="relative">
-        <Hud className="text-cyan">◇ Secure · Encrypted</Hud>
+        <Hud className="text-cyan">◇ Encrypted</Hud>
         <h1 className="reveal mt-3 font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85]">
           Ametheus wallet
         </h1>

@@ -18,14 +18,9 @@ export function LiveTickerBar({ isConnected, latestEvent }: Props) {
               }`}
             />
             <span className="font-mono text-[10px] text-dim uppercase tracking-wider font-bold">
-              {isConnected ? 'TELEMETRY: LIVE' : 'TELEMETRY: CONNECTING...'}
+              {isConnected ? 'LIVE' : 'SYNCING'}
             </span>
           </div>
-
-          <span className="hidden md:inline-block text-white/20 font-mono">•</span>
-          <span className="hidden md:inline-block text-dim font-mono text-[11px]">
-            Real-time Bracket Telemetry &amp; Match Feeds
-          </span>
         </div>
 
         <div className="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap min-w-0 max-w-full">
@@ -61,7 +56,7 @@ export function LiveTickerBar({ isConnected, latestEvent }: Props) {
           ) : (
             <div className="flex items-center gap-1.5 text-dim font-mono text-[11px] min-w-0 truncate">
               <span className="size-1.5 rounded-full bg-live animate-ping shrink-0" />
-              <span className="truncate">Monitoring authoritative match lobbies and bracket tree advances...</span>
+              <span className="truncate">Monitoring match lobbies...</span>
             </div>
           )}
         </div>
