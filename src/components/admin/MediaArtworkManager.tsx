@@ -268,28 +268,28 @@ function GamesArtworkSection({
         ...prev,
         [id]: {
           catalog_card: {
-            asset_url: cfg.catalog_card?.asset_url || selectedGame.poster_url || selectedGame.banner_url || '',
+            asset_url: cfg.catalog_card?.asset_url ?? (selectedGame.poster_url || ''),
             focal_x: cfg.catalog_card?.focal_x ?? 50,
             focal_y: cfg.catalog_card?.focal_y ?? 50,
             zoom: cfg.catalog_card?.zoom ?? 1,
             fit_mode: cfg.catalog_card?.fit_mode || 'cover',
           },
           coming_soon_catalog_card: {
-            asset_url: cfg.coming_soon_catalog_card?.asset_url || selectedGame.poster_url || selectedGame.banner_url || '',
+            asset_url: cfg.coming_soon_catalog_card?.asset_url ?? (selectedGame.poster_url || ''),
             focal_x: cfg.coming_soon_catalog_card?.focal_x ?? 50,
             focal_y: cfg.coming_soon_catalog_card?.focal_y ?? 50,
             zoom: cfg.coming_soon_catalog_card?.zoom ?? 1,
             fit_mode: cfg.coming_soon_catalog_card?.fit_mode || 'cover',
           },
           banner: {
-            asset_url: cfg.banner?.asset_url || selectedGame.banner_url || '',
+            asset_url: cfg.banner?.asset_url ?? (selectedGame.banner_url || ''),
             focal_x: cfg.banner?.focal_x ?? 50,
             focal_y: cfg.banner?.focal_y ?? 50,
             zoom: cfg.banner?.zoom ?? 1,
             fit_mode: cfg.banner?.fit_mode || 'ambient',
           },
           logo: {
-            asset_url: cfg.logo?.asset_url || selectedGame.logo_url || '',
+            asset_url: cfg.logo?.asset_url ?? (selectedGame.logo_url || ''),
           },
         },
       }))
@@ -297,10 +297,10 @@ function GamesArtworkSection({
   }, [selectedGame])
 
   const currentConfig = gameMediaState[currentGameId] || {
-    catalog_card: { asset_url: selectedGame?.poster_url || selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    coming_soon_catalog_card: { asset_url: selectedGame?.poster_url || selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    banner: { asset_url: selectedGame?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'ambient' },
-    logo: { asset_url: selectedGame?.logo_url || '' },
+    catalog_card: { asset_url: selectedGame?.media_config?.catalog_card?.asset_url ?? (selectedGame?.poster_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    coming_soon_catalog_card: { asset_url: selectedGame?.media_config?.coming_soon_catalog_card?.asset_url ?? (selectedGame?.poster_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    banner: { asset_url: selectedGame?.media_config?.banner?.asset_url ?? (selectedGame?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'ambient' },
+    logo: { asset_url: selectedGame?.media_config?.logo?.asset_url ?? (selectedGame?.logo_url || '') },
   }
 
   const updateSlot = (slotKey: string, field: string, value: any) => {
@@ -316,12 +316,19 @@ function GamesArtworkSection({
     setSavingGameId(currentGameId)
     try {
       const cfg = gameMediaState[currentGameId] || currentConfig
+      const newPoster = cfg.catalog_card?.asset_url ?? ''
+      const newBanner = cfg.banner?.asset_url ?? ''
+      const newLogo = cfg.logo?.asset_url ?? ''
       await updateGame(currentGameId, {
-        poster_url: cfg.catalog_card?.asset_url || selectedGame.poster_url,
-        banner_url: cfg.banner?.asset_url || selectedGame.banner_url,
-        logo_url: cfg.logo?.asset_url || selectedGame.logo_url,
+        poster_url: newPoster,
+        banner_url: newBanner,
+        logo_url: newLogo,
         media_config: cfg,
       })
+      setGameMediaState((prev) => ({
+        ...prev,
+        [currentGameId]: { ...cfg },
+      }))
       showToast(`Artwork for "${selectedGame.name}" successfully updated!`)
       onRefresh()
     } catch (err: any) {
@@ -573,42 +580,42 @@ function TournamentsArtworkSection({
         ...prev,
         [id]: {
           card: {
-            asset_url: cfg.card?.asset_url || selectedTournament.banner_url || '',
+            asset_url: cfg.card?.asset_url ?? (selectedTournament.banner_url || ''),
             focal_x: cfg.card?.focal_x ?? 50,
             focal_y: cfg.card?.focal_y ?? 50,
             zoom: cfg.card?.zoom ?? 1,
             fit_mode: cfg.card?.fit_mode || 'cover',
           },
           hero: {
-            asset_url: cfg.hero?.asset_url || selectedTournament.hero_banner_url || selectedTournament.banner_url || '',
+            asset_url: cfg.hero?.asset_url ?? (selectedTournament.hero_banner_url || selectedTournament.banner_url || ''),
             focal_x: cfg.hero?.focal_x ?? 50,
             focal_y: cfg.hero?.focal_y ?? 50,
             zoom: cfg.hero?.zoom ?? 1,
             fit_mode: cfg.hero?.fit_mode || 'cover',
           },
           featured_banner: {
-            asset_url: cfg.featured_banner?.asset_url || selectedTournament.banner_url || '',
+            asset_url: cfg.featured_banner?.asset_url ?? (selectedTournament.banner_url || ''),
             focal_x: cfg.featured_banner?.focal_x ?? 50,
             focal_y: cfg.featured_banner?.focal_y ?? 50,
             zoom: cfg.featured_banner?.zoom ?? 1,
             fit_mode: cfg.featured_banner?.fit_mode || 'cover',
           },
           also_on_circuit: {
-            asset_url: cfg.also_on_circuit?.asset_url || selectedTournament.banner_url || '',
+            asset_url: cfg.also_on_circuit?.asset_url ?? (selectedTournament.banner_url || ''),
             focal_x: cfg.also_on_circuit?.focal_x ?? 50,
             focal_y: cfg.also_on_circuit?.focal_y ?? 50,
             zoom: cfg.also_on_circuit?.zoom ?? 1,
             fit_mode: cfg.also_on_circuit?.fit_mode || 'cover',
           },
           upcoming_card: {
-            asset_url: cfg.upcoming_card?.asset_url || selectedTournament.banner_url || '',
+            asset_url: cfg.upcoming_card?.asset_url ?? (selectedTournament.banner_url || ''),
             focal_x: cfg.upcoming_card?.focal_x ?? 50,
             focal_y: cfg.upcoming_card?.focal_y ?? 50,
             zoom: cfg.upcoming_card?.zoom ?? 1,
             fit_mode: cfg.upcoming_card?.fit_mode || 'cover',
           },
           logo: {
-            asset_url: cfg.logo?.asset_url || selectedTournament.logo_url || '',
+            asset_url: cfg.logo?.asset_url ?? (selectedTournament.logo_url || ''),
           },
         },
       }))
@@ -616,12 +623,12 @@ function TournamentsArtworkSection({
   }, [selectedTournament])
 
   const currentConfig = tourMediaState[currentTourId] || {
-    card: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    hero: { asset_url: selectedTournament?.hero_banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    featured_banner: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    also_on_circuit: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    upcoming_card: { asset_url: selectedTournament?.banner_url || '', focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
-    logo: { asset_url: selectedTournament?.logo_url || '' },
+    card: { asset_url: selectedTournament?.media_config?.card?.asset_url ?? (selectedTournament?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    hero: { asset_url: selectedTournament?.media_config?.hero?.asset_url ?? (selectedTournament?.hero_banner_url || selectedTournament?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    featured_banner: { asset_url: selectedTournament?.media_config?.featured_banner?.asset_url ?? (selectedTournament?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    also_on_circuit: { asset_url: selectedTournament?.media_config?.also_on_circuit?.asset_url ?? (selectedTournament?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    upcoming_card: { asset_url: selectedTournament?.media_config?.upcoming_card?.asset_url ?? (selectedTournament?.banner_url || ''), focal_x: 50, focal_y: 50, zoom: 1, fit_mode: 'cover' },
+    logo: { asset_url: selectedTournament?.media_config?.logo?.asset_url ?? (selectedTournament?.logo_url || '') },
   }
 
   const updateSlot = (slotKey: string, field: string, value: any) => {
@@ -655,12 +662,19 @@ function TournamentsArtworkSection({
     setSavingTourId(currentTourId)
     try {
       const cfg = tourMediaState[currentTourId] || currentConfig
+      const newCard = cfg.card?.asset_url ?? ''
+      const newHero = cfg.hero?.asset_url ?? ''
+      const newLogo = cfg.logo?.asset_url ?? ''
       await updateTournamentOrganizer(currentTourId, {
-        banner_url: cfg.card?.asset_url || selectedTournament.banner_url,
-        hero_banner_url: cfg.hero?.asset_url || selectedTournament.hero_banner_url,
-        logo_url: cfg.logo?.asset_url || selectedTournament.logo_url,
+        banner_url: newCard,
+        hero_banner_url: newHero,
+        logo_url: newLogo,
         media_config: cfg,
       })
+      setTourMediaState((prev) => ({
+        ...prev,
+        [currentTourId]: { ...cfg },
+      }))
       showToast(`Artwork for tournament "${selectedTournament.title}" updated successfully!`)
       onRefresh()
     } catch (err: any) {

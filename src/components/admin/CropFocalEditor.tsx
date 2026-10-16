@@ -525,10 +525,13 @@ export function CropFocalEditor({
           </button>
         )}
 
-        {value && onChangeAsset && (
+        {(value || localPreviewUrl) && onChangeAsset && (
           <button
             type="button"
-            onClick={() => onChangeAsset('')}
+            onClick={() => {
+              setLocalPreviewUrl(null)
+              onChangeAsset('')
+            }}
             className="px-2.5 py-1.5 font-mono text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all cursor-pointer ml-auto"
           >
             Clear

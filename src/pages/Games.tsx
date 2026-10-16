@@ -2,12 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import { getGames, Game as ApiGame, normalizeGame } from '../services/games'
 import { getGenres, type Genre } from '../services/genres'
-import { resolveMediaUrl } from '../services/apiClient'
 import { GameCardSkeleton } from '../components/Skeleton'
 import { type CatalogGame } from '../lib/data'
 import { AdaptiveGrid, GameCard } from '../components/kit'
 import { Hud, PageHero, Container, SectionHead } from '../components/ui'
-import DynamicImage from '../components/DynamicImage'
 
 const GENRE_ACCENTS: Record<string, string> = {
   'battle-royale': '#ffb547',
@@ -35,7 +33,6 @@ export default function Games() {
   const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre)
   const [activeGenreIndex, setActiveGenreIndex] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [cyclingTick, setCyclingTick] = useState(0)
 
   // Sync selectedGenre if URL searchParams changes
   useEffect(() => {
@@ -46,14 +43,6 @@ export default function Games() {
       setSelectedGenre('ALL')
     }
   }, [searchParams])
-
-  // Periodic cycling tick for dynamic genre background images (every 3.5s)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCyclingTick((prev) => prev + 1)
-    }, 3500)
-    return () => clearInterval(timer)
-  }, [])
 
   // Fetch games and genres directly from backend database
   useEffect(() => {
@@ -89,7 +78,7 @@ export default function Games() {
           genre: norm.genreName || norm.category || 'Esports',
           platform: norm.platform || 'Cross-Platform',
           accent: norm.accentColor || '#3ef2ff',
-          photo: norm.bannerUrl || norm.logoUrl || '',
+          photo: '',
           status: 'active' as const,
           tournaments: 0,
           genreId: norm.genreId,
@@ -116,7 +105,7 @@ export default function Games() {
           genre: norm.genreName || norm.category || 'Esports',
           platform: norm.platform || 'Multi-platform',
           accent: norm.accentColor || '#8b5cff',
-          photo: norm.bannerUrl || norm.logoUrl || '',
+          photo: '',
           status: 'soon' as const,
           tournaments: 0,
           mediaConfig: norm.mediaConfig,
@@ -291,14 +280,6 @@ export default function Games() {
                     const accent = getGenreAccent(gn, i)
                     const activeGamesForGenre = genreActiveGamesMap.get(gn.slug || gn.id || gn.name) || []
 
-                    // Extract actual configured media for active games in this genre
-                    const activeGameImages: { title: string; image: string }[] = activeGamesForGenre
-                      .filter((g) => Boolean(g.photo && g.photo.trim()))
-                      .map((g) => ({
-                        title: g.name,
-                        image: resolveMediaUrl(g.photo),
-                      }))
-
                     return (
                       <div
                         key={gn.id || gn.slug || i}
@@ -312,53 +293,29 @@ export default function Games() {
                         }`}
                         style={{ borderColor: isFocused ? accent + 'aa' : undefined }}
                       >
-                        {/* Background Media: Dynamic cycling through active games belonging to this genre */}
-                        {activeGameImages.length > 0 ? (
-                          <div className="absolute inset-0 overflow-hidden">
-                            {activeGameImages.map((item, imgIdx) => {
-                              const isCur =
-                                activeGameImages.length === 1 ||
-                                imgIdx === (cyclingTick % activeGameImages.length)
-                              return (
-                                <div
-                                  key={item.title + imgIdx}
-                                  className={`absolute inset-0 transition-opacity duration-1000 ${
-                                    isCur ? 'opacity-100' : 'opacity-0'
-                                  }`}
-                                >
-                                  <DynamicImage
-                                    src={item.image}
-                                    alt={`${item.title} - ${gn.name}`}
-                                    className={`h-full w-full object-cover transition-all duration-700 ${
-                                      isFocused ? 'opacity-40 scale-105' : 'opacity-20 grayscale group-hover:opacity-35'
-                                    }`}
-                                  />
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : gn.banner_url ? (
-                          <DynamicImage
-                            src={resolveMediaUrl(gn.banner_url)}
-                            alt={gn.name}
-                            className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
-                              isFocused ? 'opacity-40 scale-105' : 'opacity-20 grayscale group-hover:opacity-35'
-                            }`}
-                          />
-                        ) : (
-                          <div
-                            className="absolute inset-0 opacity-30"
-                            style={{
-                              background: `radial-gradient(circle at 70% 30%, ${accent}44, transparent 70%), linear-gradient(135deg, #090a14 0%, #161828 100%)`,
-                            }}
-                          />
-                        )}
+                        {/* Ambient Discipline Background: Clean esports gradients and ambient glows */}
+                        <div
+                          className="absolute inset-0 transition-opacity duration-700"
+                          style={{
+                            background: `radial-gradient(circle at 75% 25%, ${accent}25, transparent 65%), radial-gradient(circle at 20% 80%, ${accent}18, transparent 60%), linear-gradient(135deg, #090a14 0%, #0d0f1a 50%, #161828 100%)`,
+                            opacity: isFocused ? 0.75 : 0.45,
+                          }}
+                        />
+
+                        {/* Subtle Grid / Circuit Overlay */}
+                        <div
+                          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                          style={{
+                            backgroundImage: `linear-gradient(${accent} 1px, transparent 1px), linear-gradient(90deg, ${accent} 1px, transparent 1px)`,
+                            backgroundSize: '24px 24px',
+                          }}
+                        />
 
                         {/* Gradient Overlays */}
                         <div
                           className="absolute inset-0 pointer-events-none"
                           style={{
-                            background: `linear-gradient(to top, #05060a 15%, rgba(5,6,10,0.65) 60%, rgba(5,6,10,0.3) 100%), radial-gradient(ellipse at 0% 100%, ${accent}55, transparent 65%)`,
+                            background: `linear-gradient(to top, #05060a 20%, rgba(5,6,10,0.7) 60%, rgba(5,6,10,0.3) 100%), radial-gradient(ellipse at 0% 100%, ${accent}45, transparent 65%)`,
                           }}
                         />
 
@@ -370,22 +327,6 @@ export default function Games() {
                               {activeGamesForGenre.length} {activeGamesForGenre.length === 1 ? 'Active Game' : 'Active Games'}
                             </span>
                           </div>
-
-                          {/* Image cycling indicator dots strictly matching active game count */}
-                          {activeGameImages.length > 1 && (
-                            <div className="flex items-center gap-1 bg-void/60 px-2 py-0.5 border border-white/10 backdrop-blur-sm">
-                              {activeGameImages.map((_, dotIdx) => (
-                                <span
-                                  key={dotIdx}
-                                  className={`h-1 rounded-full transition-all duration-500 ${
-                                    dotIdx === (cyclingTick % activeGameImages.length)
-                                      ? 'w-3 bg-cyan'
-                                      : 'w-1 bg-white/30'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                          )}
                         </div>
 
                         {/* Collapsed Vertical Title (Visible on lg when NOT focused) */}

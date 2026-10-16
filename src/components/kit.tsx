@@ -75,52 +75,90 @@ export { Modal } from './Modal'
 
 /* ---------- cards ---------- */
 
-/** Game card — works for active and locked worlds, with or without artwork. `feature` = larger type. */
+/** Game card — displays game information and metadata without artwork on the Game Catalog. */
 export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; feature?: boolean }) {
   const soon = g.status === 'soon'
   const title = g.name || g.short
-  const mediaCfg = (g as any).mediaConfig || (g as any).media_config
-  const cardCfg = soon ? (mediaCfg?.coming_soon_catalog_card || mediaCfg?.catalog_card) : mediaCfg?.catalog_card
+  const accent = g.accent || '#3ef2ff'
 
-  const imageSrc =
-    cardCfg?.asset_url ||
-    (g as any).poster_url ||
-    (g as any).posterUrl ||
-    g.photo ||
-    (g as any).bannerUrl ||
-    (g as any).banner_url
-
-  const focalPoint =
-    cardCfg && typeof cardCfg.focal_x === 'number' && typeof cardCfg.focal_y === 'number'
-      ? { x: cardCfg.focal_x, y: cardCfg.focal_y }
-      : undefined
-
-  const body = (
+  const cardContent = (
     <>
-      <DynamicImage
-        src={resolveMediaUrl(imageSrc)}
-        alt={`${title} artwork`}
-        mode={cardCfg?.fit_mode || 'cover'}
-        focalPoint={focalPoint}
-        zoom={cardCfg?.zoom}
-        className="size-full object-cover opacity-85 grayscale-[25%] transition-transform duration-700 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0"
+      {/* Accent line on top of card */}
+      <span
+        className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100"
+        style={{ background: accent }}
       />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 15%, transparent 65%), radial-gradient(ellipse at 0% 100%, ${g.accent}${soon ? '22' : '44'}, transparent 60%)` }} />
-      <span className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" style={{ background: g.accent }} />
-      <div className="absolute left-5 top-5 right-5 flex items-center justify-between gap-3">
-        <Hud className="truncate">{i != null && <span className="text-ink">{String(i + 1).padStart(2, '0')} · </span>}{g.genre}</Hud>
-        {soon && <Badge s="soon" />}
-      </div>
-      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 md:p-6">
-        <div className="min-w-0">
-          <h3 className={`text-balance break-words font-display font-black uppercase leading-[0.85] ${soon ? 'text-white/50 group-hover:text-ink' : ''} ${feature ? 'text-6xl md:text-8xl' : title.length > 14 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}>{title}</h3>
-          <Hud className="mt-2 block">{g.platform}</Hud>
+
+      {/* Subtle ambient gradient mesh for depth without image */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40 group-hover:opacity-70 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(ellipse at 90% 15%, ${accent}18 0%, transparent 65%), linear-gradient(180deg, rgba(18,20,29,0.85) 0%, rgba(8,10,16,0.95) 100%)`,
+        }}
+      />
+
+      <div className="relative z-10 flex h-full flex-col justify-between p-6">
+        {/* Card Header: Category / Genre + Status */}
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-4">
+          <Hud className="truncate">
+            {i != null && <span className="text-ink font-bold">{String(i + 1).padStart(2, '0')} · </span>}
+            <span className="uppercase text-ink/80">{g.genre || 'Esports'}</span>
+          </Hud>
+          {soon ? (
+            <Badge s="soon" />
+          ) : (
+            <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 font-mono text-[9px] uppercase font-bold text-cyan">
+              Active
+            </span>
+          )}
+        </div>
+
+        {/* Card Body: Title & Platform / Format */}
+        <div className="py-5">
+          <h3
+            className={`text-balance break-words font-display font-black uppercase leading-[0.88] transition-colors duration-300 group-hover:text-cyan ${
+              soon ? 'text-white/60' : 'text-ink'
+            } ${feature ? 'text-5xl md:text-6xl' : title.length > 14 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}
+          >
+            {title}
+          </h3>
+
+          <div className="mt-3.5 flex flex-wrap items-center gap-2 font-mono text-xs text-dim">
+            <span className="text-ink/80 font-medium">{g.platform || 'Cross-Platform'}</span>
+            {g.short && g.short !== title && (
+              <>
+                <span className="text-white/20">·</span>
+                <span className="text-dim/80">{g.short}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Card Footer: Action Navigation Prompt */}
+        <div className="flex items-center justify-between border-t border-white/5 pt-4">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-dim">
+            {soon ? 'Pending Launch' : 'Sanctioned Arena'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase font-bold tracking-wider text-dim transition-colors group-hover:text-cyan">
+            <span>{soon ? 'Locked' : 'View Arena'}</span>
+            <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+          </span>
         </div>
       </div>
     </>
   )
-  const cls = `group relative block overflow-hidden border border-white/10 bg-graphite transition-colors hover:border-white/25 ${feature ? 'aspect-[4/5] md:aspect-auto md:h-full md:min-h-[520px]' : 'aspect-[4/5]'}`
-  return soon ? <div className={cls}>{body}</div> : <Link to={`/games/${g.slug}`} className={cls}>{body}</Link>
+
+  const cls = `group relative block min-h-[220px] overflow-hidden border border-white/10 bg-[#0c0e15] transition-all duration-300 hover:border-cyan/50 hover:shadow-lg hover:shadow-cyan/5 ${
+    feature ? 'md:col-span-2' : ''
+  }`
+
+  return soon ? (
+    <div className={cls}>{cardContent}</div>
+  ) : (
+    <Link to={`/games/${g.slug}`} className={cls}>
+      {cardContent}
+    </Link>
+  )
 }
 
 export function TeamCard({ name, game, members, max, role, accent = '#3ef2ff', to = '/teams' }: { name: string; game?: string; members?: number; max?: number; role?: string; accent?: string; to?: string }) {

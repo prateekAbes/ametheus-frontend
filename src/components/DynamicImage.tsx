@@ -127,7 +127,7 @@ export default function DynamicImage({
         {/* Fallback plate */}
         {(status === 'missing' || status === 'error') && (
           <div className="absolute inset-0 flex items-center justify-center border border-white/5 bg-[#0a0e17] p-4 text-center font-mono text-[11px] uppercase tracking-wider text-dim/70 select-none">
-            <span>No image available</span>
+            <span>No media available</span>
           </div>
         )}
 
@@ -179,7 +179,7 @@ export default function DynamicImage({
         <div
           className={`flex items-center justify-center border border-white/5 bg-[#0a0e17] p-4 text-center font-mono text-[11px] uppercase tracking-wider text-dim/70 select-none ${className}`}
         >
-          <span>No image available</span>
+          <span>No media available</span>
         </div>
       )}
 

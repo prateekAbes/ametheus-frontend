@@ -288,20 +288,17 @@ function Featured({
         <div className={`mt-12 grid gap-12 lg:gap-14 ${side.length ? 'lg:grid-cols-12' : ''}`}>
           <div className={`in-view ${side.length ? 'lg:col-span-7' : ''}`}>
             <Link to={`/tournaments/${lead.slug || lead.id}`} className="group block">
-              <div
-                className="relative aspect-[4/3] overflow-hidden sm:aspect-[16/10]"
-                style={{ background: `linear-gradient(135deg, ${leadGame.accent}33, #0c0e15 60%)` }}
-              >
+              <div className="relative aspect-video overflow-hidden bg-void">
                 <DynamicImage
                   src={resolveMediaUrl(leadAssetUrl)}
                   alt={`${lead.title} featured`}
                   eager
-                  mode={leadFitMode}
+                  mode={leadFitMode === 'contain' ? 'contain' : 'cover'}
                   focalPoint={leadFocalPoint}
                   zoom={leadZoom}
-                  className="size-full transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
+                  className="size-full object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]"
                 />
-                <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}30, transparent 50%)` }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(to top, #05060a 0%, transparent 45%), linear-gradient(120deg, ${leadGame.accent}25, transparent 50%)` }} />
                 <div className="absolute left-5 top-5 flex items-center gap-3 md:left-7 md:top-7">
                   <Badge s={lead.status} />
                   <span className="border border-white/20 bg-void/80 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
@@ -359,16 +356,16 @@ function Featured({
                   <Link
                     key={t.id}
                     to={`/tournaments/${t.slug || t.id}`}
-                    className="group grid grid-cols-[88px_1fr] gap-5 border-t border-white/10 py-5 transition-colors first:border-t-0 first:pt-0 sm:grid-cols-[132px_1fr]"
+                    className="group grid grid-cols-[100px_1fr] gap-5 border-t border-white/10 py-5 transition-colors first:border-t-0 first:pt-0 sm:grid-cols-[140px_1fr]"
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden sm:aspect-[4/3] bg-surface">
+                    <div className="relative aspect-video overflow-hidden bg-void">
                       <DynamicImage
                         src={resolveMediaUrl(sideCfg?.asset_url || t.bannerUrl)}
                         alt={`${t.title} thumbnail`}
-                        mode={sideCfg?.fit_mode || 'ambient'}
+                        mode={sideCfg?.fit_mode === 'contain' ? 'contain' : 'cover'}
                         focalPoint={sideFocal}
                         zoom={sideCfg?.zoom}
-                        className="size-full opacity-85 group-hover:scale-105 transition-transform"
+                        className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     </div>
                     <div className="flex min-w-0 flex-col justify-between gap-3">
