@@ -1,256 +1,159 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
 import { PageHero, Container, Chips, Hud, Badge, Crest, Brackets, Cta } from '../components/ui'
-import { gameBy, img, tourBy, type Match } from '../lib/data'
+import { gameBy, tourBy } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import DynamicImage from '../components/DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
 import { useMatchTicker, type TickerEvent } from '../hooks/useMatchTicker'
-import { MatchLobbyModal } from '../components/match/MatchLobbyModal'
-import { EvidenceSubmissionModal } from '../components/match/EvidenceSubmissionModal'
 
 const GAMES = ['All Games', 'BGMI', 'Valorant', 'Free Fire', 'COD Mobile'] as const
 const GMAP: Record<string, string> = { BGMI: 'bgmi', Valorant: 'valorant', 'Free Fire': 'free-fire', 'COD Mobile': 'codm' }
 
-function useCountdown(scheduledAt?: string): string | null {
-  const [now, setNow] = useState<number>(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
+const STATUS_FILTERS = ['All Matches', 'Live', 'Upcoming', 'Completed'] as const
 
-  if (!scheduledAt) return null
-  const diff = new Date(scheduledAt).getTime() - now
-  if (diff <= 0) return null
+type UiMatchItem = ReturnType<typeof mapApiMatchToUiMatch>
 
-  const totalSecs = Math.floor(diff / 1000)
-  const h = Math.floor(totalSecs / 3600)
-  const m = Math.floor((totalSecs % 3600) / 60)
-  const s = totalSecs % 60
-  if (h > 0) return `T-${h}h ${m}m ${s}s`
-  if (m > 0) return `T-${m}m ${s}s`
-  return `T-${s}s`
-}
-
-function LiveFeature({
-  m,
-  onEnterLobby,
-  onSubmitEvidence,
-}: {
-  m: Match & { tourName?: string; liveLink?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string }
-  onEnterLobby: (match: any) => void
-  onSubmitEvidence: (match: any) => void
-}) {
+function PublicMatchCard({ m }: { m: UiMatchItem }) {
   const g = gameBy(m.game)
-  const [media, setMedia] = useState<'loading' | 'ok' | 'err'>('loading')
   const tourTitle = m.tourName || tourBy(m.tour)?.name || 'Tournament'
+  const isLive = m.status === 'live'
 
   return (
     <div
-      className="@container group relative block min-h-[360px] h-full overflow-hidden border border-live/50 bg-void"
+      className={`@container group relative block min-h-[300px] h-full overflow-hidden border transition-all duration-300 ${
+        isLive ? 'border-live/60 bg-void shadow-[0_0_25px_rgba(239,68,68,0.15)]' : 'border-white/10 bg-surface/50 hover:border-cyan/40'
+      }`}
       style={{
-        background: `radial-gradient(ellipse at 30% 0%, ${g.accent}40, transparent 60%), linear-gradient(160deg, #12141d, #05060a)`,
+        background: isLive
+          ? `radial-gradient(ellipse at 30% 0%, ${g.accent}40, transparent 60%), linear-gradient(160deg, #12141d, #05060a)`
+          : `radial-gradient(ellipse at 50% 0%, ${g.accent}20, transparent 70%), linear-gradient(160deg, #10121a, #08090e)`,
       }}
     >
-      <DynamicImage
-        src={resolveMediaUrl((m as any).bannerUrl || (m as any).banner_url)}
-        alt=""
-        eager
-        className="kenburns absolute inset-0 h-full w-full object-cover opacity-30 transition-opacity duration-700 group-hover:opacity-40"
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(ellipse at 50% 120%, ${g.accent}55, transparent 60%), linear-gradient(to top, #05060a, #05060a99 50%, #05060a55)`,
-        }}
-      />
-      <Brackets color="border-live/70" />
-      <div className="relative flex h-full flex-col justify-between p-5 @xl:p-8 @4xl:p-12">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <Brackets color={isLive ? 'border-live/70' : 'border-cyan/40'} />
+      <div className="relative flex h-full flex-col justify-between p-5 @xl:p-7 @4xl:p-9">
+        {/* Header Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Badge s="live" label="Live Now" />
+            <Badge s={m.status} label={isLive ? 'Live Now' : m.status === 'completed' ? 'Final' : 'Scheduled'} />
             <Hud className="truncate text-ink max-w-[280px]">
               {tourTitle} · {m.round}
             </Hud>
           </div>
-          <span className="font-display text-sm font-black tracking-[0.15em]" style={{ color: g.accent }}>
-            {g.short}
-          </span>
-        </div>
-
-        <div className="my-auto grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 py-6 @xl:gap-6 @4xl:gap-10 @4xl:py-8">
-          <div className="flex min-w-0 flex-col items-end gap-3 text-right @3xl:flex-row-reverse @3xl:items-center @3xl:justify-start">
-            <Crest name={m.a} size={48} color={g.accent} />
-            <span className="max-w-full font-display text-[clamp(1.1rem,4.6cqw,3.75rem)] font-black uppercase leading-[0.9] break-words">
-              {m.a}
+          <div className="flex items-center gap-2">
+            <span className="font-display text-sm font-black tracking-[0.15em]" style={{ color: g.accent }}>
+              {g.short}
             </span>
-          </div>
-          <div className="text-center px-2">
-            <p className="whitespace-nowrap font-display text-[clamp(2.25rem,12cqw,7rem)] font-black tabular-nums leading-none">
-              {m.score?.[0] ?? 0}
-              <span className="mx-2 text-live">:</span>
-              {m.score?.[1] ?? 0}
-            </p>
-            <Hud className="mt-2 block">
-              {m.format} · Match {String(m.no).padStart(2, '0')}
-            </Hud>
-          </div>
-          <div className="flex min-w-0 flex-col items-start gap-3 @3xl:flex-row @3xl:items-center">
-            <Crest name={m.b} size={48} color={g.accent} />
-            <span className="max-w-full font-display text-[clamp(1.1rem,4.6cqw,3.75rem)] font-black uppercase leading-[0.9] break-words">
-              {m.b}
+            <span className="border border-white/10 bg-surface/80 px-2 py-0.5 font-mono text-[10px] text-cyan uppercase font-bold">
+              {m.format}
             </span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
-          <Hud>
-            {m.date} · {m.time}
-          </Hud>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {m.liveLink && (
-              <a
-                href={m.liveLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded bg-live/20 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-live border border-live/50 hover:bg-live hover:text-white transition-all shadow-xs"
-              >
-                <span className="size-1.5 rounded-full bg-live animate-ping" />
-                [ 📺 WATCH BROADCAST ]
-              </a>
+        {/* Central Display: Battle Royale vs Head-to-Head */}
+        {m.isBattleRoyale ? (
+          <div className="my-auto py-6 text-center">
+            <div className="inline-flex items-center gap-2 border border-cyan/30 bg-cyan/10 px-3 py-1 font-mono text-xs uppercase tracking-wider text-cyan mb-3">
+              <span>Multi-Squad Battle Royale</span>
+              <span>•</span>
+              <span>Match {String(m.no).padStart(2, '0')}</span>
+            </div>
+            <h3 className="font-display text-3xl @xl:text-4xl font-black uppercase text-ink">
+              {m.squadsCount > 0 ? `${m.squadsCount} Competing Squads` : (m.hasParticipants ? 'Competing Squads' : 'Participants TBD')}
+            </h3>
+            {m.squads && m.squads.length > 0 ? (
+              <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+                {m.squads.slice(0, 6).map((sq: any, i: number) => (
+                  <span
+                    key={sq.id || sq.name || i}
+                    className="border border-white/10 bg-void/80 px-2.5 py-1 font-mono text-[11px] text-ink font-bold uppercase"
+                  >
+                    {sq.name || sq.team_name || `Squad ${i + 1}`}
+                  </span>
+                ))}
+                {m.squads.length > 6 && (
+                  <span className="border border-white/10 bg-void/40 px-2 py-1 font-mono text-[11px] text-dim">
+                    +{m.squads.length - 6} more
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="mt-3 font-mono text-xs text-dim">
+                Squad lobby registration in progress. Check match details for full lineup.
+              </p>
             )}
-            <button
-              onClick={() => onEnterLobby(m)}
-              className="border border-white/20 bg-surface/80 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
-            >
-              Enter Lobby
-            </button>
-            <button
-              onClick={() => onSubmitEvidence(m)}
-              className="border border-cyan bg-cyan/15 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
-            >
-              Submit Result
-            </button>
-            <Link
-              to={`/matches/${m.id}`}
-              className="inline-flex items-center gap-1.5 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-dim hover:text-ink transition-colors ml-2"
-            >
-              Details →
-            </Link>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MatchRowItem({
-  m,
-  onEnterLobby,
-  onSubmitEvidence,
-}: {
-  m: Match & { tourName?: string; liveLink?: string; scheduledAt?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string }
-  onEnterLobby: (match: any) => void
-  onSubmitEvidence: (match: any) => void
-}) {
-  const g = gameBy(m.game)
-  const live = m.status === 'live'
-  const countdown = useCountdown(m.scheduledAt)
-
-  return (
-    <div
-      className={`group relative grid grid-cols-1 md:grid-cols-[180px_1fr_auto_1fr_auto] items-center gap-4 overflow-hidden border p-5 transition-all duration-300 hover:bg-white/[0.03] ${
-        live ? 'border-live/50 bg-live/[0.04]' : 'border-white/10 bg-surface/40'
-      }`}
-    >
-      {live && <span className="absolute inset-y-0 left-0 w-[3px] bg-live" />}
-
-      {/* Game & Stage */}
-      <div className="flex items-center justify-between gap-3 md:block">
-        <span className="font-display text-sm font-black tracking-[0.15em]" style={{ color: g.accent }}>
-          {g.short}
-        </span>
-        <Hud className="block md:mt-1 truncate">
-          {m.tourName || 'Tournament'} · {m.round}
-        </Hud>
-      </div>
-
-      {/* Team A */}
-      <div className="flex items-center gap-3 justify-self-start md:justify-self-end text-left md:text-right">
-        <span className="font-display text-lg md:text-xl font-black uppercase text-ink truncate max-w-[140px] md:max-w-none">
-          {m.a}
-        </span>
-        <Crest name={m.a} size={32} color={g.accent} />
-      </div>
-
-      {/* Score or VS */}
-      <div className="text-center px-2">
-        {m.score ? (
-          <p className="font-display text-2xl font-black tabular-nums text-ink">
-            {m.score[0]}
-            <span className="mx-1.5 text-dim">:</span>
-            {m.score[1]}
-          </p>
+        ) : !m.hasParticipants ? (
+          /* Head-to-Head without assigned participants */
+          <div className="my-auto py-6 text-center">
+            <div className="inline-block border border-white/15 bg-void/60 px-4 py-2 font-mono text-xs uppercase tracking-widest text-dim mb-3">
+              Match {String(m.no).padStart(2, '0')}
+            </div>
+            <h3 className="font-display text-2xl @xl:text-3xl font-black uppercase text-ink">
+              Participants TBD
+            </h3>
+            <p className="mt-2 font-mono text-xs text-dim">
+              Competitor seeding or previous round progression pending.
+            </p>
+          </div>
         ) : (
-          <p className="font-display text-xl font-black text-dim">VS</p>
+          /* Genuine Head-to-Head match with participants */
+          <div className="my-auto grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 py-6 @xl:gap-6 @4xl:gap-10">
+            {/* Team A */}
+            <div className="flex min-w-0 flex-col items-end gap-3 text-right @3xl:flex-row-reverse @3xl:items-center @3xl:justify-start">
+              {m.teamALogo ? (
+                <DynamicImage src={resolveMediaUrl(m.teamALogo)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+              ) : (
+                <Crest name={m.a} size={48} color={g.accent} />
+              )}
+              <span className="max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words text-ink">
+                {m.a}
+              </span>
+            </div>
+
+            {/* Score or VS */}
+            <div className="text-center px-2">
+              {m.score ? (
+                <p className="whitespace-nowrap font-display text-[clamp(2rem,10cqw,5.5rem)] font-black tabular-nums leading-none text-ink">
+                  {m.score[0]}
+                  <span className={`mx-2 ${isLive ? 'text-live animate-pulse' : 'text-dim'}`}>:</span>
+                  {m.score[1]}
+                </p>
+              ) : (
+                <p className="font-display text-[clamp(1.75rem,8cqw,4rem)] font-black leading-none text-dim/50">
+                  VS
+                </p>
+              )}
+              <Hud className="mt-2 block">
+                Match {String(m.no).padStart(2, '0')}
+              </Hud>
+            </div>
+
+            {/* Team B */}
+            <div className="flex min-w-0 flex-col items-start gap-3 @3xl:flex-row @3xl:items-center">
+              {m.teamBLogo ? (
+                <DynamicImage src={resolveMediaUrl(m.teamBLogo)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
+              ) : (
+                <Crest name={m.b} size={48} color={g.accent} />
+              )}
+              <span className="max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words text-ink">
+                {m.b}
+              </span>
+            </div>
+          </div>
         )}
-        <Hud className="block">{m.format}</Hud>
-      </div>
 
-      {/* Team B */}
-      <div className="flex items-center gap-3">
-        <Crest name={m.b} size={32} color={g.accent} />
-        <span className="font-display text-lg md:text-xl font-black uppercase text-ink truncate max-w-[140px] md:max-w-none">
-          {m.b}
-        </span>
-      </div>
-
-      {/* Status & Actions */}
-      <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-white/10">
-        <div className="flex items-center gap-2">
-          {live ? (
-            <Badge s="live" label="Live" />
-          ) : countdown ? (
-            <span className="px-2 py-0.5 border border-cyan/40 bg-cyan/10 font-mono text-[10px] font-bold text-cyan">
-              {countdown}
-            </span>
-          ) : (
-            <Badge s={m.status} />
-          )}
-          <Hud className="hidden xl:inline-block">
+        {/* Footer Bar: Date/Time and ONLY 'Details →' Action */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 font-mono text-xs">
+          <Hud className="text-dim">
             {m.date} · {m.time}
           </Hud>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {m.liveLink && (
-            <a
-              href={m.liveLink}
-              target="_blank"
-              rel="noreferrer"
-              className="border border-live bg-live/20 px-2.5 py-1 font-mono text-[10px] font-bold uppercase text-live hover:bg-live hover:text-white transition-colors"
-            >
-              📺 Watch
-            </a>
-          )}
-          <button
-            onClick={() => onEnterLobby(m)}
-            className="border border-white/20 bg-surface px-2.5 py-1 font-mono text-[10px] uppercase text-dim hover:text-ink hover:border-white/40 cursor-pointer"
-          >
-            Lobby
-          </button>
-          <button
-            onClick={() => onSubmitEvidence(m)}
-            className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 font-mono text-[10px] uppercase text-cyan hover:bg-cyan hover:text-void cursor-pointer"
-          >
-            Proof
-          </button>
           <Link
             to={`/matches/${m.id}`}
-            className="font-mono text-[11px] text-dim hover:text-cyan uppercase font-bold ml-1"
+            className="inline-flex items-center gap-1.5 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-cyan hover:text-ink transition-colors"
           >
-            →
+            Details →
           </Link>
         </div>
       </div>
@@ -260,12 +163,9 @@ function MatchRowItem({
 
 export default function Matches() {
   const [game, setGame] = useState<(typeof GAMES)[number]>('All Games')
-  const [matches, setMatches] = useState<(Match & { tourName?: string; liveLink?: string; scheduledAt?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string })[]>([])
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('All Matches')
+  const [matches, setMatches] = useState<UiMatchItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  // Modals state
-  const [activeLobbyMatch, setActiveLobbyMatch] = useState<any | null>(null)
-  const [activeEvidenceMatch, setActiveEvidenceMatch] = useState<any | null>(null)
 
   const fetchMatchesData = useCallback(async () => {
     try {
@@ -302,23 +202,48 @@ export default function Matches() {
 
   useMatchTicker(handleTickerEvent)
 
-  const list = matches.filter(
-    (m) => m.status === 'live' && (game === 'All Games' || m.game === GMAP[game])
-  )
-  const liveCount = matches.filter((m) => m.status === 'live').length
+  const filteredList = matches.filter((m) => {
+    const gameMatch = game === 'All Games' || m.game === GMAP[game]
+    const statusMatch =
+      statusFilter === 'All Matches'
+        ? true
+        : statusFilter === 'Live'
+        ? m.status === 'live'
+        : statusFilter === 'Upcoming'
+        ? m.status === 'upcoming'
+        : m.status === 'completed'
+    return gameMatch && statusMatch
+  })
 
   return (
     <>
       <PageHero
         title="MATCHES"
-        sub="Track live verified matches across Ametheus."
+        sub="Track verified tournament matches across Ametheus."
         variant="matches"
         accent="#ff3b4e"
       />
 
       <Container className="py-10">
-        <div className="flex items-center justify-between border-b border-white/10 pb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
           <Chips items={GAMES} value={game} onChange={setGame} />
+
+          {/* Status Segmented Tabs */}
+          <div className="flex items-center gap-1 rounded bg-surface p-1 border border-white/10 font-mono text-xs">
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 uppercase font-bold transition-all cursor-pointer ${
+                  statusFilter === s
+                    ? 'bg-cyan text-void shadow-xs'
+                    : 'text-dim hover:text-ink'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="mt-10 space-y-4">
@@ -327,64 +252,24 @@ export default function Matches() {
               <div className="inline-block size-8 animate-spin rounded-full border-2 border-cyan border-t-transparent mb-4" />
               <Hud className="text-cyan">Loading matches...</Hud>
             </div>
-          ) : list.length === 0 ? (
+          ) : filteredList.length === 0 ? (
             <div className="border border-white/10 bg-surface/40 py-16 px-6 text-center flex flex-col items-center justify-center">
               <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-wider text-ink mb-6">
-                No live matches
+                No matches found
               </h2>
               <Cta to="/tournaments" small>
                 Browse Tournaments
               </Cta>
             </div>
           ) : (
-            <div className="space-y-4">
-              <LiveFeature
-                key={`live-feature-${list[0].id}`}
-                m={list[0]}
-                onEnterLobby={(m) => setActiveLobbyMatch(m)}
-                onSubmitEvidence={(m) => setActiveEvidenceMatch(m)}
-              />
-              {list.length > 1 && (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {list.slice(1).map((m, i, r) => (
-                    <div
-                      key={`live-item-${m.id}-${i}`}
-                      className={r.length % 2 === 1 && i === r.length - 1 ? 'lg:col-span-2' : ''}
-                    >
-                      <LiveFeature
-                        m={m}
-                        onEnterLobby={(match) => setActiveLobbyMatch(match)}
-                        onSubmitEvidence={(match) => setActiveEvidenceMatch(match)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {filteredList.map((m) => (
+                <PublicMatchCard key={`match-card-${m.id}`} m={m} />
+              ))}
             </div>
           )}
         </div>
       </Container>
-
-      {/* Interactive Lobby Modal */}
-      <MatchLobbyModal
-        match={activeLobbyMatch}
-        isOpen={Boolean(activeLobbyMatch)}
-        onClose={() => setActiveLobbyMatch(null)}
-        onSubmitEvidence={(m) => {
-          setActiveLobbyMatch(null)
-          setActiveEvidenceMatch(m)
-        }}
-      />
-
-      {/* Result Evidence Modal */}
-      <EvidenceSubmissionModal
-        match={activeEvidenceMatch}
-        isOpen={Boolean(activeEvidenceMatch)}
-        onClose={() => setActiveEvidenceMatch(null)}
-        onSuccess={() => {
-          fetchMatchesData()
-        }}
-      />
     </>
   )
 }

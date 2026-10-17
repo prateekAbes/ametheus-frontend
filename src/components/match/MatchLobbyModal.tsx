@@ -6,10 +6,10 @@ interface Props {
   match: any | null
   isOpen: boolean
   onClose: () => void
-  onSubmitEvidence: (match: any) => void
+  onSubmitEvidence?: (match: any) => void
 }
 
-export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Props) {
+export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [isCheckedIn, setIsCheckedIn] = useState(false)
   const [isCheckingIn, setIsCheckingIn] = useState(false)
@@ -209,37 +209,37 @@ export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Pr
                   })}
                 </div>
               </div>
-            ) : match.lobbyCode && match.lobbyCode !== 'TBD' ? (
+            ) : (joinInfoData?.credentials_released || match.credentials_released) && (match.lobbyCode || match.room_id) && match.lobbyCode !== 'TBD' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
-                <div className="border border-white/10 bg-void/70 p-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] text-dim uppercase">LOBBY / ROOM CODE</div>
-                    <div className="font-mono text-sm font-bold text-cyan">
-                      {match.lobbyCode}
+                <div className="border border-cyan/40 bg-void/70 p-3.5 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-bold text-dim uppercase tracking-wider">ROOM ID</div>
+                    <div className="font-mono text-xl font-extrabold text-cyan select-all break-all mt-0.5">
+                      {match.room_id || match.lobbyCode}
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopy(match.lobbyCode || '', 'lobby')}
-                    className="border border-white/20 bg-surface px-2 py-1 text-[10px] text-dim hover:text-ink hover:border-white/40 cursor-pointer"
+                    onClick={() => handleCopy(match.room_id || match.lobbyCode || '', 'lobby')}
+                    className="shrink-0 inline-flex items-center gap-1 border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer active:scale-95"
                   >
-                    {copiedKey === 'lobby' ? 'Copied' : 'Copy'}
+                    {copiedKey === 'lobby' ? '✓ Copied' : 'Copy'}
                   </button>
                 </div>
-                {match.lobbyPassword && (
-                  <div className="border border-white/10 bg-void/70 p-3 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] text-dim uppercase">LOBBY PASSWORD</div>
-                      <div className="font-mono text-sm font-bold text-warn">
-                        {match.lobbyPassword}
+                {(match.room_password || match.lobbyPassword) && (
+                  <div className="border border-amber-500/40 bg-void/70 p-3.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-bold text-dim uppercase tracking-wider">ROOM PASSWORD</div>
+                      <div className="font-mono text-xl font-extrabold text-amber-400 select-all break-all mt-0.5">
+                        {match.room_password || match.lobbyPassword}
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleCopy(match.lobbyPassword || '', 'pass')}
-                      className="border border-white/20 bg-surface px-2 py-1 text-[10px] text-dim hover:text-ink hover:border-white/40 cursor-pointer"
+                      onClick={() => handleCopy(match.room_password || match.lobbyPassword || '', 'pass')}
+                      className="shrink-0 inline-flex items-center gap-1 border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-bold uppercase text-amber-400 hover:bg-amber-400 hover:text-void transition-colors cursor-pointer active:scale-95"
                     >
-                      {copiedKey === 'pass' ? 'Copied' : 'Copy'}
+                      {copiedKey === 'pass' ? '✓ Copied' : 'Copy'}
                     </button>
                   </div>
                 )}
@@ -250,7 +250,7 @@ export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Pr
                   Credentials Pending Release
                 </div>
                 <p className="text-[11px] text-dim">
-                  In-game lobby room codes and credentials will be released by tournament arbiters prior to match kickoff.
+                  In-game lobby room codes and credentials will be released by tournament arbiters once check-in opens.
                 </p>
               </div>
             )}
@@ -286,17 +286,8 @@ export function MatchLobbyModal({ match, isOpen, onClose, onSubmitEvidence }: Pr
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                onClose()
-                onSubmitEvidence(match)
-              }}
-              className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-cyan/90 transition-colors cursor-pointer"
-            >
-              Submit Score &amp; Evidence
-            </button>
-            <button
               onClick={onClose}
-              className="border border-white/20 bg-surface px-4 py-2 font-mono text-xs uppercase text-dim hover:text-ink cursor-pointer"
+              className="border border-cyan bg-cyan px-5 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-cyan/90 transition-colors cursor-pointer"
             >
               Close
             </button>

@@ -326,19 +326,12 @@ export default function Games() {
                           </div>
                         </div>
 
-                        {/* Collapsed Vertical Title (Visible on lg when NOT focused) */}
-                        <span
-                          className={`absolute bottom-8 left-5 hidden origin-bottom-left font-display text-3xl xl:text-4xl font-black uppercase tracking-wider transition-opacity duration-300 [writing-mode:vertical-rl] rotate-180 lg:block text-ink/75 group-hover:text-ink pointer-events-none ${
-                            isFocused ? 'opacity-0' : 'opacity-100'
-                          }`}
-                        >
-                          {gn.name}
-                        </span>
-
                         {/* Focused Content Area */}
                         <div
                           className={`absolute inset-x-0 bottom-0 p-6 md:p-10 transition-all duration-500 z-10 ${
-                            isFocused ? 'opacity-100' : 'lg:translate-y-6 lg:opacity-0 pointer-events-none'
+                            isFocused
+                              ? 'opacity-100 translate-y-0 pointer-events-auto'
+                              : 'opacity-0 translate-y-6 pointer-events-none'
                           }`}
                         >
                           <Hud className="block text-cyan uppercase tracking-widest text-xs">

@@ -12,17 +12,36 @@ import {
   closeTournamentRegistration,
   reopenTournamentRegistration,
   updateTournamentStream,
+  updateRoundStreamAdmin,
+  updateMatchCredentialsAdmin,
+  releaseMatchCredentialsAdmin,
+  getQualifiedContendersAdmin,
+  updateMatchAliveStatusAdmin,
+  submitBattleRoyaleResultsAdmin,
+  getMatchRatingsAdmin,
+  submitMatchRatingsAdmin,
   getTournamentRoundsRosters,
   publishRosterAdmin,
   publishAllRostersAdmin,
   saveLiveMatchStructureAdmin,
   type RegisteredRosterTeam,
   type TournamentRoundsRostersResponse,
+  type QualifiedContender,
+  type BattleRoyaleTeamResultInput,
+  type ParticipantRatingItem,
 } from '../../services/matches'
 import { type Tournament } from '../../services/tournaments'
 import { resolveMediaUrl } from '../../services/apiClient'
 import { Panel, Hud, Badge, Brackets } from '../ui'
 import { Portal } from '../Modal'
+
+function normalizeStreamUrl(url?: string): string {
+  if (!url) return ''
+  const t = url.trim()
+  if (!t) return ''
+  if (/^https?:\/\//i.test(t)) return t
+  return `https://${t}`
+}
 
 interface Props {
   tournaments: Tournament[]
@@ -503,12 +522,15 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedTournId, setSelectedTournId] = useState<string>('ALL')
+  const [selectedGameFilter, setSelectedGameFilter] = useState<string>('ALL')
   const [selectedRoundTab, setSelectedRoundTab] = useState<string>('ALL')
 
   const [tournRosters, setTournRosters] = useState<RegisteredRosterTeam[]>([])
   const [loadingRosters, setLoadingRosters] = useState(false)
   const [tournStreamUrl, setTournStreamUrl] = useState('')
+  const [roundStreamUrl, setRoundStreamUrl] = useState('')
   const [savingStream, setSavingStream] = useState(false)
+  const [savingRoundStream, setSavingRoundStream] = useState(false)
   const [closingReg, setClosingReg] = useState(false)
   const [reopeningReg, setReopeningReg] = useState(false)
   const [showRostersDrawer, setShowRostersDrawer] = useState(false)
@@ -583,6 +605,346 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     winner_team_id: '',
   })
   const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // 2-Level Scope: Games List
+  const availableGames = useMemo(() => {
+    const s = new Set<string>()
+    tournaments.forEach((t) => {
+      const g = t.game_title || t.game_name || t.game_id
+      if (g) s.add(g)
+    })
+    return Array.from(s)
+  }, [tournaments])
+
+  // Sync roundStreamUrl whenever selectedRoundTab or roundsRostersData changes
+  useEffect(() => {
+    if (selectedRoundTab !== 'ALL' && roundsRostersData?.rounds) {
+      const foundRound = roundsRostersData.rounds.find((r) => r.round_name === selectedRoundTab)
+      if (foundRound?.stream_url) {
+        setRoundStreamUrl(foundRound.stream_url)
+      } else {
+        const matchWithStream = matches.find(
+          (m) =>
+            (m.round_name === selectedRoundTab || m.stage === selectedRoundTab) &&
+            (m.youtube_live_url || m.live_link)
+        )
+        setRoundStreamUrl(matchWithStream?.youtube_live_url || matchWithStream?.live_link || '')
+      }
+    } else {
+      setRoundStreamUrl(tournStreamUrl || '')
+    }
+  }, [selectedRoundTab, roundsRostersData, matches, tournStreamUrl])
+
+  const handleSaveRoundStream = async () => {
+    if (!selectedTournId || selectedTournId === 'ALL') {
+      showBanner('Please select a specific tournament first.', 'err')
+      return
+    }
+    const targetRound = selectedRoundTab !== 'ALL' ? selectedRoundTab : (availableRoundTabs[0] || 'Round 1')
+    setSavingRoundStream(true)
+    try {
+      await updateRoundStreamAdmin(selectedTournId, targetRound, roundStreamUrl.trim())
+      showBanner(`Round "${targetRound}" broadcast stream updated!`)
+      fetchRoundsData(selectedTournId)
+      fetchMatches()
+      onMatchesUpdated?.()
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to update round stream', 'err')
+    } finally {
+      setSavingRoundStream(false)
+    }
+  }
+
+  // Credentials Modal State & Handlers
+  const [credentialModalMatch, setCredentialModalMatch] = useState<ApiMatch | null>(null)
+  const [credentialForm, setCredentialForm] = useState({
+    room_id: '',
+    room_password: '',
+    custom_instructions: '',
+  })
+  const [submittingCredentials, setSubmittingCredentials] = useState(false)
+
+  const handleOpenCredentialsModal = (m: ApiMatch) => {
+    setCredentialModalMatch(m)
+    setCredentialForm({
+      room_id: m.room_id || m.lobby_code || '',
+      room_password: m.room_password || m.lobby_password || '',
+      custom_instructions: m.custom_instructions || '',
+    })
+  }
+
+  const handleSaveCredentialsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!credentialModalMatch) return
+    setSubmittingCredentials(true)
+    try {
+      await updateMatchCredentialsAdmin(credentialModalMatch.id, {
+        room_id: credentialForm.room_id.trim() || undefined,
+        room_password: credentialForm.room_password.trim() || undefined,
+        custom_instructions: credentialForm.custom_instructions.trim() || undefined,
+      })
+      showBanner('Credentials saved in confidential state.')
+      setCredentialModalMatch(null)
+      fetchMatches()
+      if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to save credentials', 'err')
+    } finally {
+      setSubmittingCredentials(false)
+    }
+  }
+
+  const handleReleaseCredentialsClick = async (m: ApiMatch) => {
+    if (
+      !confirm(
+        `Release room credentials and open check-in for Match #${m.match_number || 1}? Registered participants will receive in-app alerts and access room credentials immediately.`
+      )
+    )
+      return
+    try {
+      await releaseMatchCredentialsAdmin(m.id)
+      showBanner('✓ Credentials released to participants! Check-in is now OPEN.')
+      fetchMatches()
+      if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+      onMatchesUpdated?.()
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to release credentials', 'err')
+    }
+  }
+
+  // Battle Royale Modal State & Handlers
+  const [brResultsMatch, setBrResultsMatch] = useState<ApiMatch | null>(null)
+  const [brTeamResults, setBrTeamResults] = useState<BattleRoyaleTeamResultInput[]>([])
+  const [brScoringMatrix, setBrScoringMatrix] = useState<Record<string, number>>({
+    '1': 10,
+    '2': 6,
+    '3': 5,
+    '4': 4,
+    '5': 3,
+    '6': 2,
+    '7': 1,
+    '8': 1,
+  })
+  const [submittingBrResults, setSubmittingBrResults] = useState(false)
+
+  const handleOpenBrResultsModal = (m: ApiMatch) => {
+    setBrResultsMatch(m)
+    const squads: BattleRoyaleTeamResultInput[] = []
+    if (Array.isArray(m.teams) && m.teams.length > 0) {
+      m.teams.forEach((t: any, idx: number) => {
+        const place = idx + 1
+        const pts = brScoringMatrix[String(place)] ?? 0
+        squads.push({
+          team_id: String(t.id || t._id || `squad-${idx}`),
+          team_name: t.name || `Squad ${idx + 1}`,
+          placement: place,
+          kills: 0,
+          placement_points: pts,
+          elimination_points: 0,
+          total_points: pts,
+        })
+      })
+    } else if (Array.isArray(m.team_ids) && m.team_ids.length > 0) {
+      m.team_ids.forEach((tid: string, idx: number) => {
+        const found = tournRosters.find((r) => r.team_id === tid)
+        const place = idx + 1
+        const pts = brScoringMatrix[String(place)] ?? 0
+        squads.push({
+          team_id: tid,
+          team_name: found?.team_name || `Squad ${idx + 1}`,
+          placement: place,
+          kills: 0,
+          placement_points: pts,
+          elimination_points: 0,
+          total_points: pts,
+        })
+      })
+    } else {
+      if (m.team_a_id) {
+        squads.push({
+          team_id: m.team_a_id,
+          team_name: m.team_a?.name || m.team_a_name || 'Squad A',
+          placement: 1,
+          kills: 0,
+          placement_points: 10,
+          elimination_points: 0,
+          total_points: 10,
+        })
+      }
+      if (m.team_b_id) {
+        squads.push({
+          team_id: m.team_b_id,
+          team_name: m.team_b?.name || m.team_b_name || 'Squad B',
+          placement: 2,
+          kills: 0,
+          placement_points: 6,
+          elimination_points: 0,
+          total_points: 6,
+        })
+      }
+    }
+    setBrTeamResults(squads)
+  }
+
+  const handleUpdateBrRow = (index: number, field: 'placement' | 'kills', val: number) => {
+    setBrTeamResults((prev) => {
+      const copy = [...prev]
+      const row = { ...copy[index] }
+      if (field === 'placement') row.placement = val
+      if (field === 'kills') row.kills = val
+
+      const placementPts = brScoringMatrix[String(row.placement)] ?? 0
+      const elimPts = Number(row.kills || 0) * 1
+      row.placement_points = placementPts
+      row.elimination_points = elimPts
+      row.total_points = placementPts + elimPts
+
+      copy[index] = row
+      return copy
+    })
+  }
+
+  const handleSubmitBrResults = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!brResultsMatch) return
+    setSubmittingBrResults(true)
+    try {
+      const res = await submitBattleRoyaleResultsAdmin(brResultsMatch.id, {
+        team_results: brTeamResults,
+        scoring_matrix: brScoringMatrix,
+      })
+      showBanner(`✓ Battle Royale match finalized! Winner: ${res.winner_team_name}`)
+      setBrResultsMatch(null)
+      fetchMatches()
+      if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+      onMatchesUpdated?.()
+    } catch (err: any) {
+      alert(err?.message || 'Failed to submit Battle Royale results')
+    } finally {
+      setSubmittingBrResults(false)
+    }
+  }
+
+  const handleToggleSquadAlive = async (matchId: string, teamId: string, currentAlive: boolean) => {
+    try {
+      await updateMatchAliveStatusAdmin(matchId, teamId, !currentAlive)
+      showBanner(`Squad operational status updated (${!currentAlive ? 'ALIVE' : 'ELIMINATED'})`)
+      fetchMatches()
+      if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+    } catch (err: any) {
+      showBanner(err?.message || 'Failed to toggle alive status', 'err')
+    }
+  }
+
+  // Participant Ratings Modal State & Handlers
+  const [ratingsModalMatch, setRatingsModalMatch] = useState<ApiMatch | null>(null)
+  const [ratingsList, setRatingsList] = useState<ParticipantRatingItem[]>([])
+  const [loadingRatings, setLoadingRatings] = useState(false)
+  const [submittingRatings, setSubmittingRatings] = useState(false)
+
+  const handleOpenRatingsModal = async (m: ApiMatch) => {
+    setRatingsModalMatch(m)
+    setLoadingRatings(true)
+    try {
+      const existing = await getMatchRatingsAdmin(m.id)
+      if (existing?.ratings && existing.ratings.length > 0) {
+        setRatingsList(existing.ratings)
+      } else {
+        const items: ParticipantRatingItem[] = []
+        if (m.team_a_details?.members) {
+          m.team_a_details.members.forEach((mem: any) => {
+            if (mem.id) {
+              items.push({
+                user_id: mem.id,
+                username: mem.name || mem.handle || 'Player',
+                team_id: m.team_a_id,
+                rating: 8,
+                review: '',
+              })
+            }
+          })
+        }
+        if (m.team_b_details?.members) {
+          m.team_b_details.members.forEach((mem: any) => {
+            if (mem.id) {
+              items.push({
+                user_id: mem.id,
+                username: mem.name || mem.handle || 'Player',
+                team_id: m.team_b_id,
+                rating: 8,
+                review: '',
+              })
+            }
+          })
+        }
+        if (items.length === 0) {
+          if (m.team_a_id) {
+            items.push({
+              user_id: m.team_a_id,
+              username: m.team_a?.name || m.team_a_name || 'Team A',
+              team_id: m.team_a_id,
+              rating: 8,
+              review: '',
+            })
+          }
+          if (m.team_b_id) {
+            items.push({
+              user_id: m.team_b_id,
+              username: m.team_b?.name || m.team_b_name || 'Team B',
+              team_id: m.team_b_id,
+              rating: 8,
+              review: '',
+            })
+          }
+        }
+        setRatingsList(items)
+      }
+    } catch {
+      setRatingsList([])
+    } finally {
+      setLoadingRatings(false)
+    }
+  }
+
+  const handleSubmitRatings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!ratingsModalMatch) return
+    setSubmittingRatings(true)
+    try {
+      await submitMatchRatingsAdmin(ratingsModalMatch.id, ratingsList)
+      showBanner(`✓ Match ratings submitted successfully for ${ratingsList.length} player(s).`)
+      setRatingsModalMatch(null)
+      fetchMatches()
+    } catch (err: any) {
+      alert(err?.message || 'Failed to submit ratings')
+    } finally {
+      setSubmittingRatings(false)
+    }
+  }
+
+  // Qualified Contenders State
+  const [qualifiedContenders, setQualifiedContenders] = useState<QualifiedContender[]>([])
+  const [loadingContenders, setLoadingContenders] = useState(false)
+
+  const fetchContenders = useCallback(async (tId: string) => {
+    if (!tId || tId === 'ALL') {
+      setQualifiedContenders([])
+      return
+    }
+    setLoadingContenders(true)
+    try {
+      const res = await getQualifiedContendersAdmin(tId)
+      if (res?.contenders) {
+        setQualifiedContenders(res.contenders)
+      } else {
+        setQualifiedContenders([])
+      }
+    } catch {
+      setQualifiedContenders([])
+    } finally {
+      setLoadingContenders(false)
+    }
+  }, [])
 
   // Fetch all matches for Operations View
   const fetchMatches = useCallback(async () => {
@@ -985,7 +1347,11 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
       m.round_name === selectedRoundTab ||
       m.stage === selectedRoundTab ||
       (m.round_number && `Round ${m.round_number}` === selectedRoundTab)
-    return statusMatch && tourMatch && roundMatch
+    const matchTourn = tournaments.find((t) => t.id === m.tournament_id || t.slug === m.tournament_id)
+    const matchGame = m.game_name || m.game_title || matchTourn?.game_title || matchTourn?.game_name || ''
+    const gameMatch =
+      selectedGameFilter === 'ALL' || matchGame === selectedGameFilter
+    return statusMatch && tourMatch && roundMatch && gameMatch
   })
 
   const draftMatchesInScope = useMemo(() => {
@@ -1592,20 +1958,40 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
           {/* Scope Selector Bar */}
           <Panel className="p-4 md:p-5 space-y-4 border-white/15 bg-surface/50">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-bold text-ink uppercase tracking-wider">Tournament Scope:</span>
-                <select
-                  value={selectedTournId}
-                  onChange={(e) => setSelectedTournId(e.target.value)}
-                  className="border border-white/20 bg-void px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan min-w-[240px]"
-                >
-                  <option value="ALL">All Tournaments (Global View)</option>
-                  {tournaments.map((t) => (
-                    <option key={t.id || t.slug} value={t.id || t.slug}>
-                      {t.title} ({t.status || 'ACTIVE'})
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Level 1: Competition (Tournament) */}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-ink uppercase tracking-wider text-[11px]">Competition:</span>
+                  <select
+                    value={selectedTournId}
+                    onChange={(e) => setSelectedTournId(e.target.value)}
+                    className="border border-white/20 bg-void px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan min-w-[220px]"
+                  >
+                    <option value="ALL">All Competitions (Global)</option>
+                    {tournaments.map((t) => (
+                      <option key={t.id || t.slug} value={t.id || t.slug}>
+                        {t.title} ({t.status || 'ACTIVE'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Level 2: Game Filter */}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-dim uppercase tracking-wider text-[11px]">Game:</span>
+                  <select
+                    value={selectedGameFilter}
+                    onChange={(e) => setSelectedGameFilter(e.target.value)}
+                    className="border border-white/20 bg-void px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan min-w-[160px]"
+                  >
+                    <option value="ALL">All Games</option>
+                    {availableGames.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {selectedTournId !== 'ALL' && currentTournament && (
@@ -1642,34 +2028,34 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               )}
             </div>
 
-            {/* Broadcast Stream Bar */}
+            {/* Round Broadcast Stream Bar (One URL Per Round) */}
             {selectedTournId !== 'ALL' && currentTournament && (
               <div className="pt-3 border-t border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-void/50 p-3">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-live font-bold uppercase tracking-wider shrink-0">
-                    🔴 Tournament Stream:
+                  <span className="text-live font-bold uppercase tracking-wider shrink-0 text-[11px]">
+                    🔴 Round Broadcast ({selectedRoundTab !== 'ALL' ? selectedRoundTab : (availableRoundTabs[0] || 'Round 1')}):
                   </span>
                   <input
                     type="url"
                     placeholder="https://www.youtube.com/watch?v=... or /live/..."
-                    value={tournStreamUrl}
-                    onChange={(e) => setTournStreamUrl(e.target.value)}
+                    value={roundStreamUrl}
+                    onChange={(e) => setRoundStreamUrl(e.target.value)}
                     className="w-full border border-white/15 bg-surface px-3 py-1 text-xs text-ink outline-none focus:border-cyan"
                   />
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={handleSaveTournStream}
-                    disabled={savingStream}
+                    onClick={handleSaveRoundStream}
+                    disabled={savingRoundStream}
                     className="border border-live bg-live/20 px-3 py-1 text-[11px] font-bold text-live hover:bg-live hover:text-white transition-colors cursor-pointer"
                   >
-                    {savingStream ? 'Saving...' : 'Broadcast Stream'}
+                    {savingRoundStream ? 'Saving...' : 'Save Round Broadcast'}
                   </button>
-                  {tournStreamUrl && (
+                  {roundStreamUrl && (
                     <a
-                      href={tournStreamUrl}
+                      href={normalizeStreamUrl(roundStreamUrl)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="border border-white/20 px-2.5 py-1 text-[11px] text-dim hover:text-ink"
                     >
                       Watch ↗
@@ -1768,21 +2154,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   )
                 })}
 
-                <form onSubmit={handleAddNewRound} className="flex items-center gap-1 ml-1">
-                  <input
-                    type="text"
-                    placeholder="+ Add round..."
-                    value={newRoundName}
-                    onChange={(e) => setNewRoundName(e.target.value)}
-                    className="border border-white/20 bg-void px-2 py-0.5 text-[11px] text-ink outline-none focus:border-cyan w-28"
-                  />
-                  <button
-                    type="submit"
-                    className="border border-cyan/50 bg-cyan/15 px-2 py-0.5 text-[11px] font-bold text-cyan hover:bg-cyan hover:text-void cursor-pointer"
-                  >
-                    + Add
-                  </button>
-                </form>
               </div>
 
               {draftMatchesInScope.length > 0 && selectedTournId !== 'ALL' && (
@@ -1826,6 +2197,11 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               const isDraft = (m.roster_status || '').toUpperCase() === 'DRAFT'
               const isUpdated = (m.roster_status || '').toUpperCase() === 'UPDATED'
 
+              const isBattleRoyale =
+                m.format === 'Battle Royale' ||
+                (Array.isArray(m.teams) && m.teams.length > 2) ||
+                (Array.isArray(m.team_ids) && m.team_ids.length > 2)
+
               const teamAName = m.team_a?.name || m.team_a_name || m.team_a_placeholder || 'TBD (Team A)'
               const teamBName = m.team_b?.name || m.team_b_name || m.team_b_placeholder || 'TBD (Team B)'
               const isTeamAPlaceholder = !m.team_a_id && Boolean(m.team_a_placeholder)
@@ -1833,9 +2209,41 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
               const scoreA = m.team_a?.score ?? m.score_a ?? 0
               const scoreB = m.team_b?.score ?? m.score_b ?? 0
-              const streamUrl = m.youtube_live_url || m.live_link
+              const streamUrl = normalizeStreamUrl(m.youtube_live_url || m.live_link || roundStreamUrl)
               const roundTitle = m.round_name || m.stage || `Round ${m.round_number || 1}`
               const matchNum = m.match_number || m.order || 1
+
+              // Battle Royale squad list
+              const brSquads: Array<{ id: string; name: string; tag?: string; checkedIn: boolean; alive: boolean }> = []
+              if (isBattleRoyale) {
+                if (Array.isArray(m.teams) && m.teams.length > 0) {
+                  m.teams.forEach((t: any, idx: number) => {
+                    const tid = String(t.id || t._id || `squad-${idx}`)
+                    const isAlive = m.alive_status?.[tid] !== false
+                    const hasCheckedIn = Boolean(m.check_ins?.[tid])
+                    brSquads.push({
+                      id: tid,
+                      name: t.name || `Squad ${idx + 1}`,
+                      tag: t.tag || '',
+                      checkedIn: hasCheckedIn,
+                      alive: isAlive,
+                    })
+                  })
+                } else if (Array.isArray(m.team_ids) && m.team_ids.length > 0) {
+                  m.team_ids.forEach((tid: string, idx: number) => {
+                    const found = tournRosters.find((r) => r.team_id === tid)
+                    const isAlive = m.alive_status?.[tid] !== false
+                    const hasCheckedIn = Boolean(m.check_ins?.[tid])
+                    brSquads.push({
+                      id: tid,
+                      name: found?.team_name || `Squad ${idx + 1}`,
+                      tag: found?.team_tag || '',
+                      checkedIn: hasCheckedIn,
+                      alive: isAlive,
+                    })
+                  })
+                }
+              }
 
               return (
                 <Panel
@@ -1894,7 +2302,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                           <a
                             href={streamUrl}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 rounded bg-live/20 px-2 py-0.5 text-[10px] font-bold text-live border border-live/30 hover:bg-live/30"
                           >
                             🔴 Stream Active ↗
@@ -1902,53 +2310,134 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         )}
                       </div>
 
-                      {/* VISUAL WHO IS PLAYING WHOM */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-2 border-y border-white/5 my-1">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
-                            A
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span
-                              className={`font-display text-base md:text-lg font-black uppercase truncate ${
-                                isTeamAPlaceholder ? 'italic text-dim' : 'text-ink'
-                              }`}
-                            >
-                              {teamAName}
+                      {/* BATTLE ROYALE MULTI-SQUAD LOBBY OR 1v1 CONFRONTATION */}
+                      {isBattleRoyale ? (
+                        <div className="py-2 border-y border-white/5 my-1 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] text-dim">
+                            <span className="font-bold uppercase text-ink">
+                              Battle Royale Lobby ({brSquads.length} Squads)
                             </span>
-                            {isTeamAPlaceholder && (
-                              <span className="text-[9px] text-dim block">Advancement Placeholder</span>
-                            )}
+                            <span className="text-cyan">Shared Room Lobby</span>
                           </div>
-                          <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
-                            {scoreA}
-                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {brSquads.map((sq) => (
+                              <div
+                                key={sq.id}
+                                className={`p-2 border flex items-center justify-between gap-2 ${
+                                  !sq.alive
+                                    ? 'border-live/30 bg-live/5 opacity-60'
+                                    : 'border-white/10 bg-void/60'
+                                }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-display font-black text-ink uppercase truncate text-xs">
+                                    {sq.name} {sq.tag ? `[${sq.tag}]` : ''}
+                                  </div>
+                                  <div className="text-[10px]">
+                                    {sq.checkedIn ? (
+                                      <span className="text-ok">✓ Checked In</span>
+                                    ) : (
+                                      <span className="text-dim">Check-in Pending</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSquadAlive(m.id, sq.id, sq.alive)}
+                                  className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
+                                    sq.alive
+                                      ? 'border-ok/40 bg-ok/10 text-ok hover:bg-live hover:text-white hover:border-live'
+                                      : 'border-live/40 bg-live/15 text-live hover:bg-ok hover:text-void hover:border-ok'
+                                  }`}
+                                  title="Toggle Alive / Eliminated operational status"
+                                >
+                                  {sq.alive ? '● ALIVE' : '✕ ELIMINATED'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-
-                        <div className="flex sm:flex-col items-center justify-center px-3 py-1 font-display font-black text-dim text-xs tracking-wider shrink-0">
-                          <span>─── VS ───</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
-                            {scoreB}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <span
-                              className={`font-display text-base md:text-lg font-black uppercase truncate ${
-                                isTeamBPlaceholder ? 'italic text-dim' : 'text-ink'
-                              }`}
-                            >
-                              {teamBName}
+                      ) : (
+                        /* VISUAL WHO IS PLAYING WHOM (1v1) */
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-2 border-y border-white/5 my-1">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
+                              A
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span
+                                className={`font-display text-base md:text-lg font-black uppercase truncate ${
+                                  isTeamAPlaceholder ? 'italic text-dim' : 'text-ink'
+                                }`}
+                              >
+                                {teamAName}
+                              </span>
+                              {isTeamAPlaceholder && (
+                                <span className="text-[9px] text-dim block">Advancement Placeholder</span>
+                              )}
+                            </div>
+                            <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
+                              {scoreA}
                             </span>
-                            {isTeamBPlaceholder && (
-                              <span className="text-[9px] text-dim block">Advancement Placeholder</span>
-                            )}
                           </div>
-                          <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
-                            B
+
+                          <div className="flex sm:flex-col items-center justify-center px-3 py-1 font-display font-black text-dim text-xs tracking-wider shrink-0">
+                            <span>─── VS ───</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span className="font-display text-lg font-black text-cyan px-2 py-0.5 bg-void border border-white/10 tabular-nums shrink-0">
+                              {scoreB}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span
+                                className={`font-display text-base md:text-lg font-black uppercase truncate ${
+                                  isTeamBPlaceholder ? 'italic text-dim' : 'text-ink'
+                                }`}
+                              >
+                                {teamBName}
+                              </span>
+                              {isTeamBPlaceholder && (
+                                <span className="text-[9px] text-dim block">Advancement Placeholder</span>
+                              )}
+                            </div>
+                            <div className="size-8 rounded bg-void border border-white/10 flex items-center justify-center font-display font-black text-xs text-ink shrink-0">
+                              B
+                            </div>
                           </div>
                         </div>
+                      )}
+
+                      {/* Credentials & Check-In Bar */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                        <span className="text-dim font-bold uppercase">Room Credentials:</span>
+                        {m.credentials_released ? (
+                          <span className="border border-ok/40 bg-ok/10 text-ok px-2 py-0.5 font-bold uppercase text-[10px]">
+                            ✓ Credentials Released (Check-In Open)
+                          </span>
+                        ) : (
+                          <span className="border border-warn/40 bg-warn/10 text-warn px-2 py-0.5 font-bold uppercase text-[10px]">
+                            🔒 Confidential (Hidden from players)
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCredentialsModal(m)}
+                          className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-cyan hover:bg-cyan hover:text-void uppercase text-[10px] font-bold cursor-pointer"
+                        >
+                          🔑 Edit Room / Password
+                        </button>
+
+                        {!m.credentials_released && (
+                          <button
+                            type="button"
+                            onClick={() => handleReleaseCredentialsClick(m)}
+                            className="border border-ok/50 bg-ok/20 px-2.5 py-0.5 text-ok hover:bg-ok hover:text-void uppercase text-[10px] font-bold cursor-pointer"
+                          >
+                            📢 Release Credentials &amp; Open Check-In
+                          </button>
+                        )}
                       </div>
 
                       {/* Metadata & Advancement */}
@@ -1972,12 +2461,12 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
                           {isDone && m.winner_team_id && (
                             <span className="border border-ok/50 bg-ok/10 text-ok px-2 py-0.5 font-bold">
-                              🏆 Winner: {m.winner_team_id === m.team_a_id ? teamAName : teamBName}
+                              🏆 Winner: {m.winner_team_id === m.team_a_id ? teamAName : (m.winner_team_id === m.team_b_id ? teamBName : 'Winner Decided')}
                             </span>
                           )}
                           {m.next_match_slot && (
                             <span className="text-cyan font-mono">
-                              ──► Winner Advances to: <strong>{m.next_match_slot}</strong>
+                              ──► Destination Slot: <strong>{m.next_match_slot}</strong>
                             </span>
                           )}
                         </div>
@@ -2001,38 +2490,44 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
                       {!isLive && !isDone && (
                         <button
-                          onClick={() => {
-                            setGoLiveMatch(m)
-                            setGoLiveUrl(m.youtube_live_url || m.live_link || currentTournament?.live_stream_url || '')
-                          }}
+                          onClick={() => handleQuickStatus(m.id, 'LIVE')}
                           className="border border-live bg-live/20 px-3 py-1.5 uppercase text-xs font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
                         >
                           🔴 Go Live
                         </button>
                       )}
 
-                      {!isCheckIn && !isLive && !isDone && (
+                      {isBattleRoyale ? (
                         <button
-                          onClick={() => handleQuickStatus(m.id, 'CHECK_IN_OPEN')}
-                          className="border border-warn/40 bg-warn/10 px-3 py-1.5 uppercase text-xs text-warn hover:bg-warn/20 transition-all cursor-pointer"
+                          onClick={() => handleOpenBrResultsModal(m)}
+                          className="border border-ok bg-ok/20 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
                         >
-                          Open Check-In
+                          🏆 Submit BR Results
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setScoreMatch(m)
+                            setScoreForm({
+                              score_a: m.team_a?.score ?? m.score_a ?? 0,
+                              score_b: m.team_b?.score ?? m.score_b ?? 0,
+                              winner_team_id: m.winner_team_id || '',
+                            })
+                          }}
+                          className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
+                        >
+                          🏁 Score / Complete
                         </button>
                       )}
 
-                      <button
-                        onClick={() => {
-                          setScoreMatch(m)
-                          setScoreForm({
-                            score_a: m.team_a?.score ?? m.score_a ?? 0,
-                            score_b: m.team_b?.score ?? m.score_b ?? 0,
-                            winner_team_id: m.winner_team_id || '',
-                          })
-                        }}
-                        className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
-                      >
-                        🏁 Score / Complete
-                      </button>
+                      {isDone && (
+                        <button
+                          onClick={() => handleOpenRatingsModal(m)}
+                          className="border border-cyan bg-cyan/20 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
+                        >
+                          ★ Rate Players
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
@@ -2047,8 +2542,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                             scheduled_date: m.scheduled_date || '',
                             next_match_slot: m.next_match_slot || '',
                             youtube_live_url: m.youtube_live_url || m.live_link || '',
-                            lobby_code: m.lobby_code || '',
-                            lobby_password: m.lobby_password || '',
+                            lobby_code: m.lobby_code || m.room_id || '',
+                            lobby_password: m.lobby_password || m.room_password || '',
                             server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
                             score_a: m.team_a?.score ?? m.score_a ?? 0,
                             score_b: m.team_b?.score ?? m.score_b ?? 0,
@@ -2060,13 +2555,15 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         Edit Lobby
                       </button>
 
-                      <button
-                        onClick={() => handleSwapTeams(m.id)}
-                        title="Swap Team A and Team B sides"
-                        className="border border-white/20 px-2 py-1.5 uppercase text-xs text-dim hover:text-ink cursor-pointer"
-                      >
-                        ⇄ Swap
-                      </button>
+                      {!isBattleRoyale && (
+                        <button
+                          onClick={() => handleSwapTeams(m.id)}
+                          title="Swap Team A and Team B sides"
+                          className="border border-white/20 px-2 py-1.5 uppercase text-xs text-dim hover:text-ink cursor-pointer"
+                        >
+                          ⇄ Swap
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleDeleteMatch(m.id)}
@@ -2185,23 +2682,32 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Series Format</label>
-                  <select
-                    value={formationMatchFormData.series_format}
-                    onChange={(e) =>
-                      setFormationMatchFormData({
-                        ...formationMatchFormData,
-                        series_format: e.target.value,
-                      })
-                    }
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-                  >
-                    <option value="BO1">Best of 1 (BO1)</option>
-                    <option value="BO3">Best of 3 (BO3)</option>
-                    <option value="BO5">Best of 5 (BO5)</option>
-                  </select>
-                </div>
+                {formationMatchFormData.format !== 'Battle Royale' ? (
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Series Format</label>
+                    <select
+                      value={formationMatchFormData.series_format}
+                      onChange={(e) =>
+                        setFormationMatchFormData({
+                          ...formationMatchFormData,
+                          series_format: e.target.value,
+                        })
+                      }
+                      className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                    >
+                      <option value="BO1">Best of 1 (BO1)</option>
+                      <option value="BO3">Best of 3 (BO3)</option>
+                      <option value="BO5">Best of 5 (BO5)</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-dim uppercase mb-1">Series Format</label>
+                    <div className="w-full border border-white/10 bg-void/50 px-3 py-2 text-dim text-xs font-mono">
+                      Single Match Lobby (Battle Royale)
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* BATTLE ROYALE MULTI-TEAM CHECKBOXES */}
@@ -2685,7 +3191,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               <Brackets color="border-ok/50" />
               <h3 className="font-display text-2xl font-black uppercase text-ink">Score &amp; Complete Match</h3>
               <p className="text-xs text-dim mt-1">
-                Record official scores. Declaring a winner will automatically advance that team into the configured next round match slot in this bracket.
+                Record official scores. Declaring a winner will record this team as a qualified contender for manual subsequent round progression.
               </p>
 
               <form onSubmit={handleScoreSubmit} className="mt-4 space-y-4 font-mono text-xs">
@@ -2740,7 +3246,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                 </div>
 
                 <div className="border border-ok/30 bg-ok/[0.05] p-2.5 text-[11px] text-ok">
-                  ⚡ Winner will be populated into the next round bracket match immediately upon submission.
+                  ⚡ Winner will be recorded as a qualified contender for manual round selection (no automated match creation).
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
@@ -2929,6 +3435,282 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* EDIT CREDENTIALS MODAL */}
+      {credentialModalMatch && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-cyan/50" />
+              <h3 className="font-display text-2xl font-black uppercase text-ink">
+                Room Credentials (Confidential)
+              </h3>
+              <p className="text-xs text-dim mt-1">
+                Enter room ID and password. Credentials remain strictly confidential until you explicitly click &quot;Release Credentials&quot;.
+              </p>
+
+              <form onSubmit={handleSaveCredentialsSubmit} className="mt-4 space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-dim uppercase mb-1">Room ID / Lobby Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. AMT-LOBBY-01"
+                    value={credentialForm.room_id}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, room_id: e.target.value })}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan font-bold text-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="block text-dim uppercase mb-1">Room Password / PIN</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 7894"
+                    value={credentialForm.room_password}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, room_password: e.target.value })}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan font-bold text-warn"
+                  />
+                </div>
+                <div>
+                  <label className="block text-dim uppercase mb-1">Custom Join Instructions (Optional)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Map: Erangel, Slot 1-4 for Squad A, check in within 10 mins"
+                    value={credentialForm.custom_instructions}
+                    onChange={(e) => setCredentialForm({ ...credentialForm, custom_instructions: e.target.value })}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setCredentialModalMatch(null)}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingCredentials}
+                    className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+                  >
+                    {submittingCredentials ? 'Saving...' : 'Save Credentials'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* BATTLE ROYALE RESULTS MODAL */}
+      {brResultsMatch && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-2xl border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-cyan/50" />
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">
+                    Battle Royale Scoring &amp; Finalization
+                  </h3>
+                  <p className="text-xs text-dim mt-0.5">
+                    {brResultsMatch.tournament_title || 'Tournament'} · {brResultsMatch.round_name || brResultsMatch.stage} · Match #{brResultsMatch.match_number || 1}
+                  </p>
+                </div>
+                <span className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] text-cyan font-bold uppercase">
+                  Battle Royale
+                </span>
+              </div>
+
+              <form onSubmit={handleSubmitBrResults} className="mt-4 space-y-4 font-mono text-xs">
+                {/* Scoring Matrix reference */}
+                <div className="p-2.5 border border-white/10 bg-void/60 text-[11px] text-dim flex flex-wrap items-center gap-3">
+                  <span className="font-bold text-ink">Matrix:</span>
+                  <span>#1: 10pts</span>
+                  <span>#2: 6pts</span>
+                  <span>#3: 5pts</span>
+                  <span>#4: 4pts</span>
+                  <span>#5: 3pts</span>
+                  <span>#6: 2pts</span>
+                  <span>#7-#8: 1pt</span>
+                  <span className="text-cyan font-bold">1 Elimination = 1pt</span>
+                </div>
+
+                {/* Team Results Table */}
+                <div className="border border-white/10 bg-surface/50 max-h-[340px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-void/80 text-[10px] uppercase text-dim">
+                        <th className="p-2">Squad / Team</th>
+                        <th className="p-2 w-20">Placement</th>
+                        <th className="p-2 w-20">Kills</th>
+                        <th className="p-2 w-20">Place Pts</th>
+                        <th className="p-2 w-20">Elim Pts</th>
+                        <th className="p-2 w-20 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {brTeamResults.map((team, idx) => (
+                        <tr key={team.team_id || idx} className="hover:bg-white/[0.02]">
+                          <td className="p-2 font-display font-black text-ink text-xs uppercase">
+                            {team.team_name}
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={team.placement}
+                              onChange={(e) => handleUpdateBrRow(idx, 'placement', Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-16 border border-white/20 bg-void px-2 py-1 text-xs text-ink outline-none focus:border-cyan text-center font-bold"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={team.kills}
+                              onChange={(e) => handleUpdateBrRow(idx, 'kills', Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-16 border border-white/20 bg-void px-2 py-1 text-xs text-ink outline-none focus:border-cyan text-center font-bold text-live"
+                            />
+                          </td>
+                          <td className="p-2 text-dim tabular-nums font-bold">
+                            {team.placement_points}
+                          </td>
+                          <td className="p-2 text-dim tabular-nums font-bold">
+                            {team.elimination_points}
+                          </td>
+                          <td className="p-2 text-right font-display font-black text-cyan tabular-nums text-sm">
+                            {team.total_points}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setBrResultsMatch(null)}
+                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingBrResults}
+                    className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+                  >
+                    {submittingBrResults ? 'Finalizing...' : '🏆 Finalize Battle Royale Match'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* PARTICIPANT RATINGS MODAL */}
+      {ratingsModalMatch && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-xl border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+              <Brackets color="border-cyan/50" />
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <h3 className="font-display text-2xl font-black uppercase text-ink">
+                  ★ Post-Match Player Ratings
+                </h3>
+                <span className="text-[10px] text-cyan font-bold uppercase">
+                  Match #{ratingsModalMatch.match_number || 1}
+                </span>
+              </div>
+              <p className="text-xs text-dim mt-1">
+                Authorized organizers can assign 1-10 performance ratings and optional feedback for participants.
+              </p>
+
+              {loadingRatings ? (
+                <div className="p-8 text-center text-dim font-mono">Loading participants...</div>
+              ) : (
+                <form onSubmit={handleSubmitRatings} className="mt-4 space-y-4 font-mono text-xs">
+                  <div className="max-h-[320px] overflow-y-auto space-y-3 pr-1">
+                    {ratingsList.length === 0 ? (
+                      <div className="p-4 border border-white/10 text-center text-dim">
+                        No individual player roster found for this match.
+                      </div>
+                    ) : (
+                      ratingsList.map((item, idx) => (
+                        <div key={item.user_id || idx} className="border border-white/10 bg-void/60 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-display font-black text-ink text-sm uppercase">
+                              {item.username}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-dim text-[11px]">Rating:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                step="0.5"
+                                value={item.rating}
+                                onChange={(e) => {
+                                  const val = Math.min(10, Math.max(1, parseFloat(e.target.value) || 1))
+                                  setRatingsList((prev) => {
+                                    const next = [...prev]
+                                    next[idx] = { ...next[idx], rating: val }
+                                    return next
+                                  })
+                                }}
+                                className="w-16 border border-cyan/40 bg-surface px-2 py-1 text-center font-display font-black text-cyan text-sm outline-none"
+                              />
+                              <span className="text-dim text-[10px]">/ 10</span>
+                            </div>
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Optional performance review / notes..."
+                              value={item.review || ''}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setRatingsList((prev) => {
+                                  const next = [...prev]
+                                  next[idx] = { ...next[idx], review: val }
+                                  return next
+                                })
+                              }}
+                              className="w-full border border-white/10 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setRatingsModalMatch(null)}
+                      className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingRatings || ratingsList.length === 0}
+                      className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+                    >
+                      {submittingRatings ? 'Saving...' : 'Submit Player Ratings'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </Portal>

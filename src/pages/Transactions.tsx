@@ -40,8 +40,7 @@ export default function Transactions() {
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32">
       <Container>
-        <Hud className="text-cyan">◇ Ledger</Hud>
-        <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
+        <h1 className="reveal font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
           Transactions
         </h1>
         <div className="mt-10">

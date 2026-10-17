@@ -11,6 +11,9 @@ import {
   promoteUserToOrganizer,
   getPendingPayments,
   getAdminPayments,
+  getAdminPaymentsSummary,
+  type AdminPaymentsSummary,
+  type AdminPaymentQueryParams,
   getRegistrationRevenueAnalytics,
   approvePayment,
   rejectPayment,
@@ -154,6 +157,36 @@ export function formatAuditTimestamp(raw?: string | null): string {
   }
 }
 
+export function formatPaymentDateTime(raw?: string | null): string {
+  if (!raw || raw === 'None' || raw === 'null' || raw === 'undefined' || raw.trim() === '') {
+    return 'N/A'
+  }
+  try {
+    const d = new Date(raw)
+    if (isNaN(d.getTime())) return 'N/A'
+    const formatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
+    const parts = formatter.formatToParts(d)
+    const day = parts.find((p) => p.type === 'day')?.value || ''
+    const month = parts.find((p) => p.type === 'month')?.value || ''
+    const year = parts.find((p) => p.type === 'year')?.value || ''
+    const hour = parts.find((p) => p.type === 'hour')?.value || ''
+    const minute = parts.find((p) => p.type === 'minute')?.value || ''
+    const dayPeriod = parts.find((p) => p.type === 'dayPeriod')?.value?.toUpperCase() || ''
+
+    return `${day} ${month} ${year}, ${hour}:${minute} ${dayPeriod} IST`
+  } catch {
+    return 'N/A'
+  }
+}
+
 export function toLocalDatetimeInputString(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0')
   const year = date.getFullYear()
@@ -258,6 +291,11 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
+  // Tournament Deletion Modal
+  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isDeletingTournament, setIsDeletingTournament] = useState(false)
+
   // Payment Rejection & Archive Modal
   const [rejectPaymentId, setRejectPaymentId] = useState<string | null>(null)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -268,6 +306,19 @@ export default function Admin() {
   const [revenueTimeRange, setRevenueTimeRange] = useState<string>('all')
   const [loadingRevenue, setLoadingRevenue] = useState(false)
   const [paymentFilterQuery, setPaymentFilterQuery] = useState('')
+
+  // Advanced Payments Search & Filter States
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL')
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('ALL')
+  const [paymentDatePreset, setPaymentDatePreset] = useState('ALL')
+  const [paymentStartDate, setPaymentStartDate] = useState('')
+  const [paymentEndDate, setPaymentEndDate] = useState('')
+  const [paymentMinAmount, setPaymentMinAmount] = useState('')
+  const [paymentMaxAmount, setPaymentMaxAmount] = useState('')
+  const [paymentSortBy, setPaymentSortBy] = useState('NEWEST')
+  const [paymentSummary, setPaymentSummary] = useState<AdminPaymentsSummary | null>(null)
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false)
 
   // Audit Logs Filtering & Pagination
   const [auditAction, setAuditAction] = useState<string>('ALL')
@@ -893,10 +944,99 @@ export default function Admin() {
     }
   }
 
+  const fetchFilteredPayments = useCallback(async () => {
+    setIsLoadingPayments(true)
+    try {
+      const minAmt = paymentMinAmount ? parseFloat(paymentMinAmount) : undefined
+      const maxAmt = paymentMaxAmount ? parseFloat(paymentMaxAmount) : undefined
+
+      const queryParams: AdminPaymentQueryParams = {
+        search: paymentSearch.trim() || undefined,
+        statusFilter: paymentStatusFilter !== 'ALL' ? paymentStatusFilter : undefined,
+        paymentType: paymentTypeFilter !== 'ALL' ? paymentTypeFilter : undefined,
+        datePreset: paymentDatePreset !== 'ALL' ? paymentDatePreset : undefined,
+        startDate: paymentDatePreset === 'CUSTOM' && paymentStartDate ? paymentStartDate : undefined,
+        endDate: paymentDatePreset === 'CUSTOM' && paymentEndDate ? paymentEndDate : undefined,
+        minAmount: minAmt,
+        maxAmount: maxAmt,
+        sortBy: paymentSortBy,
+        isArchived: paymentViewMode === 'ARCHIVED',
+      }
+
+      const [paymentsData, summaryData] = await Promise.all([
+        getAdminPayments(queryParams),
+        getAdminPaymentsSummary(queryParams).catch(() => null),
+      ])
+
+      if (paymentViewMode === 'ACTIVE') {
+        setPayments(Array.isArray(paymentsData) ? paymentsData : [])
+      } else {
+        setArchivedPayments(Array.isArray(paymentsData) ? paymentsData : [])
+      }
+      if (summaryData) {
+        setPaymentSummary(summaryData)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch filtered payments:', err)
+    } finally {
+      setIsLoadingPayments(false)
+    }
+  }, [
+    paymentSearch,
+    paymentStatusFilter,
+    paymentTypeFilter,
+    paymentDatePreset,
+    paymentStartDate,
+    paymentEndDate,
+    paymentMinAmount,
+    paymentMaxAmount,
+    paymentSortBy,
+    paymentViewMode,
+  ])
+
+  useEffect(() => {
+    if (tab === 'PENDING PAYMENTS') {
+      fetchFilteredPayments()
+    }
+  }, [fetchFilteredPayments, tab])
+
+  const handleResetPaymentFilters = () => {
+    setPaymentSearch('')
+    setPaymentStatusFilter('ALL')
+    setPaymentTypeFilter('ALL')
+    setPaymentDatePreset('ALL')
+    setPaymentStartDate('')
+    setPaymentEndDate('')
+    setPaymentMinAmount('')
+    setPaymentMaxAmount('')
+    setPaymentSortBy('NEWEST')
+  }
+
+  const handleConfirmDeleteTournament = async () => {
+    if (!tournamentToDelete || deleteConfirmText.trim() !== 'DELETE') return
+    setIsDeletingTournament(true)
+    try {
+      const targetId = tournamentToDelete.id || tournamentToDelete.slug
+      await deleteTournamentOrganizer(targetId)
+      showToast(`Tournament "${tournamentToDelete.title}" permanently deleted.`)
+      setTournaments((prev) => prev.filter((t) => t.id !== tournamentToDelete.id && t.slug !== tournamentToDelete.slug))
+      if (featuredTour && (featuredTour.id === tournamentToDelete.id || featuredTour.slug === tournamentToDelete.slug)) {
+        setFeaturedTour(null)
+      }
+      setTournamentToDelete(null)
+      setDeleteConfirmText('')
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete tournament')
+    } finally {
+      setIsDeletingTournament(false)
+    }
+  }
+
   const handleApprovePayment = async (id: string) => {
     try {
       await approvePayment(id)
-      showToast('Payment verified and approved! Funds credited.')
+      showToast('Payment verified, approved, and moved to archive!')
+      fetchFilteredPayments()
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to approve payment')
@@ -907,9 +1047,10 @@ export default function Admin() {
     if (!rejectPaymentId) return
     try {
       await rejectPayment(rejectPaymentId, rejectNotes)
-      showToast('Payment rejected.')
+      showToast('Payment rejected and moved to archive.')
       setRejectPaymentId(null)
       setRejectNotes('')
+      fetchFilteredPayments()
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to reject payment')
@@ -920,6 +1061,7 @@ export default function Admin() {
     try {
       await archivePayment(id)
       showToast('Payment record archived.')
+      fetchFilteredPayments()
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to archive payment')
@@ -930,6 +1072,7 @@ export default function Admin() {
     try {
       await unarchivePayment(id)
       showToast('Payment record restored from archive.')
+      fetchFilteredPayments()
       loadData()
     } catch (err: any) {
       alert(err.message || 'Failed to unarchive payment')
@@ -2116,12 +2259,24 @@ export default function Admin() {
                           </button>
                           {t.status !== 'CANCELLED' && t.status !== 'COMPLETED' && (
                             <button
+                              type="button"
                               onClick={() => handleCancelTour(t.id || t.slug)}
                               className="border border-live/40 bg-live/10 px-2 py-1 font-mono text-[10px] uppercase text-live hover:bg-live/20"
                             >
                               Cancel
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTournamentToDelete(t)
+                              setDeleteConfirmText('')
+                            }}
+                            className="border border-red-500/50 bg-red-500/10 px-2 py-1 font-mono text-[10px] uppercase text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-colors cursor-pointer"
+                            title="Permanently delete tournament and all associated matches"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </Panel>
@@ -3444,84 +3599,326 @@ export default function Admin() {
               )}
             </div>
 
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPaymentViewMode('ACTIVE')}
-                  className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                    paymentViewMode === 'ACTIVE'
-                      ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
-                      : 'text-dim hover:text-ink'
-                  }`}
-                >
-                  Active Pending ({payments.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentViewMode('ARCHIVED')}
-                  className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                    paymentViewMode === 'ARCHIVED'
-                      ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
-                      : 'text-dim hover:text-ink'
-                  }`}
-                >
-                  Archived Records ({archivedPayments.length})
-                </button>
-              </div>
-
-              <div className="relative w-full sm:w-80">
-                <input
-                  type="text"
-                  placeholder="Filter by UTR, User, or Tournament..."
-                  value={paymentFilterQuery}
-                  onChange={(e) => setPaymentFilterQuery(e.target.value)}
-                  className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-cyan placeholder:text-dim outline-none focus:border-cyan"
-                />
-                {paymentFilterQuery && (
+            {/* View Mode Switcher and Payment Summary Bar */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentFilterQuery('')}
-                    className="absolute right-2 top-2 font-mono text-xs text-dim hover:text-ink"
+                    onClick={() => {
+                      setPaymentViewMode('ACTIVE')
+                    }}
+                    className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                      paymentViewMode === 'ACTIVE'
+                        ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                        : 'text-dim hover:text-ink'
+                    }`}
                   >
-                    ✕
+                    Active Pending ({payments.length})
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentViewMode('ARCHIVED')
+                    }}
+                    className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                      paymentViewMode === 'ARCHIVED'
+                        ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                        : 'text-dim hover:text-ink'
+                    }`}
+                  >
+                    Archived Records ({archivedPayments.length})
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {isLoadingPayments && (
+                    <span className="flex items-center gap-2 font-mono text-xs text-cyan animate-pulse">
+                      <span className="size-2 rounded-full bg-cyan animate-ping" />
+                      Loading payments...
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={fetchFilteredPayments}
+                    className="border border-white/15 bg-surface px-3 py-1.5 font-mono text-xs uppercase text-dim hover:text-ink hover:border-cyan transition-colors cursor-pointer"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* Authoritative Financial Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="border border-white/10 bg-void/50 p-3 space-y-1">
+                  <div className="font-mono text-[10px] uppercase text-dim">Matching Records</div>
+                  <div className="font-display text-xl font-bold text-ink tabular-nums">
+                    {paymentSummary?.matching_count ?? (paymentViewMode === 'ACTIVE' ? payments.length : archivedPayments.length)}
+                  </div>
+                  <div className="font-mono text-[9px] text-dim">Total records in filter</div>
+                </div>
+
+                <div className="border border-warn/30 bg-warn/5 p-3 space-y-1">
+                  <div className="font-mono text-[10px] uppercase text-warn">Pending Volume</div>
+                  <div className="font-display text-xl font-bold text-warn tabular-nums">
+                    {inr(paymentSummary?.pending_volume_inr ?? 0)}
+                  </div>
+                  <div className="font-mono text-[9px] text-dim">{paymentSummary?.pending_count ?? 0} transactions</div>
+                </div>
+
+                <div className="border border-ok/30 bg-ok/5 p-3 space-y-1">
+                  <div className="font-mono text-[10px] uppercase text-ok">Approved Volume</div>
+                  <div className="font-display text-xl font-bold text-ok tabular-nums">
+                    {inr(paymentSummary?.approved_volume_inr ?? 0)}
+                  </div>
+                  <div className="font-mono text-[9px] text-dim">{paymentSummary?.approved_count ?? 0} transactions</div>
+                </div>
+
+                <div className="border border-live/30 bg-live/5 p-3 space-y-1">
+                  <div className="font-mono text-[10px] uppercase text-live">Rejected Volume</div>
+                  <div className="font-display text-xl font-bold text-live tabular-nums">
+                    {inr(paymentSummary?.rejected_volume_inr ?? 0)}
+                  </div>
+                  <div className="font-mono text-[9px] text-dim">{paymentSummary?.rejected_count ?? 0} transactions</div>
+                </div>
+
+                <div className="border border-cyan/30 bg-cyan/5 p-3 space-y-1 col-span-2 sm:col-span-1">
+                  <div className="font-mono text-[10px] uppercase text-cyan">Total Filter Volume</div>
+                  <div className="font-display text-xl font-bold text-cyan tabular-nums">
+                    {inr(paymentSummary?.total_volume_inr ?? 0)}
+                  </div>
+                  <div className="font-mono text-[9px] text-dim">Cumulative gross INR</div>
+                </div>
+              </div>
+
+              {/* Advanced Search & Filtering Controls */}
+              <div className="border border-white/10 bg-graphite/40 p-4 space-y-3 font-mono text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {/* Search Query */}
+                  <div className="lg:col-span-2 relative">
+                    <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Search Payments</label>
+                    <input
+                      type="text"
+                      placeholder="UTR, user ID, email, name, tournament, team, VPA..."
+                      value={paymentSearch}
+                      onChange={(e) => setPaymentSearch(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-cyan placeholder:text-dim outline-none focus:border-cyan"
+                    />
+                    {paymentSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentSearch('')}
+                        className="absolute right-2.5 top-7 text-xs text-dim hover:text-ink cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Status</label>
+                    <select
+                      value={paymentStatusFilter}
+                      onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="PENDING">Pending Verification</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="REJECTED">Rejected</option>
+                      <option value="ARCHIVED">Archived</option>
+                    </select>
+                  </div>
+
+                  {/* Payment Type Filter */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Payment Type</label>
+                    <select
+                      value={paymentTypeFilter}
+                      onChange={(e) => setPaymentTypeFilter(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="ALL">All Types</option>
+                      <option value="TOURNAMENT_ENTRY">Tournament Entry</option>
+                      <option value="WALLET_TOPUP">Wallet Top-up</option>
+                      <option value="GAME_ENTRY">Game Entry</option>
+                    </select>
+                  </div>
+
+                  {/* Sort By */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Sort Order</label>
+                    <select
+                      value={paymentSortBy}
+                      onChange={(e) => setPaymentSortBy(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="NEWEST">Newest First</option>
+                      <option value="OLDEST">Oldest First</option>
+                      <option value="AMOUNT_DESC">Amount: High to Low</option>
+                      <option value="AMOUNT_ASC">Amount: Low to High</option>
+                      <option value="RECENTLY_PROCESSED">Recently Processed</option>
+                      <option value="OLDEST_PENDING">Oldest Pending</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Secondary Filters: Date Presets & Amount Range */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-white/5">
+                  {/* Date Range Preset */}
+                  <div>
+                    <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Date Range</label>
+                    <select
+                      value={paymentDatePreset}
+                      onChange={(e) => setPaymentDatePreset(e.target.value)}
+                      className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="ALL">All Time</option>
+                      <option value="TODAY">Today (IST)</option>
+                      <option value="YESTERDAY">Yesterday (IST)</option>
+                      <option value="LAST_7_DAYS">Last 7 Days</option>
+                      <option value="THIS_WEEK">This Week (IST)</option>
+                      <option value="LAST_WEEK">Last Week (IST)</option>
+                      <option value="THIS_MONTH">This Month (IST)</option>
+                      <option value="LAST_MONTH">Last Month (IST)</option>
+                      <option value="THIS_YEAR">This Year (IST)</option>
+                      <option value="CUSTOM">Custom Date Range</option>
+                    </select>
+                  </div>
+
+                  {/* Custom Date Pickers (if CUSTOM) */}
+                  {paymentDatePreset === 'CUSTOM' ? (
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">From Date</label>
+                        <input
+                          type="date"
+                          value={paymentStartDate}
+                          onChange={(e) => setPaymentStartDate(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-2.5 py-1.5 text-xs font-mono text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">To Date</label>
+                        <input
+                          type="date"
+                          value={paymentEndDate}
+                          onChange={(e) => setPaymentEndDate(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-2.5 py-1.5 text-xs font-mono text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Min Amount (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="Min INR"
+                          value={paymentMinAmount}
+                          onChange={(e) => setPaymentMinAmount(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink placeholder:text-dim outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Max Amount (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="Max INR"
+                          value={paymentMaxAmount}
+                          onChange={(e) => setPaymentMaxAmount(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-ink placeholder:text-dim outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Min / Max when CUSTOM is chosen */}
+                  {paymentDatePreset === 'CUSTOM' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Min (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={paymentMinAmount}
+                          onChange={(e) => setPaymentMinAmount(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-dim outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase text-dim mb-1 font-bold">Max (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          value={paymentMaxAmount}
+                          onChange={(e) => setPaymentMaxAmount(e.target.value)}
+                          className="w-full border border-white/15 bg-surface px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-dim outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reset Filters Button */}
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={handleResetPaymentFilters}
+                      className="w-full border border-white/15 bg-surface hover:bg-white/5 py-2 font-mono text-xs uppercase text-dim hover:text-ink transition-colors cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {paymentViewMode === 'ACTIVE' ? (
-              (() => {
-                const query = paymentFilterQuery.trim().toLowerCase()
-                const activeFiltered = payments.filter((p) => {
-                  if (!query) return true
-                  return (
-                    p.id.toLowerCase().includes(query) ||
-                    (p.utr || '').toLowerCase().includes(query) ||
-                    (p.user_email || '').toLowerCase().includes(query) ||
-                    (p.user_id || '').toLowerCase().includes(query) ||
-                    (p.sender_upi_id || '').toLowerCase().includes(query) ||
-                    (p.payment_type || '').toLowerCase().includes(query) ||
-                    (p.tournament_id || '').toLowerCase().includes(query) ||
-                    (p.tournament_title || '').toLowerCase().includes(query) ||
-                    (p.team_name || '').toLowerCase().includes(query)
-                  )
-                })
+            {/* Payment Cards List (Active Pending or Archived Records) */}
+            {(() => {
+              const currentList = paymentViewMode === 'ACTIVE' ? payments : archivedPayments
 
-                if (activeFiltered.length === 0) {
-                  return (
-                    <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
-                      {paymentFilterQuery ? 'NO PENDING PAYMENTS MATCH YOUR SEARCH CRITERIA.' : 'NO PENDING PAYMENTS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.'}
-                    </div>
-                  )
-                }
-
+              if (currentList.length === 0) {
                 return (
-                  <div className="space-y-4">
-                    {activeFiltered.map((p) => (
-                      <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-warn">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim space-y-2">
+                    <div>
+                      {paymentViewMode === 'ACTIVE'
+                        ? 'NO PENDING PAYMENTS MATCH CURRENT FILTERS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.'
+                        : 'NO ARCHIVED PAYMENT RECORDS MATCH CURRENT FILTERS.'}
+                    </div>
+                    {(paymentSearch || paymentStatusFilter !== 'ALL' || paymentTypeFilter !== 'ALL' || paymentDatePreset !== 'ALL' || paymentMinAmount || paymentMaxAmount) && (
+                      <button
+                        type="button"
+                        onClick={handleResetPaymentFilters}
+                        className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan uppercase hover:bg-cyan/20 cursor-pointer"
+                      >
+                        Clear All Filters
+                      </button>
+                    )}
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-4">
+                  {currentList.map((p) => {
+                    const isArchived = Boolean(p.is_archived || p.status === 'APPROVED' || p.status === 'REJECTED')
+                    const isPending = ['PENDING', 'PENDING_VERIFICATION', 'SUBMITTED', 'INITIATED'].includes(p.status)
+
+                    return (
+                      <Panel
+                        key={p.id}
+                        className={`p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 ${
+                          p.status === 'APPROVED'
+                            ? 'border-l-ok'
+                            : p.status === 'REJECTED'
+                            ? 'border-l-live'
+                            : isPending
+                            ? 'border-l-warn'
+                            : 'border-l-white/20'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
                           {/* Screenshot Proof Thumbnail */}
                           {(p.proof_url || p.screenshot_url) ? (
                             <div className="shrink-0 flex flex-col items-center gap-1">
@@ -3541,30 +3938,115 @@ export default function Admin() {
                             </div>
                           )}
 
-                          <div className="space-y-1 font-mono text-xs">
+                          <div className="space-y-1 font-mono text-xs min-w-0 flex-1">
+                            {/* Badges Bar */}
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 border border-warn text-warn">{p.status}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 border font-bold uppercase ${
+                                  p.status === 'APPROVED'
+                                    ? 'border-ok bg-ok/10 text-ok'
+                                    : p.status === 'REJECTED'
+                                    ? 'border-live bg-live/10 text-live'
+                                    : 'border-warn bg-warn/10 text-warn'
+                                }`}
+                              >
+                                {p.status}
+                              </span>
+
+                              {isArchived && (
+                                <span className="text-[10px] px-1.5 py-0.5 border border-white/20 text-dim uppercase">
+                                  Archived
+                                </span>
+                              )}
+
                               {p.payment_type && (
                                 <span className="text-[10px] px-1.5 py-0.5 border border-cyan/40 bg-cyan/10 text-cyan uppercase">
                                   {p.payment_type}
                                 </span>
                               )}
+
                               {(p.tournament_title || p.tournament_id) && (
-                                <span className="text-[10px] px-1.5 py-0.5 border border-white/20 text-ink uppercase">
+                                <span className="text-[10px] px-1.5 py-0.5 border border-white/20 text-ink uppercase truncate max-w-xs" title={p.tournament_title}>
                                   {p.tournament_title || `Tour #${(p.tournament_id || '').slice(0, 6)}`}
                                 </span>
                               )}
+
+                              {p.team_name && (
+                                <span className="text-[10px] px-1.5 py-0.5 border border-purple-400/40 bg-purple-950/20 text-purple-300 uppercase truncate max-w-xs">
+                                  Team: {p.team_name}
+                                </span>
+                              )}
                             </div>
-                            <div className="text-dim">User: <span className="text-ink">{p.user_email || p.user_id}</span></div>
-                            <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
-                            <div className="text-dim">UTR Reference: <span className="text-cyan font-bold select-all">{p.utr}</span></div>
-                            <div className="text-dim">Sender VPA: {p.sender_upi_id || 'Not Specified'}</div>
-                            <div className="text-[10px] text-dim">Initiated: {formatAuditTimestamp(p.created_at)}</div>
+
+                            {/* User & Financial Details */}
+                            <div className="text-dim">
+                              User: <span className="text-ink font-semibold">{p.user_email || p.user_id}</span>
+                              {(p.user_username || p.username || p.user_name) && (
+                                <span className="text-dim text-[11px] ml-1">
+                                  (@{p.user_username || p.username || p.user_name})
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-dim">
+                              Amount: <span className="text-ok font-bold text-sm">{inr(p.amount_inr)}</span>
+                            </div>
+                            <div className="text-dim">
+                              UTR Reference: <span className="text-cyan font-bold select-all tracking-wider">{p.utr}</span>
+                            </div>
+                            <div className="text-dim">
+                              Sender VPA: <span className="text-ink">{p.sender_upi_id || 'Not Specified'}</span>
+                            </div>
+
+                            {/* Authoritative Timestamps in IST */}
+                            <div className="pt-1.5 border-t border-white/5 space-y-0.5 text-[11px]">
+                              <div className="text-dim">
+                                Submitted:{' '}
+                                <span className="text-ink font-mono font-medium">{formatPaymentDateTime(p.created_at)}</span>
+                              </div>
+
+                              {p.status === 'APPROVED' && (
+                                <div className="text-ok">
+                                  Approved:{' '}
+                                  <span className="font-mono font-medium">
+                                    {formatPaymentDateTime(p.approved_at || p.verified_at)}
+                                  </span>
+                                  {(p.approved_by || p.verified_by) && (
+                                    <span className="text-dim ml-1">by {p.approved_by || p.verified_by}</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {p.status === 'REJECTED' && (
+                                <div className="text-live">
+                                  Rejected:{' '}
+                                  <span className="font-mono font-medium">
+                                    {formatPaymentDateTime(p.rejected_at || p.verified_at)}
+                                  </span>
+                                  {(p.rejected_by || p.verified_by) && (
+                                    <span className="text-dim ml-1">by {p.rejected_by || p.verified_by}</span>
+                                  )}
+                                  {p.rejection_reason && (
+                                    <span className="text-dim ml-1 block sm:inline">
+                                      · Reason: {p.rejection_reason}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {isArchived && p.archived_at && (
+                                <div className="text-dim">
+                                  Archived Record:{' '}
+                                  <span className="text-ink font-mono font-medium">{formatPaymentDateTime(p.archived_at)}</span>
+                                  {p.archived_by && <span className="text-dim ml-1">by {p.archived_by}</span>}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                        {/* Card Actions */}
+                        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => setSelectedPaymentDetail(p)}
@@ -3572,75 +4054,52 @@ export default function Admin() {
                           >
                             View Details
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleApprovePayment(p.id)}
-                            className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors cursor-pointer"
-                          >
-                            Approve & Credit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRejectPaymentId(p.id)}
-                            className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors cursor-pointer"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleArchivePayment(p.id)}
-                            className="border border-white/20 px-3 py-2 font-mono text-xs uppercase text-dim hover:text-warn hover:border-warn transition-colors cursor-pointer"
-                          >
-                            Archive
-                          </button>
+
+                          {isPending && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleApprovePayment(p.id)}
+                                className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 font-bold transition-colors cursor-pointer"
+                              >
+                                Approve & Credit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRejectPaymentId(p.id)}
+                                className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+
+                          {!isArchived && (
+                            <button
+                              type="button"
+                              onClick={() => handleArchivePayment(p.id)}
+                              className="border border-white/20 px-3 py-2 font-mono text-xs uppercase text-dim hover:text-warn hover:border-warn transition-colors cursor-pointer"
+                            >
+                              Archive
+                            </button>
+                          )}
+
+                          {isArchived && (
+                            <button
+                              type="button"
+                              onClick={() => handleUnarchivePayment(p.id)}
+                              className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
+                            >
+                              Unarchive / Restore
+                            </button>
+                          )}
                         </div>
                       </Panel>
-                    ))}
-                  </div>
-                )
-              })()
-            ) : (
-              archivedPayments.length === 0 ? (
-                <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
-                  NO ARCHIVED PAYMENTS FOUND.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {archivedPayments.map((p) => (
-                    <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-white/20">
-                      <div className="space-y-1 font-mono text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 border border-white/30 text-dim">ARCHIVED</span>
-                          <span className="text-[10px] px-1.5 py-0.5 border border-white/15 text-dim">{p.status}</span>
-                        </div>
-                        <div className="text-dim">User: {p.user_email || p.user_id}</div>
-                        <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
-                        <div className="text-dim">UTR Reference: <span className="text-cyan font-bold">{p.utr}</span></div>
-                        <div className="text-[10px] text-dim">Archived: {formatAuditTimestamp(p.archived_at || p.updated_at)}</div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentDetail(p)}
-                          className="border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleUnarchivePayment(p.id)}
-                          className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
-                        >
-                          Unarchive / Restore
-                        </button>
-                      </div>
-                    </Panel>
-                  ))}
+                    )
+                  })}
                 </div>
               )
-            )}
+            })()}
           </div>
         )}
 
@@ -5286,12 +5745,18 @@ export default function Admin() {
                   <div>User ID: <span className="text-ink break-all">{selectedPaymentDetail.user_id}</span></div>
                   <div>User Email: <span className="text-ink break-all">{selectedPaymentDetail.user_email || 'N/A'}</span></div>
                   <div>Username: <span className="text-ink">{selectedPaymentDetail.user_username || selectedPaymentDetail.username || selectedPaymentDetail.user_name || 'N/A'}</span></div>
-                  <div>Processed By: <span className="text-dim">{selectedPaymentDetail.approved_by || selectedPaymentDetail.audited_by || selectedPaymentDetail.verified_by || 'Pending verification'}</span></div>
-                  <div>Created At: <span className="text-dim">{formatAuditTimestamp(selectedPaymentDetail.created_at)}</span></div>
-                  <div>Updated At: <span className="text-dim">{formatAuditTimestamp(selectedPaymentDetail.updated_at)}</span></div>
-                  {selectedPaymentDetail.archived_at && (
-                    <div>Archived At: <span className="text-warn">{formatAuditTimestamp(selectedPaymentDetail.archived_at)}</span></div>
+                  <div>Processed By: <span className="text-dim">{selectedPaymentDetail.approved_by || selectedPaymentDetail.rejected_by || selectedPaymentDetail.audited_by || selectedPaymentDetail.verified_by || 'Pending verification'}</span></div>
+                  <div>Submitted: <span className="text-ink font-bold">{formatPaymentDateTime(selectedPaymentDetail.created_at)}</span></div>
+                  {selectedPaymentDetail.status === 'APPROVED' && (
+                    <div>Approved At: <span className="text-ok font-bold">{formatPaymentDateTime(selectedPaymentDetail.approved_at || selectedPaymentDetail.verified_at)}</span></div>
                   )}
+                  {selectedPaymentDetail.status === 'REJECTED' && (
+                    <div>Rejected At: <span className="text-live font-bold">{formatPaymentDateTime(selectedPaymentDetail.rejected_at || selectedPaymentDetail.verified_at)}</span></div>
+                  )}
+                  {selectedPaymentDetail.archived_at && (
+                    <div>Archived At: <span className="text-warn font-bold">{formatPaymentDateTime(selectedPaymentDetail.archived_at)}</span></div>
+                  )}
+                  <div>Last Updated: <span className="text-dim">{formatPaymentDateTime(selectedPaymentDetail.updated_at)}</span></div>
                 </div>
               </div>
 
@@ -5377,6 +5842,89 @@ export default function Admin() {
                   className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Permanent Tournament Deletion Confirmation Modal */}
+      {tournamentToDelete && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-lg max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-red-500/50 bg-graphite p-6 shadow-2xl select-text font-mono text-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-red-500/20 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="size-2.5 rounded-full bg-red-500 animate-ping" />
+                  <h3 className="font-display text-2xl font-black uppercase text-red-400">Delete Tournament Permanently</h3>
+                </div>
+                <button
+                  type="button"
+                  disabled={isDeletingTournament}
+                  onClick={() => {
+                    setTournamentToDelete(null)
+                    setDeleteConfirmText('')
+                  }}
+                  className="border border-white/20 px-2.5 py-1 text-dim hover:text-ink uppercase cursor-pointer disabled:opacity-50"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="border border-red-500/30 bg-red-950/25 p-4 space-y-2 text-ink">
+                <div className="font-bold text-red-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <span>⚠️ IRREVERSIBLE ACTION</span>
+                </div>
+                <p>
+                  You are about to permanently delete tournament:{' '}
+                  <strong className="text-red-200 underline font-bold select-all">
+                    {tournamentToDelete.title}
+                  </strong>{' '}
+                  <span className="text-dim text-[10px]">({tournamentToDelete.id || tournamentToDelete.slug})</span>.
+                </p>
+                <p className="text-dim text-[11px] leading-relaxed">
+                  This will completely remove the tournament, its bracket configurations, matches, and registrations from the platform. 
+                  Financial receipts (player UPI entries and wallet ledgers) and participating player accounts will remain safely preserved for audit compliance.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[11px] uppercase text-dim tracking-wider">
+                  To confirm permanent deletion, type <span className="text-red-400 font-bold select-all">DELETE</span> below:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE to confirm"
+                  className="w-full border border-red-500/50 bg-surface px-3 py-2 text-xs font-mono text-ink placeholder:text-dim outline-none focus:border-red-400"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  disabled={isDeletingTournament}
+                  onClick={() => {
+                    setTournamentToDelete(null)
+                    setDeleteConfirmText('')
+                  }}
+                  className="border border-white/20 bg-white/5 px-4 py-2 uppercase text-dim hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteConfirmText.trim() !== 'DELETE' || isDeletingTournament}
+                  onClick={handleConfirmDeleteTournament}
+                  className="border border-red-500 bg-red-600/30 px-5 py-2 uppercase font-bold text-red-200 hover:bg-red-600/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isDeletingTournament && (
+                    <span className="size-3 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {isDeletingTournament ? 'Deleting Tournament...' : 'Permanently Delete'}
                 </button>
               </div>
             </div>

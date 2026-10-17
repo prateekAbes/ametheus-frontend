@@ -26,6 +26,7 @@ export interface Tournament {
   description?: string
   game_id: string
   game_name?: string
+  game_title?: string
   format: string
   status: string
   max_teams: number

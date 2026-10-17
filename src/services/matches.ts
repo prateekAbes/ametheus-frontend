@@ -91,6 +91,7 @@ export interface ApiMatch {
   tournament_title?: string
   game_slug?: string
   game_name?: string
+  game_title?: string
   stage?: string
   match_type?: string
   format?: string
@@ -130,10 +131,20 @@ export interface ApiMatch {
   server_region?: string
   lobby_code?: string
   lobby_password?: string
+  room_id?: string
+  room_password?: string
+  credentials_released?: boolean
+  credentials_released_at?: string
+  custom_instructions?: string
+  check_ins?: any
+  alive_status?: Record<string, boolean>
+  placements?: any[]
+  scoring_matrix?: Record<string, number>
+  participant_ratings?: any[]
   team_a?: { id?: string; name: string; tag?: string; score?: number }
   team_b?: { id?: string; name: string; tag?: string; score?: number }
   winner_team_id?: string
-  check_in_status?: { team_a?: boolean; team_b?: boolean }
+  check_in_status?: Record<string, boolean>
   evidence_url?: string
   dispute_notes?: string
 }
@@ -144,23 +155,56 @@ export function mapApiMatchToUiMatch(m: ApiMatch) {
   const isDone = statusLower === 'completed'
   const status = isLive ? ('live' as const) : isDone ? ('completed' as const) : ('upcoming' as const)
 
+  const isBattleRoyale =
+    (m.format || '').toLowerCase().includes('battle royale') ||
+    (m.series_format || '').toLowerCase().includes('battle royale') ||
+    (m.stage || '').toLowerCase().includes('battle royale') ||
+    (m.match_type || '').toLowerCase().includes('battle_royale') ||
+    (m.teams_details && m.teams_details.length > 2) ||
+    (m.teams && m.teams.length > 2) ||
+    (m.team_ids && m.team_ids.length > 2)
+
+  const rawTeamA = m.team_a?.name || m.team_a_name
+  const rawTeamB = m.team_b?.name || m.team_b_name
+  const hasParticipants = Boolean(
+    (rawTeamA && !rawTeamA.includes('(Team A)')) ||
+    (rawTeamB && !rawTeamB.includes('(Team B)')) ||
+    (m.teams && m.teams.length > 0) ||
+    (m.teams_details && m.teams_details.length > 0)
+  )
+
+  const nameA = rawTeamA || (hasParticipants ? (m.team_a_placeholder || 'Participants TBD') : 'Participants TBD')
+  const nameB = rawTeamB || (hasParticipants ? (m.team_b_placeholder || 'Participants TBD') : 'Participants TBD')
+
+  const dateStr = m.scheduled_at
+    ? new Date(m.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+    : m.scheduled_date || 'Not Scheduled'
+
+  const timeStr = m.scheduled_time || (m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Not Scheduled')
+
   return {
     id: String(m.id),
     tour: m.tournament_id || 'tour',
     tourName: m.tournament_title || 'Ametheus Tournament',
     game: m.game_slug || 'valorant',
-    no: m.order || 1,
-    round: m.stage || m.match_type || 'Match',
-    a: m.team_a?.name || 'TBD (Team A)',
-    b: m.team_b?.name || 'TBD (Team B)',
-    date: m.scheduled_at
-      ? new Date(m.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-      : 'TBD',
-    time: m.scheduled_time || '18:00 IST',
+    no: m.match_number || m.order || 1,
+    round: m.round_name || m.stage || m.match_type || 'Match',
+    a: nameA,
+    b: nameB,
+    hasParticipants,
+    isBattleRoyale,
+    squadsCount: m.teams_details?.length || m.teams?.length || m.team_ids?.length || 0,
+    squads: m.teams_details || m.teams || [],
+    teamALogo: m.team_a_details?.logo_url,
+    teamBLogo: m.team_b_details?.logo_url,
+    date: dateStr,
+    time: timeStr,
     status,
     score:
       m.team_a?.score !== undefined && m.team_b?.score !== undefined
         ? ([m.team_a.score, m.team_b.score] as [number, number])
+        : m.score_a !== undefined && m.score_b !== undefined
+        ? ([m.score_a, m.score_b] as [number, number])
         : undefined,
     format: m.series_format || m.format || 'BO1',
     liveLink: m.youtube_live_url || m.live_link,
@@ -316,6 +360,10 @@ export interface AdminMatchUpdatePayload {
 
 export interface MatchJoinInfo {
   join_info_enabled: boolean
+  credentials_released?: boolean
+  room_id?: string
+  room_password?: string
+  custom_instructions?: string
   join_info?: {
     join_code?: string
     party_id?: string
@@ -508,6 +556,7 @@ export interface TournamentRoundsRostersResponse {
   rounds: Array<{
     round_number: number
     round_name: string
+    stream_url?: string
     matches: ApiMatch[]
   }>
   total_matches: number
@@ -597,5 +646,115 @@ export async function saveLiveMatchStructureAdmin(
   })
 }
 
+export async function updateRoundStreamAdmin(
+  tournamentId: string,
+  roundName: string,
+  streamUrl: string
+): Promise<{ status: string; message: string; round_name: string; stream_url: string; updated_matches_count: number }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds/${encodeURIComponent(roundName)}/stream`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stream_url: streamUrl }),
+  })
+}
 
+export async function updateMatchCredentialsAdmin(
+  matchId: string,
+  payload: {
+    room_id?: string
+    room_password?: string
+    lobby_code?: string
+    lobby_password?: string
+    custom_instructions?: string
+  }
+): Promise<{ status: string; message: string; match_id: string; credentials_released: boolean }> {
+  return apiClient(`/admin/matches/${matchId}/credentials`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
 
+export async function releaseMatchCredentialsAdmin(
+  matchId: string
+): Promise<{ status: string; message: string; match_id: string; status_updated: string; credentials_released: boolean }> {
+  return apiClient(`/admin/matches/${matchId}/release-credentials`, {
+    method: 'POST',
+  })
+}
+
+export interface QualifiedContender {
+  id: string
+  tournament_id: string
+  team_id: string
+  team_name: string
+  team_tag?: string
+  status: 'QUALIFIED' | 'ASSIGNED' | 'ELIMINATED'
+  source_round?: string
+  source_match_id?: string
+  assigned_round?: string
+}
+
+export async function getQualifiedContendersAdmin(
+  tournamentId: string,
+  sourceRound?: string
+): Promise<{ status: string; tournament_id: string; total_qualified: number; contenders: QualifiedContender[] }> {
+  const query = sourceRound ? `?source_round=${encodeURIComponent(sourceRound)}` : ''
+  return apiClient(`/admin/tournaments/${tournamentId}/qualified-contenders${query}`)
+}
+
+export async function updateMatchAliveStatusAdmin(
+  matchId: string,
+  teamId: string,
+  isAlive: boolean
+): Promise<{ status: string; message: string; team_id: string; is_alive: boolean }> {
+  return apiClient(`/admin/matches/${matchId}/alive-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ team_id: teamId, is_alive: isAlive }),
+  })
+}
+
+export interface BattleRoyaleTeamResultInput {
+  team_id: string
+  team_name: string
+  placement: number
+  kills: number
+  placement_points?: number
+  elimination_points?: number
+  total_points?: number
+}
+
+export async function submitBattleRoyaleResultsAdmin(
+  matchId: string,
+  payload: {
+    team_results: BattleRoyaleTeamResultInput[]
+    scoring_matrix?: Record<string, number>
+  }
+): Promise<{ status: string; message: string; match_id: string; winner_team_id: string; winner_team_name: string }> {
+  return apiClient(`/admin/matches/${matchId}/battle-royale-results`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export interface ParticipantRatingItem {
+  user_id: string
+  username?: string
+  team_id?: string
+  rating: number
+  review?: string
+}
+
+export async function getMatchRatingsAdmin(
+  matchId: string
+): Promise<{ status: string; match_id: string; ratings: ParticipantRatingItem[] }> {
+  return apiClient(`/admin/matches/${matchId}/ratings`)
+}
+
+export async function submitMatchRatingsAdmin(
+  matchId: string,
+  ratings: ParticipantRatingItem[]
+): Promise<{ status: string; message: string; match_id: string; total_rated: number }> {
+  return apiClient(`/admin/matches/${matchId}/ratings`, {
+    method: 'POST',
+    body: JSON.stringify({ ratings }),
+  })
+}

@@ -71,6 +71,9 @@ export interface PendingPayment {
   verified_at?: string
   verified_by?: string
   approved_by?: string
+  approved_at?: string
+  rejected_by?: string
+  rejected_at?: string
   audited_by?: string
   rejection_reason?: string
   notes?: string
@@ -236,16 +239,112 @@ export async function getAuditLogsCount(params?: AuditLogQuery): Promise<{ total
   return apiClient<{ total: number }>(`/admin/audit-logs/count?${q.toString()}`)
 }
 
-// Payments & UTR Verifications
-export async function getPendingPayments(): Promise<PendingPayment[]> {
-  return apiClient<PendingPayment[]>('/admin/payments?status_filter=PENDING')
+export interface AdminPaymentQueryParams {
+  statusFilter?: string
+  paymentType?: string
+  search?: string
+  datePreset?: string
+  startDate?: string
+  endDate?: string
+  minAmount?: number
+  maxAmount?: number
+  sortBy?: string
+  page?: number
+  limit?: number
+  isArchived?: boolean
 }
 
-export async function getAdminPayments(statusFilter?: string, isArchived: boolean = false): Promise<PendingPayment[]> {
-  const params = new URLSearchParams()
-  if (statusFilter && statusFilter !== 'ALL') params.append('status_filter', statusFilter)
-  if (isArchived) params.append('is_archived', 'true')
-  return apiClient<PendingPayment[]>(`/admin/payments?${params.toString()}`)
+export interface AdminPaymentsSummary {
+  matching_count: number
+  total_volume_inr: number
+  pending_count: number
+  pending_volume_inr: number
+  approved_count: number
+  approved_volume_inr: number
+  rejected_count: number
+  rejected_volume_inr: number
+}
+
+// Payments & UTR Verifications
+export async function getPendingPayments(params?: AdminPaymentQueryParams): Promise<PendingPayment[]> {
+  const q = new URLSearchParams()
+  q.append('is_archived', 'false')
+  if (params?.statusFilter && params.statusFilter !== 'ALL') q.append('status_filter', params.statusFilter)
+  if (params?.paymentType && params.paymentType !== 'ALL') q.append('payment_type', params.paymentType)
+  if (params?.search && params.search.trim()) q.append('search', params.search.trim())
+  if (params?.datePreset && params.datePreset !== 'ALL') q.append('date_preset', params.datePreset)
+  if (params?.startDate) q.append('start_date', params.startDate)
+  if (params?.endDate) q.append('end_date', params.endDate)
+  if (params?.minAmount !== undefined && params.minAmount !== null && !isNaN(params.minAmount)) {
+    q.append('min_amount', params.minAmount.toString())
+  }
+  if (params?.maxAmount !== undefined && params.maxAmount !== null && !isNaN(params.maxAmount)) {
+    q.append('max_amount', params.maxAmount.toString())
+  }
+  if (params?.sortBy) q.append('sort_by', params.sortBy)
+  if (params?.page) q.append('page', params.page.toString())
+  if (params?.limit) q.append('limit', params.limit.toString())
+  return apiClient<PendingPayment[]>(`/admin/payments?${q.toString()}`)
+}
+
+export async function getAdminPayments(
+  statusFilterOrParams?: string | AdminPaymentQueryParams,
+  isArchived: boolean = false
+): Promise<PendingPayment[]> {
+  const query = new URLSearchParams()
+  if (typeof statusFilterOrParams === 'string') {
+    if (statusFilterOrParams && statusFilterOrParams !== 'ALL') query.append('status_filter', statusFilterOrParams)
+    if (isArchived) query.append('is_archived', 'true')
+  } else if (statusFilterOrParams) {
+    const p = statusFilterOrParams
+    if (p.statusFilter && p.statusFilter !== 'ALL') query.append('status_filter', p.statusFilter)
+    if (p.paymentType && p.paymentType !== 'ALL') query.append('payment_type', p.paymentType)
+    if (p.search && p.search.trim()) query.append('search', p.search.trim())
+    if (p.datePreset && p.datePreset !== 'ALL') query.append('date_preset', p.datePreset)
+    if (p.startDate) query.append('start_date', p.startDate)
+    if (p.endDate) query.append('end_date', p.endDate)
+    if (p.minAmount !== undefined && p.minAmount !== null && !isNaN(p.minAmount)) {
+      query.append('min_amount', p.minAmount.toString())
+    }
+    if (p.maxAmount !== undefined && p.maxAmount !== null && !isNaN(p.maxAmount)) {
+      query.append('max_amount', p.maxAmount.toString())
+    }
+    if (p.sortBy) query.append('sort_by', p.sortBy)
+    if (p.page) query.append('page', p.page.toString())
+    if (p.limit) query.append('limit', p.limit.toString())
+    if (p.isArchived) query.append('is_archived', 'true')
+  } else if (isArchived) {
+    query.append('is_archived', 'true')
+  }
+  return apiClient<PendingPayment[]>(`/admin/payments?${query.toString()}`)
+}
+
+export async function getAdminPaymentsSummary(
+  params?: AdminPaymentQueryParams
+): Promise<AdminPaymentsSummary> {
+  const q = new URLSearchParams()
+  if (params) {
+    if (params.statusFilter && params.statusFilter !== 'ALL') q.append('status_filter', params.statusFilter)
+    if (params.paymentType && params.paymentType !== 'ALL') q.append('payment_type', params.paymentType)
+    if (params.search && params.search.trim()) q.append('search', params.search.trim())
+    if (params.datePreset && params.datePreset !== 'ALL') q.append('date_preset', params.datePreset)
+    if (params.startDate) q.append('start_date', params.startDate)
+    if (params.endDate) q.append('end_date', params.endDate)
+    if (params.minAmount !== undefined && params.minAmount !== null && !isNaN(params.minAmount)) {
+      q.append('min_amount', params.minAmount.toString())
+    }
+    if (params.maxAmount !== undefined && params.maxAmount !== null && !isNaN(params.maxAmount)) {
+      q.append('max_amount', params.maxAmount.toString())
+    }
+    if (params.isArchived) q.append('is_archived', 'true')
+  }
+  return apiClient<AdminPaymentsSummary>(`/admin/payments/summary?${q.toString()}`)
+}
+
+export async function deleteTournamentAdmin(id: string): Promise<any> {
+  return apiClient(`/admin/tournaments/${id}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function approvePayment(paymentId: string): Promise<any> {

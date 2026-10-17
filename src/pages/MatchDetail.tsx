@@ -1,17 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams } from 'react-router'
-import { Container, Hud, Badge, Crest, Avatar, Panel, Brackets, SectionHead, Modal } from '../components/ui'
-import { gameBy, img } from '../lib/data'
+import { Container, Hud, Badge, Crest, Panel, Brackets, SectionHead } from '../components/ui'
+import { gameBy } from '../lib/data'
 import DynamicImage from '../components/DynamicImage'
 import { resolveMediaUrl } from '../services/apiClient'
 import {
   getMatchById,
-  captainCheckIn,
-  submitMatchResult,
-  submitMatchDispute,
+  getMatches,
+  updateMatchStatus,
   type ApiMatch,
 } from '../services/matches'
 import { useAuthContext } from '../context/AuthContext'
+
+function normalizeStreamUrl(url?: string): string {
+  if (!url) return ''
+  const t = url.trim()
+  if (!t) return ''
+  if (/^https?:\/\//i.test(t)) return t
+  return `https://${t}`
+}
 
 function getYoutubeEmbedUrl(url?: string): string | null {
   if (!url) return null
@@ -63,7 +70,7 @@ function Countdown({ targetIso }: { targetIso?: string }) {
     <div className="flex justify-center gap-3 md:gap-6">
       {parts.map(([v, l]) => (
         <div key={l} className="w-20 border border-white/10 bg-void/60 py-4 text-center md:w-32">
-          <p className="font-display text-5xl font-black tabular-nums md:text-7xl">
+          <p className="font-display text-5xl font-black tabular-nums md:text-7xl text-ink">
             {String(v).padStart(2, '0')}
           </p>
           <Hud>{l}</Hud>
@@ -79,31 +86,30 @@ export default function MatchDetail() {
 
   const [loading, setLoading] = useState(true)
   const [match, setMatch] = useState<ApiMatch | null>(null)
-  const [checkInLoading, setCheckInLoading] = useState(false)
-  const [checkInMessage, setCheckInMessage] = useState('')
-  const [copiedCode, setCopiedCode] = useState(false)
-  const [copiedPass, setCopiedPass] = useState(false)
+  const [tournamentMatches, setTournamentMatches] = useState<ApiMatch[]>([])
+  const [selectedRound, setSelectedRound] = useState<string>('')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
-  // Modals
-  const [showResultModal, setShowResultModal] = useState(false)
-  const [scoreA, setScoreA] = useState(0)
-  const [scoreB, setScoreB] = useState(0)
-  const [evidenceUrl, setEvidenceUrl] = useState('')
-  const [submittingResult, setSubmittingResult] = useState(false)
-
-  const [showDisputeModal, setShowDisputeModal] = useState(false)
-  const [disputeReason, setDisputeReason] = useState('')
-  const [disputeEvidence, setDisputeEvidence] = useState('')
-  const [submittingDispute, setSubmittingDispute] = useState(false)
-
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true)
     getMatchById(id)
       .then((data: any) => {
         if (data && (data.id || data._id)) {
           setMatch(data)
-          if (data.score_a !== undefined) setScoreA(data.score_a)
-          if (data.score_b !== undefined) setScoreB(data.score_b)
+          const currentRound = data.round_name || data.stage || `Round ${data.round_number || 1}`
+          setSelectedRound((prev) => prev || currentRound)
+
+          // Fetch tournament matches for round navigation
+          const tid = data.tournament_id || data.tournament?.id
+          if (tid) {
+            getMatches({ tournament_id: tid })
+              .then((tMatches) => {
+                if (Array.isArray(tMatches)) {
+                  setTournamentMatches(tMatches)
+                }
+              })
+              .catch((err) => console.warn('Could not fetch tournament round matches:', err))
+          }
         }
       })
       .catch((err) => {
@@ -112,18 +118,18 @@ export default function MatchDetail() {
       .finally(() => {
         setLoading(false)
       })
-  }
+  }, [id])
 
   useEffect(() => {
     loadData()
-  }, [id])
+  }, [loadData])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-void pt-32 pb-24 text-center font-mono text-dim">
         <Container>
           <div className="inline-block size-8 animate-spin border-2 border-cyan border-t-transparent mb-4" />
-          <p className="uppercase tracking-widest text-xs">Loading Match Cockpit &amp; Roster Formation...</p>
+          <p className="uppercase tracking-widest text-xs">Loading Match Cockpit...</p>
         </Container>
       </div>
     )
@@ -149,7 +155,6 @@ export default function MatchDetail() {
   const rawStatus = (match.status || 'SCHEDULED').toUpperCase()
   const isLive = rawStatus === 'LIVE' || rawStatus === 'IN_PROGRESS'
   const isDone = rawStatus === 'COMPLETED'
-  const isUpcoming = rawStatus === 'SCHEDULED' || rawStatus === 'CHECK_IN_OPEN'
 
   const t = match.tournament || {}
   const g = gameBy(t.game_slug || match.game_slug || 'valorant')
@@ -157,7 +162,7 @@ export default function MatchDetail() {
 
   const teamA = match.team_a_details || {
     id: match.team_a_id,
-    name: match.team_a_name || match.team_a_placeholder || 'Team A',
+    name: match.team_a_name || match.team_a_placeholder || '',
     tag: 'TEAM',
     captain: { name: 'Captain', handle: match.team_a_name || 'Captain' },
     members: [],
@@ -165,14 +170,26 @@ export default function MatchDetail() {
 
   const teamB = match.team_b_details || {
     id: match.team_b_id,
-    name: match.team_b_name || match.team_b_placeholder || 'Team B',
+    name: match.team_b_name || match.team_b_placeholder || '',
     tag: 'TEAM',
     captain: { name: 'Captain', handle: match.team_b_name || 'Captain' },
     members: [],
   }
 
-  const multiTeams = match.teams_details || []
-  const isBattleRoyale = (t.format || '').toLowerCase().includes('battle royale') || multiTeams.length > 2
+  const multiTeams = match.teams_details || match.teams || []
+  const isBattleRoyale =
+    (t.format || '').toLowerCase().includes('battle royale') ||
+    (match.series_format || '').toLowerCase().includes('battle royale') ||
+    (match.format || '').toLowerCase().includes('battle royale') ||
+    (match.stage || '').toLowerCase().includes('battle royale') ||
+    (match.match_type || '').toLowerCase().includes('battle_royale') ||
+    multiTeams.length > 2
+
+  const hasParticipants = Boolean(
+    (teamA.name && !teamA.name.includes('(Team A)')) ||
+    (teamB.name && !teamB.name.includes('(Team B)')) ||
+    multiTeams.length > 0
+  )
 
   const winnerId = match.winner_team_id
   const winnerName = isDone
@@ -180,63 +197,48 @@ export default function MatchDetail() {
       (match.score_a !== undefined && match.score_b !== undefined && match.score_a > match.score_b ? teamA.name : teamB.name)
     : null
 
+  // Distinct tournament rounds for interactive segmented navigation
   const progressionRounds = match.tournament_progression || []
-  const prevMatches = match.previous_matches || []
-  const nextMatch = match.next_match
-
-  const handleCheckIn = async () => {
-    setCheckInLoading(true)
-    setCheckInMessage('')
-    try {
-      const res = await captainCheckIn(id)
-      setCheckInMessage(res.message || 'Check-in verified successfully!')
-      loadData()
-    } catch (err: any) {
-      setCheckInMessage(err.message || 'Check-in failed. Are you a registered team captain?')
-    } finally {
-      setCheckInLoading(false)
+  const roundsList: string[] = []
+  progressionRounds.forEach((r: any) => {
+    if (r.round_name && !roundsList.includes(r.round_name)) {
+      roundsList.push(r.round_name)
     }
+  })
+  tournamentMatches.forEach((tm) => {
+    const rName = tm.round_name || tm.stage || `Round ${tm.round_number || 1}`
+    if (rName && !roundsList.includes(rName)) {
+      roundsList.push(rName)
+    }
+  })
+  if (roundsList.length === 0) {
+    roundsList.push(match.round_name || match.stage || `Round ${match.round_number || 1}`)
   }
 
-  const handleResultSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmittingResult(true)
-    try {
-      await submitMatchResult(id, {
-        score_a: scoreA,
-        score_b: scoreB,
-        evidence_url: evidenceUrl || undefined,
-      })
-      setShowResultModal(false)
-      loadData()
-    } catch (err: any) {
-      alert(err.message || 'Failed to submit score.')
-    } finally {
-      setSubmittingResult(false)
-    }
-  }
+  const activeRound = selectedRound || roundsList[0]
+  const roundMatches = tournamentMatches.filter((tm) => {
+    const rName = tm.round_name || tm.stage || `Round ${tm.round_number || 1}`
+    return rName === activeRound
+  })
 
-  const handleDisputeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmittingDispute(true)
+  // Admin status update handler
+  const isAdmin = Boolean(profile?.role && ['SUPER_ADMIN', 'ADMIN', 'ORGANIZER'].includes(profile.role.toUpperCase()))
+  const handleStatusChange = async (newStatus: string) => {
+    if (!newStatus || newStatus === rawStatus) return
+    setUpdatingStatus(true)
     try {
-      await submitMatchDispute(id, {
-        reason: disputeReason,
-        evidence_url: disputeEvidence || undefined,
-      })
-      setShowDisputeModal(false)
-      alert('Dispute submitted for tournament arbiter review.')
+      await updateMatchStatus(id, newStatus)
       loadData()
     } catch (err: any) {
-      alert(err.message || 'Failed to submit dispute.')
+      alert(err.message || 'Failed to update match status')
     } finally {
-      setSubmittingDispute(false)
+      setUpdatingStatus(false)
     }
   }
 
   return (
     <>
-      {/* 1. BROADCAST HERO / TOURNAMENT INFO (Section 30) */}
+      {/* 1. HERO / TOURNAMENT HEADER */}
       <section className="relative overflow-hidden bg-void pt-28">
         <DynamicImage
           src={resolveMediaUrl(t.banner_url || (t as any).bannerUrl)}
@@ -252,55 +254,126 @@ export default function MatchDetail() {
         />
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-40" />
 
-        <Container className="relative pb-12">
-          {/* Tournament Bar */}
+        <Container className="relative pb-10">
+          {/* Header Breadcrumb: Clean compact hierarchy (Tournament Name / Round 1 / Match 01) */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className="font-display text-sm font-black tracking-[0.2em] uppercase"
-                style={{ color: g.accent }}
-              >
-                {t.game_name || g.name}
-              </span>
-              <span className="text-dim">•</span>
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-wider">
               <Link
                 to={`/tournaments/${t.id || match.tournament_id}`}
-                className="font-mono text-xs uppercase tracking-[0.18em] text-ink hover:text-cyan font-bold transition-colors"
+                className="font-bold text-ink hover:text-cyan transition-colors"
               >
-                {t.title || 'Tournament Championship'}
+                {t.title || t.name || 'Tournament Championship'}
               </Link>
-              <span className="text-dim">•</span>
-              <Hud className="text-dim">
-                {match.round_name || match.stage || `Round ${match.round_number || 1}`} · Match {String(match.match_number || 1).padStart(2, '0')}
-              </Hud>
-              {match.format && (
-                <span className="border border-white/10 bg-surface/60 px-2 py-0.5 font-mono text-[10px] text-cyan uppercase font-bold">
-                  {match.series_format || match.format}
-                </span>
-              )}
+              <span className="text-dim">/</span>
+              <span className="text-cyan font-bold">
+                {match.round_name || match.stage || `Round ${match.round_number || 1}`}
+              </span>
+              <span className="text-dim">/</span>
+              <span className="text-dim font-bold">
+                Match {String(match.match_number || 1).padStart(2, '0')}
+              </span>
             </div>
 
-            <div className="flex items-center gap-3">
-              {t.community_link && (
-                <a
-                  href={t.community_link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded bg-emerald-500/20 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition-all shadow-xs"
-                >
-                  <span>💬</span>
-                  <span>Join {t.community_platform || 'WhatsApp'}</span>
-                </a>
-              )}
-              <Badge
-                s={isLive ? 'live' : isDone ? 'completed' : 'upcoming'}
-                label={isLive ? 'Live · On Air' : isDone ? 'Final Result' : 'Scheduled'}
-              />
-            </div>
+            {/* Optional Community Coordinator Link */}
+            {t.community_link && (
+              <a
+                href={t.community_link}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded bg-emerald-500/20 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500 hover:text-white transition-all shadow-xs"
+              >
+                <span>💬</span>
+                <span>Join {t.community_platform || 'WhatsApp'}</span>
+              </a>
+            )}
           </div>
 
-          {/* 2. MATCH FORMATION HEADLINE (1v1 or Battle Royale Grid) */}
-          {!isBattleRoyale ? (
+          {/* 2. FORMAT-AWARE HERO */}
+          {isBattleRoyale ? (
+            /* Battle Royale Multi-Participant Presentation */
+            <div className="mt-12 text-center">
+              <div className="inline-flex items-center gap-2 border border-cyan/40 bg-cyan/10 px-4 py-1.5 font-mono text-xs uppercase tracking-widest text-cyan mb-4">
+                <span>Multi-Squad Battle Royale</span>
+                <span>•</span>
+                <span>{match.round_name || `Round ${match.round_number || 1}`}</span>
+                <span>•</span>
+                <span>Match {String(match.match_number || 1).padStart(2, '0')}</span>
+              </div>
+
+              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black uppercase text-ink">
+                {multiTeams.length > 0 ? `${multiTeams.length} Competing Squads` : 'Battle Royale Lobby'}
+              </h1>
+
+              {/* Status & Counts Strip */}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-6 font-mono text-xs">
+                <div className="border border-white/10 bg-surface/70 px-4 py-2">
+                  <span className="text-dim block">TOTAL SQUADS</span>
+                  <span className="font-display text-xl font-bold text-ink">{multiTeams.length}</span>
+                </div>
+                <div className="border border-white/10 bg-surface/70 px-4 py-2">
+                  <span className="text-dim block">MATCH STATUS</span>
+                  <span className={`font-display text-xl font-bold ${isLive ? 'text-live animate-pulse' : isDone ? 'text-ok' : 'text-cyan'}`}>
+                    {rawStatus}
+                  </span>
+                </div>
+                <div className="border border-white/10 bg-surface/70 px-4 py-2">
+                  <span className="text-dim block">SERIES FORMAT</span>
+                  <span className="font-display text-xl font-bold text-cyan">{match.series_format || match.format || 'Battle Royale'}</span>
+                </div>
+              </div>
+
+              {/* Placements Standings if match completed, or Active Squads Grid */}
+              {match.placements && match.placements.length > 0 ? (
+                <div className="mt-8 max-w-4xl mx-auto overflow-hidden border border-white/10 bg-surface/40">
+                  <div className="bg-void/80 px-4 py-2 text-left font-mono text-xs font-bold text-cyan uppercase border-b border-white/10">
+                    Official Round Standings &amp; Points
+                  </div>
+                  <div className="divide-y divide-white/5 font-mono text-xs">
+                    {match.placements.map((pl: any, idx: number) => (
+                      <div key={pl.team_id || idx} className="grid grid-cols-[60px_1fr_80px_80px_90px] items-center p-3 text-left">
+                        <span className={`font-bold ${idx === 0 ? 'text-amber-400 font-display text-base' : 'text-dim'}`}>
+                          #{pl.placement || idx + 1}
+                        </span>
+                        <span className="font-bold text-ink uppercase truncate">{pl.team_name}</span>
+                        <span className="text-dim">Kills: <strong className="text-ink">{pl.kills ?? 0}</strong></span>
+                        <span className="text-dim">Place Pts: <strong className="text-ink">{pl.placement_points ?? 0}</strong></span>
+                        <span className="text-right text-cyan font-bold">{pl.total_points ?? 0} PTS</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : multiTeams.length > 0 ? (
+                <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-w-5xl mx-auto">
+                  {multiTeams.map((sq: any, i: number) => (
+                    <Panel key={sq.id || i} className="p-3 text-center border-white/10 bg-surface/60">
+                      <p className="font-display text-sm font-black uppercase truncate text-ink">{sq.name || sq.team_name}</p>
+                      <p className="font-mono text-[10px] text-cyan uppercase">TAG: [{sq.tag || 'SQ'}]</p>
+                      <p className="font-mono text-[10px] text-dim truncate mt-1">@{sq.captain?.handle || sq.captain?.name || 'Captain'}</p>
+                    </Panel>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-8 p-8 border border-dashed border-white/15 bg-void/40 max-w-lg mx-auto">
+                  <p className="font-display text-xl font-bold uppercase text-dim">Participants TBD</p>
+                  <p className="font-mono text-xs text-dim/70 mt-1">Squad assignments for this battle royale lobby are pending arbiter configuration.</p>
+                </div>
+              )}
+            </div>
+          ) : !hasParticipants ? (
+            /* Genuine Head-to-Head with Participants TBD */
+            <div className="mt-12 text-center py-8">
+              <div className="inline-block border border-white/15 bg-void/60 px-4 py-1.5 font-mono text-xs uppercase tracking-widest text-dim mb-4">
+                {match.round_name || `Round ${match.round_number || 1}`} · Match {String(match.match_number || 1).padStart(2, '0')}
+              </div>
+              <h1 className="font-display text-4xl sm:text-5xl font-black uppercase text-ink">
+                Participants TBD
+              </h1>
+              <p className="mt-2 font-mono text-xs text-dim max-w-md mx-auto">
+                Competing rosters for this fixture will be determined upon completion of preceding bracket matches.
+              </p>
+            </div>
+          ) : (
+            /* Genuine Head-to-Head Match with Known Participants */
             <div className="mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-12">
               {/* Team A */}
               <div
@@ -311,11 +384,11 @@ export default function MatchDetail() {
                 {teamA.logo_url ? (
                   <DynamicImage src={resolveMediaUrl(teamA.logo_url)} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
                 ) : (
-                  <Crest name={teamA.name} size={90} color={g.accent} />
+                  <Crest name={teamA.name || 'Team A'} size={80} color={g.accent} />
                 )}
                 <div>
-                  <h1 className="font-display text-[clamp(1.75rem,5.5vw,5rem)] font-black uppercase leading-[0.85] text-ink">
-                    {teamA.name}
+                  <h1 className="font-display text-[clamp(1.5rem,4.5vw,4.25rem)] font-black uppercase leading-[0.88] text-ink break-words">
+                    {teamA.name || 'TBD'}
                   </h1>
                   <p className="mt-1 font-mono text-xs text-dim uppercase">
                     TAG: [{teamA.tag || 'TEAM'}] • CAPTAIN: @{teamA.captain?.handle || teamA.captain?.name || 'TBD'}
@@ -326,13 +399,13 @@ export default function MatchDetail() {
               {/* Score / VS Center */}
               <div className="text-center px-4">
                 {match.score_a !== undefined && match.score_b !== undefined ? (
-                  <p className="font-display text-[clamp(3.5rem,10vw,8.5rem)] font-black leading-none tabular-nums text-ink">
+                  <p className="font-display text-[clamp(3rem,8vw,7rem)] font-black leading-none tabular-nums text-ink">
                     {match.score_a}
                     <span className={isLive ? 'text-live animate-pulse' : 'text-dim'}>:</span>
                     {match.score_b}
                   </p>
                 ) : (
-                  <p className="font-display text-[clamp(3.5rem,10vw,8.5rem)] font-black leading-none text-dim/50">
+                  <p className="font-display text-[clamp(3rem,8vw,7rem)] font-black leading-none text-dim/50">
                     VS
                   </p>
                 )}
@@ -352,11 +425,11 @@ export default function MatchDetail() {
                 {teamB.logo_url ? (
                   <DynamicImage src={resolveMediaUrl(teamB.logo_url)} alt="" className="size-20 rounded-full border border-white/20 object-cover" />
                 ) : (
-                  <Crest name={teamB.name} size={90} color={g.accent} />
+                  <Crest name={teamB.name || 'Team B'} size={80} color={g.accent} />
                 )}
                 <div>
-                  <h1 className="font-display text-[clamp(1.75rem,5.5vw,5rem)] font-black uppercase leading-[0.85] text-ink">
-                    {teamB.name}
+                  <h1 className="font-display text-[clamp(1.5rem,4.5vw,4.25rem)] font-black uppercase leading-[0.88] text-ink break-words">
+                    {teamB.name || 'TBD'}
                   </h1>
                   <p className="mt-1 font-mono text-xs text-dim uppercase">
                     TAG: [{teamB.tag || 'TEAM'}] • CAPTAIN: @{teamB.captain?.handle || teamB.captain?.name || 'TBD'}
@@ -364,151 +437,174 @@ export default function MatchDetail() {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="mt-10">
-              <div className="text-center mb-6">
-                <span className="font-mono text-xs uppercase tracking-widest text-cyan">
-                  [ MULTI-TEAM BATTLE ROYALE LOBBY ]
-                </span>
-                <h1 className="font-display text-4xl font-black uppercase text-ink mt-1">
-                  {multiTeams.length} Competing Squads
-                </h1>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {multiTeams.map((sq, i) => (
-                  <Panel key={sq.id || i} className="p-3 text-center border-white/10">
-                    <p className="font-display text-sm font-black uppercase truncate text-ink">{sq.name}</p>
-                    <p className="font-mono text-[10px] text-cyan uppercase">TAG: [{sq.tag}]</p>
-                    <p className="font-mono text-[10px] text-dim truncate">@{sq.captain?.handle || 'Captain'}</p>
-                  </Panel>
-                ))}
-              </div>
-            </div>
           )}
 
-          {/* Quick Match Specs Bar */}
-          <div className="mt-10 grid grid-cols-2 gap-px border border-white/10 bg-white/10 md:grid-cols-4 font-mono text-xs">
+          {/* 3. INFORMATION STRIP (Dynamic Schedule, Competition Format, Match Status with Admin Editor) */}
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px border border-white/10 bg-white/10 font-mono text-xs">
+            {/* 1. Scheduled Date */}
             <div className="bg-void/90 p-4">
               <Hud>SCHEDULED DATE</Hud>
               <p className="mt-1 font-display text-lg font-extrabold uppercase text-ink">
-                {match.scheduled_date || (match.scheduled_at ? new Date(match.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD')}
+                {match.scheduled_date || (match.scheduled_at ? new Date(match.scheduled_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not Scheduled')}
               </p>
             </div>
+
+            {/* 2. Scheduled Time */}
             <div className="bg-void/90 p-4">
               <Hud>SCHEDULED TIME</Hud>
               <p className="mt-1 font-display text-lg font-extrabold uppercase text-ink">
-                {match.scheduled_time || 'TBD'}
+                {match.scheduled_time || (match.scheduled_at ? new Date(match.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Not Scheduled')}
               </p>
             </div>
+
+            {/* 3. Competition Format */}
             <div className="bg-void/90 p-4">
               <Hud>COMPETITION FORMAT</Hud>
-              <p className="mt-1 font-display text-lg font-extrabold uppercase text-cyan">
+              <p className="mt-1 font-display text-lg font-extrabold uppercase text-cyan truncate">
                 {t.format || match.format || 'Single Elimination'}
               </p>
             </div>
+
+            {/* 4. Match Status (renamed from Match Telemetry, without red dot, with admin status selector) */}
             <div className="bg-void/90 p-4">
-              <Hud>MATCH TELEMETRY</Hud>
-              <p className="mt-1 font-display text-lg font-extrabold uppercase text-live">
-                {isLive ? '🔴 BROADCAST ON AIR' : isDone ? '🏆 RESULT CONFIRMED' : '⏳ UPCOMING'}
-              </p>
+              <Hud>MATCH STATUS</Hud>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                {isAdmin ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={rawStatus}
+                      disabled={updatingStatus}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      className="border border-cyan/40 bg-void px-2.5 py-1 font-mono text-xs font-bold text-cyan uppercase cursor-pointer hover:border-cyan focus:outline-none"
+                    >
+                      <option value="SCHEDULED">SCHEDULED</option>
+                      <option value="CHECK_IN_OPEN">CHECK-IN OPEN</option>
+                      <option value="LIVE">LIVE ON AIR</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="CANCELLED">CANCELLED</option>
+                    </select>
+                    {updatingStatus && <span className="size-3 animate-spin border-2 border-cyan border-t-transparent inline-block" />}
+                  </div>
+                ) : (
+                  <p className={`font-display text-lg font-extrabold uppercase ${isLive ? 'text-live' : isDone ? 'text-ok' : 'text-cyan'}`}>
+                    {isLive ? 'LIVE ON AIR' : isDone ? 'RESULT CONFIRMED' : rawStatus === 'CHECK_IN_OPEN' ? 'CHECK-IN OPEN' : 'SCHEDULED'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </Container>
       </section>
 
-      {/* 3. MATCH JOURNEY / BRACKET VISUALIZATION (Section 31) */}
+      {/* 4. INTERACTIVE ROUND NAVIGATION & FIXTURES */}
       <Container className="py-8">
         <Panel className="p-6 border-white/10 bg-surface/60">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
             <div>
-              <Hud className="text-cyan">Tournament Progression &amp; Match Journey</Hud>
+              <Hud className="text-cyan">Tournament Rounds &amp; Fixtures</Hud>
               <p className="text-xs text-dim mt-1 font-mono">
-                Visual advancement pathway from qualification to championship final.
+                Explore match results and fixtures across each tournament stage.
               </p>
             </div>
             {match.advancement_label && (
-              <div className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-[11px] text-cyan font-bold uppercase">
+              <div className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-[11px] text-cyan font-bold uppercase self-start sm:self-auto">
                 Advancement: {match.advancement_label}
               </div>
             )}
           </div>
 
-          {/* Timeline of Rounds */}
-          {progressionRounds.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:gap-6 font-mono text-xs">
-              {progressionRounds.map((rnd: any, idx: number) => (
-                <div key={rnd.round_name || idx} className="flex items-center gap-3">
-                  <div
-                    className={`px-4 py-2 border rounded transition-all ${
-                      rnd.is_current
-                        ? 'border-cyan bg-cyan/20 text-cyan font-bold shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                        : 'border-white/10 bg-void/60 text-dim'
-                    }`}
-                  >
-                    <span className="text-[10px] uppercase block tracking-wider">Round {rnd.round_number}</span>
-                    <span className="font-display text-sm font-black uppercase text-ink">{rnd.round_name}</span>
-                  </div>
-                  {idx < progressionRounds.length - 1 && (
-                    <span className="text-dim/60 font-bold">──►</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Horizontal Segmented Round Selector */}
+          <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-xs">
+            {roundsList.map((rName) => {
+              const isSelected = rName === activeRound
+              return (
+                <button
+                  key={rName}
+                  onClick={() => setSelectedRound(rName)}
+                  className={`px-4 py-2 border rounded font-bold uppercase transition-all cursor-pointer ${
+                    isSelected
+                      ? 'border-cyan bg-cyan/20 text-cyan shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                      : 'border-white/10 bg-void/60 text-dim hover:text-ink hover:border-white/20'
+                  }`}
+                >
+                  {rName}
+                </button>
+              )
+            })}
+          </div>
 
-          {/* Upstream & Downstream Match Nodes */}
-          <div className="mt-8 grid gap-4 md:grid-cols-3 font-mono text-xs">
-            {/* Feeder / Previous Match */}
-            <div className="border border-white/10 bg-void/80 p-4">
-              <Hud className="text-dim">← PREVIOUS ROUND FEEDER</Hud>
-              {prevMatches.length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {prevMatches.map((pm: any) => (
-                    <div key={pm.id} className="text-[11px] border-b border-white/5 pb-1">
-                      <span className="text-dim">{pm.round_name} M{pm.match_number}: </span>
-                      <span className="text-ink font-bold">{pm.team_a_name} vs {pm.team_b_name}</span>
-                      {pm.winner_team_id && <span className="text-ok ml-1">(Winner Advanced)</span>}
+          {/* Matches of Selected Round */}
+          <div className="mt-6">
+            {roundMatches.length === 0 ? (
+              <div className="border border-dashed border-white/15 bg-void/50 p-8 text-center font-mono">
+                <p className="text-sm text-dim">No matches have been created for this round yet.</p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {roundMatches.map((rm) => {
+                  const isCurrentMatch = String(rm.id) === String(id)
+                  const rmTeamA = rm.team_a?.name || rm.team_a_name || 'Participants TBD'
+                  const rmTeamB = rm.team_b?.name || rm.team_b_name || 'Participants TBD'
+                  const rmLive = (rm.status || '').toUpperCase() === 'LIVE' || (rm.status || '').toUpperCase() === 'IN_PROGRESS'
+                  const rmDone = (rm.status || '').toUpperCase() === 'COMPLETED'
+
+                  return (
+                    <div
+                      key={rm.id}
+                      className={`p-4 border transition-colors flex flex-col justify-between ${
+                        isCurrentMatch
+                          ? 'border-cyan bg-cyan/10'
+                          : 'border-white/10 bg-void/70 hover:border-white/20'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2 font-mono text-[11px]">
+                          <span className="text-dim">Match #{rm.match_number || rm.order || 1}</span>
+                          <span className={`px-1.5 py-0.5 text-[10px] font-bold uppercase border ${
+                            rmLive ? 'border-live text-live bg-live/10' :
+                            rmDone ? 'border-ok text-ok bg-ok/10' :
+                            'border-white/15 text-dim'
+                          }`}>
+                            {rmLive ? 'Live' : rmDone ? 'Completed' : 'Scheduled'}
+                          </span>
+                        </div>
+
+                        {/* Fixture participants */}
+                        <div className="font-display text-sm font-bold uppercase text-ink space-y-1">
+                          <p className="truncate">{rmTeamA}</p>
+                          <p className="text-[10px] font-mono text-dim">VS</p>
+                          <p className="truncate">{rmTeamB}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-2 border-t border-white/5 flex items-center justify-between font-mono text-xs">
+                        <span className="text-dim">
+                          {rm.score_a !== undefined && rm.score_b !== undefined ? `${rm.score_a} : ${rm.score_b}` : (rm.scheduled_time || 'TBD')}
+                        </span>
+                        {isCurrentMatch ? (
+                          <span className="text-cyan font-bold text-[11px]">[ Current ]</span>
+                        ) : (
+                          <Link
+                            to={`/matches/${rm.id}`}
+                            className="font-bold uppercase text-cyan hover:text-ink transition-colors"
+                          >
+                            Details →
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-dim text-[11px]">Opening stage fixture (Direct Seeding).</p>
-              )}
-            </div>
-
-            {/* Current Match */}
-            <div className="border border-cyan/60 bg-cyan/10 p-4 shadow-sm">
-              <Hud className="text-cyan">★ CURRENT FIXTURE ★</Hud>
-              <p className="mt-2 font-display text-sm font-black text-ink uppercase">
-                {teamA.name} <span className="text-dim">VS</span> {teamB.name}
-              </p>
-              <p className="text-[10px] text-cyan mt-1">
-                STATUS: {match.status} • {match.scheduled_time || 'TBD'}
-              </p>
-            </div>
-
-            {/* Downstream / Next Match */}
-            <div className="border border-white/10 bg-void/80 p-4">
-              <Hud className="text-dim">NEXT ROUND DESTINATION →</Hud>
-              {nextMatch ? (
-                <div className="mt-2 text-[11px]">
-                  <p className="font-bold text-ink">{nextMatch.round_name} · Match {nextMatch.match_number}</p>
-                  <p className="text-dim mt-0.5">Slot: {nextMatch.team_a_name} vs {nextMatch.team_b_name}</p>
-                </div>
-              ) : (
-                <p className="mt-2 text-dim text-[11px]">
-                  {match.advancement_label || 'Winner advances to subsequent tournament bracket tier.'}
-                </p>
-              )}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </Panel>
       </Container>
 
-      {/* 4. BROADCAST STREAM OR COUNTDOWN (Section 33) */}
-      <Container className="pb-10">
+      {/* 5. BROADCAST STREAM OR COUNTDOWN */}
+      <Container className="pb-12">
         {isLive ? (
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
             <div className="group relative aspect-video overflow-hidden border border-live/60 bg-black shadow-[0_0_30px_rgba(239,68,68,0.2)]">
               {getYoutubeEmbedUrl(streamUrl) ? (
                 <iframe
@@ -529,9 +625,9 @@ export default function MatchDetail() {
                   </p>
                   {streamUrl && (
                     <a
-                      href={streamUrl}
+                      href={normalizeStreamUrl(streamUrl)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="mt-5 border border-live bg-live/20 px-6 py-2.5 uppercase font-bold text-xs text-live hover:bg-live hover:text-white transition-all"
                     >
                       📺 Watch on Streaming Portal →
@@ -541,25 +637,21 @@ export default function MatchDetail() {
               )}
             </div>
 
-            {/* Live Telemetry Panel */}
+            {/* Broadcast Telemetry Sidebar */}
             <Panel className="p-5 font-mono text-xs">
-              <Hud className="text-live">◉ Telemetry Feed</Hud>
+              <Hud className="text-live">Broadcast Telemetry</Hud>
               <div className="mt-4 space-y-3">
                 <div className="border-b border-white/5 pb-2">
                   <span className="text-dim">Match Status:</span>
-                  <p className="font-bold text-live">🔴 LIVE ON AIR</p>
+                  <p className="font-bold text-live mt-0.5">LIVE ON AIR</p>
                 </div>
                 <div className="border-b border-white/5 pb-2">
-                  <span className="text-dim">Score:</span>
-                  <p className="font-display text-lg font-black text-ink">{match.score_a ?? 0} : {match.score_b ?? 0}</p>
-                </div>
-                <div className="border-b border-white/5 pb-2">
-                  <span className="text-dim">Server Region:</span>
-                  <p className="text-ink">{match.server_region || 'AWS Mumbai (ap-south-1)'}</p>
+                  <span className="text-dim">Current Score:</span>
+                  <p className="font-display text-lg font-black text-ink mt-0.5">{match.score_a ?? 0} : {match.score_b ?? 0}</p>
                 </div>
                 <div>
-                  <span className="text-dim">Format:</span>
-                  <p className="text-cyan font-bold">{match.series_format || match.format || 'BO1'}</p>
+                  <span className="text-dim">Match Format:</span>
+                  <p className="text-cyan font-bold mt-0.5">{match.series_format || match.format || 'BO1'}</p>
                 </div>
               </div>
             </Panel>
@@ -578,7 +670,7 @@ export default function MatchDetail() {
             </div>
             {match.captain_notes && (
               <p className="mt-4 font-mono text-xs text-dim italic">
-                Arbiter Notes: "{match.captain_notes}"
+                Arbiter Notes: &quot;{match.captain_notes}&quot;
               </p>
             )}
           </Panel>
@@ -593,101 +685,10 @@ export default function MatchDetail() {
         )}
       </Container>
 
-      {/* 5. PARTICIPANT LOBBY & ACTIONS SECTION */}
-      <Container className="pb-12">
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Lobby Info Card */}
-          <Panel className="p-6">
-            <Brackets color="border-cyan/40" />
-            <Hud className="text-cyan">Match Room Credentials</Hud>
-            <div className="mt-4 space-y-3 font-mono text-xs">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <span className="text-dim">Room ID:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-ink">{match.lobby_code || 'AMT-ROOM-01'}</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(match.lobby_code || 'AMT-ROOM-01')
-                      setCopiedCode(true)
-                      setTimeout(() => setCopiedCode(false), 1500)
-                    }}
-                    className="text-[10px] uppercase text-cyan hover:underline cursor-pointer"
-                  >
-                    {copiedCode ? '✓' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <span className="text-dim">Password:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-ink">{match.lobby_password || 'PASS-99'}</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(match.lobby_password || 'PASS-99')
-                      setCopiedPass(true)
-                      setTimeout(() => setCopiedPass(false), 1500)
-                    }}
-                    className="text-[10px] uppercase text-cyan hover:underline cursor-pointer"
-                  >
-                    {copiedPass ? '✓' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-dim">Server Region:</span>
-                <span className="text-ink">{match.server_region || 'AWS Mumbai (ap-south-1)'}</span>
-              </div>
-            </div>
-          </Panel>
-
-          {/* Captain Check-in */}
-          <Panel className="p-6">
-            <Hud className="text-ink">Captain Check-in</Hud>
-            <p className="mt-2 text-xs text-dim">
-              Both team captains must signal lobby presence prior to scheduled match commencement.
-            </p>
-            <div className="mt-4">
-              <button
-                disabled={checkInLoading || isDone}
-                onClick={handleCheckIn}
-                className="w-full border border-cyan bg-cyan/15 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors disabled:opacity-40 cursor-pointer"
-              >
-                {checkInLoading ? 'Verifying check-in...' : '✓ Confirm Captain Check-in'}
-              </button>
-            </div>
-            {checkInMessage && (
-              <p className="mt-2 font-mono text-[11px] text-cyan">{checkInMessage}</p>
-            )}
-          </Panel>
-
-          {/* Results & Disputes */}
-          <Panel className="p-6">
-            <Hud className="text-ink">Roster Match Operations</Hud>
-            <p className="mt-2 text-xs text-dim">
-              Submit verified scoreboard screenshots, or flag competitive rule disputes.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 font-mono text-xs">
-              <button
-                onClick={() => setShowResultModal(true)}
-                className="border border-white/20 bg-surface px-4 py-2.5 font-bold uppercase tracking-wider text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
-              >
-                Submit Scorecard Proof
-              </button>
-              <button
-                onClick={() => setShowDisputeModal(true)}
-                className="border border-live/40 bg-live/10 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-live hover:bg-live/20 transition-colors cursor-pointer"
-              >
-                Open Arbiter Dispute
-              </button>
-            </div>
-          </Panel>
-        </div>
-      </Container>
-
-      {/* 6. VERIFIED TEAM ROSTER DETAILS (Section 32) */}
+      {/* 6. VERIFIED TEAM ROSTERS (Section 32) */}
       <Container className="pb-24">
         <SectionHead kicker="Verified Squads" title="Team Rosters" size="md" className="mb-8" />
-        
+
         <div className="grid gap-6 md:grid-cols-2">
           {/* Team A Roster Card */}
           <Panel className="p-6 border-white/10">
@@ -696,10 +697,10 @@ export default function MatchDetail() {
                 {teamA.logo_url ? (
                   <DynamicImage src={resolveMediaUrl(teamA.logo_url)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
                 ) : (
-                  <Crest name={teamA.name} size={48} color={g.accent} />
+                  <Crest name={teamA.name || 'Team A'} size={48} color={g.accent} />
                 )}
                 <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamA.name}</h3>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamA.name || 'Team A'}</h3>
                   <span className="font-mono text-xs text-cyan uppercase font-bold">TAG: [{teamA.tag || 'TEAM'}]</span>
                 </div>
               </div>
@@ -745,10 +746,10 @@ export default function MatchDetail() {
                 {teamB.logo_url ? (
                   <DynamicImage src={resolveMediaUrl(teamB.logo_url)} alt="" className="size-12 rounded-full border border-white/20 object-cover" />
                 ) : (
-                  <Crest name={teamB.name} size={48} color={g.accent} />
+                  <Crest name={teamB.name || 'Team B'} size={48} color={g.accent} />
                 )}
                 <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamB.name}</h3>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">{teamB.name || 'Team B'}</h3>
                   <span className="font-mono text-xs text-cyan uppercase font-bold">TAG: [{teamB.tag || 'TEAM'}]</span>
                 </div>
               </div>
@@ -788,115 +789,6 @@ export default function MatchDetail() {
           </Panel>
         </div>
       </Container>
-
-      {/* RESULT MODAL */}
-      <Modal
-        open={showResultModal}
-        onClose={() => setShowResultModal(false)}
-        title="Submit Match Score"
-        subtitle="Report verified match scorecard for administrative audit."
-        maxWidth="max-w-md"
-      >
-        <form onSubmit={handleResultSubmit} className="space-y-4 font-mono text-xs">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-dim uppercase">{teamA.name} Score</label>
-              <input
-                type="number"
-                min="0"
-                value={scoreA}
-                onChange={(e) => setScoreA(parseInt(e.target.value) || 0)}
-                className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
-              />
-            </div>
-            <div>
-              <label className="text-dim uppercase">{teamB.name} Score</label>
-              <input
-                type="number"
-                min="0"
-                value={scoreB}
-                onChange={(e) => setScoreB(parseInt(e.target.value) || 0)}
-                className="mt-1 w-full border border-white/20 bg-void p-2.5 font-display text-xl font-bold text-ink"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-dim uppercase">Proof Screenshot / Evidence URL</label>
-            <input
-              type="url"
-              placeholder="https://..."
-              value={evidenceUrl}
-              onChange={(e) => setEvidenceUrl(e.target.value)}
-              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowResultModal(false)}
-              className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submittingResult}
-              className="border border-cyan bg-cyan/20 px-6 py-2 uppercase font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
-            >
-              {submittingResult ? 'Submitting...' : 'Submit Result'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* DISPUTE MODAL */}
-      <Modal
-        open={showDisputeModal}
-        onClose={() => setShowDisputeModal(false)}
-        title="File Match Dispute"
-        subtitle="Freeze match outcome for official arbiter investigation."
-        maxWidth="max-w-md"
-      >
-        <form onSubmit={handleDisputeSubmit} className="space-y-4 font-mono text-xs">
-          <div>
-            <label className="text-dim uppercase">Dispute Description / Grounds</label>
-            <textarea
-              rows={4}
-              required
-              value={disputeReason}
-              onChange={(e) => setDisputeReason(e.target.value)}
-              placeholder="Detail rule infractions, no-shows, or server anomalies..."
-              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-            />
-          </div>
-          <div>
-            <label className="text-dim uppercase">Evidence Link (optional)</label>
-            <input
-              type="url"
-              value={disputeEvidence}
-              onChange={(e) => setDisputeEvidence(e.target.value)}
-              placeholder="https://..."
-              className="mt-1 w-full border border-white/20 bg-void p-2.5 text-ink"
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowDisputeModal(false)}
-              className="border border-white/20 px-4 py-2 uppercase font-bold text-dim hover:text-ink cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submittingDispute}
-              className="border border-live bg-live/20 px-6 py-2 uppercase font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
-            >
-              {submittingDispute ? 'Filing...' : 'Submit Dispute'}
-            </button>
-          </div>
-        </form>
-      </Modal>
     </>
   )
 }

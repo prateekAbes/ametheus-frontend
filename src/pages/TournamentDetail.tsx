@@ -285,6 +285,59 @@ export default function TournamentDetail() {
     }
   }, [isConfirmedParticipant, isRegistrationClosed, communityInfo, id])
 
+  const [copiedCredField, setCopiedCredField] = useState<string | null>(null)
+
+  const handleCopyCredential = (value?: string | null, field?: string) => {
+    if (!value || !field) return
+    navigator.clipboard?.writeText(value)
+    setCopiedCredField(field)
+    setTimeout(() => setCopiedCredField(null), 2000)
+  }
+
+  const userTeamId = regStatus?.team?.id || (regStatus?.team as any)?._id || regStatus?.registration?.team_id
+  const userMatch = useMemo(() => {
+    if (!matchesData || matchesData.length === 0) return null
+    if (userTeamId) {
+      const found = matchesData.find((m: any) =>
+        m.team_a?.id === userTeamId ||
+        m.team_b?.id === userTeamId ||
+        m.team_a_id === userTeamId ||
+        m.team_b_id === userTeamId ||
+        (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id) === userTeamId))
+      )
+      if (found) return found
+    }
+    return matchesData.find((m: any) => m.credentials_released) || null
+  }, [matchesData, userTeamId])
+
+  const activeCreds = useMemo(() => {
+    if (userMatch?.credentials_released) {
+      const rId = userMatch.room_id || userMatch.lobby_code
+      const rPass = userMatch.room_password || userMatch.lobby_password
+      if (rId && rId !== 'TBD') {
+        return {
+          roomId: rId,
+          roomPassword: rPass || 'None',
+          customInstructions: userMatch.custom_instructions,
+          serverRegion: userMatch.server_region || tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
+          isReleased: true,
+        }
+      }
+    }
+    const tRoomId = (tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id
+    if (tRoomId && tRoomId !== 'TBD') {
+      const tRoomPass = (tourData as any)?.customRoomPassword || (tourData as any)?.custom_room_password || (communityInfo as any)?.room_password
+      return {
+        roomId: tRoomId,
+        roomPassword: tRoomPass || 'None',
+        customInstructions: (tourData as any)?.customInstructions,
+        serverRegion: tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
+        isReleased: true,
+      }
+    }
+    return null
+  }, [userMatch, tourData, communityInfo])
+
   // Registered rosters
   const rosterList = tourData?.registeredRosters || []
 
@@ -508,22 +561,18 @@ export default function TournamentDetail() {
       {isConfirmedParticipant && (
         <section id="participant-hub" className="scroll-mt-24 border-b border-white/10 bg-graphite/40 py-16">
           <Container>
-            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="size-2.5 rounded-full bg-ok animate-pulse" />
-                  <Hud className="text-ok">Confirmed Competitor Hub</Hud>
-                </div>
-                <h2 className="mt-2 font-display text-4xl font-black uppercase text-ink md:text-5xl">
-                  Participant Headquarters
+                <h2 className="font-display text-3xl font-black uppercase tracking-tight text-ink md:text-4xl">
+                  Competitor Hub
                 </h2>
-                <p className="mt-1 font-mono text-xs uppercase tracking-wider text-dim">
-                  Your entry is officially confirmed. Review your roster, tournament schedule, and join the official communication channel.
+                <p className="mt-1 font-mono text-xs text-dim">
+                  Entry confirmed · Monitor match status, check-in, and view lobby credentials below.
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="border border-ok/30 bg-ok/10 px-4 py-2 font-display text-lg font-bold text-ok uppercase">
-                  Confirmed #{regStatus?.position ?? 1}
+                <span className="border border-ok/40 bg-ok/10 px-3.5 py-1.5 font-mono text-xs font-bold text-ok uppercase tracking-wider">
+                  Confirmed Entry #{regStatus?.position ?? 1}
                 </span>
               </div>
             </div>
@@ -543,148 +592,180 @@ export default function TournamentDetail() {
               </div>
             )}
 
-            {/* Official WhatsApp Group Card — Visible Only After Registration Closes */}
-            {isRegistrationClosed ? (
-              <div className="mb-8 border-2 border-emerald-500/50 bg-emerald-950/30 p-6 md:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="grid size-12 shrink-0 place-items-center rounded bg-emerald-500 font-display text-xl font-black text-void">
-                      WA
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="font-display text-2xl font-black uppercase text-ink">
-                          Official Tournament WhatsApp Group
-                        </h3>
-                        <span className="border border-emerald-500/50 bg-emerald-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-400">
-                          Registration Closed • Channel Unlocked
-                        </span>
-                      </div>
-                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
-                        {communityInfo?.instructions ||
-                          'Custom Lobby Room ID, Password, Bracket calls, Coin toss, and real-time referee communications are coordinated exclusively in this channel.'}
-                      </p>
-                      <p className="mt-2 font-mono text-xs text-emerald-400/90">
-                        Registration is officially closed. All squad captains and players must join the WhatsApp channel now for match coordination.
-                      </p>
-                    </div>
-                  </div>
-                  {communityInfo?.whatsapp_group_url || communityInfo?.community_link ? (
-                    <a
-                      href={communityInfo.whatsapp_group_url || communityInfo.community_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex shrink-0 items-center justify-center gap-3 bg-emerald-500 px-8 py-3.5 font-display text-base font-black uppercase tracking-wider text-void shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 active:scale-95 cursor-pointer"
-                    >
-                      <span>Join WhatsApp Group</span>
-                      <span>→</span>
-                    </a>
-                  ) : (
-                    <div className="border border-white/10 bg-void/50 px-4 py-2 font-mono text-xs text-dim">
-                      Connecting to group channel...
-                    </div>
-                  )}
+            {/* Match Coordination Channel — Compact and subtle when unlocked */}
+            {isRegistrationClosed && (communityInfo?.whatsapp_group_url || communityInfo?.community_link) && (
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-emerald-500/30 bg-emerald-950/20 px-4 py-2.5">
+                <div className="flex items-center gap-2 font-mono text-xs text-emerald-300">
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  <span>Match coordination channel is active for confirmed competitors.</span>
                 </div>
+                <a
+                  href={communityInfo.whatsapp_group_url || communityInfo.community_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 font-mono text-xs font-bold uppercase text-emerald-300 hover:bg-emerald-500 hover:text-void transition-colors cursor-pointer"
+                >
+                  <span>Open Coordinator Chat</span>
+                  <span>↗</span>
+                </a>
               </div>
-            ) : (
-              <div className="mb-8 border border-amber-500/40 bg-amber-950/20 p-6 md:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="grid size-12 shrink-0 place-items-center rounded bg-amber-500/20 border border-amber-500/40 font-display text-xl font-black text-amber-400">
-                      🔒
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="font-display text-2xl font-black uppercase text-ink">
-                          Official Tournament WhatsApp Group
-                        </h3>
-                        <span className="border border-amber-500/50 bg-amber-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-400">
-                          Locked While Registration Is Open
-                        </span>
-                      </div>
-                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
-                        Tournament registration is currently open. To preserve bracket integrity and prevent premature room access, the official WhatsApp group link will unlock automatically for confirmed participants once registration officially closes.
-                      </p>
-                      <p className="mt-2 font-mono text-xs text-amber-400/90">
-                        {tourData?.registrationDeadline
-                          ? `Scheduled Registration Close: ${new Date(tourData.registrationDeadline).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST (or when slots fill).`
-                          : 'Unlocks automatically when all tournament slots fill or registration is marked closed.'}
-                      </p>
-                    </div>
+            )}
+
+            {/* Match Lobby Credentials — Primary Focal Point for Confirmed Participants */}
+            {activeCreds ? (
+              <div className="mb-8 border border-cyan/40 bg-void/80 p-6 md:p-8 backdrop-blur-md relative overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan">
+                      Match Lobby Credentials
+                    </span>
                   </div>
-                  <div className="shrink-0 flex flex-col items-center sm:items-end gap-1.5">
+                  <span className="border border-ok/40 bg-ok/10 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-ok tracking-wider">
+                    ● Released &amp; Active
+                  </span>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Room ID Card */}
+                  <div className="border border-cyan/40 bg-surface/80 p-5 flex flex-col justify-between">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                        Room ID
+                      </span>
+                      <div className="mt-2 font-mono text-2xl sm:text-3xl font-extrabold tracking-wide text-cyan select-all break-all">
+                        {activeCreds.roomId}
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      disabled
-                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 border border-amber-500/40 bg-amber-500/10 px-6 py-3 font-mono text-xs uppercase tracking-wider text-amber-400/80 select-none"
+                      onClick={() => handleCopyCredential(activeCreds.roomId, 'room_id')}
+                      className="mt-4 inline-flex items-center justify-center gap-1.5 border border-cyan/40 bg-cyan/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer active:scale-95"
                     >
-                      <span>🔒 Locked Until Registration Closes</span>
+                      <span>{copiedCredField === 'room_id' ? '✓ Copied' : '📋 Copy Room ID'}</span>
                     </button>
-                    <span className="font-mono text-[10px] text-dim">
-                      {tourData?.availableSlots !== undefined && tourData.availableSlots > 0
-                        ? `${tourData.availableSlots} slot${tourData.availableSlots === 1 ? '' : 's'} remaining open`
-                        : 'Registration in progress'}
+                  </div>
+
+                  {/* Room Password Card */}
+                  <div className="border border-amber-500/40 bg-surface/80 p-5 flex flex-col justify-between">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                        Room Password
+                      </span>
+                      <div className="mt-2 font-mono text-2xl sm:text-3xl font-extrabold tracking-wide text-amber-400 select-all break-all">
+                        {activeCreds.roomPassword || 'None'}
+                      </div>
+                    </div>
+                    {activeCreds.roomPassword && activeCreds.roomPassword !== 'None' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCredential(activeCreds.roomPassword, 'room_password')}
+                        className="mt-4 inline-flex items-center justify-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-amber-400 hover:bg-amber-400 hover:text-void transition-all cursor-pointer active:scale-95"
+                      >
+                        <span>{copiedCredField === 'room_password' ? '✓ Copied' : '📋 Copy Password'}</span>
+                      </button>
+                    ) : (
+                      <span className="mt-4 font-mono text-[11px] text-dim block text-center">
+                        No Password Required
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Server / Region Card */}
+                  <div className="border border-white/10 bg-surface/80 p-5 flex flex-col justify-between">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                        Server Region
+                      </span>
+                      <div className="mt-2 font-display text-lg sm:text-xl font-bold uppercase text-ink break-words">
+                        {activeCreds.serverRegion || tourData?.serverRegion || 'AWS Mumbai (ap-south-1)'}
+                      </div>
+                    </div>
+                    <span className="mt-4 font-mono text-[11px] text-dim block">
+                      Authoritative Match Server
                     </span>
+                  </div>
+
+                  {/* Reporting Time Card */}
+                  <div className="border border-white/10 bg-surface/80 p-5 flex flex-col justify-between">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                        Reporting Window
+                      </span>
+                      <div className="mt-2 font-display text-lg sm:text-xl font-bold uppercase text-ok">
+                        15 Min Prior
+                      </div>
+                    </div>
+                    <span className="mt-4 font-mono text-[11px] text-ok/80 block">
+                      Join Lobby Before Kickoff
+                    </span>
+                  </div>
+                </div>
+
+                {/* Arbiter Host Instructions if present */}
+                {activeCreds.customInstructions && (
+                  <div className="mt-4 border-t border-white/10 pt-4 font-mono text-xs">
+                    <span className="font-bold text-cyan uppercase tracking-wider block mb-1">
+                      Host Instructions:
+                    </span>
+                    <p className="text-ink text-sm leading-relaxed">
+                      {activeCreds.customInstructions}
+                    </p>
+                  </div>
+                )}
+
+                {/* Match Link and Status if user has match */}
+                {userMatch && (
+                  <div className="mt-5 border-t border-white/10 pt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="font-mono text-xs uppercase text-dim">Active Match:</span>
+                      <span className="font-display text-sm font-bold uppercase text-ink">
+                        {userMatch.round_name || userMatch.stage || 'Round 1'} · Match #{userMatch.match_number || 1}
+                      </span>
+                      <span className={`px-2 py-0.5 font-mono text-[10px] font-bold uppercase border ${
+                        userMatch.status === 'LIVE' ? 'border-live bg-live/10 text-live' :
+                        userMatch.status === 'CHECK_IN_OPEN' ? 'border-ok bg-ok/10 text-ok' :
+                        'border-white/20 bg-white/5 text-dim'
+                      }`}>
+                        {userMatch.status || 'SCHEDULED'}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/matches/${userMatch.id || userMatch._id}`}
+                      className="inline-flex items-center gap-1.5 border border-cyan/40 bg-cyan/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                    >
+                      <span>Open Match Lobby</span>
+                      <span>→</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mb-8 border border-dashed border-white/20 bg-void/60 p-6 md:p-8">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-dim">
+                    <span className="size-2 rounded-full bg-dim" />
+                    <span>Match Lobby Credentials</span>
+                  </div>
+                  <span className="border border-white/15 bg-white/5 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-dim tracking-wider">
+                    Awaiting Arbiter Release
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <p className="font-display text-xl font-bold uppercase text-ink">
+                      Credentials Scheduled for Match Day
+                    </p>
+                    <p className="mt-1 text-sm text-dim leading-relaxed">
+                      Custom Room ID and Password will unlock directly in your Competitor Hub once released by arbiters prior to match kickoff.
+                    </p>
+                  </div>
+                  <div className="shrink-0 border border-white/10 bg-surface/60 px-3.5 py-2 font-mono text-xs text-dim">
+                    <span>⏱ Lobby opens 15m prior to start</span>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Match Lobby Credentials (Gated for Confirmed Participants) */}
-            <div className="mb-8 border border-cyan/30 bg-surface p-6 md:p-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
-                  <Hud className="text-cyan">Match Lobby Credentials</Hud>
-                </div>
-                <span className="font-mono text-[10px] uppercase text-cyan border border-cyan/40 bg-cyan/10 px-2 py-0.5">
-                  Exclusive Participant Access
-                </span>
-              </div>
-              
-              {((tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id) ? (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-                  <div className="border border-white/10 bg-void/60 p-4">
-                    <span className="font-mono text-[10px] text-dim uppercase">Room ID</span>
-                    <p className="mt-1 font-mono text-lg font-bold text-cyan select-all">
-                      {(tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id}
-                    </p>
-                  </div>
-                  <div className="border border-white/10 bg-void/60 p-4">
-                    <span className="font-mono text-[10px] text-dim uppercase">Room Password</span>
-                    <p className="mt-1 font-mono text-lg font-bold text-cyan select-all">
-                      {(tourData as any)?.customRoomPassword || (tourData as any)?.custom_room_password || (communityInfo as any)?.room_password || 'Shared in WhatsApp'}
-                    </p>
-                  </div>
-                  <div className="border border-white/10 bg-void/60 p-4">
-                    <span className="font-mono text-[10px] text-dim uppercase">Server / Region</span>
-                    <p className="mt-1 font-display text-lg font-bold uppercase text-ink">
-                      {tourData?.serverRegion || 'South Asia'}
-                    </p>
-                  </div>
-                  <div className="border border-white/10 bg-void/60 p-4">
-                    <span className="font-mono text-[10px] text-dim uppercase">Reporting Time</span>
-                    <p className="mt-1 font-display text-lg font-bold uppercase text-ok">
-                      15 Min Before Start
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 border border-dashed border-white/15 bg-void/40 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <p className="font-display text-lg font-bold uppercase text-ink">
-                      Credentials Scheduled for Match Day
-                    </p>
-                    <p className="mt-1 text-xs text-dim">
-                      Custom Room ID and Password will appear here and in the official WhatsApp group exactly 15 minutes before the match start time.
-                    </p>
-                  </div>
-                  <span className="border border-white/20 bg-white/5 px-3 py-1 font-mono text-[11px] text-dim uppercase whitespace-nowrap">
-                    Lobby Ready 15m Prior
-                  </span>
-                </div>
-              )}
-            </div>
 
             {/* 3 Core Cards Grid */}
             <div className="grid gap-6 md:grid-cols-3">
@@ -840,7 +921,7 @@ export default function TournamentDetail() {
                 <span className="h-px flex-1 bg-white/10" />
               </div>
               <h3 className="mt-3 font-display text-2xl font-black uppercase text-ink">
-                Lobby Credentials & Match Instructions
+                Schedule &amp; Match Protocol
               </h3>
               <div className="mt-6 grid gap-6 md:grid-cols-3">
                 <div className="border border-white/5 bg-void/50 p-4">
@@ -884,7 +965,7 @@ export default function TournamentDetail() {
 
               <div className="mt-6 border-t border-white/10 pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <p className="text-xs text-dim max-w-2xl leading-relaxed">
-                  <strong className="text-ink">Lobby Delivery:</strong> Custom Room ID and Password will be posted 15 minutes before match start in the Official WhatsApp Group and sent via platform notification. Teams that fail to enter within 10 minutes of scheduled start will receive a forfeit loss.
+                  <strong className="text-ink">Match Readiness:</strong> Custom Room ID and Password unlock directly in your Competitor Hub 15 minutes before match start. Teams that fail to join within 10 minutes of scheduled start will receive a forfeit loss.
                 </p>
                 <Cta small ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
                   Review Full Rulebook ↓
@@ -948,7 +1029,7 @@ export default function TournamentDetail() {
                 <div className="border border-warn/30 bg-warn/10 p-4 text-center shrink-0">
                   <p className="font-mono text-xs uppercase text-warn font-bold">Awaiting Admin Approval</p>
                   <p className="mt-1 text-[11px] text-dim max-w-[200px]">
-                    Once approved, WhatsApp channel access and room credentials unlock automatically.
+                    Once approved, full Competitor Hub access and room credentials unlock automatically.
                   </p>
                 </div>
               </div>

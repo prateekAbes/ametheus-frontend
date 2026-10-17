@@ -179,7 +179,7 @@ export default function Wallet() {
                   Withdraw winnings
                 </Cta>
                 <Cta small ghost to="/transactions">
-                  Ledger History
+                  Transaction History
                 </Cta>
               </div>
             </div>
