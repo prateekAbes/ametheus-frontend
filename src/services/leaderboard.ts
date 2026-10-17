@@ -27,6 +27,43 @@ export interface LeaderboardEntry {
   status?: string
 }
 
+export const METRICS = [
+  { id: 'overall', label: 'Overall Standing', unit: 'Rating' },
+  { id: 'win_rate', label: 'Win Rate', unit: 'Win Rate' },
+  { id: 'wins', label: 'Match Wins', unit: 'Wins' },
+  { id: 'spending', label: 'Highest Spending', unit: 'Spent' },
+] as const
+
+export type MetricId = (typeof METRICS)[number]['id']
+
+export interface LeaderboardPlayer {
+  id: string
+  name: string
+  rawName: string
+  initials: string
+  tone: number
+  wins: number
+  matches: number
+  points: number
+  spent: number
+  winRate: number
+  avatarUrl?: string
+  rank: number
+  isCurrentUser: boolean
+  isDisqualified: boolean
+  tag?: string
+}
+
+export const getPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) =>
+  m === 'win_rate' ? p.winRate : m === 'wins' ? p.wins : m === 'spending' ? p.spent : p.points
+
+export const showPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) =>
+  m === 'win_rate'
+    ? `${p.winRate}%`
+    : m === 'spending'
+    ? `₹${p.spent.toLocaleString()}`
+    : getPlayerMetricValue(p, m).toLocaleString()
+
 export interface LeaderboardDisqualification {
   id: string
   entity_id: string
