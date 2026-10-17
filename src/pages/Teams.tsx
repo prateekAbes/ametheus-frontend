@@ -137,15 +137,15 @@ export default function Teams() {
             <div className="mt-14 grid gap-4 md:grid-cols-2">
               <Link
                 to="/teams/create"
-                className="group relative flex min-h-[340px] flex-col justify-end overflow-hidden bg-ink p-8 text-void transition-all duration-500 md:p-12"
+                className="group relative flex min-h-[340px] flex-col justify-end overflow-hidden border border-white/15 bg-[#0d242a] p-8 text-ink transition-all duration-500 md:p-12"
               >
-                <span className="absolute right-6 top-4 font-display text-[10rem] font-black leading-none text-void/10 transition-transform duration-700 group-hover:scale-110">
+                <span className="absolute right-6 top-4 font-display text-[10rem] font-black leading-none text-white/10 transition-transform duration-700 group-hover:scale-110">
                   +
                 </span>
                 <h2 className="mt-3 font-display text-6xl font-black uppercase leading-[0.85] md:text-7xl">
                   Create<br />Team
                 </h2>
-                <p className="mt-4 max-w-sm text-void/70">
+                <p className="mt-4 max-w-sm text-dim">
                   Name it, pick a game, add your players. Get a team code instantly.
                 </p>
                 <span className="mt-6 inline-flex items-center gap-2 font-display font-extrabold uppercase tracking-[0.08em] transition-all group-hover:gap-4">
