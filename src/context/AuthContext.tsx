@@ -44,6 +44,7 @@ interface AuthContextValue {
   isOrganizer: boolean
   isSuperAdmin: boolean
   refreshProfile: () => Promise<void>
+  updateLocalProfile: (updates: Partial<UserProfile>) => void
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -58,6 +59,7 @@ const AuthContext = createContext<AuthContextValue>({
   isOrganizer: false,
   isSuperAdmin: false,
   refreshProfile: async () => {},
+  updateLocalProfile: () => {},
 })
 
 export function useAuthContext() {
@@ -207,26 +209,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (user.unsafeMetadata as any)?.role ||
           undefined
 
-        // 2. Initial warm cache read (optimistic display while verifying authoritatively)
-        try {
-          const cached = localStorage.getItem(storageKey)
-          if (cached) {
-            const parsed = JSON.parse(cached)
-            if (
-              parsed &&
-              (parsed.id === user.id ||
-                parsed.clerk_user_id === user.id ||
-                parsed.email?.toLowerCase() === userEmail.toLowerCase())
-            ) {
-              parsed.role = normalizeRole(parsed.role || metadataRole, userEmail)
-              if (clerkUsername && parsed.username !== clerkUsername) {
-                parsed.username = clerkUsername
+        // 2. Initial warm cache read (optimistic display ONLY when NOT force-syncing)
+        if (!forceSync) {
+          try {
+            const cached = localStorage.getItem(storageKey)
+            if (cached) {
+              const parsed = JSON.parse(cached)
+              if (
+                parsed &&
+                (parsed.id === user.id ||
+                  parsed.clerk_user_id === user.id ||
+                  parsed.email?.toLowerCase() === userEmail.toLowerCase())
+              ) {
+                parsed.role = normalizeRole(parsed.role || metadataRole, userEmail)
+                if (clerkUsername && parsed.username !== clerkUsername) {
+                  parsed.username = clerkUsername
+                }
+                setProfile(parsed)
               }
-              setProfile(parsed)
             }
+          } catch {
+            // Ignore cache read failures
           }
-        } catch {
-          // Ignore cache read failures
         }
 
         // Helper to prioritize elevated roles
@@ -364,6 +368,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadProfile(true)
   }, [loadProfile])
 
+  const updateLocalProfile = useCallback((updates: Partial<UserProfile>) => {
+    setProfile((prev) => {
+      if (!prev) return prev
+      const updated: UserProfile = {
+        ...prev,
+        ...updates,
+      }
+      try {
+        const storageKey = `ametheus_user_profile_${prev.clerk_user_id || prev.id}`
+        localStorage.setItem(storageKey, JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }, [])
 
   const effectiveRole: CanonicalRole = useMemo(() => {
     if (!profile) return 'PLAYER'
@@ -406,6 +424,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isOrganizer,
         isSuperAdmin,
         refreshProfile,
+        updateLocalProfile,
       }}
     >
       {children}

@@ -137,7 +137,6 @@ export default function Tournaments() {
   return (
     <>
       <PageHero
-        kicker="◇ Compete · Win · Repeat"
         title="TOURNAMENTS"
         sub="High-stakes competitive esports events with automated brackets and verified prize pools."
         variant="tournaments"

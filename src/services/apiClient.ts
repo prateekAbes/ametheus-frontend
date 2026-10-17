@@ -30,11 +30,25 @@ export function resolveMediaUrl(url?: string | null): string {
     trimmed.startsWith('data:') ||
     trimmed.startsWith('blob:')
   ) {
+    if (trimmed.startsWith('data:image/svg+xml')) {
+      if (trimmed.includes('<svg') || trimmed.includes('</svg>') || trimmed.includes('<') || trimmed.includes('>')) {
+        const commaIndex = trimmed.indexOf(',')
+        if (commaIndex !== -1) {
+          const header = trimmed.slice(0, commaIndex)
+          const body = trimmed.slice(commaIndex + 1)
+          return `${header},${encodeURIComponent(body)}`
+        }
+      }
+      return trimmed
+    }
     if (trimmed.includes('images.unsplash.com') && !trimmed.includes('w=')) {
       const sep = trimmed.includes('?') ? '&' : '?'
       return `${trimmed}${sep}auto=format&fit=crop&q=75&w=800`
     }
     return trimmed
+  }
+  if (trimmed.startsWith('/assets/') || trimmed.startsWith('assets/')) {
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
   }
   if (trimmed.startsWith('img_')) {
     return `${API_BASE_URL}/api/v1/media/${trimmed}`

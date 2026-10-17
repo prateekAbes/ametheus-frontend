@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
-import { PageHero, Container, Tabs, Chips, EmptyState, Hud, Badge, Crest, Brackets } from '../components/ui'
+import { PageHero, Container, Chips, EmptyState, Hud, Badge, Crest, Brackets } from '../components/ui'
 import { gameBy, img, tourBy, type Match } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import DynamicImage from '../components/DynamicImage'
@@ -9,7 +9,6 @@ import { useMatchTicker, type TickerEvent } from '../hooks/useMatchTicker'
 import { MatchLobbyModal } from '../components/match/MatchLobbyModal'
 import { EvidenceSubmissionModal } from '../components/match/EvidenceSubmissionModal'
 
-const TABS = ['UPCOMING', 'LIVE', 'COMPLETED'] as const
 const GAMES = ['All Games', 'BGMI', 'Valorant', 'Free Fire', 'COD Mobile'] as const
 const GMAP: Record<string, string> = { BGMI: 'bgmi', Valorant: 'valorant', 'Free Fire': 'free-fire', 'COD Mobile': 'codm' }
 
@@ -260,7 +259,6 @@ function MatchRowItem({
 }
 
 export default function Matches() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>('LIVE')
   const [game, setGame] = useState<(typeof GAMES)[number]>('All Games')
   const [matches, setMatches] = useState<(Match & { tourName?: string; liveLink?: string; scheduledAt?: string; rawStatus?: string; lobbyCode?: string; lobbyPassword?: string; serverRegion?: string })[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -305,23 +303,30 @@ export default function Matches() {
   useMatchTicker(handleTickerEvent)
 
   const list = matches.filter(
-    (m) => m.status === tab.toLowerCase() && (game === 'All Games' || m.game === GMAP[game])
+    (m) => m.status === 'live' && (game === 'All Games' || m.game === GMAP[game])
   )
   const liveCount = matches.filter((m) => m.status === 'live').length
 
   return (
     <>
       <PageHero
-        kicker={liveCount > 0 ? `◉ ${liveCount} matches live now` : '◇ Fixtures & Results'}
+        kicker={liveCount > 0 ? `◉ ${liveCount} ${liveCount === 1 ? 'match' : 'matches'} live now` : '◉ Live Matches'}
         title="MATCHES"
-        sub="Track live matches, upcoming fixtures, and completed results across Ametheus."
+        sub="Track live verified matches across Ametheus."
         variant="matches"
         accent="#ff3b4e"
       />
 
       <Container className="py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <Tabs tabs={TABS} value={tab} onChange={setTab} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-6">
+          <div className="flex items-center gap-3">
+            <span className="size-2 rounded-full bg-live animate-pulse shadow-[0_0_8px_#ff3b4e]" />
+            <Hud className="text-ink font-bold">SANCTIONED LIVE ARENA</Hud>
+            <span className="font-mono text-xs text-dim">·</span>
+            <span className="font-mono text-xs text-dim uppercase">
+              {list.length} {list.length === 1 ? 'Match Live' : 'Matches Live'}
+            </span>
+          </div>
           <Chips items={GAMES} value={game} onChange={setGame} />
         </div>
 
@@ -334,12 +339,12 @@ export default function Matches() {
           ) : list.length === 0 ? (
             <EmptyState
               code="0:0"
-              title={`No ${tab.toLowerCase()} matches`}
-              body="No matches currently found for this filter. Switch games or check another tab."
+              title="No live matches"
+              body="No matches currently live for this game filter. Check back when tournament rounds begin."
               cta="Browse Tournaments"
               to="/tournaments"
             />
-          ) : tab === 'LIVE' ? (
+          ) : (
             <div className="space-y-4">
               <LiveFeature
                 key={`live-feature-${list[0].id}`}
@@ -364,20 +369,6 @@ export default function Matches() {
                 </div>
               )}
             </div>
-          ) : (
-            list.map((m, i) => (
-              <div
-                key={`match-${m.id}-${i}`}
-                className="reveal"
-                style={{ animationDelay: `${Math.min(i, 6) * 60}ms` }}
-              >
-                <MatchRowItem
-                  m={m}
-                  onEnterLobby={(match) => setActiveLobbyMatch(match)}
-                  onSubmitEvidence={(match) => setActiveEvidenceMatch(match)}
-                />
-              </div>
-            ))
           )}
         </div>
       </Container>

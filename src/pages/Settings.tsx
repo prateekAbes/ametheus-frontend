@@ -44,7 +44,7 @@ function Row({ k, d, children }: { k: string; d?: string; children: ReactNode })
 }
 
 export default function Settings() {
-  const { profile, refreshProfile, googleAvatarUrl } = useAuthContext()
+  const { profile, refreshProfile, googleAvatarUrl, updateLocalProfile } = useAuthContext()
   const { user } = useUser()
   const clerk = useClerk()
   const { getToken } = useAuth()
@@ -247,7 +247,8 @@ export default function Settings() {
       if (res && res.url) {
         setAvatarUrl(res.url)
         // Automatically persist custom avatar upload to database
-        await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        const updatedUser = await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        updateLocalProfile?.(updatedUser)
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setSaveMessage('Profile picture uploaded and saved successfully.')
@@ -265,7 +266,8 @@ export default function Settings() {
     if (!googleAvatarUrl) return
     setAvatarUrl(googleAvatarUrl)
     try {
-      await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      const updatedUser = await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      updateLocalProfile?.(updatedUser)
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaveMessage('Google profile picture equipped and persisted.')
@@ -279,7 +281,8 @@ export default function Settings() {
   const handleSelectCrest = async (crest: Crest) => {
     setAvatarUrl(crest.image_url)
     try {
-      await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      const updatedUser = await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      updateLocalProfile?.(updatedUser)
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaveMessage(`Player crest "${crest.name}" equipped and persisted.`)
@@ -519,7 +522,7 @@ export default function Settings() {
     setSaveMessage('')
     try {
       const cleanNewUsername = username.trim() || undefined
-      await updateUserProfile({
+      const updatedUser = await updateUserProfile({
         username: cleanNewUsername,
         display_name: displayName.trim() || undefined,
         avatar_url: avatarUrl ? avatarUrl.trim() : undefined,
@@ -535,6 +538,7 @@ export default function Settings() {
           show_stats: showStats,
         },
       })
+      updateLocalProfile?.(updatedUser)
 
       if (user && cleanNewUsername) {
         try {
@@ -648,11 +652,11 @@ export default function Settings() {
               {/* Profile Avatar & Player Crest Selector */}
               <Panel className="p-6">
                 <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                  <div className="relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-cyan/50 bg-surface shadow-md">
+                  <div className="relative size-24 shrink-0 overflow-hidden aspect-square rounded-[2px] border-2 border-cyan/50 bg-surface shadow-md">
                     <DynamicImage
                       src={resolveMediaUrl(avatarUrl)}
                       alt="Avatar Preview"
-                      className="size-full object-cover"
+                      className="size-full aspect-square object-cover object-center"
                     />
                   </div>
                   <div className="flex-1 space-y-4">
@@ -683,11 +687,11 @@ export default function Settings() {
                     {googleAvatarUrl && (
                       <div className="border border-white/10 bg-surface/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="size-12 shrink-0 rounded-full border border-white/20 bg-void overflow-hidden">
+                          <div className="size-12 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
                             <img
                               src={googleAvatarUrl}
                               alt="Google Profile"
-                              className="size-full object-cover"
+                              className="size-full aspect-square object-cover object-center"
                             />
                           </div>
                           <div>
@@ -738,11 +742,13 @@ export default function Settings() {
                                     : 'border-white/10 bg-surface/50 hover:border-white/30 hover:bg-surface'
                                 }`}
                               >
-                                <div className="size-10 shrink-0 rounded-full border border-white/20 bg-void flex items-center justify-center p-1 overflow-hidden">
+                                <div className={`size-12 shrink-0 aspect-square rounded-[2px] border overflow-hidden flex items-center justify-center bg-void transition-colors ${
+                                  isSelected ? 'border-cyan ring-1 ring-cyan/60 shadow-[0_0_12px_rgba(62,242,255,0.3)]' : 'border-white/20'
+                                }`}>
                                   <img
                                     src={resolveMediaUrl(c.image_url)}
                                     alt={c.name}
-                                    className="size-full object-contain"
+                                    className="size-full aspect-square object-cover object-center"
                                   />
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -900,67 +906,92 @@ export default function Settings() {
               <Panel className="p-6">
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
                   <div>
-                    <h3 className="font-display text-2xl font-black uppercase text-ink">Change Password</h3>
-                    <p className="text-xs text-dim">Update your security credentials across all competitive client sessions.</p>
+                    <h3 className="font-display text-2xl font-black uppercase text-ink">Account Security & Credentials</h3>
+                    <p className="text-xs text-dim">Authentication and password credentials management.</p>
                   </div>
                   <Hud className="text-cyan">CREDENTIALS</Hud>
                 </div>
 
-                {passwordStatus && (
-                  <div
-                    className={`mt-4 border p-3 font-mono text-xs ${
-                      passwordStatus.type === 'success'
-                        ? 'border-ok/40 bg-ok/10 text-ok'
-                        : 'border-live/40 bg-live/10 text-live'
-                    }`}
-                  >
-                    {passwordStatus.text}
+                {!user?.passwordEnabled ? (
+                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border border-white/10 bg-surface/40 p-5">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-cyan shadow-[0_0_8px_#3ef2ff]" />
+                        <h4 className="font-display text-lg font-black uppercase text-ink">Managed by Google Authentication</h4>
+                      </div>
+                      <p className="text-xs text-dim max-w-xl leading-relaxed">
+                        Your account is secured with Google Authentication ({profile?.email || user?.primaryEmailAddress?.emailAddress || 'Gmail'}). Password updates, recovery options, and login security are managed directly in your Google Account.
+                      </p>
+                    </div>
+                    <a
+                      href="https://myaccount.google.com/security"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors inline-flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Google Security Settings</span>
+                      <span>↗</span>
+                    </a>
                   </div>
+                ) : (
+                  <>
+                    {passwordStatus && (
+                      <div
+                        className={`mt-4 border p-3 font-mono text-xs ${
+                          passwordStatus.type === 'success'
+                            ? 'border-ok/40 bg-ok/10 text-ok'
+                            : 'border-live/40 bg-live/10 text-live'
+                        }`}
+                      >
+                        {passwordStatus.text}
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-dim">Current Password</label>
+                        <input
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-dim">New Password</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min 8 characters"
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-dim">Confirm New Password</label>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                      <span className="text-[11px] text-dim font-mono">Requires current password authentication</span>
+                      <button
+                        onClick={handleUpdatePassword}
+                        disabled={isChangingPassword || !newPassword}
+                        className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 disabled:opacity-50 transition-colors cursor-pointer"
+                      >
+                        {isChangingPassword ? 'Updating...' : 'Update Password'}
+                      </button>
+                    </div>
+                  </>
                 )}
-
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block font-mono text-[10px] uppercase text-dim">Current Password</label>
-                    <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] uppercase text-dim">New Password</label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Min 8 characters"
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] uppercase text-dim">Confirm New Password</label>
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Repeat new password"
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-cyan"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-                  <span className="text-[11px] text-dim font-mono">Requires current password authentication</span>
-                  <button
-                    onClick={handleUpdatePassword}
-                    disabled={isChangingPassword || !newPassword}
-                    className="border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    {isChangingPassword ? 'Updating...' : 'Update Password'}
-                  </button>
-                </div>
               </Panel>
 
               {/* 2. Active Sessions & Devices */}
@@ -1043,58 +1074,35 @@ export default function Settings() {
                 </div>
               </Panel>
 
-              {/* 3. Verification & 2FA */}
-              <div className="grid gap-6 md:grid-cols-2">
-                <Panel className="p-6">
-                  <Hud className="text-cyan">EMAIL SECURITY</Hud>
-                  <h4 className="mt-2 font-display text-xl font-black uppercase">Email Verification</h4>
-                  <p className="mt-1 text-xs text-dim">
-                    Primary: <span className="font-mono text-ink">{profile?.email || 'user@ametheus.gg'}</span>
-                  </p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span
-                      className={`border px-2.5 py-1 font-mono text-[10px] uppercase ${
-                        isEmailVerified ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'
-                      }`}
-                    >
-                      {isEmailVerified ? '✓ Verified' : 'Unverified'}
-                    </span>
-                    {!isEmailVerified && user?.primaryEmailAddress && (
-                      <button
-                        onClick={handleSendEmailVerification}
-                        disabled={isSendingVerify}
-                        className="text-xs text-cyan underline font-mono hover:text-white disabled:opacity-50 cursor-pointer"
-                      >
-                        {isSendingVerify ? 'Sending...' : 'Resend Verification Email'}
-                      </button>
-                    )}
-                  </div>
-                  {emailVerifyMsg && (
-                    <p className="mt-2 font-mono text-[11px] text-cyan">{emailVerifyMsg}</p>
-                  )}
-                </Panel>
-
-                <Panel className="p-6">
-                  <Hud className="text-cyan">TWO-FACTOR AUTHENTICATION</Hud>
-                  <h4 className="mt-2 font-display text-xl font-black uppercase">Two-Step Verification (2FA)</h4>
-                  <p className="mt-1 text-xs text-dim">Additional security layer requiring SMS or authenticator passkey.</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span
-                      className={`border px-2.5 py-1 font-mono text-[10px] uppercase ${
-                        user?.twoFactorEnabled ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'
-                      }`}
-                    >
-                      {user?.twoFactorEnabled ? '✓ 2FA Active' : 'Disabled (Recommended)'}
-                    </span>
+              {/* 3. Email Verification */}
+              <Panel className="p-6">
+                <Hud className="text-cyan">EMAIL SECURITY</Hud>
+                <h4 className="mt-2 font-display text-xl font-black uppercase">Email Verification</h4>
+                <p className="mt-1 text-xs text-dim">
+                  Primary: <span className="font-mono text-ink">{profile?.email || 'user@ametheus.gg'}</span>
+                </p>
+                <div className="mt-4 flex items-center justify-between">
+                  <span
+                    className={`border px-2.5 py-1 font-mono text-[10px] uppercase ${
+                      isEmailVerified ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'
+                    }`}
+                  >
+                    {isEmailVerified ? '✓ Verified' : 'Unverified'}
+                  </span>
+                  {!isEmailVerified && user?.primaryEmailAddress && (
                     <button
-                      onClick={() => clerk.openUserProfile()}
-                      className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
+                      onClick={handleSendEmailVerification}
+                      disabled={isSendingVerify}
+                      className="text-xs text-cyan underline font-mono hover:text-white disabled:opacity-50 cursor-pointer"
                     >
-                      {user?.twoFactorEnabled ? 'Manage 2FA' : 'Enable 2FA'}
+                      {isSendingVerify ? 'Sending...' : 'Resend Verification Email'}
                     </button>
-                  </div>
-                </Panel>
-              </div>
+                  )}
+                </div>
+                {emailVerifyMsg && (
+                  <p className="mt-2 font-mono text-[11px] text-cyan">{emailVerifyMsg}</p>
+                )}
+              </Panel>
 
               {/* 4. Login Alerts */}
               <Row k="Login alerts" d="Email me when a new IP signs into my account.">

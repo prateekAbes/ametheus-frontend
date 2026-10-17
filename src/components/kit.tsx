@@ -135,10 +135,7 @@ export function GameCard({ g, i, feature }: { g: CatalogGame; i?: number; featur
         </div>
 
         {/* Card Footer: Action Navigation Prompt */}
-        <div className="flex items-center justify-between border-t border-white/5 pt-4">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-dim">
-            {soon ? 'Pending Launch' : 'Sanctioned Arena'}
-          </span>
+        <div className="flex items-center justify-end border-t border-white/5 pt-4">
           <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase font-bold tracking-wider text-dim transition-colors group-hover:text-cyan">
             <span>{soon ? 'Locked' : 'View Arena'}</span>
             <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>

@@ -1762,12 +1762,6 @@ export default function Admin() {
                           {t.status === 'REGISTRATION_CLOSED' && (
                             <>
                               <button
-                                onClick={() => handleStartLiveTour(t.id || t.slug)}
-                                className="border border-ok bg-ok/15 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30 font-bold"
-                              >
-                                ▶ Start Live
-                              </button>
-                              <button
                                 onClick={() => handleReopenRegTour(t.id || t.slug)}
                                 className="border border-white/20 bg-surface px-2 py-1 font-mono text-[10px] uppercase text-dim hover:text-ink hover:border-cyan"
                               >

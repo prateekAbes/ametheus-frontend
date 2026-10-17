@@ -168,7 +168,6 @@ export default function Games() {
   return (
     <>
       <PageHero
-        kicker={`${String(activeGamesCatalog.length).padStart(2, '0')} live worlds`}
         title={<>Explore<br />Games</>}
         variant="games"
         accent="#8b5cff"

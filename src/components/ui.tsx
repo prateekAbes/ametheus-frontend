@@ -106,7 +106,7 @@ export function PageHero({
   children,
   tall,
 }: {
-  kicker: string
+  kicker?: string
   title: ReactNode
   sub?: ReactNode
   photo?: string
@@ -130,10 +130,12 @@ export function PageHero({
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
       <div className="relative mx-auto w-full max-w-[1600px] px-5 pb-14 pt-36 md:px-10 md:pb-20">
-        <div className="mb-6 flex items-center gap-4">
-          <span className="h-px w-12" style={{ background: accent }} />
-          <Hud className="text-ink">{kicker}</Hud>
-        </div>
+        {kicker && (
+          <div className="mb-6 flex items-center gap-4">
+            <span className="h-px w-12" style={{ background: accent }} />
+            <Hud className="text-ink">{kicker}</Hud>
+          </div>
+        )}
         <h1 className={`${typeof title === 'string' ? 'reveal-chars' : 'reveal'} font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] text-balance break-words`}>
           {title}
         </h1>

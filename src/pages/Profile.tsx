@@ -17,7 +17,7 @@ import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../se
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
 export default function Profile() {
-  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, googleAvatarUrl, isSignedIn, refreshProfile } = useAuthContext()
+  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, googleAvatarUrl, isSignedIn, refreshProfile, updateLocalProfile } = useAuthContext()
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
   const [matches, setMatches] = useState<any[]>([])
@@ -81,7 +81,12 @@ export default function Profile() {
   const handleSelectCrest = async (crest: CrestType) => {
     setCrestModalMsg(null)
     try {
-      await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      const updated = await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      if (updated) {
+        updateLocalProfile(updated)
+      } else {
+        updateLocalProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      }
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setCrestModalMsg({ type: 'ok', text: `Crest '${crest.name}' successfully equipped and saved!` })
@@ -95,7 +100,12 @@ export default function Profile() {
     if (!googleAvatarUrl) return
     setCrestModalMsg(null)
     try {
-      await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      const updated = await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      if (updated) {
+        updateLocalProfile(updated)
+      } else {
+        updateLocalProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      }
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setCrestModalMsg({ type: 'ok', text: 'Google Profile Photo successfully equipped and saved!' })
@@ -113,7 +123,12 @@ export default function Profile() {
     try {
       const res = await uploadMediaFile(file)
       if (res && res.url) {
-        await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        const updated = await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        if (updated) {
+          updateLocalProfile(updated)
+        } else {
+          updateLocalProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        }
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setCrestModalMsg({ type: 'ok', text: 'Custom avatar uploaded and saved to your account!' })
@@ -832,11 +847,11 @@ export default function Profile() {
 
           {/* Current Avatar Preview & Upload Action */}
           <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center gap-5">
-            <div className="relative size-20 shrink-0 overflow-hidden rounded-full border-2 border-cyan/50 bg-surface">
+            <div className="relative size-20 shrink-0 aspect-square overflow-hidden rounded-[2px] border-2 border-cyan/50 bg-surface">
               <DynamicImage
                 src={avatarDisplay}
                 alt="Current Avatar"
-                className="size-full object-cover"
+                className="size-full aspect-square object-cover object-center"
               />
             </div>
             <div className="flex-1 text-center sm:text-left space-y-2">
@@ -861,11 +876,11 @@ export default function Profile() {
           {googleAvatarUrl && (
             <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
-                <div className="size-14 shrink-0 rounded-full border border-white/20 bg-void overflow-hidden">
+                <div className="size-14 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
                   <img
                     src={googleAvatarUrl}
                     alt="Google Profile"
-                    className="size-full object-cover"
+                    className="size-full aspect-square object-cover object-center"
                   />
                 </div>
                 <div className="space-y-1">
@@ -924,11 +939,13 @@ export default function Profile() {
                           : 'border-white/10 bg-surface/50 hover:border-white/30 hover:bg-surface'
                       }`}
                     >
-                      <div className="size-12 shrink-0 rounded-full border border-white/20 bg-void flex items-center justify-center p-1.5 overflow-hidden">
+                      <div className={`size-12 shrink-0 aspect-square rounded-[2px] border overflow-hidden flex items-center justify-center bg-void transition-colors ${
+                        isSelected ? 'border-cyan ring-1 ring-cyan/60 shadow-[0_0_12px_rgba(62,242,255,0.3)]' : 'border-white/20'
+                      }`}>
                         <img
                           src={resolveMediaUrl(c.image_url)}
                           alt={c.name}
-                          className="size-full object-contain"
+                          className="size-full aspect-square object-cover object-center"
                         />
                       </div>
                       <div className="min-w-0 flex-1">
