@@ -234,24 +234,52 @@ export default function Leaderboard() {
   const activeMetricConfig = METRICS.find((m) => m.id === metric) || METRICS[0]
 
   return (
-    <div className="relative min-h-[calc(100vh-72px)] w-full mt-16 md:mt-[72px] overflow-hidden bg-void text-ink">
+    <div
+      className="relative min-h-screen w-full overflow-hidden text-ink pt-16 md:pt-[72px]"
+      style={{ backgroundColor: '#05060A' }}
+    >
       {/* ============================================================== */}
-      {/* ATMOSPHERIC RADIAL GLOW LAYERS FROM LEADERBOARD UI DESIGN      */}
+      {/* 1. AMBIENT BACKGROUND CONTAINER (FIRST CHILD OF WRAPPER)       */}
       {/* ============================================================== */}
-      <div
-        className="pointer-events-none absolute inset-0 select-none"
-        aria-hidden="true"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 40% at 80% 5%, rgba(24,66,140,0.3) 0%, rgba(14,40,92,0.12) 35%, rgba(5,6,10,0) 100%), radial-gradient(ellipse 45% 35% at 5% 60%, rgba(18,50,110,0.14) 0%, rgba(5,6,10,0) 100%), radial-gradient(ellipse 60% 30% at 60% 100%, rgba(20,56,120,0.16) 0%, rgba(5,6,10,0) 100%)',
-        }}
-      />
+      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+        {/* Layer One — Soft Ambient Color Glows (5 radial-gradients) */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: [
+              'radial-gradient(ellipse 55% 650px at 85% 6%, rgba(30, 80, 170, 0.34) 0%, transparent 70%)',
+              'radial-gradient(ellipse 50% 650px at 8% 30%, rgba(60, 50, 170, 0.22) 0%, transparent 70%)',
+              'radial-gradient(ellipse 55% 650px at 92% 58%, rgba(24, 70, 150, 0.24) 0%, transparent 70%)',
+              'radial-gradient(ellipse 50% 600px at 10% 92%, rgba(30, 80, 170, 0.22) 0%, transparent 70%)',
+              'radial-gradient(ellipse 60% 550px at 50% 98%, rgba(62, 242, 255, 0.09) 0%, transparent 70%)',
+            ].join(', '),
+          }}
+        />
+
+        {/* Layer Two — Fine CSS Starfield (5-dot radial-gradient tiled pattern with vertical fade mask) */}
+        <div
+          className="absolute inset-0 opacity-70 pointer-events-none"
+          style={{
+            backgroundImage: [
+              'radial-gradient(circle 1.2px at 65px 42px, rgba(220, 235, 255, 0.85) 0%, transparent 100%)',
+              'radial-gradient(circle 1.5px at 215px 110px, rgba(210, 225, 255, 0.70) 0%, transparent 100%)',
+              'radial-gradient(circle 1.0px at 370px 75px, rgba(230, 240, 255, 0.60) 0%, transparent 100%)',
+              'radial-gradient(circle 1.6px at 140px 220px, rgba(205, 230, 255, 0.90) 0%, transparent 100%)',
+              'radial-gradient(circle 1.1px at 320px 250px, rgba(215, 235, 255, 0.50) 0%, transparent 100%)',
+            ].join(', '),
+            backgroundSize: '430px 290px',
+            backgroundRepeat: 'repeat',
+            maskImage: 'linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent)',
+          }}
+        />
+      </div>
 
       {/* Existing WebGL 3D starry particle background sits behind this layer, unchanged */}
       <LeaderboardParticleBackground />
 
       {/* ============================================================== */}
-      {/* MAIN LEADERBOARD CONTAINER                                     */}
+      {/* 2. LEADERBOARD CONTENT IN SEPARATE RELATIVE Z-10 WRAPPER       */}
       {/* ============================================================== */}
       <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pb-24">
         {/* Page Header: Adjusted to match Ametheus website conventions */}
