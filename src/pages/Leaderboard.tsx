@@ -197,7 +197,9 @@ export default function Leaderboard() {
       return {
         id: entry.id,
         name: displayName,
-        rawName,
+        rawName: displayName,
+        displayName,
+        username: entry.username,
         initials,
         tone,
         wins,
