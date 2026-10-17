@@ -43,6 +43,14 @@ export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
   const unit = metricConfig.unit
   const height = ['', 'h-72 md:h-80', 'h-64 md:h-72', 'h-60 md:h-64'][p.rank] || 'h-60 md:h-64'
 
+  // Proportional avatar sizing matching podium hierarchy (Rank 1 > Rank 2 > Rank 3)
+  const avatarClass =
+    p.rank === 1
+      ? 'w-24 text-3xl ring-1 ring-cyan/40 md:w-28 md:text-4xl'
+      : p.rank === 2
+      ? 'w-[74px] text-xl md:w-[86px] md:text-2xl'
+      : 'w-[70px] text-xl md:w-20 md:text-2xl'
+
   return (
     <div className={`flex flex-col items-center ${order} w-full`}>
       <div className={`flex w-full flex-col items-center text-center ${first ? 'pb-8' : 'pb-6'}`}>
@@ -50,26 +58,18 @@ export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
           <Link to="/profile" title="View your profile" className="group">
             <Avatar
               p={p}
-              className={`${
-                first
-                  ? 'w-28 text-4xl ring-1 ring-cyan/40 md:w-36 md:text-5xl'
-                  : 'w-20 text-2xl md:w-24 md:text-3xl'
-              } transition-transform group-hover:scale-105`}
+              className={`${avatarClass} transition-transform group-hover:scale-105`}
             />
           </Link>
         ) : (
-          <Avatar
-            p={p}
-            className={
-              first
-                ? 'w-28 text-4xl ring-1 ring-cyan/40 md:w-36 md:text-5xl'
-                : 'w-20 text-2xl md:w-24 md:text-3xl'
-            }
-          />
+          <Avatar p={p} className={avatarClass} />
         )}
         <h2
-          className={`mt-5 font-display font-black uppercase leading-[0.9] tracking-tight text-white ${
-            first ? 'text-6xl md:text-7xl' : 'text-4xl md:text-5xl'
+          title={p.name}
+          className={`mt-4 w-full px-2 font-display font-black uppercase leading-[0.95] tracking-tight text-white truncate ${
+            first
+              ? 'text-3xl sm:text-4xl md:text-[2.75rem]'
+              : 'text-xl sm:text-2xl md:text-3xl'
           }`}
         >
           {p.isCurrentUser ? (

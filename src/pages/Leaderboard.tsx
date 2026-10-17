@@ -278,7 +278,7 @@ export default function Leaderboard() {
       {/* ============================================================== */}
       <main className="relative z-10 w-full pb-24">
         {/* Page Header: Exact match to Matches & Tournaments layout, top spacing, and left container alignment */}
-        <section className="relative mx-auto w-full max-w-[1600px] px-5 pt-36 md:px-10 pb-12 md:pb-16">
+        <section className="relative mx-auto w-full max-w-[1600px] px-5 pt-36 md:px-10 pb-14 md:pb-20">
           <h1 className="reveal-chars font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white text-balance break-words">
             LEADERBOARD
           </h1>
@@ -287,7 +287,7 @@ export default function Leaderboard() {
           </p>
         </section>
 
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 md:pt-14">
           {loading ? (
             <LeaderboardSkeleton />
           ) : error ? (

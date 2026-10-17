@@ -8,8 +8,8 @@ export function LeaderboardSkeleton() {
         {/* 2nd Place Column Skeleton (md:order-1) */}
         <div className="flex flex-col items-center order-2 md:order-1 w-full">
           <div className="flex w-full flex-col items-center text-center pb-6">
-            <div className="w-20 md:w-24 aspect-square rounded-sm bg-white/10" />
-            <div className="mt-5 h-8 w-28 bg-white/10 rounded-sm" />
+            <div className="w-[74px] md:w-[86px] aspect-square rounded-sm bg-white/10" />
+            <div className="mt-4 h-7 w-24 bg-white/10 rounded-sm" />
           </div>
           <div className="relative flex w-full flex-col items-center px-3 pt-3 text-center h-64 md:h-72 border border-b-0 border-white/10 bg-surface/50 rounded-t-sm">
             <div className="h-14 w-12 bg-white/5 rounded-sm" />
@@ -21,8 +21,8 @@ export function LeaderboardSkeleton() {
         {/* 1st Place Column Skeleton (md:order-2) */}
         <div className="flex flex-col items-center order-1 md:order-2 w-full">
           <div className="flex w-full flex-col items-center text-center pb-8">
-            <div className="w-28 md:w-36 aspect-square rounded-sm bg-white/15 ring-1 ring-cyan/40" />
-            <div className="mt-5 h-12 w-40 bg-white/15 rounded-sm" />
+            <div className="w-24 md:w-28 aspect-square rounded-sm bg-white/15 ring-1 ring-cyan/40" />
+            <div className="mt-4 h-9 w-32 bg-white/15 rounded-sm" />
           </div>
           <div className="relative flex w-full flex-col items-center px-3 pt-3 text-center h-72 md:h-80 border border-b-0 border-white/10 bg-surface/60 rounded-t-sm">
             <div className="h-16 w-14 bg-white/5 rounded-sm" />
@@ -38,8 +38,8 @@ export function LeaderboardSkeleton() {
         {/* 3rd Place Column Skeleton (md:order-3) */}
         <div className="flex flex-col items-center order-3 md:order-3 w-full">
           <div className="flex w-full flex-col items-center text-center pb-6">
-            <div className="w-20 md:w-24 aspect-square rounded-sm bg-white/10" />
-            <div className="mt-5 h-8 w-24 bg-white/10 rounded-sm" />
+            <div className="w-[70px] md:w-20 aspect-square rounded-sm bg-white/10" />
+            <div className="mt-4 h-7 w-20 bg-white/10 rounded-sm" />
           </div>
           <div className="relative flex w-full flex-col items-center px-3 pt-3 text-center h-60 md:h-64 border border-b-0 border-white/10 bg-surface/40 rounded-t-sm">
             <div className="h-12 w-10 bg-white/5 rounded-sm" />
