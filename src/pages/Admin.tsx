@@ -98,6 +98,7 @@ import {
   type Crest,
 } from '../services/crests'
 import {
+  getMyOrganizedTournaments,
   createTournamentOrganizer,
   updateTournamentOrganizer,
   deleteTournamentOrganizer,
@@ -332,6 +333,7 @@ export default function Admin() {
     title: string
     game_id: string
     format: string
+    status: 'REGISTRATION_OPEN' | 'UPCOMING' | 'DRAFT'
     prize_pool_inr: number
     entry_fee_inr: number
     max_teams: number
@@ -352,6 +354,7 @@ export default function Admin() {
     title: '',
     game_id: 'valorant',
     format: 'Single Elimination · BO3',
+    status: 'REGISTRATION_OPEN',
     prize_pool_inr: 25000,
     entry_fee_inr: 100,
     max_teams: 16,
@@ -718,7 +721,7 @@ export default function Admin() {
         getGames().catch(() => []),
         getAuditLogs({ limit: auditLimit, skip: 0 }).catch(() => []),
         getAuditLogsCount().catch(() => ({ total: 0 })),
-        getTournaments().catch(() => []),
+        getMyOrganizedTournaments().catch(() => getTournaments({ include_drafts: true, status: 'ALL' }).catch(() => [])),
         getFeaturedTournament().catch(() => null),
         getAdminUpiAccounts().catch(() => []),
         getAdminPayouts().catch(() => []),
@@ -1482,10 +1485,11 @@ export default function Admin() {
 
     setIsSubmittingTour(true)
     try {
-      await createTournamentOrganizer({
+      const created = await createTournamentOrganizer({
         title,
         game_id: newTour.game_id,
         format,
+        status: newTour.status || 'REGISTRATION_OPEN',
         prize_pool_inr: prizePool,
         entry_fee_inr: entryFee,
         max_teams: maxTeams,
@@ -1501,6 +1505,12 @@ export default function Admin() {
         community_link: newTour.community_link?.trim() || undefined,
         description: newTour.description?.trim() || 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
       })
+      if (created && (created.id || (created as any).slug)) {
+        setTournaments((prev) => {
+          const exists = prev.some((t) => (t.id && t.id === created.id) || (t.slug && t.slug === created.slug))
+          return exists ? prev : [created, ...prev]
+        })
+      }
       showToast('Tournament created successfully!')
       setIsCreateTourOpen(false)
       sessionStorage.removeItem('ametheus_admin_draft_new_tour')
@@ -1959,7 +1969,7 @@ export default function Admin() {
             {/* Filters & Search */}
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex flex-wrap gap-1.5">
-                {['ALL', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LIVE', 'UPCOMING', 'COMPLETED', 'CANCELLED'].map((f) => (
+                {['ALL', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED', 'LIVE', 'UPCOMING', 'COMPLETED', 'CANCELLED', 'DRAFT'].map((f) => (
                   <button
                     key={f}
                     onClick={() => setTournamentFilter(f)}
@@ -5815,6 +5825,27 @@ export default function Admin() {
                           className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="text-dim">Initial Publication Status <span className="text-cyan">*</span></label>
+                        <span className="text-[10px] text-cyan uppercase font-bold tracking-wider">Visibility & Enrollment</span>
+                      </div>
+                      <select
+                        value={newTour.status}
+                        onChange={(e) => setNewTour({ ...newTour, status: e.target.value as any })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      >
+                        <option value="REGISTRATION_OPEN">Registration Open (Publicly Visible & Open for Squad Entries)</option>
+                        <option value="UPCOMING">Upcoming (Publicly Visible Announcement - Registrations Pending)</option>
+                        <option value="DRAFT">Draft (Admin Only - Staged & Hidden from Public)</option>
+                      </select>
+                      <p className="mt-1 text-[10px] text-dim font-mono">
+                        {newTour.status === 'REGISTRATION_OPEN' && 'Tournament will be immediately visible on public listings and open for player and team registrations.'}
+                        {newTour.status === 'UPCOMING' && 'Tournament will be visible as an upcoming event on public listings.'}
+                        {newTour.status === 'DRAFT' && 'Tournament will be saved as a draft. Only admins can view and publish it.'}
+                      </p>
                     </div>
                   </div>
 

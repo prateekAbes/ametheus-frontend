@@ -272,11 +272,13 @@ export async function getTournaments(params?: {
   game?: string
   status?: string
   search?: string
+  include_drafts?: boolean
 }): Promise<Tournament[]> {
   const searchParams = new URLSearchParams()
   if (params?.game) searchParams.set('game', params.game)
   if (params?.status) searchParams.set('status', params.status)
   if (params?.search) searchParams.set('search', params.search.trim())
+  if (params?.include_drafts) searchParams.set('include_drafts', 'true')
   const q = searchParams.toString() ? `?${searchParams.toString()}` : ''
   return apiClient<Tournament[]>(`/tournaments${q}`)
 }
