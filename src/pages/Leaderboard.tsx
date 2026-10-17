@@ -4,10 +4,12 @@ import { useAuthContext } from '../context/AuthContext'
 import {
   getLeaderboardEntries,
   getLeaderboardDisqualifications,
+  getLeaderboardStats,
   isEntryCurrentUser,
   isEntryDisqualified,
   LeaderboardEntry,
   LeaderboardPlayer,
+  LeaderboardPlatformStats,
   METRICS,
   MetricId,
   showPlayerMetricValue,
@@ -17,6 +19,8 @@ import { PodiumSlot, Mono } from '../components/leaderboard/PodiumSlot'
 import { LeaderboardSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
 import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmptyState'
 import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErrorState'
+import { PlatformStatsStrip } from '../components/leaderboard/PlatformStatsStrip'
+import { RankingMetricsPanel } from '../components/leaderboard/RankingMetricsPanel'
 import { resolveMediaUrl } from '../services/apiClient'
 
 export default function Leaderboard() {
@@ -34,12 +38,28 @@ export default function Leaderboard() {
 
   // 3. Data fetching states
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
+  const [platformStats, setPlatformStats] = useState<LeaderboardPlatformStats | null>(null)
   const [disqualifiedIds, setDisqualifiedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<boolean>(false)
 
   // 4. Pagination state: player rankings displayed in groups of 10
   const [page, setPage] = useState<number>(1)
+
+  // Fetch platform stats once on mount
+  useEffect(() => {
+    let isMounted = true
+    getLeaderboardStats()
+      .then((stats) => {
+        if (isMounted) setPlatformStats(stats)
+      })
+      .catch((err) => {
+        console.error('[Leaderboard] Error fetching platform stats:', err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Fetch disqualifications once on mount
   useEffect(() => {
@@ -157,6 +177,9 @@ export default function Leaderboard() {
         winRate,
         points: entry.rating || 1500,
         spent: entry.spending || 0,
+        earnings: entry.earnings || 0,
+        streak: entry.streak || 0,
+        top3: entry.top3 || 0,
         avatarUrl,
         rank: entry.rank || index + 1,
         isCurrentUser,
@@ -168,6 +191,76 @@ export default function Leaderboard() {
 
   // Top 3 for the podium
   const top = useMemo(() => players.slice(0, 3), [players])
+
+  // Active metric config object
+  const activeMetricConfig = METRICS.find((m) => m.id === metric) || METRICS[0]
+
+  // Dynamic user position calculation for the YOUR POSITION card
+  const userPosition = useMemo(() => {
+    if (!profile) {
+      return {
+        rankText: '--',
+        subText: 'Sign in to view your platform ranking',
+      }
+    }
+
+    const userPlayer = players.find((p) => p.isCurrentUser)
+    if (!userPlayer) {
+      return {
+        rankText: '--',
+        subText: 'Unranked in this category',
+      }
+    }
+
+    const rank = userPlayer.rank
+    const total = Math.max(players.length, 1)
+    const percentile = Math.max(1, Math.round((rank / total) * 100))
+    const statValueStr = showPlayerMetricValue(userPlayer, metric)
+    const metricLabel = activeMetricConfig.unit
+
+    return {
+      rankText: `#${String(rank).padStart(2, '0')}`,
+      subText: `${statValueStr} ${metricLabel} · Top ${percentile}%`,
+    }
+  }, [profile, players, metric, activeMetricConfig.unit])
+
+  // Platform statistics strip blocks
+  const statBlocks = useMemo(() => {
+    return [
+      {
+        label: 'Ranked Players',
+        value: platformStats
+          ? platformStats.ranked_players.toLocaleString()
+          : loading
+          ? '—'
+          : players.length.toLocaleString(),
+      },
+      {
+        label: 'Matches Played',
+        value: platformStats
+          ? platformStats.matches_played.toLocaleString()
+          : loading
+          ? '—'
+          : '0',
+      },
+      {
+        label: 'Prize Paid Out',
+        value: platformStats
+          ? platformStats.prize_paid_out
+          : loading
+          ? '—'
+          : '$0',
+      },
+      {
+        label: 'Active Streaks',
+        value: platformStats
+          ? platformStats.active_streaks.toLocaleString()
+          : loading
+          ? '—'
+          : '0',
+      },
+    ]
+  }, [platformStats, players.length, loading])
 
   // Pagination & Search logic:
   // - First group displays ranks 1–10 (top 3 on podium + ranks 4–10 in the list)
@@ -229,8 +322,6 @@ export default function Leaderboard() {
     }
   }
 
-  const activeMetricConfig = METRICS.find((m) => m.id === metric) || METRICS[0]
-
   return (
     <div
       className="relative min-h-screen w-full overflow-hidden text-ink"
@@ -278,16 +369,20 @@ export default function Leaderboard() {
       {/* ============================================================== */}
       <main className="relative z-10 w-full pb-24">
         {/* Page Header: Exact match to Matches & Tournaments layout, top spacing, and left container alignment */}
-        <section className="relative mx-auto w-full max-w-[1600px] px-5 pt-36 md:px-10 pb-14 md:pb-20">
+        <section className="relative mx-auto w-full max-w-[1600px] px-5 pt-36 md:px-10 pb-8 md:pb-12">
           <h1 className="reveal-chars font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white text-balance break-words">
             LEADERBOARD
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-ink/75">
-            Top competitive rankings and player performance across tournament circuits.
+          <p className="mt-6 max-w-xl text-lg text-dim">
+            Player standings and competitive rankings across Ametheus.
           </p>
         </section>
 
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 md:pt-14">
+        {/* Horizontal Platform Statistics Strip */}
+        <PlatformStatsStrip stats={statBlocks} />
+
+        {/* Main Content Area: 2-Column Desktop Grid */}
+        <div className="mx-auto w-full max-w-[1600px] px-5 md:px-10 pt-10 md:pt-14">
           {loading ? (
             <LeaderboardSkeleton />
           ) : error ? (
@@ -298,23 +393,27 @@ export default function Leaderboard() {
               onResetFilters={handleResetFilters}
             />
           ) : (
-            <>
-              {/* Top-3 Podium (1st in center, 2nd left, 3rd right) */}
-              <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
-                <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
-                <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
-                <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
-              </section>
+            <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[260px_1fr] gap-8 xl:gap-14 items-start">
+              {/* Left Column (Desktop): Ranking Metrics Panel + Your Position Card */}
+              <RankingMetricsPanel
+                currentMetric={metric}
+                onSelectMetric={setMetric}
+                userPosition={userPosition}
+                className="hidden lg:flex sticky top-28"
+              />
 
-              {/* Divider */}
-              <div className="mx-auto my-16 max-w-6xl border-b border-white/10" />
-
-              {/* Bottom Section: Metric Selector Aside + Challengers Ladder */}
-              <section className="grid gap-8 lg:grid-cols-[180px_1fr] lg:gap-14">
-                {/* Left Sidebar Metric Selector */}
-                <aside>
-                  <Mono className="mb-3 block">Rank by</Mono>
-                  <div className="flex gap-6 overflow-x-auto lg:flex-col lg:gap-1">
+              {/* Mobile Metric Switcher & User Position Banner (lg:hidden) */}
+              <div className="lg:hidden space-y-4 mb-2">
+                <div className="rounded-sm border border-white/10 bg-[#0c121d]/90 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono text-xs uppercase tracking-[0.18em] text-dim font-bold">
+                      Rank by
+                    </span>
+                    <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider">
+                      {activeMetricConfig.label}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
                     {METRICS.map((x) => {
                       const on = x.id === metric
                       return (
@@ -322,21 +421,48 @@ export default function Leaderboard() {
                           key={x.id}
                           type="button"
                           onClick={() => setMetric(x.id)}
-                          aria-pressed={on}
-                          className={`flex items-center gap-3 whitespace-nowrap py-1.5 text-left text-sm transition-colors cursor-pointer ${
-                            on ? 'text-white' : 'text-dim hover:text-white'
+                          className={`px-3 py-1.5 rounded-xs font-mono text-xs whitespace-nowrap transition-colors cursor-pointer ${
+                            on
+                              ? 'border border-cyan bg-cyan/15 text-white font-bold'
+                              : 'border border-white/10 bg-surface/50 text-dim hover:text-white'
                           }`}
                         >
-                          <span className={`h-px transition-all ${on ? 'w-5 bg-cyan' : 'w-2 bg-white/25'}`} />
                           {x.label}
                         </button>
                       )
                     })}
                   </div>
-                </aside>
+                </div>
+
+                <div className="flex items-center justify-between rounded-sm border border-white/10 bg-[#0d121c]/90 px-4 py-3">
+                  <div>
+                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-dim font-bold">
+                      Your Position
+                    </div>
+                    <div className="mt-0.5 font-mono text-xs text-dim">
+                      {userPosition.subText}
+                    </div>
+                  </div>
+                  <div className="font-display text-3xl font-black text-cyan tabular-nums">
+                    {userPosition.rankText}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Podium + Divider + Challengers Ladder */}
+              <div className="min-w-0 space-y-12 md:space-y-16">
+                {/* Top-3 Podium (1st in center, 2nd left, 3rd right) */}
+                <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
+                  <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
+                  <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
+                  <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
+                </section>
+
+                {/* Divider */}
+                <div className="w-full border-b border-white/10" />
 
                 {/* Challengers Ladder & Search */}
-                <div id="challengers-ladder" className="scroll-mt-20">
+                <section id="challengers-ladder" className="scroll-mt-20">
                   <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-baseline gap-4">
                       <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
@@ -402,137 +528,137 @@ export default function Leaderboard() {
                             </span>
                           )}
                         </div>
-                      {metric === 'overall' && (
-                        <>
-                          <div className="hidden text-right md:block">
-                            <div className="font-mono text-sm font-bold tabular-nums">{p.wins}</div>
-                            <Mono>Wins</Mono>
+                        {metric === 'overall' && (
+                          <>
+                            <div className="hidden text-right md:block">
+                              <div className="font-mono text-sm font-bold tabular-nums">{p.wins}</div>
+                              <Mono>Wins</Mono>
+                            </div>
+                            <div className="hidden text-right md:block">
+                              <div className="font-mono text-sm font-bold tabular-nums">{p.winRate}%</div>
+                              <Mono>Win Rate</Mono>
+                            </div>
+                          </>
+                        )}
+                        <div className="text-right">
+                          <div className="font-display text-3xl font-extrabold leading-none tabular-nums text-white">
+                            {showPlayerMetricValue(p, metric)}
                           </div>
-                          <div className="hidden text-right md:block">
-                            <div className="font-mono text-sm font-bold tabular-nums">{p.winRate}%</div>
-                            <Mono>Win Rate</Mono>
-                          </div>
-                        </>
-                      )}
-                      <div className="text-right">
-                        <div className="font-display text-3xl font-extrabold leading-none tabular-nums text-white">
-                          {showPlayerMetricValue(p, metric)}
+                          <Mono>{activeMetricConfig.unit}</Mono>
                         </div>
-                        <Mono>{activeMetricConfig.unit}</Mono>
+                      </li>
+                    ))}
+                    {paginatedList.length === 0 && (
+                      <li className="py-12 text-center text-sm text-dim">
+                        {q ? `No players found matching "${q}".` : 'No challengers ranked yet.'}
+                      </li>
+                    )}
+                  </ul>
+
+                  {/* Compact Pagination Controls: Groups of 10 */}
+                  {totalPages > 1 && (
+                    <nav
+                      aria-label="Leaderboard pagination"
+                      className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-white/[0.07] pt-4 font-mono text-xs"
+                    >
+                      <div className="text-dim text-[11px]">
+                        {isSearching ? (
+                          <>
+                            Showing{' '}
+                            <span className="text-white font-bold">
+                              {searchResults.length === 0 ? 0 : (page - 1) * 10 + 1}–
+                              {Math.min(page * 10, searchResults.length)}
+                            </span>{' '}
+                            of {searchResults.length} matching contenders
+                          </>
+                        ) : page === 1 ? (
+                          <>
+                            Showing ranks{' '}
+                            <span className="text-white font-bold">
+                              01–{String(Math.min(10, players.length)).padStart(2, '0')}
+                            </span>{' '}
+                            of {players.length} contenders (Group 1)
+                          </>
+                        ) : (
+                          <>
+                            Showing ranks{' '}
+                            <span className="text-white font-bold">
+                              {String(10 + (page - 2) * 10 + 1).padStart(2, '0')}–
+                              {String(Math.min(10 + (page - 1) * 10, players.length)).padStart(2, '0')}
+                            </span>{' '}
+                            of {players.length} contenders (Group {page})
+                          </>
+                        )}
                       </div>
-                    </li>
-                  ))}
-                  {paginatedList.length === 0 && (
-                    <li className="py-12 text-center text-sm text-dim">
-                      {q ? `No players found matching "${q}".` : 'No challengers ranked yet.'}
-                    </li>
-                  )}
-                </ul>
 
-                {/* Compact Pagination Controls: Groups of 10 */}
-                {totalPages > 1 && (
-                  <nav
-                    aria-label="Leaderboard pagination"
-                    className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-white/[0.07] pt-4 font-mono text-xs"
-                  >
-                    <div className="text-dim text-[11px]">
-                      {isSearching ? (
-                        <>
-                          Showing{' '}
-                          <span className="text-white font-bold">
-                            {searchResults.length === 0 ? 0 : (page - 1) * 10 + 1}–
-                            {Math.min(page * 10, searchResults.length)}
-                          </span>{' '}
-                          of {searchResults.length} matching contenders
-                        </>
-                      ) : page === 1 ? (
-                        <>
-                          Showing ranks{' '}
-                          <span className="text-white font-bold">
-                            01–{String(Math.min(10, players.length)).padStart(2, '0')}
-                          </span>{' '}
-                          of {players.length} contenders (Group 1)
-                        </>
-                      ) : (
-                        <>
-                          Showing ranks{' '}
-                          <span className="text-white font-bold">
-                            {String(10 + (page - 2) * 10 + 1).padStart(2, '0')}–
-                            {String(Math.min(10 + (page - 1) * 10, players.length)).padStart(2, '0')}
-                          </span>{' '}
-                          of {players.length} contenders (Group {page})
-                        </>
-                      )}
-                    </div>
+                      <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => handlePageChange(page - 1)}
+                          disabled={page === 1}
+                          aria-label="Previous page"
+                          className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
+                            page === 1
+                              ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                              : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
+                          }`}
+                        >
+                          ← Prev
+                        </button>
 
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => handlePageChange(page - 1)}
-                        disabled={page === 1}
-                        aria-label="Previous page"
-                        className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
-                          page === 1
-                            ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
-                            : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
-                        }`}
-                      >
-                        ← Prev
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                          if (totalPages > 7) {
-                            if (num !== 1 && num !== totalPages && Math.abs(num - page) > 1) {
-                              if (num === 2 || num === totalPages - 1) {
-                                return (
-                                  <span key={num} className="px-1 text-dim font-mono text-xs">
-                                    …
-                                  </span>
-                                )
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+                            if (totalPages > 7) {
+                              if (num !== 1 && num !== totalPages && Math.abs(num - page) > 1) {
+                                if (num === 2 || num === totalPages - 1) {
+                                  return (
+                                    <span key={num} className="px-1 text-dim font-mono text-xs">
+                                      …
+                                    </span>
+                                  )
+                                }
+                                return null
                               }
-                              return null
                             }
-                          }
-                          const active = num === page
-                          return (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => handlePageChange(num)}
-                              aria-current={active ? 'page' : undefined}
-                              className={`size-7 text-[11px] font-bold font-mono rounded-sm transition-colors cursor-pointer ${
-                                active
-                                  ? 'border border-cyan bg-cyan/15 text-cyan'
-                                  : 'border border-white/10 bg-surface/50 text-dim hover:border-white/30 hover:text-white'
-                              }`}
-                            >
-                              {num}
-                            </button>
-                          )
-                        })}
-                      </div>
+                            const active = num === page
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => handlePageChange(num)}
+                                aria-current={active ? 'page' : undefined}
+                                className={`size-7 text-[11px] font-bold font-mono rounded-sm transition-colors cursor-pointer ${
+                                  active
+                                    ? 'border border-cyan bg-cyan/15 text-cyan'
+                                    : 'border border-white/10 bg-surface/50 text-dim hover:border-white/30 hover:text-white'
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            )
+                          })}
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handlePageChange(page + 1)}
-                        disabled={page === totalPages}
-                        aria-label="Next page"
-                        className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
-                          page === totalPages
-                            ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
-                            : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
-                        }`}
-                      >
-                        Next →
-                      </button>
-                    </div>
-                  </nav>
-                )}
+                        <button
+                          type="button"
+                          onClick={() => handlePageChange(page + 1)}
+                          disabled={page === totalPages}
+                          aria-label="Next page"
+                          className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
+                            page === totalPages
+                              ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                              : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
+                          }`}
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </nav>
+                  )}
+                </section>
               </div>
-            </section>
-          </>
-        )}
+            </div>
+          )}
         </div>
       </main>
     </div>

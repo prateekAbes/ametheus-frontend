@@ -17,6 +17,8 @@ export interface LeaderboardEntry {
   rating: number
   earnings: number
   spending?: number
+  streak?: number
+  top3?: number
   form: string[]
   is_verified: boolean
   category: string
@@ -27,14 +29,54 @@ export interface LeaderboardEntry {
   status?: string
 }
 
-export const METRICS = [
-  { id: 'overall', label: 'Overall Standing', unit: 'Rating' },
-  { id: 'win_rate', label: 'Win Rate', unit: 'Win Rate' },
-  { id: 'wins', label: 'Match Wins', unit: 'Wins' },
-  { id: 'spending', label: 'Highest Spending', unit: 'Spent' },
-] as const
+export type MetricId =
+  | 'overall'
+  | 'win_rate'
+  | 'wins'
+  | 'streak'
+  | 'matches'
+  | 'top3'
+  | 'earnings'
+  | 'spending'
 
-export type MetricId = (typeof METRICS)[number]['id']
+export interface MetricItem {
+  id: MetricId
+  label: string
+  unit: string
+}
+
+export interface MetricGroup {
+  group: string
+  items: MetricItem[]
+}
+
+export const METRIC_GROUPS: MetricGroup[] = [
+  {
+    group: 'PERFORMANCE',
+    items: [
+      { id: 'overall', label: 'Overall Standing', unit: 'Rating' },
+      { id: 'win_rate', label: 'Win Rate', unit: 'Win Rate' },
+      { id: 'wins', label: 'Match Wins', unit: 'Wins' },
+      { id: 'streak', label: 'Win Streak', unit: 'Streak' },
+    ],
+  },
+  {
+    group: 'ACTIVITY',
+    items: [
+      { id: 'matches', label: 'Matches Played', unit: 'Matches' },
+      { id: 'top3', label: 'Top 3 Finishes', unit: 'Top 3' },
+    ],
+  },
+  {
+    group: 'ECONOMY',
+    items: [
+      { id: 'earnings', label: 'Prize Earnings', unit: 'Prize' },
+      { id: 'spending', label: 'Highest Spending', unit: 'Spent' },
+    ],
+  },
+]
+
+export const METRICS: MetricItem[] = METRIC_GROUPS.flatMap((g) => g.items)
 
 export interface LeaderboardPlayer {
   id: string
@@ -46,6 +88,9 @@ export interface LeaderboardPlayer {
   matches: number
   points: number
   spent: number
+  earnings: number
+  streak: number
+  top3: number
   winRate: number
   avatarUrl?: string
   rank: number
@@ -54,15 +99,60 @@ export interface LeaderboardPlayer {
   tag?: string
 }
 
-export const getPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) =>
-  m === 'win_rate' ? p.winRate : m === 'wins' ? p.wins : m === 'spending' ? p.spent : p.points
+export const getPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) => {
+  switch (m) {
+    case 'win_rate':
+      return p.winRate
+    case 'wins':
+      return p.wins
+    case 'streak':
+      return p.streak
+    case 'matches':
+      return p.matches
+    case 'top3':
+      return p.top3
+    case 'earnings':
+      return p.earnings
+    case 'spending':
+      return p.spent
+    case 'overall':
+    default:
+      return p.points
+  }
+}
 
-export const showPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) =>
-  m === 'win_rate'
-    ? `${p.winRate}%`
-    : m === 'spending'
-    ? `₹${p.spent.toLocaleString()}`
-    : getPlayerMetricValue(p, m).toLocaleString()
+export const showPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) => {
+  switch (m) {
+    case 'win_rate':
+      return `${p.winRate}%`
+    case 'streak':
+      return p.streak > 0 ? `${p.streak}W` : '0'
+    case 'earnings':
+      return `$${p.earnings.toLocaleString()}`
+    case 'spending':
+      return `$${p.spent.toLocaleString()}`
+    case 'matches':
+      return p.matches.toLocaleString()
+    case 'top3':
+      return p.top3.toLocaleString()
+    case 'wins':
+      return p.wins.toLocaleString()
+    case 'overall':
+    default:
+      return p.points.toLocaleString()
+  }
+}
+
+export interface LeaderboardPlatformStats {
+  ranked_players: number
+  matches_played: number
+  prize_paid_out: string
+  active_streaks: number
+}
+
+export async function getLeaderboardStats(): Promise<LeaderboardPlatformStats> {
+  return apiClient<LeaderboardPlatformStats>('/leaderboard/stats')
+}
 
 export interface LeaderboardDisqualification {
   id: string
