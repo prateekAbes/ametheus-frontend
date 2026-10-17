@@ -27,11 +27,12 @@ interface PodiumSlotProps {
 }
 
 /**
- * Three-Player Podium Slot from Leaderboard UI Design:
- * - 1st Place: elevated, w-28 md:w-36 avatar with ring-1 ring-cyan/40, text-6xl md:text-7xl title, h-72 md:h-80 pedestal with cyan/70 top border, text-6xl md:text-7xl cyan score
- * - 2nd/3rd Place: w-20 md:w-24 avatar, text-4xl md:text-5xl title, h-64 md:h-72 (2nd) or h-60 md:h-64 (3rd) pedestal with white/25 top border
+ * Three-Player Podium Slot
+ * Strict adherence to visual hierarchy:
+ * - 1st Place: elevated, 120-140px avatar with ring-1 ring-cyan/40, 48-56px title, h-72 md:h-80 pedestal with cyan/70 top border, text-6xl md:text-7xl cyan score
+ * - 2nd/3rd Place: 90-100px avatar, 30-36px title, h-64 md:h-72 (2nd) or h-60 md:h-64 (3rd) pedestal with white/25 top border
  * - Ghost watermark rank number (text-white/20 text-7xl md:text-8xl)
- * - Overall supporting stats (Wins & Win Rate) side-by-side with border-t border-white/10
+ * - Complete stats: Rank, Rating/Metric, Unit label, Divider, Wins, Win Rate
  */
 export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
   if (!p) {
@@ -43,13 +44,13 @@ export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
   const unit = metricConfig.unit
   const height = ['', 'h-72 md:h-80', 'h-64 md:h-72', 'h-60 md:h-64'][p.rank] || 'h-60 md:h-64'
 
-  // Proportional avatar sizing matching podium hierarchy (Rank 1 > Rank 2 > Rank 3)
+  // Approximate dimensions: winner ~120-140px, sides ~90-100px
   const avatarClass =
-    p.rank === 1
-      ? 'w-24 text-3xl ring-1 ring-cyan/40 md:w-28 md:text-4xl'
+    first
+      ? 'w-28 text-3xl ring-1 ring-cyan/40 md:w-32 md:text-4xl'
       : p.rank === 2
-      ? 'w-[74px] text-xl md:w-[86px] md:text-2xl'
-      : 'w-[70px] text-xl md:w-20 md:text-2xl'
+      ? 'w-[84px] text-xl md:w-24 md:text-2xl'
+      : 'w-20 text-xl md:w-24 md:text-2xl'
 
   return (
     <div className={`flex flex-col items-center ${order} w-full`}>
@@ -68,7 +69,7 @@ export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
           title={p.name}
           className={`mt-4 w-full px-2 font-display font-black uppercase leading-[0.95] tracking-tight text-white truncate ${
             first
-              ? 'text-3xl sm:text-4xl md:text-[2.75rem]'
+              ? 'text-3xl sm:text-4xl md:text-5xl'
               : 'text-xl sm:text-2xl md:text-3xl'
           }`}
         >
@@ -98,18 +99,18 @@ export function PodiumSlot({ p, m, order }: PodiumSlotProps) {
           {showPlayerMetricValue(p, m)}
         </div>
         <Mono className="relative mt-1.5">{unit}</Mono>
-        {m === 'overall' && (
-          <div className="relative mt-5 flex gap-7 border-t border-white/10 pt-4">
-            <div>
-              <div className="font-mono text-sm font-bold tabular-nums">{p.wins}</div>
-              <Mono>Wins</Mono>
-            </div>
-            <div>
-              <div className="font-mono text-sm font-bold tabular-nums">{p.winRate}%</div>
-              <Mono>Win Rate</Mono>
-            </div>
+
+        {/* Separator and supporting stats: Wins & Win Rate */}
+        <div className="relative mt-5 flex gap-7 border-t border-white/10 pt-4">
+          <div>
+            <div className="font-mono text-sm font-bold tabular-nums text-white">{p.wins}</div>
+            <Mono>Wins</Mono>
           </div>
-        )}
+          <div>
+            <div className="font-mono text-sm font-bold tabular-nums text-white">{p.winRate}%</div>
+            <Mono>Win Rate</Mono>
+          </div>
+        </div>
       </div>
     </div>
   )

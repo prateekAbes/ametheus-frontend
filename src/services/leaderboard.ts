@@ -10,6 +10,8 @@ export interface LeaderboardEntry {
   captain?: string
   logo_url?: string
   avatar_url?: string
+  username?: string
+  display_name?: string
   win_rate: number
   matches_played: number
   wins: number
@@ -28,6 +30,16 @@ export interface LeaderboardEntry {
   is_disqualified?: boolean
   status?: string
 }
+
+export type TimeRange = 'all_time' | 'season' | 'month' | 'week'
+
+export const TIME_RANGES: { id: TimeRange; label: string }[] = [
+  { id: 'all_time', label: 'ALL TIME' },
+  { id: 'season', label: 'SEASON' },
+  { id: 'month', label: 'MONTH' },
+  { id: 'week', label: 'WEEK' },
+]
+
 
 export type MetricId =
   | 'overall'
@@ -81,6 +93,8 @@ export const METRICS: MetricItem[] = METRIC_GROUPS.flatMap((g) => g.items)
 export interface LeaderboardPlayer {
   id: string
   name: string
+  username?: string
+  displayName?: string
   rawName: string
   initials: string
   tone: number
@@ -92,6 +106,7 @@ export interface LeaderboardPlayer {
   streak: number
   top3: number
   winRate: number
+  form?: string[]
   avatarUrl?: string
   rank: number
   isCurrentUser: boolean
@@ -150,8 +165,9 @@ export interface LeaderboardPlatformStats {
   active_streaks: number
 }
 
-export async function getLeaderboardStats(): Promise<LeaderboardPlatformStats> {
-  return apiClient<LeaderboardPlatformStats>('/leaderboard/stats')
+export async function getLeaderboardStats(timeRange?: string): Promise<LeaderboardPlatformStats> {
+  const qs = timeRange && timeRange !== 'all_time' ? `?time_range=${timeRange}` : ''
+  return apiClient<LeaderboardPlatformStats>(`/leaderboard/stats${qs}`)
 }
 
 export interface LeaderboardDisqualification {
@@ -182,6 +198,7 @@ export async function getLeaderboardEntries(params?: {
   platform?: string
   game?: string
   search?: string
+  time_range?: string
   limit?: number
   skip?: number
   include_disqualified?: boolean
@@ -192,6 +209,7 @@ export async function getLeaderboardEntries(params?: {
   if (params?.platform && params.platform !== 'all') q.set('platform', params.platform)
   if (params?.game && params.game !== 'all') q.set('game', params.game)
   if (params?.search) q.set('search', params.search)
+  if (params?.time_range && params.time_range !== 'all_time') q.set('time_range', params.time_range)
   if (params?.limit) q.set('limit', String(params.limit))
   if (params?.skip) q.set('skip', String(params.skip))
   if (params?.include_disqualified) q.set('include_disqualified', 'true')
