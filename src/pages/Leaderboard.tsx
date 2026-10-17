@@ -17,9 +17,7 @@ import { PodiumSlot, Mono } from '../components/leaderboard/PodiumSlot'
 import { LeaderboardSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
 import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmptyState'
 import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErrorState'
-import { LeaderboardParticleBackground } from '../components/leaderboard/LeaderboardParticleBackground'
 import { resolveMediaUrl } from '../services/apiClient'
-import { Hud } from '../components/ui'
 
 export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -275,25 +273,15 @@ export default function Leaderboard() {
         />
       </div>
 
-      {/* Existing WebGL 3D starry particle background sits behind this layer, unchanged */}
-      <LeaderboardParticleBackground />
-
       {/* ============================================================== */}
       {/* 2. LEADERBOARD CONTENT IN SEPARATE RELATIVE Z-10 WRAPPER       */}
       {/* ============================================================== */}
       <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pb-24">
-        {/* Page Header: Adjusted to match Ametheus website conventions */}
-        <section className="pb-14 pt-10 sm:pt-14">
-          <div className="mb-6 flex items-center gap-4">
-            <span className="h-px w-12 bg-cyan" />
-            <Hud className="text-ink">◇ Global Player Standings</Hud>
-          </div>
+        {/* Page Header */}
+        <section className="pb-8 pt-2 sm:pt-4 md:pt-6">
           <h1 className="reveal-chars font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white text-balance break-words">
             LEADERBOARD
           </h1>
-          <p className="mt-6 max-w-xl text-base text-ink/75 sm:text-lg">
-            Authoritative player standings and competitive rankings across sanctioned tournament circuits.
-          </p>
         </section>
 
         {loading ? (
