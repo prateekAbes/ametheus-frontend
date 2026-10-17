@@ -233,7 +233,7 @@ export default function Leaderboard() {
 
   return (
     <div
-      className="relative min-h-screen w-full overflow-hidden text-ink pt-16 md:pt-[72px]"
+      className="relative min-h-screen w-full overflow-hidden text-ink"
       style={{ backgroundColor: '#05060A' }}
     >
       {/* ============================================================== */}
@@ -276,125 +276,132 @@ export default function Leaderboard() {
       {/* ============================================================== */}
       {/* 2. LEADERBOARD CONTENT IN SEPARATE RELATIVE Z-10 WRAPPER       */}
       {/* ============================================================== */}
-      <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pb-24">
-        {/* Page Header */}
-        <section className="pb-8 pt-2 sm:pt-4 md:pt-6">
+      <main className="relative z-10 w-full pb-24">
+        {/* Page Header: Exact match to Matches & Tournaments layout, top spacing, and left container alignment */}
+        <section className="relative mx-auto w-full max-w-[1600px] px-5 pt-36 md:px-10 pb-12 md:pb-16">
           <h1 className="reveal-chars font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white text-balance break-words">
             LEADERBOARD
           </h1>
+          <p className="mt-6 max-w-xl text-lg text-ink/75">
+            Top competitive rankings and player performance across tournament circuits.
+          </p>
         </section>
 
-        {loading ? (
-          <LeaderboardSkeleton />
-        ) : error ? (
-          <LeaderboardErrorState onRetry={fetchLeaderboardData} />
-        ) : players.length === 0 ? (
-          <LeaderboardEmptyState
-            hasFilters={metric !== 'overall'}
-            onResetFilters={handleResetFilters}
-          />
-        ) : (
-          <>
-            {/* Top-3 Podium (1st in center, 2nd left, 3rd right) */}
-            <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
-              <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
-              <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
-              <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
-            </section>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          {loading ? (
+            <LeaderboardSkeleton />
+          ) : error ? (
+            <LeaderboardErrorState onRetry={fetchLeaderboardData} />
+          ) : players.length === 0 ? (
+            <LeaderboardEmptyState
+              hasFilters={metric !== 'overall'}
+              onResetFilters={handleResetFilters}
+            />
+          ) : (
+            <>
+              {/* Top-3 Podium (1st in center, 2nd left, 3rd right) */}
+              <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
+                <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
+                <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
+                <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
+              </section>
 
-            {/* Divider */}
-            <div className="mx-auto my-16 max-w-6xl border-b border-white/10" />
+              {/* Divider */}
+              <div className="mx-auto my-16 max-w-6xl border-b border-white/10" />
 
-            {/* Bottom Section: Metric Selector Aside + Challengers Ladder */}
-            <section className="grid gap-8 lg:grid-cols-[180px_1fr] lg:gap-14">
-              {/* Left Sidebar Metric Selector */}
-              <aside>
-                <Mono className="mb-3 block">Rank by</Mono>
-                <div className="flex gap-6 overflow-x-auto lg:flex-col lg:gap-1">
-                  {METRICS.map((x) => {
-                    const on = x.id === metric
-                    return (
-                      <button
-                        key={x.id}
-                        type="button"
-                        onClick={() => setMetric(x.id)}
-                        aria-pressed={on}
-                        className={`flex items-center gap-3 whitespace-nowrap py-1.5 text-left text-sm transition-colors cursor-pointer ${
-                          on ? 'text-white' : 'text-dim hover:text-white'
+              {/* Bottom Section: Metric Selector Aside + Challengers Ladder */}
+              <section className="grid gap-8 lg:grid-cols-[180px_1fr] lg:gap-14">
+                {/* Left Sidebar Metric Selector */}
+                <aside>
+                  <Mono className="mb-3 block">Rank by</Mono>
+                  <div className="flex gap-6 overflow-x-auto lg:flex-col lg:gap-1">
+                    {METRICS.map((x) => {
+                      const on = x.id === metric
+                      return (
+                        <button
+                          key={x.id}
+                          type="button"
+                          onClick={() => setMetric(x.id)}
+                          aria-pressed={on}
+                          className={`flex items-center gap-3 whitespace-nowrap py-1.5 text-left text-sm transition-colors cursor-pointer ${
+                            on ? 'text-white' : 'text-dim hover:text-white'
+                          }`}
+                        >
+                          <span className={`h-px transition-all ${on ? 'w-5 bg-cyan' : 'w-2 bg-white/25'}`} />
+                          {x.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </aside>
+
+                {/* Challengers Ladder & Search */}
+                <div id="challengers-ladder" className="scroll-mt-20">
+                  <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-baseline gap-4">
+                      <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
+                        Challengers Ladder
+                      </h2>
+                      <Mono className="normal-case tracking-normal">
+                        {players.length} contenders ranked
+                      </Mono>
+                    </div>
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Search players"
+                      aria-label="Search players"
+                      className="w-full rounded-sm border border-white/10 bg-[#0c121d]/90 px-3.5 py-2 font-mono text-xs outline-none transition placeholder:text-dim focus:border-white/30 sm:w-56"
+                    />
+                  </div>
+
+                  <ul className="divide-y divide-white/[0.07] border-t border-white/[0.07]">
+                    {paginatedList.map((p) => (
+                      <li
+                        key={p.id || `player-${p.rank}-${p.name}`}
+                        className={`grid grid-cols-[2rem_2.5rem_1fr_auto] items-center gap-3 py-3.5 transition-colors hover:bg-white/[0.025] md:gap-5 ${
+                          metric === 'overall'
+                            ? 'md:grid-cols-[2.5rem_2.75rem_1fr_6rem_6rem_7rem]'
+                            : 'md:grid-cols-[2.5rem_2.75rem_1fr_7rem]'
                         }`}
                       >
-                        <span className={`h-px transition-all ${on ? 'w-5 bg-cyan' : 'w-2 bg-white/25'}`} />
-                        {x.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </aside>
-
-              {/* Challengers Ladder & Search */}
-              <div id="challengers-ladder" className="scroll-mt-20">
-                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-baseline gap-4">
-                    <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
-                      Challengers Ladder
-                    </h2>
-                    <Mono className="normal-case tracking-normal">
-                      {players.length} contenders ranked
-                    </Mono>
-                  </div>
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search players"
-                    aria-label="Search players"
-                    className="w-full rounded-sm border border-white/10 bg-[#0c121d]/90 px-3.5 py-2 font-mono text-xs outline-none transition placeholder:text-dim focus:border-white/30 sm:w-56"
-                  />
-                </div>
-
-                <ul className="divide-y divide-white/[0.07] border-t border-white/[0.07]">
-                  {paginatedList.map((p) => (
-                    <li
-                      key={p.id || `player-${p.rank}-${p.name}`}
-                      className={`grid grid-cols-[2rem_3rem_1fr_auto] items-center gap-4 py-4 transition-colors hover:bg-white/[0.025] md:gap-6 ${
-                        metric === 'overall'
-                          ? 'md:grid-cols-[3rem_3.5rem_1fr_6rem_6rem_7rem]'
-                          : 'md:grid-cols-[3rem_3.5rem_1fr_7rem]'
-                      }`}
-                    >
-                      <span className="font-display text-2xl font-bold tabular-nums text-dim">
-                        {String(p.rank).padStart(2, '0')}
-                      </span>
-                      {p.isCurrentUser ? (
-                        <Link to="/profile" title="View your profile">
-                          <Avatar p={p} className="w-12 text-lg md:w-14 md:text-xl transition-transform hover:scale-105" />
-                        </Link>
-                      ) : (
-                        <Avatar p={p} className="w-12 text-lg md:w-14 md:text-xl" />
-                      )}
-                      <div className="min-w-0 truncate font-display text-xl font-bold uppercase tracking-wide text-white">
+                        <span className="font-display text-2xl font-bold tabular-nums text-dim">
+                          {String(p.rank).padStart(2, '0')}
+                        </span>
                         {p.isCurrentUser ? (
-                          <Link to="/profile" className="hover:text-cyan transition-colors">
-                            {p.name}
+                          <Link to="/profile" title="View your profile">
+                            <Avatar
+                              p={p}
+                              className="w-10 text-sm md:w-11 md:text-base transition-transform hover:scale-105"
+                            />
                           </Link>
                         ) : (
-                          p.name
+                          <Avatar p={p} className="w-10 text-sm md:w-11 md:text-base" />
                         )}
-                        {p.tag && (
-                          <span className="ml-2 font-mono text-[11px] text-white/40 tracking-normal font-normal">
-                            [{p.tag}]
-                          </span>
-                        )}
-                        {p.isCurrentUser && (
-                          <span className="ml-2 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-white text-black rounded-xs">
-                            YOU
-                          </span>
-                        )}
-                        {p.isDisqualified && (
-                          <span className="ml-2 px-1 py-0.5 font-mono text-[8px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40">
-                            DQ
-                          </span>
-                        )}
-                      </div>
+                        <div className="min-w-0 truncate font-display text-lg font-bold uppercase tracking-wide text-white">
+                          {p.isCurrentUser ? (
+                            <Link to="/profile" className="hover:text-cyan transition-colors">
+                              {p.name}
+                            </Link>
+                          ) : (
+                            p.name
+                          )}
+                          {p.tag && (
+                            <span className="ml-2 font-mono text-[11px] text-white/40 tracking-normal font-normal">
+                              [{p.tag}]
+                            </span>
+                          )}
+                          {p.isCurrentUser && (
+                            <span className="ml-2 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-white text-black rounded-xs">
+                              YOU
+                            </span>
+                          )}
+                          {p.isDisqualified && (
+                            <span className="ml-2 px-1 py-0.5 font-mono text-[8px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40">
+                              DQ
+                            </span>
+                          )}
+                        </div>
                       {metric === 'overall' && (
                         <>
                           <div className="hidden text-right md:block">
@@ -526,6 +533,7 @@ export default function Leaderboard() {
             </section>
           </>
         )}
+        </div>
       </main>
     </div>
   )

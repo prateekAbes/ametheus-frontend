@@ -72,7 +72,7 @@ export function LeaderboardSkeleton() {
               <div key={i} className="py-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="h-6 w-8 bg-white/5 rounded-sm" />
-                  <div className="w-12 h-12 bg-white/10 rounded-sm" />
+                  <div className="w-10 h-10 md:w-11 md:h-11 bg-white/10 rounded-full shrink-0" />
                   <div className="h-5 w-36 bg-white/10 rounded-sm" />
                 </div>
                 <div className="h-8 w-24 bg-white/10 rounded-sm" />
