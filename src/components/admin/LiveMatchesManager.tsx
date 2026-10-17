@@ -63,11 +63,8 @@ const DEFAULT_STAGES = [
 
 export const COMPETITION_FORMATS = [
   'Knockout',
-  'Single Elimination',
-  'Double Elimination',
   'Round Robin',
   'Battle Royale',
-  'Drop-in',
 ] as const
 
 interface FormationRound {
@@ -2697,7 +2694,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                     >
                       <option value="BO1">Best of 1 (BO1)</option>
                       <option value="BO3">Best of 3 (BO3)</option>
-                      <option value="BO5">Best of 5 (BO5)</option>
                     </select>
                   </div>
                 ) : (

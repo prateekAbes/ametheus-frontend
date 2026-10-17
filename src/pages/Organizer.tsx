@@ -86,9 +86,11 @@ export default function Organizer() {
     is_solo: false,
     min_team_size: 5,
     max_team_size: 5,
-    format: 'Single Elimination Bracket',
-    tournament_type: 'Single Elimination',
+    format: 'Knockout',
+    tournament_type: 'Knockout',
     match_format: 'Best of 1',
+    whatsapp_group_url: '',
+    discord_url: '',
     server_region: 'AWS Mumbai (ap-south-1)',
     prize_pool_inr: 10000,
     entry_fee_inr: 0,
@@ -171,7 +173,7 @@ export default function Organizer() {
       is_solo: !!isSolo,
       min_team_size: isSolo ? 1 : (sel?.min_team_size || 5),
       max_team_size: isSolo ? 1 : (sel?.max_team_size || 5),
-      format: isSolo ? '1v1 Solo Championship' : 'Single Elimination Bracket',
+      format: 'Knockout',
     }))
   }
 
@@ -196,8 +198,10 @@ export default function Organizer() {
         max_team_size: Number(formData.max_team_size),
         rank_requirement: formData.rank_requirement,
         format: formData.format,
-        tournament_type: formData.tournament_type,
+        tournament_type: formData.tournament_type || formData.format,
         match_format: formData.match_format,
+        whatsapp_group_url: formData.whatsapp_group_url || undefined,
+        discord_url: formData.discord_url || undefined,
         description: formData.description,
         rules: rulesArr,
       })
@@ -238,7 +242,7 @@ export default function Organizer() {
   const handleGenBracket = async (id: string) => {
     try {
       await generateBracketOrganizer(id)
-      setActionMsg('Single Elimination bracket generated! Tournament matches are LIVE.')
+      setActionMsg('Tournament bracket generated! Matches are now LIVE.')
       setTimeout(() => setActionMsg(null), 4000)
       loadData()
     } catch (err: any) {
@@ -1201,13 +1205,12 @@ export default function Organizer() {
                   <Hud>Tournament Format</Hud>
                   <select
                     value={formData.format}
-                    onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, format: e.target.value, tournament_type: e.target.value })}
                     className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
                   >
-                    <option value="Single Elimination Bracket">Single Elimination Bracket</option>
-                    <option value="Double Elimination Bracket">Double Elimination Bracket</option>
-                    <option value="Battle Royale Points">Battle Royale Points</option>
-                    <option value="Round Robin Groups">Round Robin Groups</option>
+                    <option value="Knockout">Knockout</option>
+                    <option value="Round Robin">Round Robin</option>
+                    <option value="Battle Royale">Battle Royale</option>
                   </select>
                 </div>
                 <div>
@@ -1219,8 +1222,30 @@ export default function Organizer() {
                   >
                     <option value="Best of 1">Best of 1 (BO1)</option>
                     <option value="Best of 3">Best of 3 (BO3)</option>
-                    <option value="Best of 5">Best of 5 (BO5 Finals)</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Hud>WhatsApp Group URL</Hud>
+                  <input
+                    type="url"
+                    placeholder="https://chat.whatsapp.com/..."
+                    value={formData.whatsapp_group_url}
+                    onChange={(e) => setFormData({ ...formData, whatsapp_group_url: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <Hud>Discord Server URL</Hud>
+                  <input
+                    type="url"
+                    placeholder="https://discord.gg/..."
+                    value={formData.discord_url}
+                    onChange={(e) => setFormData({ ...formData, discord_url: e.target.value })}
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                  />
                 </div>
               </div>
 

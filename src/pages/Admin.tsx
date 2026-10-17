@@ -384,6 +384,7 @@ export default function Admin() {
     title: string
     game_id: string
     format: string
+    series_format?: string
     status: 'REGISTRATION_OPEN' | 'UPCOMING' | 'DRAFT'
     prize_pool_inr: number
     entry_fee_inr: number
@@ -397,6 +398,7 @@ export default function Admin() {
     banner_mobile_url: string
     logo_url: string
     whatsapp_group_url: string
+    discord_url?: string
     community_link: string
     description: string
   }
@@ -404,7 +406,8 @@ export default function Admin() {
   const getInitialNewTourState = (): NewTournamentFormState => ({
     title: '',
     game_id: 'valorant',
-    format: 'Single Elimination · BO3',
+    format: 'Knockout',
+    series_format: 'BO1',
     status: 'REGISTRATION_OPEN',
     prize_pool_inr: 25000,
     entry_fee_inr: 100,
@@ -418,6 +421,7 @@ export default function Admin() {
     banner_mobile_url: '',
     logo_url: '',
     whatsapp_group_url: '',
+    discord_url: '',
     community_link: '',
     description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
   })
@@ -1632,6 +1636,7 @@ export default function Admin() {
         title,
         game_id: newTour.game_id,
         format,
+        series_format: newTour.series_format || 'BO1',
         status: newTour.status || 'REGISTRATION_OPEN',
         prize_pool_inr: prizePool,
         entry_fee_inr: entryFee,
@@ -1645,7 +1650,8 @@ export default function Admin() {
         banner_mobile_url: newTour.banner_mobile_url || undefined,
         logo_url: newTour.logo_url || undefined,
         whatsapp_group_url: newTour.whatsapp_group_url.trim() || undefined,
-        community_link: newTour.community_link?.trim() || undefined,
+        discord_url: (newTour.discord_url?.trim() || newTour.community_link?.trim()) || undefined,
+        community_link: (newTour.discord_url?.trim() || newTour.community_link?.trim()) || undefined,
         description: newTour.description?.trim() || 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
       })
       if (created && (created.id || (created as any).slug)) {
@@ -1686,6 +1692,7 @@ export default function Admin() {
         title,
         game_id: editingTour.game_id,
         format: editingTour.format,
+        series_format: (editingTour as any).series_format || 'BO1',
         status: editingTour.status,
         registration_status: regStatus,
         prize_pool_inr: Number(editingTour.prize_pool_inr),
@@ -1699,7 +1706,8 @@ export default function Admin() {
         banner_mobile_url: editingTour.banner_mobile_url,
         logo_url: editingTour.logo_url,
         whatsapp_group_url: editingTour.whatsapp_group_url,
-        community_link: editingTour.community_link,
+        discord_url: (editingTour as any).discord_url || editingTour.community_link,
+        community_link: editingTour.community_link || (editingTour as any).discord_url,
         description: editingTour.description,
       })
       showToast('Tournament updated successfully!')
@@ -6342,13 +6350,13 @@ export default function Admin() {
                         className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="text-dim">Sanctioned Game <span className="text-cyan">*</span></label>
                         <select
                           value={newTour.game_id}
                           onChange={(e) => handleSelectGameForNewTour(e.target.value)}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
                         >
                           {games.map((g) => (
                             <option key={g.id || g.slug} value={g.slug || g.id}>{g.name}</option>
@@ -6364,14 +6372,29 @@ export default function Admin() {
                         </select>
                       </div>
                       <div>
-                        <label className="text-dim">Match Format <span className="text-cyan">*</span></label>
-                        <input
+                        <label className="text-dim">Competition Format <span className="text-cyan">*</span></label>
+                        <select
                           required
-                          placeholder="e.g. Single Elimination · BO3"
                           value={newTour.format}
                           onChange={(e) => setNewTour({ ...newTour, format: e.target.value })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                        >
+                          <option value="Knockout">Knockout</option>
+                          <option value="Round Robin">Round Robin</option>
+                          <option value="Battle Royale">Battle Royale</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-dim">Series Format <span className="text-cyan">*</span></label>
+                        <select
+                          required
+                          value={newTour.series_format || 'BO1'}
+                          onChange={(e) => setNewTour({ ...newTour, series_format: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                        >
+                          <option value="BO1">Best of 1 (BO1)</option>
+                          <option value="BO3">Best of 3 (BO3)</option>
+                        </select>
                       </div>
                     </div>
 
@@ -6649,14 +6672,35 @@ export default function Admin() {
                     <label className="text-dim">Title</label>
                     <input required value={editingTour.title} onChange={(e) => setEditingTour({ ...editingTour, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="text-dim">Format</label>
-                      <input required value={editingTour.format} onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                      <label className="text-dim">Competition Format</label>
+                      <select
+                        required
+                        value={editingTour.format}
+                        onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                      >
+                        <option value="Knockout">Knockout</option>
+                        <option value="Round Robin">Round Robin</option>
+                        <option value="Battle Royale">Battle Royale</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-dim">Series Format</label>
+                      <select
+                        required
+                        value={(editingTour as any).series_format || 'BO1'}
+                        onChange={(e) => setEditingTour({ ...editingTour, series_format: e.target.value } as any)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                      >
+                        <option value="BO1">Best of 1 (BO1)</option>
+                        <option value="BO3">Best of 3 (BO3)</option>
+                      </select>
                     </div>
                     <div>
                       <label className="text-dim">Max Teams</label>
-                      <input required type="number" min="2" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                      <input required type="number" min="2" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">

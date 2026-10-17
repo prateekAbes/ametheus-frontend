@@ -28,6 +28,8 @@ export function Brackets({ color = 'border-white/30' }: { color?: string }) {
 const STATUS: Record<string, [string, string, string]> = {
   registration_open: ['Registration Open', 'bg-ok', 'text-ok'],
   'registration open': ['Registration Open', 'bg-ok', 'text-ok'],
+  registration_closed: ['Registration Closed', 'bg-dim', 'text-dim'],
+  'registration closed': ['Registration Closed', 'bg-dim', 'text-dim'],
   open: ['Open', 'bg-cyan', 'text-cyan'],
   upcoming: ['Upcoming', 'bg-cyan', 'text-cyan'],
   live: ['Live', 'bg-live', 'text-live'],
@@ -307,11 +309,12 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
               label={
                 t.status?.toLowerCase() === 'open' || t.status?.toUpperCase() === 'REGISTRATION_OPEN'
                   ? 'Registration Open'
-                  : undefined
+                  : (t.status?.toLowerCase() === 'closed' || t.status?.toUpperCase() === 'REGISTRATION_CLOSED'
+                    ? 'Registration Closed'
+                    : (t.status?.toUpperCase() === 'LIVE' ? 'Live' : undefined))
               }
             />
           )}
-          {(t as any).isRegistered && <Badge s="confirmed" label="REGISTERED" />}
         </div>
         {g && <span className="absolute right-4 top-3 font-display text-sm font-black tracking-[0.15em]" style={{ color: accent }}>{g.short}</span>}
       </div>

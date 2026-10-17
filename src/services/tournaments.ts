@@ -55,6 +55,7 @@ export interface Tournament {
   stream_url?: string
   registration_status?: string
   whatsapp_group_url?: string
+  discord_url?: string
   community_link?: string
   starts_at?: string
   roster_lock_time?: string
@@ -86,6 +87,8 @@ export interface NormalizedTournament {
   serverRegion?: string
   announcementText?: string
   whatsappGroupUrl?: string
+  discordUrl?: string
+  discord_url?: string
   communityLink?: string
   bannerUrl?: string
   heroBannerUrl?: string
@@ -225,7 +228,7 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     description: t.description || '',
     gameId: rawGameId,
     gameName: rawGameName,
-    format: t.format || (t as any).tournament_type || (t as any).match_format || 'Single Elimination',
+    format: t.format || (t as any).tournament_type || (t as any).match_format || 'Knockout',
     status: t.status,
     maxTeams,
     registeredTeams: regCount,
@@ -242,6 +245,8 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     serverRegion: t.server_region || (t as any).serverRegion || 'AWS Mumbai (ap-south-1)',
     announcementText: (t as any).announcement_text || (t as any).announcementText,
     whatsappGroupUrl: t.whatsapp_group_url || (t as any).whatsappGroupUrl,
+    discordUrl: t.discord_url || (t as any).discordUrl,
+    discord_url: t.discord_url || (t as any).discordUrl,
     communityLink: t.community_link || (t as any).communityLink,
     bannerUrl,
     heroBannerUrl,
@@ -454,6 +459,7 @@ export interface TournamentRegistrationStatusResponse {
 export interface TournamentCommunityLinkResponse {
   community_link?: string
   whatsapp_group_url?: string
+  discord_url?: string
   instructions?: string
   tournament_title?: string
 }

@@ -280,10 +280,10 @@ export default function TournamentDetail() {
   }, [tourData, isRegOpen])
 
   useEffect(() => {
-    if (isConfirmedParticipant && isRegistrationClosed && !communityInfo && id) {
+    if (isConfirmedParticipant && !communityInfo && id) {
       getTournamentCommunityLink(id).then(setCommunityInfo).catch(() => {})
     }
-  }, [isConfirmedParticipant, isRegistrationClosed, communityInfo, id])
+  }, [isConfirmedParticipant, communityInfo, id])
 
   const [copiedCredField, setCopiedCredField] = useState<string | null>(null)
 
@@ -471,7 +471,7 @@ export default function TournamentDetail() {
               </div>
               <div>
                 <Hud>Format</Hud>
-                <p className="mt-1 font-display text-2xl font-extrabold uppercase">{tourData?.format || 'Single Elimination'}</p>
+                <p className="mt-1 font-display text-2xl font-extrabold uppercase">{tourData?.format || 'Knockout'}</p>
               </div>
               <div>
                 <Hud>Team Size</Hud>
@@ -592,22 +592,76 @@ export default function TournamentDetail() {
               </div>
             )}
 
-            {/* Match Coordination Channel — Compact and subtle when unlocked */}
-            {isRegistrationClosed && (communityInfo?.whatsapp_group_url || communityInfo?.community_link) && (
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-emerald-500/30 bg-emerald-950/20 px-4 py-2.5">
-                <div className="flex items-center gap-2 font-mono text-xs text-emerald-300">
-                  <span className="size-2 rounded-full bg-emerald-400" />
-                  <span>Match coordination channel is active for confirmed competitors.</span>
+            {/* Stay Connected — Official Coordination Channels for Confirmed Competitors */}
+            {isConfirmedParticipant && (communityInfo?.whatsapp_group_url || communityInfo?.discord_url || communityInfo?.community_link) && (
+              <div className="mb-8 border border-white/10 bg-graphite/40 p-5 backdrop-blur-md">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink">
+                      Stay Connected
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] text-cyan uppercase font-bold tracking-wider">
+                    Competitor Coordination
+                  </span>
                 </div>
-                <a
-                  href={communityInfo.whatsapp_group_url || communityInfo.community_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 font-mono text-xs font-bold uppercase text-emerald-300 hover:bg-emerald-500 hover:text-void transition-colors cursor-pointer"
-                >
-                  <span>Open Coordinator Chat</span>
-                  <span>↗</span>
-                </a>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {communityInfo?.whatsapp_group_url && (
+                    <a
+                      href={communityInfo.whatsapp_group_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex flex-col justify-between border border-emerald-500/30 bg-emerald-950/20 p-4 hover:border-emerald-400 hover:bg-emerald-950/40 transition-all duration-200"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <svg className="size-5 shrink-0 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.588-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.074-2.127-.47-1.425-.54-2.344-1.956-2.415-2.05-.072-.095-.572-.76-.572-1.45 0-.69.36-1.029.488-1.173.128-.144.28-.18.375-.18.094 0 .188.001.27.006.086.005.201-.033.314.24.118.283.404.985.44 1.056.036.072.06.156.012.252-.048.096-.072.156-.144.24-.072.084-.152.188-.217.252-.072.072-.148.15-.064.294.084.144.373.616.8 1.001.55.495 1.013.65 1.157.722.144.072.228.06.312-.036.084-.096.36-.42.456-.564.096-.144.192-.12.324-.072.132.048.837.395.981.467.144.072.24.108.276.168.036.06.036.353-.108.758zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.983-1.39A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18c-1.61 0-3.098-.44-4.38-1.206l-.314-.187-2.955.824.836-2.88-.205-.327C4.197 15.01 3.75 13.56 3.75 12c0-4.549 3.701-8.25 8.25-8.25 4.548 0 8.25 3.701 8.25 8.25 0 4.549-3.702 8.25-8.25 8.25z"/>
+                          </svg>
+                          <span className="font-display font-bold text-sm uppercase text-emerald-300">
+                            WhatsApp Community
+                          </span>
+                        </div>
+                        <p className="text-xs text-dim leading-relaxed mb-4">
+                          Official tournament coordination group for captain briefings, fixture alerts, and real-time organizer notifications.
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold uppercase text-emerald-400 group-hover:underline">
+                        <span>Join WhatsApp Group</span>
+                        <span className="transition-transform group-hover:translate-x-1">→</span>
+                      </span>
+                    </a>
+                  )}
+
+                  {(communityInfo?.discord_url || communityInfo?.community_link) && (
+                    <a
+                      href={communityInfo.discord_url || communityInfo.community_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex flex-col justify-between border border-[#5865F2]/40 bg-[#5865F2]/10 p-4 hover:border-[#5865F2] hover:bg-[#5865F2]/20 transition-all duration-200"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <svg className="size-5 shrink-0 text-[#7983f5]" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                          </svg>
+                          <span className="font-display font-bold text-sm uppercase text-[#a5adff]">
+                            Discord Server
+                          </span>
+                        </div>
+                        <p className="text-xs text-dim leading-relaxed mb-4">
+                          Dedicated tournament community for match disputes, voice lobbies, schedule coordination, and team comms.
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold uppercase text-[#a5adff] group-hover:underline">
+                        <span>Join Discord Server</span>
+                        <span className="transition-transform group-hover:translate-x-1">→</span>
+                      </span>
+                    </a>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1258,7 +1312,7 @@ export default function TournamentDetail() {
                 Bracket trees and custom match pairings generate automatically upon tournament registration close. Competing squads will be seeded into single-elimination brackets based on authoritative player ratings and registration order.
               </p>
               <div className="pt-2 flex flex-wrap justify-center gap-3 font-mono text-xs text-dim">
-                <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || 'Single Elimination'}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || 'Knockout'}</span>
                 <span className="border border-white/10 bg-white/5 px-3 py-1">Series: BO1 Qualifiers · BO3 Finals</span>
                 <span className="border border-white/10 bg-white/5 px-3 py-1">Slots: {maxTeams} Squads</span>
               </div>
