@@ -31,21 +31,7 @@ const PROFILE = [
 
 export function Logo() {
   return (
-    <Link to="/" className="group flex items-center gap-2.5 outline-none select-none">
-      <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-surface/60 p-1 transition-colors duration-300 group-hover:border-cyan/50">
-        <svg
-          width="20"
-          height="18"
-          viewBox="0 0 30 28"
-          fill="none"
-          aria-hidden
-          className="shrink-0 transition-transform duration-300 origin-center group-hover:scale-105"
-        >
-          <polygon points="3,7 25,7 27,2 5,2" fill="#3ef2ff" />
-          <polygon points="7,15 21,15 23,10 9,10" fill="#3ef2ff" />
-          <polygon points="11,23 17,23 19,18 13,18" fill="#3ef2ff" />
-        </svg>
-      </span>
+    <Link to="/" className="group flex items-center outline-none select-none">
       <span className="font-display text-xl font-black tracking-[0.18em] text-white transition-colors duration-300 group-hover:text-cyan">
         AMETHEUS
       </span>

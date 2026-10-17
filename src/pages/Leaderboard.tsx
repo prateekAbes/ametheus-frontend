@@ -19,6 +19,7 @@ import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmpt
 import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErrorState'
 import { LeaderboardParticleBackground } from '../components/leaderboard/LeaderboardParticleBackground'
 import { resolveMediaUrl } from '../services/apiClient'
+import { Hud } from '../components/ui'
 
 export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -39,9 +40,8 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<boolean>(false)
 
-  // 4. Pagination for Challengers Ladder (Ranks 4+)
+  // 4. Pagination state: player rankings displayed in groups of 10
   const [page, setPage] = useState<number>(1)
-  const pageSize = 15
 
   // Fetch disqualifications once on mount
   useEffect(() => {
@@ -171,29 +171,65 @@ export default function Leaderboard() {
   // Top 3 for the podium
   const top = useMemo(() => players.slice(0, 3), [players])
 
-  // Remaining contenders (rank 4+) filtered by search query
-  const filteredRest = useMemo(() => {
+  // Pagination & Search logic:
+  // - First group displays ranks 1–10 (top 3 on podium + ranks 4–10 in the list)
+  // - Next group displays ranks 11–20 (ranks 11–20 in the list)
+  // - Next group displays ranks 21–30 (ranks 21–30 in the list)
+  // - When searching, search results across all contenders are displayed 10 per page
+  const isSearching = Boolean(q.trim())
+
+  const searchResults = useMemo(() => {
     const remaining = players.slice(3)
-    if (!q.trim()) return remaining
+    if (!isSearching) return remaining
     const query = q.toLowerCase().trim()
     return remaining.filter(
       (p) =>
         p.name.toLowerCase().includes(query) ||
         (p.tag && p.tag.toLowerCase().includes(query))
     )
-  }, [players, q])
+  }, [players, isSearching, q])
 
-  // Reset page when search changes
+  // Reset page when search or metric changes
   useEffect(() => {
     setPage(1)
-  }, [q])
+  }, [q, metric])
 
-  // Paginated contenders for ladder
-  const totalLadderPages = Math.ceil(filteredRest.length / pageSize) || 1
-  const paginatedRest = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filteredRest.slice(start, start + pageSize)
-  }, [filteredRest, page, pageSize])
+  // Total pages calculation
+  const totalPages = useMemo(() => {
+    if (isSearching) {
+      return Math.max(1, Math.ceil(searchResults.length / 10))
+    }
+    if (players.length <= 10) {
+      return 1
+    }
+    return 1 + Math.ceil((players.length - 10) / 10)
+  }, [isSearching, searchResults.length, players.length])
+
+  // Current page items for the Challengers Ladder list
+  const paginatedList = useMemo(() => {
+    if (isSearching) {
+      const start = (page - 1) * 10
+      return searchResults.slice(start, start + 10)
+    }
+    if (page === 1) {
+      // First group: Ranks 1–10 (Podium displays 1–3, so Ladder list displays ranks 4–10)
+      return players.slice(3, 10)
+    }
+    // Subsequent groups of 10:
+    // Page 2: ranks 11–20 -> index 10 to 20
+    // Page 3: ranks 21–30 -> index 20 to 30
+    const start = 10 + (page - 2) * 10
+    return players.slice(start, start + 10)
+  }, [isSearching, searchResults, page, players])
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return
+    setPage(newPage)
+    const ladderEl = document.getElementById('challengers-ladder')
+    if (ladderEl) {
+      ladderEl.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   const activeMetricConfig = METRICS.find((m) => m.id === metric) || METRICS[0]
 
@@ -218,12 +254,16 @@ export default function Leaderboard() {
       {/* MAIN LEADERBOARD CONTAINER                                     */}
       {/* ============================================================== */}
       <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pb-24">
-        {/* Page Header */}
+        {/* Page Header: Adjusted to match Ametheus website conventions */}
         <section className="pb-14 pt-10 sm:pt-14">
-          <h1 className="font-display text-[clamp(3.5rem,11vw,9rem)] font-black uppercase leading-[0.8] tracking-tight text-white">
-            Leaderboard
+          <div className="mb-6 flex items-center gap-4">
+            <span className="h-px w-12 bg-cyan" />
+            <Hud className="text-ink">◇ Global Player Standings</Hud>
+          </div>
+          <h1 className="reveal-chars font-display text-[clamp(3.5rem,12vw,12rem)] font-black uppercase leading-[0.8] tracking-tight text-white text-balance break-words">
+            LEADERBOARD
           </h1>
-          <p className="mt-5 max-w-xl text-base text-ink/75 sm:text-lg">
+          <p className="mt-6 max-w-xl text-base text-ink/75 sm:text-lg">
             Authoritative player standings and competitive rankings across sanctioned tournament circuits.
           </p>
         </section>
@@ -296,7 +336,7 @@ export default function Leaderboard() {
                 </div>
 
                 <ul className="divide-y divide-white/[0.07] border-t border-white/[0.07]">
-                  {paginatedRest.map((p) => (
+                  {paginatedList.map((p) => (
                     <li
                       key={p.id || `player-${p.rank}-${p.name}`}
                       className={`grid grid-cols-[2rem_3rem_1fr_auto] items-center gap-4 py-4 transition-colors hover:bg-white/[0.025] md:gap-6 ${
@@ -359,63 +399,112 @@ export default function Leaderboard() {
                       </div>
                     </li>
                   ))}
-                  {filteredRest.length === 0 && (
+                  {paginatedList.length === 0 && (
                     <li className="py-12 text-center text-sm text-dim">
                       {q ? `No players found matching "${q}".` : 'No challengers ranked yet.'}
                     </li>
                   )}
                 </ul>
 
-                {/* Pagination Controls */}
-                {totalLadderPages > 1 && (
-                  <div className="flex items-center justify-between border-t border-white/[0.07] pt-4 font-mono text-xs">
-                    <span className="text-dim text-[11px]">
-                      Showing {(page - 1) * pageSize + 1}-
-                      {Math.min(page * pageSize, filteredRest.length)} of {filteredRest.length} challengers
-                    </span>
+                {/* Compact Pagination Controls: Groups of 10 */}
+                {totalPages > 1 && (
+                  <nav
+                    aria-label="Leaderboard pagination"
+                    className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-white/[0.07] pt-4 font-mono text-xs"
+                  >
+                    <div className="text-dim text-[11px]">
+                      {isSearching ? (
+                        <>
+                          Showing{' '}
+                          <span className="text-white font-bold">
+                            {searchResults.length === 0 ? 0 : (page - 1) * 10 + 1}–
+                            {Math.min(page * 10, searchResults.length)}
+                          </span>{' '}
+                          of {searchResults.length} matching contenders
+                        </>
+                      ) : page === 1 ? (
+                        <>
+                          Showing ranks{' '}
+                          <span className="text-white font-bold">
+                            01–{String(Math.min(10, players.length)).padStart(2, '0')}
+                          </span>{' '}
+                          of {players.length} contenders (Group 1)
+                        </>
+                      ) : (
+                        <>
+                          Showing ranks{' '}
+                          <span className="text-white font-bold">
+                            {String(10 + (page - 2) * 10 + 1).padStart(2, '0')}–
+                            {String(Math.min(10 + (page - 1) * 10, players.length)).padStart(2, '0')}
+                          </span>{' '}
+                          of {players.length} contenders (Group {page})
+                        </>
+                      )}
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (page > 1) {
-                            setPage(page - 1)
-                            document.getElementById('challengers-ladder')?.scrollIntoView({ behavior: 'smooth' })
-                          }
-                        }}
+                        onClick={() => handlePageChange(page - 1)}
                         disabled={page === 1}
-                        className={`px-3 py-1 uppercase font-bold text-[10px] rounded-sm border transition-colors cursor-pointer ${
+                        aria-label="Previous page"
+                        className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
                           page === 1
-                            ? 'border-white/5 text-white/20 cursor-not-allowed'
-                            : 'border-white/10 text-white hover:border-white/30 hover:bg-white/5'
+                            ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                            : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
                         }`}
                       >
-                        Prev
+                        ← Prev
                       </button>
 
-                      <span className="px-2 text-dim text-[10px]">
-                        {page} / {totalLadderPages}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+                          if (totalPages > 7) {
+                            if (num !== 1 && num !== totalPages && Math.abs(num - page) > 1) {
+                              if (num === 2 || num === totalPages - 1) {
+                                return (
+                                  <span key={num} className="px-1 text-dim font-mono text-xs">
+                                    …
+                                  </span>
+                                )
+                              }
+                              return null
+                            }
+                          }
+                          const active = num === page
+                          return (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => handlePageChange(num)}
+                              aria-current={active ? 'page' : undefined}
+                              className={`size-7 text-[11px] font-bold font-mono rounded-sm transition-colors cursor-pointer ${
+                                active
+                                  ? 'border border-cyan bg-cyan/15 text-cyan'
+                                  : 'border border-white/10 bg-surface/50 text-dim hover:border-white/30 hover:text-white'
+                              }`}
+                            >
+                              {num}
+                            </button>
+                          )
+                        })}
+                      </div>
 
                       <button
                         type="button"
-                        onClick={() => {
-                          if (page < totalLadderPages) {
-                            setPage(page + 1)
-                            document.getElementById('challengers-ladder')?.scrollIntoView({ behavior: 'smooth' })
-                          }
-                        }}
-                        disabled={page === totalLadderPages}
-                        className={`px-3 py-1 uppercase font-bold text-[10px] rounded-sm border transition-colors cursor-pointer ${
-                          page === totalLadderPages
-                            ? 'border-white/5 text-white/20 cursor-not-allowed'
-                            : 'border-white/10 text-white hover:border-white/30 hover:bg-white/5'
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page === totalPages}
+                        aria-label="Next page"
+                        className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
+                          page === totalPages
+                            ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                            : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
                         }`}
                       >
-                        Next
+                        Next →
                       </button>
                     </div>
-                  </div>
+                  </nav>
                 )}
               </div>
             </section>
