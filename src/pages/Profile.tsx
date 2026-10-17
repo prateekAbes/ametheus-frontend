@@ -17,7 +17,7 @@ import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../se
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
 export default function Profile() {
-  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, isSignedIn, refreshProfile } = useAuthContext()
+  const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, googleAvatarUrl, isSignedIn, refreshProfile } = useAuthContext()
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
   const [matches, setMatches] = useState<any[]>([])
@@ -81,13 +81,27 @@ export default function Profile() {
   const handleSelectCrest = async (crest: CrestType) => {
     setCrestModalMsg(null)
     try {
-      await updateUserProfile({ avatar_url: crest.image_url })
+      await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setCrestModalMsg({ type: 'ok', text: `Crest '${crest.name}' successfully equipped and saved!` })
       setTimeout(() => setCrestModalMsg(null), 4000)
     } catch (err: any) {
       setCrestModalMsg({ type: 'err', text: err.message || 'Failed to equip crest.' })
+    }
+  }
+
+  const handleEquipGooglePhoto = async () => {
+    if (!googleAvatarUrl) return
+    setCrestModalMsg(null)
+    try {
+      await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      await refreshProfile()
+      window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+      setCrestModalMsg({ type: 'ok', text: 'Google Profile Photo successfully equipped and saved!' })
+      setTimeout(() => setCrestModalMsg(null), 4000)
+    } catch (err: any) {
+      setCrestModalMsg({ type: 'err', text: err.message || 'Failed to equip Google profile photo.' })
     }
   }
 
@@ -99,7 +113,7 @@ export default function Profile() {
     try {
       const res = await uploadMediaFile(file)
       if (res && res.url) {
-        await updateUserProfile({ avatar_url: res.url })
+        await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setCrestModalMsg({ type: 'ok', text: 'Custom avatar uploaded and saved to your account!' })
@@ -842,6 +856,44 @@ export default function Profile() {
               </label>
             </div>
           </div>
+
+          {/* Voluntary Google Profile Picture Option */}
+          {googleAvatarUrl && (
+            <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="size-14 shrink-0 rounded-full border border-white/20 bg-void overflow-hidden">
+                  <img
+                    src={googleAvatarUrl}
+                    alt="Google Profile"
+                    className="size-full object-cover"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-black uppercase text-sm text-ink">Google Profile Picture</span>
+                    {(profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl) && (
+                      <span className="text-[10px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-dim">
+                    Voluntarily use your Google / Gmail account picture as your public esports avatar.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleEquipGooglePhoto}
+                disabled={profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl}
+                className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
+                  (profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl)
+                    ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
+                    : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
+                }`}
+              >
+                {(profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl) ? 'Equipped' : 'Equip Google Photo'}
+              </button>
+            </div>
+          )}
 
           {/* Sanctioned Operator Crests Grid */}
           <div>

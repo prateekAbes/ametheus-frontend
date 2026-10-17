@@ -37,6 +37,7 @@ interface AuthContextValue {
   role: CanonicalRole
   displayName: string
   avatarUrl: string
+  googleAvatarUrl: string
   isLoading: boolean
   isSignedIn: boolean
   isPlayer: boolean
@@ -50,6 +51,7 @@ const AuthContext = createContext<AuthContextValue>({
   role: 'PLAYER',
   displayName: 'Contender',
   avatarUrl: '',
+  googleAvatarUrl: '',
   isLoading: true,
   isSignedIn: false,
   isPlayer: false,
@@ -197,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           canonicalUsername ||
           user.firstName?.trim() ||
           'Contender'
-        const avatarUrl = user.imageUrl
+        const incomingGooglePic = user.imageUrl || undefined
 
         // Metadata-indicated role (if set on Clerk user)
         const metadataRole =
@@ -244,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: userEmail,
                 username,
                 display_name: displayName,
-                avatar_url: avatarUrl,
+                google_avatar_url: incomingGooglePic,
                 has_chosen_username: hasChosenUsername,
               },
               token
@@ -260,7 +262,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const finalProfile: UserProfile = {
                 ...synced,
                 email: cleanEmail,
-                avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : avatarUrl,
+                avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : '',
+                google_avatar_url: synced.google_avatar_url || incomingGooglePic,
                 role: canonical as any,
               }
               syncedUserIdRef.current = user.id
@@ -286,7 +289,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const finalProfile: UserProfile = {
                 ...me,
                 email: cleanEmail,
-                avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : avatarUrl,
+                avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : '',
+                google_avatar_url: me.google_avatar_url || incomingGooglePic,
                 role: canonical as any,
               }
               syncedUserIdRef.current = user.id
@@ -308,7 +312,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: userEmail,
             username,
             display_name: displayName,
-            avatar_url: avatarUrl,
+            avatar_url: '',
+            google_avatar_url: incomingGooglePic,
             role: fallbackCanonical as any,
             inr_balance: '0.00',
             inr_balance_paise: 0,
@@ -374,9 +379,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
   }, [profile?.username, profile?.display_name, user?.username])
 
+  const googleAvatarUrl = useMemo(() => {
+    return user?.imageUrl || profile?.google_avatar_url || ''
+  }, [user?.imageUrl, profile?.google_avatar_url])
+
   const effectiveAvatarUrl = useMemo(() => {
-    return resolveMediaUrl(profile?.avatar_url || user?.imageUrl)
-  }, [profile?.avatar_url, user?.imageUrl])
+    return profile?.avatar_url ? resolveMediaUrl(profile.avatar_url) : ''
+  }, [profile?.avatar_url])
 
   const isSignedIn = !!clerkSignedIn || !!profile
   const isPlayer = isSignedIn
@@ -390,6 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: effectiveRole,
         displayName: effectiveDisplayName,
         avatarUrl: effectiveAvatarUrl,
+        googleAvatarUrl,
         isLoading,
         isSignedIn,
         isPlayer,

@@ -54,10 +54,10 @@ export function LeaderboardSkeleton() {
       </div>
 
       {/* Divider */}
-      <div className="w-full border-b border-white/10" />
+      <div className="w-full max-w-[1120px] border-b border-white/10" />
 
       {/* 2. Lower 2-Column Desktop Grid Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-10 lg:gap-16 items-start max-w-[1120px]">
         {/* Left Column Sidebar Skeleton (Hidden on mobile) */}
         <aside className="hidden lg:block w-[200px] shrink-0 space-y-6 sticky top-28">
           <div>

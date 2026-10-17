@@ -7,6 +7,8 @@ export interface UserProfile {
   username: string
   display_name?: string
   avatar_url?: string
+  avatar_source?: 'DEFAULT' | 'CREST' | 'GOOGLE' | 'UPLOADED' | string
+  google_avatar_url?: string
   role: 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN' | 'TOURNAMENT_ADMIN' | 'MATCH_ARBITER' | 'COMMUNITY_MODERATOR'
   inr_balance: string
   inr_balance_paise?: number
@@ -25,6 +27,8 @@ export interface UserSyncPayload {
   username: string
   display_name?: string
   avatar_url?: string
+  avatar_source?: string
+  google_avatar_url?: string
   has_chosen_username?: boolean
 }
 
@@ -66,6 +70,8 @@ export interface UserProfileUpdatePayload {
   riot_id?: string
   steam_id?: string
   avatar_url?: string
+  avatar_source?: string
+  google_avatar_url?: string
   preferences?: Record<string, any>
   privacy_settings?: Record<string, any>
 }

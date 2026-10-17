@@ -44,7 +44,7 @@ function Row({ k, d, children }: { k: string; d?: string; children: ReactNode })
 }
 
 export default function Settings() {
-  const { profile, refreshProfile } = useAuthContext()
+  const { profile, refreshProfile, googleAvatarUrl } = useAuthContext()
   const { user } = useUser()
   const clerk = useClerk()
   const { getToken } = useAuth()
@@ -247,7 +247,7 @@ export default function Settings() {
       if (res && res.url) {
         setAvatarUrl(res.url)
         // Automatically persist custom avatar upload to database
-        await updateUserProfile({ avatar_url: res.url })
+        await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setSaveMessage('Profile picture uploaded and saved successfully.')
@@ -261,10 +261,25 @@ export default function Settings() {
     }
   }
 
+  const handleEquipGooglePhoto = async () => {
+    if (!googleAvatarUrl) return
+    setAvatarUrl(googleAvatarUrl)
+    try {
+      await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      await refreshProfile()
+      window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
+      setSaveMessage('Google profile picture equipped and persisted.')
+      setSaved(true)
+      setTimeout(() => setSaveMessage(''), 4000)
+    } catch (err: any) {
+      setSaveMessage(err.message || 'Failed to equip Google profile photo.')
+    }
+  }
+
   const handleSelectCrest = async (crest: Crest) => {
     setAvatarUrl(crest.image_url)
     try {
-      await updateUserProfile({ avatar_url: crest.image_url })
+      await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaveMessage(`Player crest "${crest.name}" equipped and persisted.`)
@@ -663,6 +678,44 @@ export default function Settings() {
                         <p className="mt-2 font-mono text-xs text-live">{avatarUploadError}</p>
                       )}
                     </div>
+
+                    {/* Voluntary Google Profile Picture Option */}
+                    {googleAvatarUrl && (
+                      <div className="border border-white/10 bg-surface/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="size-12 shrink-0 rounded-full border border-white/20 bg-void overflow-hidden">
+                            <img
+                              src={googleAvatarUrl}
+                              alt="Google Profile"
+                              className="size-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-display font-black uppercase text-xs text-ink flex items-center gap-2">
+                              Google Profile Picture
+                              {(profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl) && (
+                                <span className="text-[9px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
+                              )}
+                            </p>
+                            <p className="font-sans text-[11px] text-dim mt-0.5">
+                              Voluntarily use your Google / Gmail account picture as your public esports avatar.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleEquipGooglePhoto}
+                          disabled={profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl}
+                          className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
+                            (profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl)
+                              ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
+                              : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
+                          }`}
+                        >
+                          {(profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl) ? 'Equipped' : 'Equip Google Photo'}
+                        </button>
+                      </div>
+                    )}
 
                     {/* Sanctioned Crests Grid */}
                     <div className="pt-2 border-t border-white/10">

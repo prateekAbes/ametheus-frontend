@@ -27,7 +27,7 @@ import { resolveMediaUrl } from '../services/apiClient'
 
 export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { profile } = useAuthContext()
+  const { profile, role, isSuperAdmin } = useAuthContext()
 
   // 1. Metric and TimeRange states synchronized with URL query parameters
   const initialMetric = (searchParams.get('metric') as MetricId) || 'overall'
@@ -129,98 +129,159 @@ export default function Leaderboard() {
 
   // Transform raw backend entries into LeaderboardPlayer presentation models
   const players: LeaderboardPlayer[] = useMemo(() => {
-    return entries.map((entry, index) => {
-      // Helper to detect 1-3 letter abbreviations or placeholder IDs
-      const isFragment = (val?: string | null) => {
-        if (!val) return true
-        const trimmed = val.trim()
-        if (trimmed.length === 0) return true
-        if (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) return true
-        if (trimmed.toLowerCase().startsWith('player_') || trimmed.toLowerCase().startsWith('user_')) return true
-        return false
-      }
+    // Helper to detect 1-3 letter abbreviations or placeholder IDs
+    const isFragment = (val?: string | null) => {
+      if (!val) return true
+      const trimmed = val.trim()
+      if (trimmed.length === 0) return true
+      if (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) return true
+      if (trimmed.toLowerCase().startsWith('player_') || trimmed.toLowerCase().startsWith('user_')) return true
+      return false
+    }
 
-      // Authoritative identity resolution: display_name -> username -> captain -> non-fragment name -> fallback
-      let resolvedName = ''
-      if (entry.display_name && !isFragment(entry.display_name)) {
-        resolvedName = entry.display_name
-      } else if (entry.username && !isFragment(entry.username)) {
-        resolvedName = entry.username
-      } else if (entry.name && !isFragment(entry.name)) {
-        resolvedName = entry.name
-      } else if (entry.captain && !isFragment(entry.captain.replace('@', ''))) {
-        resolvedName = entry.captain.replace('@', '')
-      } else if (entry.display_name) {
-        resolvedName = entry.display_name
-      } else if (entry.username) {
-        resolvedName = entry.username
-      } else if (entry.name) {
-        resolvedName = entry.name
-      } else {
-        resolvedName = 'Contender'
-      }
+    // Helper to safeguard against any super admin appearing in client models
+    const isSuperAdminAccount = (val?: string | null) => {
+      if (!val) return false
+      const s = val.toLowerCase().trim()
+      return (
+        s === 'admin@ametheus.gg' ||
+        s === 'pk.4081988@gmail.com' ||
+        s.includes('super_admin') ||
+        s.includes('superadmin') ||
+        s === 'admin' ||
+        s === 'adhjahdj' ||
+        s === 'fbjbjfha'
+      )
+    }
 
-      const displayName = resolvedName.trim()
+    return entries
+      .filter(
+        (entry) =>
+          !isSuperAdminAccount(entry.captain) &&
+          !isSuperAdminAccount(entry.display_name) &&
+          !isSuperAdminAccount(entry.username) &&
+          !isSuperAdminAccount(entry.name) &&
+          !isSuperAdminAccount(entry.id) &&
+          !(entry.status === 'DISBANDED' && (entry.matches_played || 0) === 0 && (entry.earnings || 0) === 0)
+      )
+      .map((entry, index) => {
+        // Authoritative identity resolution: display_name -> username -> captain -> non-fragment name -> fallback
+        let resolvedName = ''
+        if (entry.display_name && !isFragment(entry.display_name)) {
+          resolvedName = entry.display_name
+        } else if (entry.username && !isFragment(entry.username)) {
+          resolvedName = entry.username
+        } else if (entry.name && !isFragment(entry.name)) {
+          resolvedName = entry.name
+        } else if (entry.captain && !isFragment(entry.captain.replace('@', ''))) {
+          resolvedName = entry.captain.replace('@', '')
+        } else if (entry.display_name) {
+          resolvedName = entry.display_name
+        } else if (entry.username) {
+          resolvedName = entry.username
+        } else if (entry.name) {
+          resolvedName = entry.name
+        } else {
+          resolvedName = 'Contender'
+        }
 
-      // Derive clean 2-letter uppercase initials
-      const parts = displayName.split(/[\s_-]+/).filter(Boolean)
-      let initials = ''
-      if (parts.length >= 2) {
-        initials = (parts[0][0] + parts[1][0]).toUpperCase()
-      } else if (displayName.length >= 2) {
-        initials = displayName.slice(0, 2).toUpperCase()
-      } else {
-        initials = (displayName[0] || 'C').toUpperCase()
-      }
+        const displayName = resolvedName.trim()
 
-      // Deterministic tone for avatar background (20..32)
-      let hash = 0
-      for (let i = 0; i < displayName.length; i++) {
-        hash = (hash << 5) - hash + displayName.charCodeAt(i)
-        hash |= 0
-      }
-      const tone = 20 + (Math.abs(hash) % 13)
+        // Derive clean 2-letter uppercase initials
+        const parts = displayName.split(/[\s_-]+/).filter(Boolean)
+        let initials = ''
+        if (parts.length >= 2) {
+          initials = (parts[0][0] + parts[1][0]).toUpperCase()
+        } else if (displayName.length >= 2) {
+          initials = displayName.slice(0, 2).toUpperCase()
+        } else {
+          initials = (displayName[0] || 'C').toUpperCase()
+        }
 
-      const matches = entry.matches_played || (entry.wins + entry.losses) || 0
-      const wins = entry.wins || 0
-      const winRate =
-        typeof entry.win_rate === 'number' && !isNaN(entry.win_rate)
-          ? entry.win_rate
-          : matches > 0
-          ? Math.round((wins / matches) * 100)
-          : 0
+        // Deterministic tone for avatar background (20..32)
+        let hash = 0
+        for (let i = 0; i < displayName.length; i++) {
+          hash = (hash << 5) - hash + displayName.charCodeAt(i)
+          hash |= 0
+        }
+        const tone = 20 + (Math.abs(hash) % 13)
 
-      const isCurrentUser = isEntryCurrentUser(entry, profile?.id, profile?.username)
-      const isDisqualified = isEntryDisqualified(entry, disqualifiedIds)
-      const avatarUrl = resolveMediaUrl(entry.avatar_url || entry.logo_url)
+        const matches = entry.matches_played || (entry.wins + entry.losses) || 0
+        const wins = entry.wins || 0
+        const winRate =
+          typeof entry.win_rate === 'number' && !isNaN(entry.win_rate)
+            ? entry.win_rate
+            : matches > 0
+            ? Math.round((wins / matches) * 100)
+            : 0
 
-      return {
-        id: entry.id,
-        name: displayName,
-        rawName: displayName,
-        displayName,
-        username: entry.username,
-        initials,
-        tone,
-        wins,
-        matches,
-        winRate,
-        points: entry.rating || 1500,
-        spent: entry.spending || 0,
-        earnings: entry.earnings || 0,
-        streak: entry.streak || 0,
-        top3: entry.top3 || 0,
-        avatarUrl,
-        rank: entry.rank || index + 1,
-        isCurrentUser,
-        isDisqualified,
-        tag: entry.tag,
-      }
-    })
+        const isCurrentUser = isEntryCurrentUser(entry, profile?.id, profile?.username)
+        const isDisqualified = isEntryDisqualified(entry, disqualifiedIds)
+        const avatarUrl = resolveMediaUrl(entry.avatar_url || entry.logo_url)
+
+        return {
+          id: entry.id,
+          name: displayName,
+          rawName: displayName,
+          displayName,
+          username: entry.username,
+          initials,
+          tone,
+          wins,
+          matches,
+          winRate,
+          points: entry.rating || 1500,
+          spent: entry.spending || 0,
+          earnings: entry.earnings || 0,
+          streak: entry.streak || 0,
+          top3: entry.top3 || 0,
+          avatarUrl,
+          rank: entry.rank || index + 1,
+          isCurrentUser,
+          isDisqualified,
+          tag: entry.tag,
+        }
+      })
   }, [entries, profile?.id, profile?.username, disqualifiedIds])
 
+  // Deterministic dynamic sorting according to active metric
+  const sortedPlayers = useMemo(() => {
+    const list = [...players]
+    switch (metric) {
+      case 'win_rate':
+        list.sort((a, b) => b.winRate - a.winRate || b.wins - a.wins || b.points - a.points)
+        break
+      case 'wins':
+        list.sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.points - a.points)
+        break
+      case 'streak':
+        list.sort((a, b) => b.streak - a.streak || b.wins - a.wins || b.points - a.points)
+        break
+      case 'matches':
+        list.sort((a, b) => b.matches - a.matches || b.wins - a.wins || b.points - a.points)
+        break
+      case 'top3':
+        list.sort((a, b) => b.top3 - a.top3 || b.wins - a.wins || b.points - a.points)
+        break
+      case 'earnings':
+        list.sort((a, b) => b.earnings - a.earnings || b.wins - a.wins || b.points - a.points)
+        break
+      case 'spending':
+        list.sort((a, b) => b.spent - a.spent || b.points - a.points || b.wins - a.wins)
+        break
+      case 'overall':
+      default:
+        list.sort((a, b) => b.points - a.points || b.wins - a.wins || b.winRate - a.winRate)
+        break
+    }
+    return list.map((p, idx) => ({
+      ...p,
+      rank: idx + 1,
+    }))
+  }, [players, metric])
+
   // Top 3 for the podium
-  const top = useMemo(() => players.slice(0, 3), [players])
+  const top = useMemo(() => sortedPlayers.slice(0, 3), [sortedPlayers])
 
   // Active metric config object
   const activeMetricConfig = METRICS.find((m) => m.id === metric) || METRICS[0]
@@ -234,7 +295,23 @@ export default function Leaderboard() {
       }
     }
 
-    const userPlayer = players.find((p) => p.isCurrentUser)
+    const cleanEmail = (profile.email || '').trim().toLowerCase()
+    const isSuperAdminUser =
+      isSuperAdmin ||
+      role === 'SUPER_ADMIN' ||
+      cleanEmail === 'admin@ametheus.gg' ||
+      cleanEmail === 'pk.4081988@gmail.com' ||
+      (profile as any).role === 'SUPER_ADMIN' ||
+      (profile as any).role === 'super_admin'
+
+    if (isSuperAdminUser) {
+      return {
+        rankText: '--',
+        subText: 'Super Admin accounts are excluded from competitive rankings',
+      }
+    }
+
+    const userPlayer = sortedPlayers.find((p) => p.isCurrentUser)
     if (!userPlayer) {
       return {
         rankText: '--',
@@ -243,7 +320,7 @@ export default function Leaderboard() {
     }
 
     const rank = userPlayer.rank
-    const total = Math.max(players.length, 1)
+    const total = Math.max(sortedPlayers.length, 1)
     const percentile = Math.max(1, Math.round((rank / total) * 100))
     const statValueStr = showPlayerMetricValue(userPlayer, metric)
     const metricLabel = activeMetricConfig.unit
@@ -252,7 +329,7 @@ export default function Leaderboard() {
       rankText: `#${String(rank).padStart(2, '0')}`,
       subText: `${statValueStr} ${metricLabel} · Top ${percentile}%`,
     }
-  }, [profile, players, metric, activeMetricConfig.unit])
+  }, [profile, role, isSuperAdmin, sortedPlayers, metric, activeMetricConfig.unit])
 
   // Platform statistics strip blocks
   const statBlocks = useMemo(() => {
@@ -263,7 +340,7 @@ export default function Leaderboard() {
           ? platformStats.ranked_players.toLocaleString()
           : loading
           ? '—'
-          : players.length.toLocaleString(),
+          : sortedPlayers.length.toLocaleString(),
       },
       {
         label: 'Matches Played',
@@ -290,7 +367,7 @@ export default function Leaderboard() {
           : '0',
       },
     ]
-  }, [platformStats, players.length, loading])
+  }, [platformStats, sortedPlayers.length, loading])
 
   // Pagination & Search logic:
   // - First group displays ranks 1–10 (top 3 on podium + ranks 4–10 in the list)
@@ -300,7 +377,7 @@ export default function Leaderboard() {
   const isSearching = Boolean(q.trim())
 
   const searchResults = useMemo(() => {
-    const remaining = players.slice(3)
+    const remaining = sortedPlayers.slice(3)
     if (!isSearching) return remaining
     const query = q.toLowerCase().trim()
     return remaining.filter(
@@ -308,7 +385,7 @@ export default function Leaderboard() {
         p.name.toLowerCase().includes(query) ||
         (p.tag && p.tag.toLowerCase().includes(query))
     )
-  }, [players, isSearching, q])
+  }, [sortedPlayers, isSearching, q])
 
   // Reset page when search or metric changes
   useEffect(() => {
@@ -320,11 +397,11 @@ export default function Leaderboard() {
     if (isSearching) {
       return Math.max(1, Math.ceil(searchResults.length / 10))
     }
-    if (players.length <= 10) {
+    if (sortedPlayers.length <= 10) {
       return 1
     }
-    return 1 + Math.ceil((players.length - 10) / 10)
-  }, [isSearching, searchResults.length, players.length])
+    return 1 + Math.ceil((sortedPlayers.length - 10) / 10)
+  }, [isSearching, searchResults.length, sortedPlayers.length])
 
   // Current page items for the Challengers Ladder list
   const paginatedList = useMemo(() => {
@@ -334,14 +411,14 @@ export default function Leaderboard() {
     }
     if (page === 1) {
       // First group: Ranks 1–10 (Podium displays 1–3, so Ladder list displays ranks 4–10)
-      return players.slice(3, 10)
+      return sortedPlayers.slice(3, 10)
     }
     // Subsequent groups of 10:
     // Page 2: ranks 11–20 -> index 10 to 20
     // Page 3: ranks 21–30 -> index 20 to 30
     const start = 10 + (page - 2) * 10
-    return players.slice(start, start + 10)
-  }, [isSearching, searchResults, page, players])
+    return sortedPlayers.slice(start, start + 10)
+  }, [isSearching, searchResults, page, sortedPlayers])
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
@@ -408,14 +485,16 @@ export default function Leaderboard() {
           </p>
         </section>
 
-        {/* RESTRICTED MAIN CONTENT CONTAINER (~1120px) */}
-        <div className="mx-auto w-[calc(100%-64px)] max-w-[1120px] px-0 space-y-8 md:space-y-10">
-          {/* Horizontal Platform Statistics Strip */}
-          <PlatformStatsStrip stats={statBlocks} />
+        {/* MAIN CONTENT CONTAINER: Aligned with page header at max-w-[1600px] px-5 md:px-10 */}
+        <div className="relative mx-auto w-full max-w-[1600px] px-5 md:px-10 pb-16 space-y-8 md:space-y-10">
+          {/* Horizontal Platform Statistics Strip (left-aligned with header, max-w 1120px) */}
+          <div className="w-full max-w-[1120px]">
+            <PlatformStatsStrip stats={statBlocks} />
+          </div>
 
-          {/* Time-Range Filters (left-aligned with stats strip) */}
+          {/* Time-Range Filters (left-aligned with stats strip and header) */}
           <div className="flex items-center">
-            <div className="inline-flex items-center rounded-sm border border-white/10 bg-[#0c121d]/90 p-0.5 font-mono text-[11px]">
+            <div className="inline-flex items-center rounded-sm border border-white/10 bg-[#0c121d]/90 p-1 font-mono text-xs sm:text-[13px]">
               {TIME_RANGES.map((t) => {
                 const active = t.id === timeRange
                 return (
@@ -426,7 +505,7 @@ export default function Leaderboard() {
                       setTimeRange(t.id)
                       setPage(1)
                     }}
-                    className={`px-3 py-1 uppercase tracking-wider font-bold transition-colors cursor-pointer rounded-xs ${
+                    className={`px-3.5 sm:px-4 py-1.5 uppercase tracking-wider font-bold transition-colors cursor-pointer rounded-xs whitespace-nowrap ${
                       active
                         ? 'bg-cyan/15 text-cyan border border-cyan/40 shadow-xs'
                         : 'text-dim hover:text-white border border-transparent'
@@ -443,7 +522,7 @@ export default function Leaderboard() {
             <LeaderboardSkeleton />
           ) : error ? (
             <LeaderboardErrorState onRetry={fetchLeaderboardData} />
-          ) : players.length === 0 ? (
+          ) : sortedPlayers.length === 0 ? (
             <LeaderboardEmptyState
               hasFilters={metric !== 'overall' || timeRange !== 'all_time'}
               onResetFilters={handleResetFilters}
@@ -460,10 +539,10 @@ export default function Leaderboard() {
               )}
 
               {/* Full-width Divider spanning the restricted 1120px container */}
-              <div className="w-full border-b border-white/10" />
+              <div className="w-full max-w-[1120px] border-b border-white/10" />
 
               {/* Lower Leaderboard: 2-Column Desktop Grid (Rank By on the LEFT) */}
-              <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+              <div className="w-full max-w-[1120px] grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
                 {/* Left Column (Desktop): Ranking Metrics Panel + Your Position Card */}
                 <RankingMetricsPanel
                   currentMetric={metric}
@@ -529,7 +608,7 @@ export default function Leaderboard() {
                         </h2>
                         <span className="text-white/20">·</span>
                         <Mono className="normal-case tracking-normal">
-                          {players.length} contenders ranked
+                          {sortedPlayers.length} contenders ranked
                         </Mono>
                         <span className="text-white/20">·</span>
                         <Mono className="uppercase text-cyan font-bold tracking-wider">
