@@ -13,6 +13,8 @@ import {
   METRICS,
   MetricId,
   showPlayerMetricValue,
+  TimeRange,
+  TIME_RANGES,
 } from '../services/leaderboard'
 import { Avatar } from '../components/leaderboard/Avatar'
 import { PodiumSlot, Mono } from '../components/leaderboard/PodiumSlot'
@@ -27,10 +29,15 @@ export default function Leaderboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { profile } = useAuthContext()
 
-  // 1. Metric state synchronized with URL query parameter
+  // 1. Metric and TimeRange states synchronized with URL query parameters
   const initialMetric = (searchParams.get('metric') as MetricId) || 'overall'
   const [metric, setMetric] = useState<MetricId>(
     METRICS.some((m) => m.id === initialMetric) ? initialMetric : 'overall'
+  )
+
+  const initialTimeRange = (searchParams.get('time_range') as TimeRange) || 'all_time'
+  const [timeRange, setTimeRange] = useState<TimeRange>(
+    TIME_RANGES.some((t) => t.id === initialTimeRange) ? initialTimeRange : 'all_time'
   )
 
   // 2. Search query state
@@ -45,21 +52,6 @@ export default function Leaderboard() {
 
   // 4. Pagination state: player rankings displayed in groups of 10
   const [page, setPage] = useState<number>(1)
-
-  // Fetch platform stats once on mount
-  useEffect(() => {
-    let isMounted = true
-    getLeaderboardStats()
-      .then((stats) => {
-        if (isMounted) setPlatformStats(stats)
-      })
-      .catch((err) => {
-        console.error('[Leaderboard] Error fetching platform stats:', err)
-      })
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   // Fetch disqualifications once on mount
   useEffect(() => {
@@ -83,32 +75,45 @@ export default function Leaderboard() {
     }
   }, [])
 
-  // Sync metric state to URL query parameter
+  // Sync metric and timeRange states to URL query parameter
   useEffect(() => {
     const params = new URLSearchParams()
     if (metric !== 'overall') {
       params.set('metric', metric)
     }
+    if (timeRange !== 'all_time') {
+      params.set('time_range', timeRange)
+    }
     setSearchParams(params, { replace: true })
-  }, [metric, setSearchParams])
+  }, [metric, timeRange, setSearchParams])
 
-  // Fetch authoritative leaderboard entries from backend
+  // Fetch authoritative leaderboard entries and platform stats from backend
   const fetchLeaderboardData = useCallback(async () => {
     setLoading(true)
     setError(false)
     try {
-      const data = await getLeaderboardEntries({
-        metric,
-        limit: 100,
-      })
-      setEntries(data || [])
+      const [entriesData, statsData] = await Promise.all([
+        getLeaderboardEntries({
+          metric,
+          time_range: timeRange,
+          limit: 100,
+        }),
+        getLeaderboardStats(timeRange).catch((err) => {
+          console.error('[Leaderboard] Error fetching platform stats:', err)
+          return null
+        }),
+      ])
+      setEntries(entriesData || [])
+      if (statsData) {
+        setPlatformStats(statsData)
+      }
     } catch (err) {
       console.error('[Leaderboard] Error fetching standings:', err)
       setError(true)
     } finally {
       setLoading(false)
     }
-  }, [metric])
+  }, [metric, timeRange])
 
   useEffect(() => {
     fetchLeaderboardData()
@@ -117,6 +122,7 @@ export default function Leaderboard() {
   // Reset filters handler
   const handleResetFilters = () => {
     setMetric('overall')
+    setTimeRange('all_time')
     setQ('')
     setPage(1)
   }
@@ -124,15 +130,37 @@ export default function Leaderboard() {
   // Transform raw backend entries into LeaderboardPlayer presentation models
   const players: LeaderboardPlayer[] = useMemo(() => {
     return entries.map((entry, index) => {
-      const rawName =
-        entry.name &&
-        !entry.name.toLowerCase().startsWith('player_') &&
-        !entry.name.toLowerCase().startsWith('user_')
-          ? entry.name
-          : entry.captain
-          ? entry.captain.replace('@', '')
-          : entry.name || 'Contender'
-      const displayName = rawName.trim()
+      // Helper to detect 1-3 letter abbreviations or placeholder IDs
+      const isFragment = (val?: string | null) => {
+        if (!val) return true
+        const trimmed = val.trim()
+        if (trimmed.length === 0) return true
+        if (trimmed.length <= 3 && trimmed === trimmed.toUpperCase()) return true
+        if (trimmed.toLowerCase().startsWith('player_') || trimmed.toLowerCase().startsWith('user_')) return true
+        return false
+      }
+
+      // Authoritative identity resolution: display_name -> username -> captain -> non-fragment name -> fallback
+      let resolvedName = ''
+      if (entry.display_name && !isFragment(entry.display_name)) {
+        resolvedName = entry.display_name
+      } else if (entry.username && !isFragment(entry.username)) {
+        resolvedName = entry.username
+      } else if (entry.name && !isFragment(entry.name)) {
+        resolvedName = entry.name
+      } else if (entry.captain && !isFragment(entry.captain.replace('@', ''))) {
+        resolvedName = entry.captain.replace('@', '')
+      } else if (entry.display_name) {
+        resolvedName = entry.display_name
+      } else if (entry.username) {
+        resolvedName = entry.username
+      } else if (entry.name) {
+        resolvedName = entry.name
+      } else {
+        resolvedName = 'Contender'
+      }
+
+      const displayName = resolvedName.trim()
 
       // Derive clean 2-letter uppercase initials
       const parts = displayName.split(/[\s_-]+/).filter(Boolean)
@@ -374,288 +402,362 @@ export default function Leaderboard() {
             LEADERBOARD
           </h1>
           <p className="mt-6 max-w-xl text-lg text-dim">
-            Player standings and competitive rankings across Ametheus.
+            Authoritative player standings and competitive rankings across sanctioned tournament circuits.
           </p>
         </section>
 
-        {/* Horizontal Platform Statistics Strip */}
-        <PlatformStatsStrip stats={statBlocks} />
+        {/* RESTRICTED MAIN CONTENT CONTAINER (~1120px) */}
+        <div className="mx-auto w-[calc(100%-64px)] max-w-[1120px] px-0 space-y-8 md:space-y-10">
+          {/* Horizontal Platform Statistics Strip */}
+          <PlatformStatsStrip stats={statBlocks} />
 
-        {/* Main Content Area: 2-Column Desktop Grid */}
-        <div className="mx-auto w-full max-w-[1600px] px-5 md:px-10 pt-10 md:pt-14">
+          {/* Time-Range Filters (left-aligned with stats strip) */}
+          <div className="flex items-center">
+            <div className="inline-flex items-center rounded-sm border border-white/10 bg-[#0c121d]/90 p-0.5 font-mono text-[11px]">
+              {TIME_RANGES.map((t) => {
+                const active = t.id === timeRange
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setTimeRange(t.id)
+                      setPage(1)
+                    }}
+                    className={`px-3 py-1 uppercase tracking-wider font-bold transition-colors cursor-pointer rounded-xs ${
+                      active
+                        ? 'bg-cyan/15 text-cyan border border-cyan/40 shadow-xs'
+                        : 'text-dim hover:text-white border border-transparent'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {loading ? (
             <LeaderboardSkeleton />
           ) : error ? (
             <LeaderboardErrorState onRetry={fetchLeaderboardData} />
           ) : players.length === 0 ? (
             <LeaderboardEmptyState
-              hasFilters={metric !== 'overall'}
+              hasFilters={metric !== 'overall' || timeRange !== 'all_time'}
               onResetFilters={handleResetFilters}
             />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[260px_1fr] gap-8 xl:gap-14 items-start">
-              {/* Left Column (Desktop): Ranking Metrics Panel + Your Position Card */}
-              <RankingMetricsPanel
-                currentMetric={metric}
-                onSelectMetric={setMetric}
-                userPosition={userPosition}
-                className="hidden lg:flex sticky top-28"
-              />
-
-              {/* Mobile Metric Switcher & User Position Banner (lg:hidden) */}
-              <div className="lg:hidden space-y-4 mb-2">
-                <div className="rounded-sm border border-white/10 bg-[#0c121d]/90 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono text-xs uppercase tracking-[0.18em] text-dim font-bold">
-                      Rank by
-                    </span>
-                    <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider">
-                      {activeMetricConfig.label}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                    {METRICS.map((x) => {
-                      const on = x.id === metric
-                      return (
-                        <button
-                          key={x.id}
-                          type="button"
-                          onClick={() => setMetric(x.id)}
-                          className={`px-3 py-1.5 rounded-xs font-mono text-xs whitespace-nowrap transition-colors cursor-pointer ${
-                            on
-                              ? 'border border-cyan bg-cyan/15 text-white font-bold'
-                              : 'border border-white/10 bg-surface/50 text-dim hover:text-white'
-                          }`}
-                        >
-                          {x.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-sm border border-white/10 bg-[#0d121c]/90 px-4 py-3">
-                  <div>
-                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-dim font-bold">
-                      Your Position
-                    </div>
-                    <div className="mt-0.5 font-mono text-xs text-dim">
-                      {userPosition.subText}
-                    </div>
-                  </div>
-                  <div className="font-display text-3xl font-black text-cyan tabular-nums">
-                    {userPosition.rankText}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Podium + Divider + Challengers Ladder */}
-              <div className="min-w-0 space-y-12 md:space-y-16">
-                {/* Top-3 Podium (1st in center, 2nd left, 3rd right) */}
+            <div className="space-y-12 md:space-y-16">
+              {/* Centered Three-Player Podium (sitting above the divider) */}
+              {top.length > 0 && (
                 <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
                   <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
                   <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
                   <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
                 </section>
+              )}
 
-                {/* Divider */}
-                <div className="w-full border-b border-white/10" />
+              {/* Full-width Divider spanning the restricted 1120px container */}
+              <div className="w-full border-b border-white/10" />
 
-                {/* Challengers Ladder & Search */}
-                <section id="challengers-ladder" className="scroll-mt-20">
-                  <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-baseline gap-4">
-                      <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
-                        Challengers Ladder
-                      </h2>
-                      <Mono className="normal-case tracking-normal">
-                        {players.length} contenders ranked
-                      </Mono>
+              {/* Lower Leaderboard: 2-Column Desktop Grid (Rank By on the LEFT) */}
+              <div className="grid grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)] gap-10 lg:gap-16 items-start">
+                {/* Left Column (Desktop): Ranking Metrics Panel + Your Position Card */}
+                <RankingMetricsPanel
+                  currentMetric={metric}
+                  onSelectMetric={setMetric}
+                  userPosition={userPosition}
+                  className="hidden lg:flex sticky top-28"
+                />
+
+                {/* Mobile Metric Switcher & User Position Banner (lg:hidden) */}
+                <div className="lg:hidden space-y-4 mb-2">
+                  <div className="rounded-sm border border-white/10 bg-[#0c121d]/90 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-mono text-xs uppercase tracking-[0.18em] text-dim font-bold">
+                        Rank by
+                      </span>
+                      <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider">
+                        {activeMetricConfig.label}
+                      </span>
                     </div>
-                    <input
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Search players"
-                      aria-label="Search players"
-                      className="w-full rounded-sm border border-white/10 bg-[#0c121d]/90 px-3.5 py-2 font-mono text-xs outline-none transition placeholder:text-dim focus:border-white/30 sm:w-56"
-                    />
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                      {METRICS.map((x) => {
+                        const on = x.id === metric
+                        return (
+                          <button
+                            key={x.id}
+                            type="button"
+                            onClick={() => setMetric(x.id)}
+                            className={`px-3 py-1.5 rounded-xs font-mono text-xs whitespace-nowrap transition-colors cursor-pointer ${
+                              on
+                                ? 'border border-cyan bg-cyan/15 text-white font-bold'
+                                : 'border border-white/10 bg-surface/50 text-dim hover:text-white'
+                            }`}
+                          >
+                            {x.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  <ul className="divide-y divide-white/[0.07] border-t border-white/[0.07]">
-                    {paginatedList.map((p) => (
-                      <li
-                        key={p.id || `player-${p.rank}-${p.name}`}
-                        className={`grid grid-cols-[2rem_2.5rem_1fr_auto] items-center gap-3 py-3.5 transition-colors hover:bg-white/[0.025] md:gap-5 ${
-                          metric === 'overall'
-                            ? 'md:grid-cols-[2.5rem_2.75rem_1fr_6rem_6rem_7rem]'
-                            : 'md:grid-cols-[2.5rem_2.75rem_1fr_7rem]'
-                        }`}
-                      >
-                        <span className="font-display text-2xl font-bold tabular-nums text-dim">
-                          {String(p.rank).padStart(2, '0')}
-                        </span>
-                        {p.isCurrentUser ? (
-                          <Link to="/profile" title="View your profile">
-                            <Avatar
-                              p={p}
-                              className="w-10 text-sm md:w-11 md:text-base transition-transform hover:scale-105"
-                            />
-                          </Link>
-                        ) : (
-                          <Avatar p={p} className="w-10 text-sm md:w-11 md:text-base" />
-                        )}
-                        <div className="min-w-0 truncate font-display text-lg font-bold uppercase tracking-wide text-white">
+                  <div className="flex items-center justify-between rounded-sm border border-white/10 bg-[#0d121c]/90 px-4 py-3">
+                    <div>
+                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-dim font-bold">
+                        Your Position
+                      </div>
+                      <div className="mt-0.5 font-mono text-xs text-dim">
+                        {userPosition.subText}
+                      </div>
+                    </div>
+                    <div className="font-display text-3xl font-black text-cyan tabular-nums">
+                      {userPosition.rankText}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Challenger Ladder & Search */}
+                <div className="min-w-0 space-y-4">
+                  <section id="challengers-ladder" className="scroll-mt-20">
+                    <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+                        <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
+                          Challengers Ladder
+                        </h2>
+                        <span className="text-white/20">·</span>
+                        <Mono className="normal-case tracking-normal">
+                          {players.length} contenders ranked
+                        </Mono>
+                        <span className="text-white/20">·</span>
+                        <Mono className="uppercase text-cyan font-bold tracking-wider">
+                          {TIME_RANGES.find((t) => t.id === timeRange)?.label || 'ALL TIME'}
+                        </Mono>
+                      </div>
+                      <input
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search players"
+                        aria-label="Search players"
+                        className="w-full rounded-sm border border-white/10 bg-[#0c121d]/90 px-3.5 py-2 font-mono text-xs outline-none transition placeholder:text-dim focus:border-white/30 sm:w-56"
+                      />
+                    </div>
+
+                    <ul className="divide-y divide-white/[0.07] border-t border-white/[0.07]">
+                      {paginatedList.map((p) => (
+                        <li
+                          key={p.id || `player-${p.rank}-${p.name}`}
+                          className="flex items-center gap-3 md:gap-4 py-3.5 transition-colors hover:bg-white/[0.025]"
+                        >
+                          {/* 1. Rank */}
+                          <span className="w-8 md:w-10 text-center font-display text-xl md:text-2xl font-bold tabular-nums text-dim shrink-0">
+                            {String(p.rank).padStart(2, '0')}
+                          </span>
+
+                          {/* 2. Avatar */}
                           {p.isCurrentUser ? (
-                            <Link to="/profile" className="hover:text-cyan transition-colors">
-                              {p.name}
+                            <Link to="/profile" title="View your profile" className="shrink-0">
+                              <Avatar
+                                p={p}
+                                className="size-10 text-sm md:size-11 md:text-base transition-transform hover:scale-105"
+                              />
                             </Link>
                           ) : (
-                            p.name
+                            <Avatar p={p} className="size-10 text-sm md:size-11 md:text-base" />
                           )}
-                          {p.tag && (
-                            <span className="ml-2 font-mono text-[11px] text-white/40 tracking-normal font-normal">
-                              [{p.tag}]
+
+                          {/* 3. Username / Display Name & Badges */}
+                          <div className="min-w-0 flex-1 flex items-center gap-2 truncate">
+                            <span className="font-display text-base md:text-lg font-bold uppercase tracking-wide text-white truncate">
+                              {p.isCurrentUser ? (
+                                <Link to="/profile" className="hover:text-cyan transition-colors">
+                                  {p.name}
+                                </Link>
+                              ) : (
+                                p.name
+                              )}
                             </span>
-                          )}
-                          {p.isCurrentUser && (
-                            <span className="ml-2 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-white text-black rounded-xs">
-                              YOU
-                            </span>
-                          )}
-                          {p.isDisqualified && (
-                            <span className="ml-2 px-1 py-0.5 font-mono text-[8px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40">
-                              DQ
-                            </span>
-                          )}
-                        </div>
-                        {metric === 'overall' && (
-                          <>
-                            <div className="hidden text-right md:block">
-                              <div className="font-mono text-sm font-bold tabular-nums">{p.wins}</div>
-                              <Mono>Wins</Mono>
-                            </div>
-                            <div className="hidden text-right md:block">
-                              <div className="font-mono text-sm font-bold tabular-nums">{p.winRate}%</div>
-                              <Mono>Win Rate</Mono>
-                            </div>
-                          </>
-                        )}
-                        <div className="text-right">
-                          <div className="font-display text-3xl font-extrabold leading-none tabular-nums text-white">
-                            {showPlayerMetricValue(p, metric)}
+                            {p.tag && (
+                              <span className="shrink-0 font-mono text-[11px] text-white/40 tracking-normal font-normal">
+                                [{p.tag}]
+                              </span>
+                            )}
+                            {p.isCurrentUser && (
+                              <span className="shrink-0 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold bg-white text-black rounded-xs">
+                                YOU
+                              </span>
+                            )}
+                            {p.isDisqualified && (
+                              <span className="shrink-0 px-1 py-0.5 font-mono text-[8px] uppercase font-bold bg-rose-900/60 text-rose-300 border border-rose-500/40">
+                                DQ
+                              </span>
+                            )}
                           </div>
-                          <Mono>{activeMetricConfig.unit}</Mono>
+
+                          {/* 4. Movement Indicator */}
+                          <span
+                            className="font-mono text-xs text-white/40 shrink-0 px-1"
+                            title="Rank movement: stable"
+                          >
+                            —
+                          </span>
+
+                          {/* 5. Five Cyan Progression Dots */}
+                          <div
+                            className="hidden lg:flex items-center gap-1 shrink-0 px-2"
+                            title={`Progression: ${p.winRate}% win rate`}
+                          >
+                            {[1, 2, 3, 4, 5].map((dotIndex) => {
+                              const filled =
+                                dotIndex <= Math.max(1, Math.round((p.winRate / 100) * 5))
+                              return (
+                                <span
+                                  key={dotIndex}
+                                  className={`size-1.5 rounded-full ${
+                                    filled ? 'bg-cyan' : 'bg-white/10'
+                                  }`}
+                                />
+                              )
+                            })}
+                          </div>
+
+                          {/* 6. Wins */}
+                          <div className="hidden sm:block w-14 md:w-16 text-right shrink-0">
+                            <div className="font-mono text-sm font-bold tabular-nums text-white">
+                              {p.wins}
+                            </div>
+                            <Mono>Wins</Mono>
+                          </div>
+
+                          {/* 7. Win Rate */}
+                          <div className="hidden sm:block w-16 md:w-20 text-right shrink-0">
+                            <div className="font-mono text-sm font-bold tabular-nums text-white">
+                              {p.winRate}%
+                            </div>
+                            <Mono>Win Rate</Mono>
+                          </div>
+
+                          {/* 8. Rating + 9. Thin Cyan Bar Beneath */}
+                          <div className="w-20 md:w-24 text-right shrink-0">
+                            <div className="font-display text-2xl md:text-3xl font-extrabold leading-none tabular-nums text-white">
+                              {showPlayerMetricValue(p, metric)}
+                            </div>
+                            <div className="mt-1 flex flex-col items-end">
+                              <div className="h-0.5 w-full bg-cyan/60 rounded-full" />
+                              <Mono className="mt-0.5 text-[9px]">{activeMetricConfig.unit}</Mono>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                      {paginatedList.length === 0 && (
+                        <li className="py-12 text-center text-sm text-dim">
+                          {q ? `No players found matching "${q}".` : 'No challengers ranked yet.'}
+                        </li>
+                      )}
+                    </ul>
+
+                    {/* Compact Pagination Controls: Groups of 10 */}
+                    {totalPages > 1 && (
+                      <nav
+                        aria-label="Leaderboard pagination"
+                        className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-white/[0.07] pt-4 font-mono text-xs"
+                      >
+                        <div className="text-dim text-[11px]">
+                          {isSearching ? (
+                            <>
+                              Showing{' '}
+                              <span className="text-white font-bold">
+                                {searchResults.length === 0 ? 0 : (page - 1) * 10 + 1}–
+                                {Math.min(page * 10, searchResults.length)}
+                              </span>{' '}
+                              of {searchResults.length} matching contenders
+                            </>
+                          ) : page === 1 ? (
+                            <>
+                              Showing ranks{' '}
+                              <span className="text-white font-bold">
+                                01–{String(Math.min(10, players.length)).padStart(2, '0')}
+                              </span>{' '}
+                              of {players.length} contenders (Group 1)
+                            </>
+                          ) : (
+                            <>
+                              Showing ranks{' '}
+                              <span className="text-white font-bold">
+                                {String(10 + (page - 2) * 10 + 1).padStart(2, '0')}–
+                                {String(Math.min(10 + (page - 1) * 10, players.length)).padStart(2, '0')}
+                              </span>{' '}
+                              of {players.length} contenders (Group {page})
+                            </>
+                          )}
                         </div>
-                      </li>
-                    ))}
-                    {paginatedList.length === 0 && (
-                      <li className="py-12 text-center text-sm text-dim">
-                        {q ? `No players found matching "${q}".` : 'No challengers ranked yet.'}
-                      </li>
-                    )}
-                  </ul>
 
-                  {/* Compact Pagination Controls: Groups of 10 */}
-                  {totalPages > 1 && (
-                    <nav
-                      aria-label="Leaderboard pagination"
-                      className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-white/[0.07] pt-4 font-mono text-xs"
-                    >
-                      <div className="text-dim text-[11px]">
-                        {isSearching ? (
-                          <>
-                            Showing{' '}
-                            <span className="text-white font-bold">
-                              {searchResults.length === 0 ? 0 : (page - 1) * 10 + 1}–
-                              {Math.min(page * 10, searchResults.length)}
-                            </span>{' '}
-                            of {searchResults.length} matching contenders
-                          </>
-                        ) : page === 1 ? (
-                          <>
-                            Showing ranks{' '}
-                            <span className="text-white font-bold">
-                              01–{String(Math.min(10, players.length)).padStart(2, '0')}
-                            </span>{' '}
-                            of {players.length} contenders (Group 1)
-                          </>
-                        ) : (
-                          <>
-                            Showing ranks{' '}
-                            <span className="text-white font-bold">
-                              {String(10 + (page - 2) * 10 + 1).padStart(2, '0')}–
-                              {String(Math.min(10 + (page - 1) * 10, players.length)).padStart(2, '0')}
-                            </span>{' '}
-                            of {players.length} contenders (Group {page})
-                          </>
-                        )}
-                      </div>
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handlePageChange(page - 1)}
+                            disabled={page === 1}
+                            aria-label="Previous page"
+                            className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
+                              page === 1
+                                ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                                : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
+                            }`}
+                          >
+                            ← Prev
+                          </button>
 
-                      <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                        <button
-                          type="button"
-                          onClick={() => handlePageChange(page - 1)}
-                          disabled={page === 1}
-                          aria-label="Previous page"
-                          className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
-                            page === 1
-                              ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
-                              : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
-                          }`}
-                        >
-                          ← Prev
-                        </button>
-
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                            if (totalPages > 7) {
-                              if (num !== 1 && num !== totalPages && Math.abs(num - page) > 1) {
-                                if (num === 2 || num === totalPages - 1) {
-                                  return (
-                                    <span key={num} className="px-1 text-dim font-mono text-xs">
-                                      …
-                                    </span>
-                                  )
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+                              if (totalPages > 7) {
+                                if (num !== 1 && num !== totalPages && Math.abs(num - page) > 1) {
+                                  if (num === 2 || num === totalPages - 1) {
+                                    return (
+                                      <span key={num} className="px-1 text-dim font-mono text-xs">
+                                        …
+                                      </span>
+                                    )
+                                  }
+                                  return null
                                 }
-                                return null
                               }
-                            }
-                            const active = num === page
-                            return (
-                              <button
-                                key={num}
-                                type="button"
-                                onClick={() => handlePageChange(num)}
-                                aria-current={active ? 'page' : undefined}
-                                className={`size-7 text-[11px] font-bold font-mono rounded-sm transition-colors cursor-pointer ${
-                                  active
-                                    ? 'border border-cyan bg-cyan/15 text-cyan'
-                                    : 'border border-white/10 bg-surface/50 text-dim hover:border-white/30 hover:text-white'
-                                }`}
-                              >
-                                {num}
-                              </button>
-                            )
-                          })}
-                        </div>
+                              const active = num === page
+                              return (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => handlePageChange(num)}
+                                  aria-current={active ? 'page' : undefined}
+                                  className={`size-7 text-[11px] font-bold font-mono rounded-sm transition-colors cursor-pointer ${
+                                    active
+                                      ? 'border border-cyan bg-cyan/15 text-cyan'
+                                      : 'border border-white/10 bg-surface/50 text-dim hover:border-white/30 hover:text-white'
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              )
+                            })}
+                          </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handlePageChange(page + 1)}
-                          disabled={page === totalPages}
-                          aria-label="Next page"
-                          className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
-                            page === totalPages
-                              ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
-                              : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
-                          }`}
-                        >
-                          Next →
-                        </button>
-                      </div>
-                    </nav>
-                  )}
-                </section>
+                          <button
+                            type="button"
+                            onClick={() => handlePageChange(page + 1)}
+                            disabled={page === totalPages}
+                            aria-label="Next page"
+                            className={`px-3 py-1.5 uppercase font-bold text-[10px] tracking-wider rounded-sm border transition-colors cursor-pointer ${
+                              page === totalPages
+                                ? 'border-white/5 text-white/20 cursor-not-allowed bg-transparent'
+                                : 'border-white/10 bg-surface/70 text-white hover:border-cyan hover:text-cyan'
+                            }`}
+                          >
+                            Next →
+                          </button>
+                        </div>
+                      </nav>
+                    )}
+                  </section>
+                </div>
               </div>
             </div>
           )}
