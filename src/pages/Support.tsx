@@ -244,10 +244,6 @@ export default function Support() {
         <EsportsHeroVisual variant="support" />
         <div className="grid-floor absolute -inset-x-1/2 bottom-0 h-1/2 opacity-50" />
         <Container className="relative">
-          <div className="mb-6 flex items-center gap-4">
-            <span className="h-px w-12 bg-cyan" />
-            <Hud className="text-ink">AMETHEUS Help Center & Support Desk</Hud>
-          </div>
           <h1 className="reveal font-display text-[clamp(3.5rem,12vw,11rem)] font-black uppercase leading-[0.8]">
             How can<br /><span className="text-cyan">we help?</span>
           </h1>
@@ -266,7 +262,7 @@ export default function Support() {
       </section>
 
       <Container className="py-20">
-        <SectionHead idx="01" kicker="Categories" title="Browse topics" size="md" />
+        <SectionHead title="Browse topics" size="md" />
         <div className="mt-10 grid auto-rows-[160px] grid-cols-2 gap-3 md:grid-cols-5">
           {CATS.map((c) => (
             <button
@@ -303,7 +299,7 @@ export default function Support() {
       <Container className="grid gap-16 pb-20 lg:grid-cols-[1.4fr_1fr]">
         <div>
           <div className="flex items-center justify-between">
-            <SectionHead idx="02" kicker={cat ?? 'All topics'} title="Knowledge Base & FAQ" size="md" />
+            <SectionHead title="Knowledge Base & FAQ" size="md" />
             {cat && (
               <button
                 onClick={() => {
@@ -360,7 +356,7 @@ export default function Support() {
         </div>
 
         <div>
-          <SectionHead idx="03" kicker="Support Desk" title="Tickets" size="md" />
+          <SectionHead title="Tickets" size="md" />
           <Panel className="mt-8 p-6">
             <Hud>Direct Arbiter & Staff Assistance</Hud>
             <p className="mt-2 text-dim text-sm">
@@ -377,11 +373,25 @@ export default function Support() {
             </Cta>
           </Panel>
 
-          <Hud className="mt-10 block">My Open Tickets ({userTickets.length})</Hud>
-          <ul className="mt-3 space-y-2 font-mono text-xs">
+          <div className="mt-10 flex items-center justify-between border-b border-white/15 pb-4">
+            <h3 className="font-display text-2xl font-black uppercase tracking-wider text-white">
+              My Open Tickets
+            </h3>
+            <span className="font-mono text-xs sm:text-sm font-black text-cyan bg-cyan/15 border border-cyan/40 px-3 py-1 rounded-sm shadow-xs">
+              {userTickets.length} {userTickets.length === 1 ? 'Ticket' : 'Tickets'}
+            </span>
+          </div>
+          <ul className="mt-4 space-y-3 font-mono text-xs">
             {userTickets.length === 0 ? (
-              <li className="border border-white/10 p-4 text-xs text-dim text-center">
-                {isSignedIn ? 'No support tickets raised yet.' : 'Sign in to view your open support tickets.'}
+              <li className="border border-white/15 bg-surface/50 p-8 text-center rounded-sm">
+                <p className="font-display text-lg md:text-xl font-bold uppercase tracking-wide text-white">
+                  {isSignedIn ? 'No support ticket raised yet' : 'Sign in to view your open support tickets'}
+                </p>
+                <p className="mt-2 text-xs md:text-sm text-dim">
+                  {isSignedIn
+                    ? 'Need assistance? Use the button above to reach our 24/7 arbiter operations crew.'
+                    : 'Access your ticket history and check arbiter resolutions.'}
+                </p>
               </li>
             ) : (
               userTickets.map((t) => (

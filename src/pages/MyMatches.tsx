@@ -55,8 +55,7 @@ export default function MyMatches() {
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32">
       <Container>
-        <Hud className="text-cyan">◇ Match Schedule</Hud>
-        <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
+        <h1 className="reveal font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
           My matches
         </h1>
 
@@ -82,11 +81,11 @@ export default function MyMatches() {
                   <Hud>{list.length}</Hud>
                 </div>
                 {list.length === 0 ? (
-                  <EmptyState
-                    code="0"
-                    title={`No ${label.toLowerCase()} matches`}
-                    body="Matches appear here once brackets are drawn for your registered tournaments."
-                  />
+                  <div className="border border-white/10 bg-surface/30 p-10 text-center">
+                    <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                      {s === 'live' ? 'No Live Match' : s === 'upcoming' ? 'No Upcoming Match' : 'No Completed Match'}
+                    </h3>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {list.map((m) => {

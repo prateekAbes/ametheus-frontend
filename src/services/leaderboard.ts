@@ -47,7 +47,6 @@ export type MetricId =
   | 'wins'
   | 'streak'
   | 'matches'
-  | 'top3'
   | 'earnings'
   | 'spending'
 
@@ -76,7 +75,6 @@ export const METRIC_GROUPS: MetricGroup[] = [
     group: 'ACTIVITY',
     items: [
       { id: 'matches', label: 'Matches Played', unit: 'Matches' },
-      { id: 'top3', label: 'Top 3 Finishes', unit: 'Top 3' },
     ],
   },
   {
@@ -124,8 +122,6 @@ export const getPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) => {
       return p.streak
     case 'matches':
       return p.matches
-    case 'top3':
-      return p.top3
     case 'earnings':
       return p.earnings
     case 'spending':
@@ -148,8 +144,6 @@ export const showPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) => {
       return `₹${p.spent.toLocaleString()}`
     case 'matches':
       return p.matches.toLocaleString()
-    case 'top3':
-      return p.top3.toLocaleString()
     case 'wins':
       return p.wins.toLocaleString()
     case 'overall':

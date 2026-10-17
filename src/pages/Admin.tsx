@@ -150,6 +150,48 @@ export function formatAuditTimestamp(raw?: string | null): string {
   }
 }
 
+export function toLocalDatetimeInputString(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+  const hours = pad(date.getHours())
+  const minutes = pad(date.getMinutes())
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+export function getDefaultStartLocal(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  d.setHours(18, 0, 0, 0)
+  return toLocalDatetimeInputString(d)
+}
+
+export function getDefaultLockLocal(startLocal?: string): string {
+  if (startLocal) {
+    const d = new Date(startLocal)
+    if (!isNaN(d.getTime())) {
+      d.setHours(d.getHours() - 2)
+      return toLocalDatetimeInputString(d)
+    }
+  }
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  d.setHours(16, 0, 0, 0)
+  return toLocalDatetimeInputString(d)
+}
+
+export function isoToLocalDatetimeInputString(isoStr?: string | null): string {
+  if (!isoStr || isoStr === 'TBD') return ''
+  try {
+    const d = new Date(isoStr)
+    if (isNaN(d.getTime())) return ''
+    return toLocalDatetimeInputString(d)
+  } catch {
+    return ''
+  }
+}
+
 const TABS = [
   'OVERVIEW',
   'MEDIA & ARTWORK MANAGER',
@@ -276,32 +318,68 @@ export default function Admin() {
   const [isNewRegOpen, setIsNewRegOpen] = useState(false)
   const [newReg, setNewReg] = useState({ game_name: 'VALORANT', chapter_code: 'VAL-SEC-01', title: 'Tournament Regulations', format: '5v5 Tactical', server: 'AWS Mumbai', rules: 'Anti-cheat verification mandatory.\nRespect referee rulings.' })
 
+  interface NewTournamentFormState {
+    title: string
+    game_id: string
+    format: string
+    prize_pool_inr: number
+    entry_fee_inr: number
+    max_teams: number
+    min_team_size: number
+    max_team_size: number
+    starts_at_local: string
+    roster_lock_local: string
+    banner_url: string
+    banner_tablet_url: string
+    banner_mobile_url: string
+    logo_url: string
+    whatsapp_group_url: string
+    community_link: string
+    description: string
+  }
+
+  const getInitialNewTourState = (): NewTournamentFormState => ({
+    title: '',
+    game_id: 'valorant',
+    format: 'Single Elimination · BO3',
+    prize_pool_inr: 25000,
+    entry_fee_inr: 100,
+    max_teams: 16,
+    min_team_size: 5,
+    max_team_size: 5,
+    starts_at_local: getDefaultStartLocal(),
+    roster_lock_local: getDefaultLockLocal(),
+    banner_url: '',
+    banner_tablet_url: '',
+    banner_mobile_url: '',
+    logo_url: '',
+    whatsapp_group_url: '',
+    community_link: '',
+    description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+  })
+
   // TOURNAMENTS Interactive States
   const [tournamentFilter, setTournamentFilter] = useState('ALL')
   const [tournamentSearch, setTournamentSearch] = useState('')
   const [isCreateTourOpen, setIsCreateTourOpen] = useState(false)
-  const [newTour, setNewTour] = useState(() => {
+  const [createTourError, setCreateTourError] = useState<string | null>(null)
+  const [isSubmittingTour, setIsSubmittingTour] = useState(false)
+  const [newTour, setNewTour] = useState<NewTournamentFormState>(() => {
+    const defaults = getInitialNewTourState()
     try {
       const saved = sessionStorage.getItem('ametheus_admin_draft_new_tour')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.start_date && !parsed.starts_at_local) {
+          parsed.starts_at_local = parsed.start_date
+        }
+        if (!parsed.roster_lock_local && parsed.starts_at_local) {
+          parsed.roster_lock_local = getDefaultLockLocal(parsed.starts_at_local)
+        }
+        return { ...defaults, ...parsed }
+      }
     } catch {}
-    return {
-      title: '',
-      game_id: 'valorant',
-      format: 'Single Elimination · BO3',
-      prize_pool_inr: 25000,
-      entry_fee_inr: 100,
-      max_teams: 16,
-      min_team_size: 5,
-      max_team_size: 5,
-      start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
-      banner_url: '',
-      banner_tablet_url: '',
-      banner_mobile_url: '',
-      logo_url: '',
-      whatsapp_group_url: '',
-      description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
-    }
+    return defaults
   })
 
   useEffect(() => {
@@ -311,6 +389,8 @@ export default function Admin() {
   }, [newTour])
 
   const [editingTour, setEditingTour] = useState<Tournament | null>(null)
+  const [editTourError, setEditTourError] = useState<string | null>(null)
+  const [isUpdatingTour, setIsUpdatingTour] = useState(false)
   const [rosterTour, setRosterTour] = useState<Tournament | null>(null)
   const [rostersList, setRostersList] = useState<any[]>([])
   const [loadingRosters, setLoadingRosters] = useState(false)
@@ -1192,52 +1272,176 @@ export default function Admin() {
     }
   }
 
+  const handleSelectGameForNewTour = (gameSlugOrId: string) => {
+    const g = games.find((item) => item.slug === gameSlugOrId || item.id === gameSlugOrId)
+    const nextMin = g?.min_team_size ?? 5
+    const nextMax = g?.max_team_size ?? 5
+    setNewTour((prev) => ({
+      ...prev,
+      game_id: gameSlugOrId,
+      min_team_size: nextMin,
+      max_team_size: nextMax,
+    }))
+  }
+
+  const handleStartDateChange = (val: string) => {
+    setNewTour((prev) => {
+      const prevStart = new Date(prev.starts_at_local).getTime()
+      const prevLock = new Date(prev.roster_lock_local).getTime()
+      const nextStart = new Date(val).getTime()
+
+      let nextLock = prev.roster_lock_local
+      if (isNaN(prevLock) || prevLock > nextStart || (prevStart && prevStart - prevLock === 2 * 3600000)) {
+        nextLock = getDefaultLockLocal(val)
+      }
+      return {
+        ...prev,
+        starts_at_local: val,
+        roster_lock_local: nextLock,
+      }
+    })
+  }
+
   const handleCreateTourSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setCreateTourError(null)
+
+    // Pre-submission validation
+    const title = newTour.title?.trim()
+    if (!title) {
+      setCreateTourError('Tournament title is required.')
+      return
+    }
+    if (!newTour.game_id) {
+      setCreateTourError('Please select a sanctioned game discipline.')
+      return
+    }
+    const format = newTour.format?.trim()
+    if (!format) {
+      setCreateTourError('Match format is required (e.g. Single Elimination · BO3).')
+      return
+    }
+    if (!newTour.starts_at_local) {
+      setCreateTourError('Tournament Start Date & Time is required.')
+      return
+    }
+    if (!newTour.roster_lock_local) {
+      setCreateTourError('Roster Lock Date & Time is required.')
+      return
+    }
+
+    const startDate = new Date(newTour.starts_at_local)
+    const lockDate = new Date(newTour.roster_lock_local)
+
+    if (isNaN(startDate.getTime())) {
+      setCreateTourError('Tournament Start Date & Time is invalid. Please select a valid date and time.')
+      return
+    }
+    if (isNaN(lockDate.getTime())) {
+      setCreateTourError('Roster Lock Date & Time is invalid. Please select a valid date and time.')
+      return
+    }
+    if (lockDate.getTime() > startDate.getTime()) {
+      setCreateTourError('Roster lock deadline must be at or before tournament start time.')
+      return
+    }
+
+    const maxTeams = Number(newTour.max_teams)
+    if (isNaN(maxTeams) || maxTeams < 2) {
+      setCreateTourError('Maximum teams must be at least 2.')
+      return
+    }
+
+    const minTeamSize = Number(newTour.min_team_size)
+    const maxTeamSize = Number(newTour.max_team_size)
+    if (isNaN(minTeamSize) || minTeamSize < 1) {
+      setCreateTourError('Minimum team size must be at least 1 player.')
+      return
+    }
+    if (isNaN(maxTeamSize) || maxTeamSize < minTeamSize) {
+      setCreateTourError('Maximum team size cannot be less than minimum team size.')
+      return
+    }
+
+    const prizePool = Number(newTour.prize_pool_inr)
+    if (isNaN(prizePool) || prizePool < 0) {
+      setCreateTourError('Prize pool cannot be negative.')
+      return
+    }
+
+    const entryFee = Number(newTour.entry_fee_inr)
+    if (isNaN(entryFee) || entryFee < 0) {
+      setCreateTourError('Entry fee cannot be negative.')
+      return
+    }
+
+    if (newTour.whatsapp_group_url && newTour.whatsapp_group_url.trim()) {
+      const url = newTour.whatsapp_group_url.trim()
+      if (!/^https?:\/\//i.test(url)) {
+        setCreateTourError('Official WhatsApp group link must begin with http:// or https://')
+        return
+      }
+    }
+
+    if (newTour.community_link && newTour.community_link.trim()) {
+      const url = newTour.community_link.trim()
+      if (!/^https?:\/\//i.test(url)) {
+        setCreateTourError('Community link must begin with http:// or https://')
+        return
+      }
+    }
+
+    setIsSubmittingTour(true)
     try {
       await createTournamentOrganizer({
-        ...newTour,
-        prize_pool_inr: Number(newTour.prize_pool_inr),
-        entry_fee_inr: Number(newTour.entry_fee_inr),
-        max_teams: Number(newTour.max_teams),
-        min_team_size: Number(newTour.min_team_size),
-        max_team_size: Number(newTour.max_team_size),
+        title,
+        game_id: newTour.game_id,
+        format,
+        prize_pool_inr: prizePool,
+        entry_fee_inr: entryFee,
+        max_teams: maxTeams,
+        min_team_size: minTeamSize,
+        max_team_size: maxTeamSize,
+        starts_at: startDate.toISOString(),
+        roster_lock_time: lockDate.toISOString(),
+        banner_url: newTour.banner_url || undefined,
+        banner_tablet_url: newTour.banner_tablet_url || undefined,
+        banner_mobile_url: newTour.banner_mobile_url || undefined,
+        logo_url: newTour.logo_url || undefined,
+        whatsapp_group_url: newTour.whatsapp_group_url.trim() || undefined,
+        community_link: newTour.community_link?.trim() || undefined,
+        description: newTour.description?.trim() || 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
       })
       showToast('Tournament created successfully!')
       setIsCreateTourOpen(false)
       sessionStorage.removeItem('ametheus_admin_draft_new_tour')
-      setNewTour({
-        title: '',
-        game_id: 'valorant',
-        format: 'Single Elimination · BO3',
-        prize_pool_inr: 25000,
-        entry_fee_inr: 100,
-        max_teams: 16,
-        min_team_size: 5,
-        max_team_size: 5,
-        start_date: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
-        banner_url: '',
-        banner_tablet_url: '',
-        banner_mobile_url: '',
-        logo_url: '',
-        whatsapp_group_url: '',
-        description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
-      })
+      setNewTour(getInitialNewTourState())
       loadData()
     } catch (err: any) {
-      alert(err.message || 'Failed to create tournament')
+      setCreateTourError(err.message || 'Failed to create tournament. Please check server validation.')
+    } finally {
+      setIsSubmittingTour(false)
     }
   }
 
   const handleUpdateTourSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingTour) return
+    setEditTourError(null)
+
+    const title = editingTour.title?.trim()
+    if (!title) {
+      setEditTourError('Tournament title cannot be empty.')
+      return
+    }
+
+    setIsUpdatingTour(true)
     try {
       const regStatus = editingTour.status === 'REGISTRATION_CLOSED'
         ? 'CLOSED'
         : (editingTour.status === 'REGISTRATION_OPEN' ? 'OPEN' : editingTour.registration_status)
       await updateTournamentOrganizer(editingTour.id || editingTour.slug, {
-        title: editingTour.title,
+        title,
         game_id: editingTour.game_id,
         format: editingTour.format,
         status: editingTour.status,
@@ -1245,20 +1449,24 @@ export default function Admin() {
         prize_pool_inr: Number(editingTour.prize_pool_inr),
         entry_fee_inr: Number(editingTour.entry_fee_inr),
         max_teams: Number(editingTour.max_teams),
-        start_date: editingTour.start_date,
+        starts_at: editingTour.starts_at,
+        roster_lock_time: editingTour.roster_lock_time,
         banner_url: editingTour.banner_url,
         hero_banner_url: editingTour.hero_banner_url,
         banner_tablet_url: editingTour.banner_tablet_url,
         banner_mobile_url: editingTour.banner_mobile_url,
         logo_url: editingTour.logo_url,
         whatsapp_group_url: editingTour.whatsapp_group_url,
+        community_link: editingTour.community_link,
         description: editingTour.description,
       })
       showToast('Tournament updated successfully!')
       setEditingTour(null)
       loadData()
     } catch (err: any) {
-      alert(err.message || 'Failed to update tournament')
+      setEditTourError(err.message || 'Failed to update tournament')
+    } finally {
+      setIsUpdatingTour(false)
     }
   }
 
@@ -1652,7 +1860,7 @@ export default function Admin() {
                 <p className="text-xs text-dim">Authoritative control: create, edit, lock rosters, generate brackets, publish or cancel tournaments.</p>
               </div>
               <button
-                onClick={() => setIsCreateTourOpen(true)}
+                onClick={() => { setCreateTourError(null); setIsCreateTourOpen(true); }}
                 className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 transition-all shrink-0"
               >
                 + Create Tournament
@@ -5125,91 +5333,271 @@ export default function Admin() {
             <div className="relative w-full max-w-xl max-h-[min(90vh,calc(100svh-2rem))] flex flex-col border border-white/20 bg-graphite shadow-2xl overflow-hidden select-text">
               <div className="flex items-center justify-between border-b border-white/10 p-6 pb-4 shrink-0">
                 <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-cyan">Create Sanctioned Tournament</h3>
-                  <p className="text-xs text-dim mt-1">Configure competition parameters, rules, and entry structure.</p>
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse" />
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-cyan">SANCTIONED OPERATIONS</span>
+                  </div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink mt-0.5">Create Sanctioned Tournament</h3>
+                  <p className="text-xs text-dim mt-0.5">Configure competition parameters, schedule, rules, and entry structure.</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsCreateTourOpen(false)}
-                  className="text-dim hover:text-ink font-mono text-xs uppercase border border-white/15 px-2.5 py-1 cursor-pointer"
+                  onClick={() => { setIsCreateTourOpen(false); setCreateTourError(null); }}
+                  className="text-dim hover:text-ink font-mono text-xs uppercase border border-white/15 px-2.5 py-1 cursor-pointer transition-colors"
                 >
                   ✕ Close
                 </button>
               </div>
+
+              {createTourError && (
+                <div className="mx-6 mt-4 p-3 border border-red-500/50 bg-red-950/40 text-red-200 font-mono text-xs flex items-start gap-2.5 rounded-sm shrink-0">
+                  <span className="text-red-400 font-bold shrink-0">✕ VALIDATION ERROR:</span>
+                  <span className="flex-1 leading-relaxed">{createTourError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCreateTourError(null)}
+                    className="text-red-400 hover:text-white shrink-0 font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={handleCreateTourSubmit} className="flex flex-col min-h-0 flex-1">
-                <div className="overflow-y-auto p-6 space-y-3 font-mono text-xs flex-1">
-                  <div>
-                    <label className="text-dim">Tournament Title</label>
-                    <input required placeholder="e.g. Ascent Championship Series" value={newTour.title} onChange={(e) => setNewTour({ ...newTour, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                <div className="overflow-y-auto p-6 space-y-5 font-mono text-xs flex-1 pr-4">
+                  {/* SECTION A: COMPETITION IDENTITY */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
+                      <span className="text-cyan font-bold">01 //</span>
+                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Competition Identity</span>
+                    </div>
+                    <div>
+                      <label className="text-dim">Tournament Title <span className="text-cyan">*</span></label>
+                      <input
+                        required
+                        placeholder="e.g. Ascent Championship Series 2026"
+                        value={newTour.title}
+                        onChange={(e) => { setNewTour({ ...newTour, title: e.target.value }); if (createTourError) setCreateTourError(null); }}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-dim">Sanctioned Game <span className="text-cyan">*</span></label>
+                        <select
+                          value={newTour.game_id}
+                          onChange={(e) => handleSelectGameForNewTour(e.target.value)}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        >
+                          {games.map((g) => (
+                            <option key={g.id || g.slug} value={g.slug || g.id}>{g.name}</option>
+                          ))}
+                          {games.length === 0 && (
+                            <>
+                              <option value="valorant">VALORANT</option>
+                              <option value="bgmi">BGMI</option>
+                              <option value="free-fire">Free Fire</option>
+                              <option value="codm">COD Mobile</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-dim">Match Format <span className="text-cyan">*</span></label>
+                        <input
+                          required
+                          placeholder="e.g. Single Elimination · BO3"
+                          value={newTour.format}
+                          onChange={(e) => setNewTour({ ...newTour, format: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-dim">Sanctioned Game</label>
-                      <select value={newTour.game_id} onChange={(e) => setNewTour({ ...newTour, game_id: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none">
-                        {games.map((g) => (
-                          <option key={g.id || g.slug} value={g.slug || g.id}>{g.name}</option>
-                        ))}
-                        {games.length === 0 && (
-                          <>
-                            <option value="valorant">VALORANT</option>
-                            <option value="bgmi">BGMI</option>
-                            <option value="free-fire">Free Fire</option>
-                            <option value="codm">COD Mobile</option>
-                          </>
-                        )}
-                      </select>
+
+                  {/* SECTION B: TOURNAMENT SCHEDULE */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
+                      <span className="text-cyan font-bold">02 //</span>
+                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Tournament Schedule</span>
                     </div>
+
+                    {/* Start Date & Time */}
                     <div>
-                      <label className="text-dim">Match Format</label>
-                      <input required placeholder="e.g. Single Elim · BO3" value={newTour.format} onChange={(e) => setNewTour({ ...newTour, format: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                      <div className="flex items-center justify-between">
+                        <label className="text-dim">Tournament Start Date & Time (UTC/Local) <span className="text-cyan">*</span></label>
+                      </div>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={newTour.starts_at_local}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                      <p className="mt-1 text-[10px] text-dim font-mono">
+                        Target scheduled start time for Round 1 of the tournament.
+                      </p>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+
+                    {/* Roster Lock Date & Time - DIRECTLY BENEATH */}
                     <div>
-                      <label className="text-dim">Prize Pool (₹)</label>
-                      <input required type="number" min="0" value={newTour.prize_pool_inr} onChange={(e) => setNewTour({ ...newTour, prize_pool_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-dim">Entry Fee per Squad (₹)</label>
-                      <input required type="number" min="0" value={newTour.entry_fee_inr} onChange={(e) => setNewTour({ ...newTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-dim">Max Teams</label>
-                      <input required type="number" min="2" max="128" value={newTour.max_teams} onChange={(e) => setNewTour({ ...newTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-dim">Min Team Size</label>
-                      <input required type="number" min="1" max="10" value={newTour.min_team_size} onChange={(e) => setNewTour({ ...newTour, min_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-dim">Max Team Size</label>
-                      <input required type="number" min="1" max="10" value={newTour.max_team_size} onChange={(e) => setNewTour({ ...newTour, max_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                      <div className="flex items-center justify-between">
+                        <label className="text-dim">Roster Lock Date & Time (UTC/Local) <span className="text-cyan">*</span></label>
+                        <span className="text-[10px] text-cyan uppercase font-bold tracking-wider">Registration Cutoff</span>
+                      </div>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={newTour.roster_lock_local}
+                        onChange={(e) => setNewTour({ ...newTour, roster_lock_local: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                      <p className="mt-1 text-[10px] text-dim font-mono">
+                        Roster lock cutoff deadline. Squad registration and lineup changes lock permanently at this cutoff (must be at or before tournament start).
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-dim">Start Date & Time (UTC/Local)</label>
-                    <input required type="datetime-local" value={newTour.start_date} onChange={(e) => setNewTour({ ...newTour, start_date: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+
+                  {/* SECTION C: TEAM & PLAYER STRUCTURE */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
+                      <span className="text-cyan font-bold">03 //</span>
+                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Roster & Team Structure</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-dim">Max Teams</label>
+                        <input
+                          required
+                          type="number"
+                          min="2"
+                          max="128"
+                          value={newTour.max_teams}
+                          onChange={(e) => setNewTour({ ...newTour, max_teams: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-dim">Min Team Size</label>
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={newTour.min_team_size}
+                          onChange={(e) => setNewTour({ ...newTour, min_team_size: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-dim">Max Team Size</label>
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={newTour.max_team_size}
+                          onChange={(e) => setNewTour({ ...newTour, max_team_size: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-dim">Official WhatsApp Group / Community Link</label>
-                    <input
-                      placeholder="https://chat.whatsapp.com/... (optional)"
-                      value={newTour.whatsapp_group_url || ''}
-                      onChange={(e) => setNewTour({ ...newTour, whatsapp_group_url: e.target.value })}
-                      className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                    />
-                    <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
+
+                  {/* SECTION D: FINANCIAL STRUCTURE */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
+                      <span className="text-cyan font-bold">04 //</span>
+                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Financial Structure</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-dim">Prize Pool (₹)</label>
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={newTour.prize_pool_inr}
+                          onChange={(e) => setNewTour({ ...newTour, prize_pool_inr: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-dim">Entry Fee per Squad (₹)</label>
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={newTour.entry_fee_inr}
+                          onChange={(e) => setNewTour({ ...newTour, entry_fee_inr: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                        />
+                        <p className="mt-1 text-[10px] text-dim font-mono">Set to 0 for Free-to-enter tournaments.</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-dim">Description</label>
-                    <textarea rows={3} value={newTour.description} onChange={(e) => setNewTour({ ...newTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+
+                  {/* SECTION E: COMMUNITY & OVERVIEW */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
+                      <span className="text-cyan font-bold">05 //</span>
+                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Communications & Information</span>
+                    </div>
+                    <div>
+                      <label className="text-dim">Official WhatsApp Group Link</label>
+                      <input
+                        placeholder="https://chat.whatsapp.com/... (optional)"
+                        value={newTour.whatsapp_group_url || ''}
+                        onChange={(e) => setNewTour({ ...newTour, whatsapp_group_url: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                      <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
+                    </div>
+                    <div>
+                      <label className="text-dim">Community Discord / Channel Link</label>
+                      <input
+                        placeholder="https://discord.gg/... (optional)"
+                        value={newTour.community_link || ''}
+                        onChange={(e) => setNewTour({ ...newTour, community_link: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                      <p className="mt-1 text-[10px] text-dim font-mono">Public discord server or communication hub for general announcements.</p>
+                    </div>
+                    <div>
+                      <label className="text-dim">Description</label>
+                      <textarea
+                        rows={3}
+                        value={newTour.description}
+                        onChange={(e) => setNewTour({ ...newTour, description: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="pt-3 flex justify-end gap-2 border-t border-white/10 p-4 shrink-0 bg-graphite">
-                  <button type="button" onClick={() => setIsCreateTourOpen(false)} className="border border-white/20 px-3 py-1.5 uppercase text-dim cursor-pointer">Cancel</button>
-                  <button type="submit" className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold cursor-pointer">Create Tournament</button>
+
+                <div className="pt-3 flex justify-end items-center gap-3 border-t border-white/10 p-4 shrink-0 bg-graphite">
+                  <button
+                    type="button"
+                    disabled={isSubmittingTour}
+                    onClick={() => { setIsCreateTourOpen(false); setCreateTourError(null); }}
+                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer disabled:opacity-50 text-xs font-mono"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingTour}
+                    className="border border-cyan bg-cyan hover:bg-cyan/90 text-void font-bold px-6 py-2 uppercase text-xs font-mono tracking-wider cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isSubmittingTour ? (
+                      <>
+                        <span className="h-3 w-3 border-2 border-void border-t-transparent rounded-full animate-spin" />
+                        <span>Creating Tournament...</span>
+                      </>
+                    ) : (
+                      <span>Create Tournament</span>
+                    )}
+                  </button>
                 </div>
               </form>
             </div>
@@ -5236,6 +5624,20 @@ export default function Admin() {
                   ✕ Close
                 </button>
               </div>
+
+              {editTourError && (
+                <div className="mx-6 mt-4 p-3 border border-red-500/50 bg-red-950/40 text-red-200 font-mono text-xs flex items-start gap-2.5 rounded-sm shrink-0">
+                  <span className="text-red-400 font-bold shrink-0">✕ ERROR:</span>
+                  <span className="flex-1 leading-relaxed">{editTourError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditTourError(null)}
+                    className="text-red-400 hover:text-white shrink-0 font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               <form onSubmit={handleUpdateTourSubmit} className="flex flex-col min-h-0 flex-1">
                 <div className="overflow-y-auto p-6 space-y-4 font-mono text-xs flex-1">
@@ -5272,21 +5674,53 @@ export default function Admin() {
                     </div>
                     <div>
                       <label className="text-dim">Max Teams</label>
-                      <input required type="number" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                      <input required type="number" min="2" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-dim">Prize Pool (₹)</label>
-                      <input required type="number" value={editingTour.prize_pool_inr} onChange={(e) => setEditingTour({ ...editingTour, prize_pool_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                      <input required type="number" min="0" value={editingTour.prize_pool_inr} onChange={(e) => setEditingTour({ ...editingTour, prize_pool_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                     </div>
                     <div>
                       <label className="text-dim">Entry Fee (₹)</label>
-                      <input required type="number" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                      <input required type="number" min="0" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-dim">Start Date & Time (UTC/Local)</label>
+                      <input
+                        type="datetime-local"
+                        value={isoToLocalDatetimeInputString(editingTour.starts_at || editingTour.start_date)}
+                        onChange={(e) => {
+                          const d = new Date(e.target.value)
+                          setEditingTour({
+                            ...editingTour,
+                            starts_at: isNaN(d.getTime()) ? undefined : d.toISOString(),
+                          })
+                        }}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-dim">Roster Lock Date & Time (UTC/Local)</label>
+                      <input
+                        type="datetime-local"
+                        value={isoToLocalDatetimeInputString(editingTour.roster_lock_time)}
+                        onChange={(e) => {
+                          const d = new Date(e.target.value)
+                          setEditingTour({
+                            ...editingTour,
+                            roster_lock_time: isNaN(d.getTime()) ? undefined : d.toISOString(),
+                          })
+                        }}
+                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                      />
                     </div>
                   </div>
                   <div>
-                    <label className="text-dim">Official WhatsApp Group / Community Link</label>
+                    <label className="text-dim">Official WhatsApp Group Link</label>
                     <input
                       placeholder="https://chat.whatsapp.com/... (optional)"
                       value={editingTour.whatsapp_group_url || ''}
@@ -5296,14 +5730,44 @@ export default function Admin() {
                     <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
                   </div>
                   <div>
+                    <label className="text-dim">Official Community Link (Discord / Public)</label>
+                    <input
+                      placeholder="https://discord.gg/... (optional)"
+                      value={editingTour.community_link || ''}
+                      onChange={(e) => setEditingTour({ ...editingTour, community_link: e.target.value })}
+                      className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                    <p className="mt-1 text-[10px] text-dim font-mono">Community channel for match disputes, announcements, and scheduling.</p>
+                  </div>
+                  <div>
                     <label className="text-dim">Description</label>
                     <textarea rows={3} value={editingTour.description || ''} onChange={(e) => setEditingTour({ ...editingTour, description: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-3 border-t border-white/10 p-4 shrink-0 bg-graphite">
-                  <button type="button" onClick={() => setEditingTour(null)} className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer">Cancel</button>
-                  <button type="submit" className="border border-cyan bg-cyan px-6 py-2 uppercase text-void font-bold hover:brightness-110 cursor-pointer">Save Changes</button>
+                  <button
+                    type="button"
+                    disabled={isUpdatingTour}
+                    onClick={() => { setEditingTour(null); setEditTourError(null); }}
+                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer disabled:opacity-50 text-xs font-mono"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdatingTour}
+                    className="border border-cyan bg-cyan px-6 py-2 uppercase text-void font-bold hover:brightness-110 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs font-mono flex items-center gap-2"
+                  >
+                    {isUpdatingTour ? (
+                      <>
+                        <span className="h-3 w-3 border-2 border-void border-t-transparent rounded-full animate-spin" />
+                        <span>Saving Changes...</span>
+                      </>
+                    ) : (
+                      <span>Save Changes</span>
+                    )}
+                  </button>
                 </div>
               </form>
             </div>

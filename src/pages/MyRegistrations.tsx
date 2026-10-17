@@ -45,8 +45,7 @@ export default function MyRegistrations() {
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32">
       <Container>
-        <Hud className="text-cyan">◇ Entries</Hud>
-        <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
+        <h1 className="reveal font-display text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[0.85]">
           My registrations
         </h1>
         <Tabs tabs={T} value={tab} onChange={setTab} className="mt-10" />
@@ -57,13 +56,25 @@ export default function MyRegistrations() {
               <Hud className="text-cyan">Checking your verified tournament entries...</Hud>
             </div>
           ) : list.length === 0 ? (
-            <EmptyState
-              code="00"
-              title={`No ${tab.toLowerCase()} entries`}
-              body="Find a tournament and register your team."
-              cta="Browse tournaments"
-              to="/tournaments"
-            />
+            <div className="border border-white/10 bg-surface/30 p-12 text-center flex flex-col items-center justify-center">
+              <h3 className="font-display text-xl font-bold uppercase tracking-wider text-white mb-4">
+                {tab === 'Upcoming'
+                  ? 'No Upcoming Entries'
+                  : tab === 'Active'
+                  ? 'No Active Entries'
+                  : tab === 'Completed'
+                  ? 'No Completed Entries'
+                  : 'No Canceled Entries'}
+              </h3>
+              {(tab === 'Upcoming' || tab === 'Active') && (
+                <Link
+                  to="/tournaments"
+                  className="inline-flex items-center gap-2 border border-cyan bg-cyan/10 px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                >
+                  Browse Tournaments
+                </Link>
+              )}
+            </div>
           ) : (
             list.map((r) => {
               const g = gameBy(r.game_slug || 'valorant')

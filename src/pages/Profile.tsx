@@ -288,7 +288,6 @@ export default function Profile() {
           <div className="flex flex-col justify-end">
             {/* Metadata & Identity Row */}
             <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
-              <Hud className="text-rose-400 font-bold tracking-widest">ESPORTS IDENTITY</Hud>
               <span
                 className={`font-mono text-[9px] uppercase tracking-[0.18em] px-2.5 py-0.5 border ${
                   role === 'SUPER_ADMIN'
@@ -363,35 +362,40 @@ export default function Profile() {
       <Container>
         <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
           {[
-            ['Registered Teams', String(teams.length), 'Active Squads'],
-            ['Ametheus Vault', inr(balanceInr), 'Verified Balance'],
-            ['Registered Events', String(registrations.length), 'Tournaments Played'],
-            ['Regional Division', 'India (IN)', 'Official Server'],
-          ].map(([k, v, sub], i) => (
+            { label: 'Registered Teams', val: String(teams.length), sub: 'Squads Active', color: 'text-white' },
+            { label: 'Vault Balance', val: inr(balanceInr), sub: 'Available Funds', color: 'text-amber-300' },
+            { label: 'Registered Events', val: String(registrations.length), sub: 'Tournament Entries', color: 'text-white' },
+            {
+              label: 'Player Performance',
+              val: matches.length > 0 ? String(matches.length) : `${profile?.rating || 500}`,
+              sub: matches.length > 0 ? 'Matches Drawn' : 'Rating',
+              color: 'text-cyan',
+            },
+          ].map(({ label, val, sub, color }, i) => (
             <div
-              key={k}
-              className="relative overflow-hidden border border-white/[0.09] bg-gradient-to-b from-[#111624]/90 via-[#0B0E16]/95 to-[#06080D]/98 p-5 md:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-rose-500/40 group"
+              key={label}
+              className="relative overflow-hidden border border-white/[0.09] bg-gradient-to-b from-[#111624]/90 via-[#0B0E16]/95 to-[#06080D]/98 p-5 md:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-cyan/40 group"
             >
               {/* Top Directional Edge Highlight Beam */}
               <div
                 className={`h-[2px] w-8 group-hover:w-full transition-all duration-500 mb-3.5 ${
                   i === 1
                     ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-600'
+                    : i === 3
+                    ? 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-cyan-600'
                     : 'bg-gradient-to-r from-rose-500 via-rose-600 to-rose-800'
                 }`}
               />
-              <Hud className="text-slate-400 font-bold tracking-[0.2em]">{k}</Hud>
+              <Hud className="text-slate-400 font-bold tracking-[0.2em]">{label}</Hud>
               <p
-                className={`mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-none tabular-nums ${
-                  i === 1 ? 'text-amber-300' : 'text-white'
-                }`}
+                className={`mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-none tabular-nums ${color}`}
               >
-                {v}
+                {val}
               </p>
               <div className="mt-2.5 flex items-center gap-1.5 font-mono text-[10px] uppercase text-slate-500 tracking-wider">
                 <span
                   className={`size-1 rounded-full ${
-                    i === 1 ? 'bg-amber-400' : 'bg-rose-500'
+                    i === 1 ? 'bg-amber-400' : i === 3 ? 'bg-cyan-400' : 'bg-rose-500'
                   } opacity-75`}
                 />
                 <span>{sub}</span>
@@ -406,29 +410,22 @@ export default function Profile() {
             {/* PAST TOURNAMENTS (Career Participation & Results) */}
             <div>
               <div className="flex items-center justify-between">
-                <Hud className="text-cyan">◇ Past Tournaments</Hud>
-                <span className="font-mono text-[10px] uppercase text-dim tracking-wider">
-                  {pastTournaments.length} Concluded
-                </span>
+                <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                  Past Tournaments
+                </h3>
+                {pastTournaments.length > 0 && (
+                  <span className="font-mono text-[10px] uppercase text-dim tracking-wider">
+                    {pastTournaments.length} Concluded
+                  </span>
+                )}
               </div>
 
               <div className="mt-4 space-y-3">
                 {pastTournaments.length === 0 ? (
-                  <div className="border border-white/10 bg-surface/30 p-6 text-center">
-                    <p className="font-mono text-xs uppercase tracking-wider text-dim">
-                      No concluded tournaments yet
-                    </p>
-                    <p className="mt-1 text-xs text-dim">
-                      Your historical placements, prize distribution, and final match standings appear here once official platform tournaments conclude.
-                    </p>
-                    <div className="mt-4">
-                      <Link
-                        to="/tournaments"
-                        className="inline-block border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
-                      >
-                        Browse Tournaments
-                      </Link>
-                    </div>
+                  <div className="border border-white/10 bg-surface/30 p-8 text-center">
+                    <h4 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                      No Concluded Tournaments
+                    </h4>
                   </div>
                 ) : (
                   pastTournaments.map((pt) => {
@@ -484,36 +481,41 @@ export default function Profile() {
             {/* MY TEAMS */}
             <div>
               <div className="flex items-center justify-between">
-                <Hud className="text-cyan">◇ My Teams</Hud>
-                <div className="flex items-center gap-2">
+                <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                  My Teams
+                </h3>
+                <div className="flex items-center gap-3">
                   <Link
                     to="/teams/create"
-                    className="font-mono text-[10px] uppercase tracking-wider text-cyan hover:underline"
+                    className="font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:underline"
                   >
                     + Create Team
                   </Link>
                   <span className="text-white/20">·</span>
                   <Link
                     to="/teams/join"
-                    className="font-mono text-[10px] uppercase tracking-wider text-violet hover:underline"
+                    className="font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:underline"
                   >
-                    Join Team
+                    Join One
                   </Link>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {teams.length === 0 ? (
-                  <div className="col-span-2 border border-white/10 bg-surface/30 p-6 text-center text-dim text-sm">
-                    No active team memberships.{' '}
-                    <Link to="/teams/create" className="text-cyan hover:underline">
-                      Create a team
-                    </Link>{' '}
-                    or{' '}
-                    <Link to="/teams/join" className="text-violet hover:underline">
-                      join one with an invite code
+                  <div className="col-span-2 border border-white/10 bg-surface/30 p-8 text-center flex items-center justify-center gap-4">
+                    <Link
+                      to="/teams/create"
+                      className="border border-cyan bg-cyan/10 px-4 py-2 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                    >
+                      Create Team
                     </Link>
-                    .
+                    <Link
+                      to="/teams/join"
+                      className="border border-white/20 bg-surface px-4 py-2 font-mono text-xs font-bold uppercase text-white hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+                    >
+                      Join One
+                    </Link>
                   </div>
                 ) : (
                   teams.map((team) => (
@@ -541,7 +543,9 @@ export default function Profile() {
           {/* RIGHT: Intelligent Authoritative Tournament Feed */}
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Hud className="text-cyan">◇ Tournament Feed</Hud>
+              <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                Tournament Feed
+              </h3>
               <div className="flex gap-1">
                 {(
                   [
@@ -581,17 +585,11 @@ export default function Profile() {
                   ))}
                 </div>
               ) : filteredFeed.length === 0 ? (
-                <EmptyState
-                  code="00"
-                  title={
-                    feedFilter === 'ALL'
-                      ? 'No tournament entries'
-                      : `No ${feedFilter.toLowerCase()} tournaments`
-                  }
-                  body="Browse platform tournaments and register with your squad to participate."
-                  cta="Browse Tournaments"
-                  to="/tournaments"
-                />
+                <div className="border border-white/10 bg-surface/30 p-10 text-center">
+                  <h4 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                    No Tournament Entries
+                  </h4>
+                </div>
               ) : (
                 <ol className="border-l border-white/10 space-y-1">
                   {filteredFeed.map((r) => {
@@ -1032,42 +1030,54 @@ export default function Profile() {
           </div>
 
           {/* Voluntary Google Profile Picture Option */}
-          {googleAvatarUrl && (
-            <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="size-14 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
-                  <img
-                    src={googleAvatarUrl}
-                    alt="Google Profile"
-                    className="size-full aspect-square object-cover object-center"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-black uppercase text-sm text-ink">Google Profile Picture</span>
-                    {(profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl) && (
-                      <span className="text-[10px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
-                    )}
+          {googleAvatarUrl && (() => {
+            const normGoogle = (googleAvatarUrl || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
+            const normCurrent = (rawAvatar || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
+            const isGoogleSelected = Boolean(
+              googleAvatarUrl && (
+                profile?.avatar_source === 'GOOGLE' ||
+                normGoogle === normCurrent ||
+                rawAvatar === googleAvatarUrl
+              )
+            )
+
+            return (
+              <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="size-14 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
+                    <img
+                      src={googleAvatarUrl}
+                      alt="Google Profile"
+                      className="size-full aspect-square object-cover object-center"
+                    />
                   </div>
-                  <p className="text-[11px] text-dim">
-                    Voluntarily use your Google / Gmail account picture as your public esports avatar.
-                  </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display font-black uppercase text-sm text-ink">Google Profile Picture</span>
+                      {isGoogleSelected && (
+                        <span className="text-[10px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-dim">
+                      Voluntarily use your Google / Gmail account picture as your public esports avatar.
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleEquipGooglePhoto}
+                  disabled={isGoogleSelected}
+                  className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
+                    isGoogleSelected
+                      ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
+                      : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
+                  }`}
+                >
+                  {isGoogleSelected ? 'Equipped' : 'Equip Google Photo'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleEquipGooglePhoto}
-                disabled={profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl}
-                className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
-                  (profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl)
-                    ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
-                    : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
-                }`}
-              >
-                {(profile?.avatar_source === 'GOOGLE' || rawAvatar === googleAvatarUrl) ? 'Equipped' : 'Equip Google Photo'}
-              </button>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Sanctioned Operator Crests Grid */}
           <div>
@@ -1083,9 +1093,21 @@ export default function Profile() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                 {availableCrests.map((c) => {
-                  const isSelected =
-                    rawAvatar === c.image_url ||
-                    avatarDisplay === c.image_url
+                  const normCurrent = (rawAvatar || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
+                  const normCrest = (c.image_url || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
+                  const resolvedCurrent = resolveMediaUrl(rawAvatar).toLowerCase().trim()
+                  const resolvedCrest = resolveMediaUrl(c.image_url).toLowerCase().trim()
+
+                  const isSelected = Boolean(
+                    normCrest && (
+                      normCurrent === normCrest ||
+                      resolvedCurrent === resolvedCrest ||
+                      (normCurrent && normCurrent.endsWith(normCrest)) ||
+                      (normCrest && normCrest.endsWith(normCurrent)) ||
+                      (c.image_url && rawAvatar?.includes(c.image_url)) ||
+                      (c.id && (profile as any)?.equipped_crest_id === c.id)
+                    )
+                  )
 
                   return (
                     <button
@@ -1113,7 +1135,7 @@ export default function Profile() {
                             {c.name}
                           </p>
                           {isSelected && (
-                            <span className="text-[9px] font-bold text-cyan uppercase shrink-0">
+                            <span className="text-[9px] font-bold text-cyan uppercase tracking-wider shrink-0 bg-cyan/20 border border-cyan/40 px-1.5 py-0.5 rounded-xs">
                               ✓ Equipped
                             </span>
                           )}

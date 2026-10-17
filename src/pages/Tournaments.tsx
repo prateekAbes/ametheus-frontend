@@ -70,48 +70,124 @@ export default function Tournaments() {
 
   // Filter and map to card shape
   const list = useMemo(() => {
-    let result = tournaments.filter((t) => {
-      if (t.status === 'CANCELLED') return false
+    const trimmedSearch = search.trim().toLowerCase()
+    const searchTerms = trimmedSearch ? trimmedSearch.split(/\s+/).filter(Boolean) : []
 
-      if (selectedGame !== 'All Games') {
-        const gameMatch = games.find(
+    const filterTournament = (t: NormalizedTournament, matchStrictTerms: boolean) => {
+      // 1. Exclude deleted/cancelled
+      if (t.status === 'CANCELLED' || (t as any).status === 'DELETED') return false
+
+      // 2. Resolve associated game metadata
+      const rawGId = (t.gameId || '').toLowerCase()
+      const rawGName = (t.gameName || '').toLowerCase()
+      const rawGIdClean = rawGId.replace(/[-_\s]+/g, '')
+      const rawGNameClean = rawGName.replace(/[-_\s]+/g, '')
+
+      const associatedGame =
+        games.find(
           (g) =>
-            g.name.toLowerCase() === selectedGame.toLowerCase() ||
-            g.slug === selectedGame.toLowerCase()
-        )
-        if (gameMatch && t.gameId !== gameMatch.slug && t.gameId !== gameMatch.id) {
-          return false
-        }
+            (g.id && g.id === t.gameId) ||
+            ((g as any)._id && (g as any)._id === t.gameId) ||
+            (g.slug && g.slug.toLowerCase().replace(/[-_\s]+/g, '') === rawGIdClean) ||
+            (g.name && g.name.toLowerCase().replace(/[-_\s]+/g, '') === rawGNameClean)
+        ) || gameBy(t.gameId || t.gameName)
+
+      // 3. Game Filter
+      if (selectedGame !== 'All Games') {
+        const targetClean = selectedGame.toLowerCase().replace(/[-_\s]+/g, '')
+        const matchSlugClean = (associatedGame?.slug || '').toLowerCase().replace(/[-_\s]+/g, '')
+        const matchNameClean = (associatedGame?.name || '').toLowerCase().replace(/[-_\s]+/g, '')
+        const matchShortClean = ((associatedGame as any)?.short || (associatedGame as any)?.tag || '').toLowerCase().replace(/[-_\s]+/g, '')
+
+        const isGameMatch =
+          rawGIdClean === targetClean ||
+          rawGNameClean === targetClean ||
+          matchSlugClean === targetClean ||
+          matchNameClean === targetClean ||
+          matchShortClean === targetClean ||
+          matchNameClean.includes(targetClean) ||
+          targetClean.includes(matchNameClean) ||
+          (targetClean === 'bgmi' &&
+            (matchSlugClean.includes('bgmi') || matchNameClean.includes('battlegrounds'))) ||
+          (targetClean === 'codmobile' &&
+            (matchSlugClean.includes('cod') || matchNameClean.includes('duty'))) ||
+          (targetClean === 'freefire' &&
+            (matchSlugClean.includes('freefire') || matchNameClean.includes('fire'))) ||
+          (targetClean === 'valorant' && matchSlugClean.includes('val'))
+
+        if (!isGameMatch) return false
       }
 
+      // 4. Status Filter
       if (selectedStatus === 'My Registered') {
         const isReg = registeredIds.has(t.id) || registeredIds.has(t.slug) || !!t.isRegistered
         if (!isReg) return false
       } else if (selectedStatus !== 'All') {
-        const targetStatus = STATUS_MAP[selectedStatus]
-        if (
-          t.status.toUpperCase() !== targetStatus &&
-          t.status.toLowerCase() !== selectedStatus.toLowerCase()
-        ) {
-          return false
+        const sUpper = (t.status || '').toUpperCase().trim()
+        let matchesStatus = false
+        if (selectedStatus === 'Registration Open') {
+          matchesStatus = sUpper === 'REGISTRATION_OPEN' || sUpper === 'OPEN'
+        } else if (selectedStatus === 'Upcoming') {
+          matchesStatus = sUpper === 'UPCOMING' || sUpper === 'COMING_SOON' || sUpper === 'DRAFT'
+        } else if (selectedStatus === 'Live') {
+          matchesStatus = sUpper === 'LIVE' || sUpper === 'ONGOING' || sUpper === 'IN_PROGRESS'
+        } else if (selectedStatus === 'Completed') {
+          matchesStatus = sUpper === 'COMPLETED' || sUpper === 'FINISHED' || sUpper === 'ENDED'
+        } else {
+          matchesStatus = sUpper === selectedStatus.toUpperCase()
         }
+        if (!matchesStatus) return false
       }
 
-      if (search.trim()) {
-        const query = search.toLowerCase()
-        if (!t.title.toLowerCase().includes(query) && !t.gameId.toLowerCase().includes(query)) {
-          return false
+      // 5. Search Filter
+      if (searchTerms.length > 0) {
+        const corpus = [
+          t.title,
+          t.slug,
+          t.slug ? t.slug.replace(/[-_]+/g, ' ') : '',
+          t.id,
+          t.gameName,
+          t.gameId,
+          associatedGame?.name,
+          (associatedGame as any)?.short || (associatedGame as any)?.tag,
+          associatedGame?.slug,
+          (associatedGame as any)?.genre || (associatedGame as any)?.genre_name || (associatedGame as any)?.category,
+          associatedGame?.platform,
+          t.description,
+          t.format,
+          t.serverRegion,
+          t.status,
+          t.announcementText,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        if (matchStrictTerms) {
+          const matchesAll = searchTerms.every((term) => corpus.includes(term))
+          if (!matchesAll) return false
+        } else {
+          const matchesAny = searchTerms.some((term) => corpus.includes(term))
+          if (!matchesAny) return false
         }
       }
 
       return true
-    })
+    }
+
+    // First attempt strict match (all terms must be present)
+    let result = tournaments.filter((t) => filterTournament(t, true))
+
+    // If multi-word search returned 0 strict matches, try lenient matching
+    if (result.length === 0 && searchTerms.length > 1) {
+      result = tournaments.filter((t) => filterTournament(t, false))
+    }
 
     return result.map(
       (nt): Partial<DesignTournament> & Pick<DesignTournament, 'id' | 'name'> => ({
         id: nt.slug || nt.id,
         name: nt.title,
-        game: nt.gameId,
+        game: nt.gameName || nt.gameId,
         prize: nt.prizePoolInr,
         entry: nt.entryFeeInr,
         status: nt.status.toLowerCase() as any,
@@ -134,6 +210,10 @@ export default function Tournaments() {
 
   const page = useLoadMore(list, 9)
 
+  useEffect(() => {
+    page.reset?.()
+  }, [search, selectedGame, selectedStatus])
+
   return (
     <>
       <PageHero
@@ -151,14 +231,33 @@ export default function Tournaments() {
               <Chips items={STATUS_CHIPS} value={selectedStatus} onChange={setSelectedStatus} />
             </div>
             <div className="flex items-center gap-3">
-              <input
-                type="text"
-                placeholder="Search tournaments..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full sm:w-auto border border-white/10 bg-surface px-3 py-1.5 font-mono text-xs text-ink placeholder:text-dim outline-none focus:border-cyan"
-              />
-              <Hud className="shrink-0">{list.length} Events</Hud>
+              <div className="relative flex items-center w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search tournaments..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setSearch('')
+                  }}
+                  className="w-full sm:w-64 border border-white/10 bg-surface pl-3 pr-8 py-1.5 font-mono text-xs text-ink placeholder:text-dim outline-none focus:border-cyan transition-colors"
+                />
+                {search ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    title="Clear search"
+                    className="absolute right-2.5 text-dim hover:text-ink font-mono text-xs transition-colors"
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <span className="absolute right-2.5 text-dim/40 pointer-events-none text-xs">
+                    ⌕
+                  </span>
+                )}
+              </div>
+              <Hud className="shrink-0">{list.length} {list.length === 1 ? 'Event' : 'Events'}</Hud>
             </div>
           </div>
           <div className="overflow-x-auto no-scrollbar">
@@ -177,17 +276,23 @@ export default function Tournaments() {
         ) : list.length === 0 ? (
           <EmptyState
             code="00"
-            title="No tournaments found"
+            title={search.trim() ? "No tournaments found for your search" : "No tournaments found"}
             body={
-              selectedStatus === 'My Registered'
+              search.trim()
+                ? `No tournaments matched "${search.trim()}". Check your spelling or try clearing your active filters.`
+                : selectedStatus === 'My Registered'
                 ? "You haven't entered any tournaments matching this filter yet."
                 : 'Try adjusting your filters or search keywords.'
             }
-            cta="Clear filters"
+            cta={search.trim() ? "Clear search" : "Clear filters"}
             onClick={() => {
-              setSelectedGame('All Games')
-              setSelectedStatus('All')
-              setSearch('')
+              if (search.trim()) {
+                setSearch('')
+              } else {
+                setSelectedGame('All Games')
+                setSelectedStatus('All')
+                setSearch('')
+              }
             }}
           />
         ) : (

@@ -45,7 +45,10 @@ export function RankingMetricsPanel({
                       <button
                         key={x.id}
                         type="button"
-                        onClick={() => onSelectMetric(x.id)}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          onSelectMetric(x.id)
+                        }}
                         aria-pressed={on}
                         className={`group flex items-center gap-3 w-full py-1 text-left text-sm transition-colors cursor-pointer ${
                           on ? 'text-white font-bold' : 'text-dim hover:text-white'

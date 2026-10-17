@@ -54,6 +54,9 @@ export interface Tournament {
   stream_url?: string
   registration_status?: string
   whatsapp_group_url?: string
+  community_link?: string
+  starts_at?: string
+  roster_lock_time?: string
   server_region?: string
   media_config?: Record<string, any>
 }
@@ -69,11 +72,20 @@ export interface NormalizedTournament {
   status: string
   maxTeams: number
   registeredTeams: number
+  confirmedTeams: number
+  reservedTeams: number
+  availableSlots: number
   minTeamSize: number
   maxTeamSize: number
   startDate: string
   endDate?: string
   registrationDeadline?: string
+  startsAt?: string
+  rosterLockTime?: string
+  serverRegion?: string
+  announcementText?: string
+  whatsappGroupUrl?: string
+  communityLink?: string
   bannerUrl?: string
   heroBannerUrl?: string
   bannerTabletUrl?: string
@@ -96,6 +108,31 @@ export interface NormalizedTournament {
   isFeatured?: boolean
   media_config?: Record<string, any>
   mediaConfig?: Record<string, any>
+}
+
+export function getRequiredTeamSizeDisplay(tour: NormalizedTournament | Tournament | null | undefined): string {
+  if (!tour) return 'Squad Roster'
+  const min = (tour as any).minTeamSize ?? (tour as any).min_team_size
+  const max = (tour as any).maxTeamSize ?? (tour as any).max_team_size
+  const fmt = ((tour as any).format || '').toLowerCase()
+
+  if (fmt.includes('solo') || fmt.includes('1v1') || (min === 1 && max === 1)) {
+    return '1 Player (Solo)'
+  }
+  if (fmt.includes('duo') || fmt.includes('2v2') || (min === 2 && max === 2)) {
+    return '2 Players (Duo)'
+  }
+  if (fmt.includes('trio') || fmt.includes('3v3') || (min === 3 && max === 3)) {
+    return '3 Players (Trio)'
+  }
+
+  const safeMin = Math.max(1, Number(min || 4))
+  const safeMax = Math.max(safeMin, Number(max || safeMin || 5))
+
+  if (safeMin === safeMax) {
+    return `${safeMin} Players (Squad)`
+  }
+  return `${safeMin}–${safeMax} Players (Squad)`
 }
 
 export function normalizeTournament(t: Tournament): NormalizedTournament {
@@ -121,6 +158,11 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
       ? Number((t as any).registeredTeams)
       : 0
 
+  const confirmedTeams = (t as any).confirmed_teams !== undefined ? Number((t as any).confirmed_teams) : regCount
+  const reservedTeams = (t as any).reserved_teams !== undefined ? Number((t as any).reserved_teams) : 0
+  const maxTeams = t.max_teams || (t as any).maxTeams || 16
+  const availableSlots = (t as any).available_slots !== undefined ? Number((t as any).available_slots) : Math.max(0, maxTeams - confirmedTeams - reservedTeams)
+
   const bannerUrl = t.banner_url || (t as any).bannerUrl || ''
   const heroBannerUrl = t.hero_banner_url || (t as any).heroBannerUrl || bannerUrl
   const bannerTabletUrl = t.banner_tablet_url || (t as any).bannerTabletUrl || bannerUrl
@@ -128,22 +170,43 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
   const logoUrl = t.logo_url || (t as any).logoUrl || ''
   const mediaConfig = t.media_config || (t as any).mediaConfig || {}
 
+  const rawGameId = t.game_id || (t as any).game_slug || (t as any).gameId || (t as any).game || ''
+  const rawGameName = t.game_name || (t as any).gameName || (t as any).game_slug || (t as any).game || t.game_id || 'Esports'
+
+  const rawMin = t.min_team_size ?? (t as any).minTeamSize
+  const rawMax = t.max_team_size ?? (t as any).maxTeamSize
+  const formatLower = (t.format || '').toLowerCase()
+  const isSolo = formatLower.includes('solo') || formatLower.includes('1v1') || (rawMin === 1 && rawMax === 1)
+  const isDuo = formatLower.includes('duo') || formatLower.includes('2v2') || (rawMin === 2 && rawMax === 2)
+
+  const safeMin = isSolo ? 1 : isDuo ? 2 : Math.max(1, Number(rawMin || 1))
+  const safeMax = isSolo ? 1 : isDuo ? 2 : Math.max(safeMin, Number(rawMax || safeMin || 5))
+
   return {
     id: t.id || t._id || t.slug,
     slug: t.slug || t.id,
-    title: t.title,
+    title: t.title || (t as any).name || 'Tournament',
     description: t.description || '',
-    gameId: t.game_id,
-    gameName: t.game_name || (t as any).game_slug || t.game_id || 'Esports',
-    format: t.format,
+    gameId: rawGameId,
+    gameName: rawGameName,
+    format: t.format || (t as any).tournament_type || (t as any).match_format || 'Single Elimination',
     status: t.status,
-    maxTeams: t.max_teams || 16,
+    maxTeams,
     registeredTeams: regCount,
-    minTeamSize: t.min_team_size || 1,
-    maxTeamSize: t.max_team_size || 5,
-    startDate: t.start_date,
+    confirmedTeams,
+    reservedTeams,
+    availableSlots,
+    minTeamSize: safeMin,
+    maxTeamSize: safeMax,
+    startDate: t.start_date || (t as any).starts_at || (t as any).startsAt || '',
     endDate: t.end_date,
     registrationDeadline: t.registration_deadline,
+    startsAt: t.starts_at || (t as any).startsAt || t.start_date,
+    rosterLockTime: t.roster_lock_time || (t as any).rosterLockTime,
+    serverRegion: t.server_region || (t as any).serverRegion || 'AWS Mumbai (ap-south-1)',
+    announcementText: (t as any).announcement_text || (t as any).announcementText,
+    whatsappGroupUrl: t.whatsapp_group_url || (t as any).whatsappGroupUrl,
+    communityLink: t.community_link || (t as any).communityLink,
     bannerUrl,
     heroBannerUrl,
     bannerTabletUrl,
@@ -172,10 +235,12 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
 export async function getTournaments(params?: {
   game?: string
   status?: string
+  search?: string
 }): Promise<Tournament[]> {
   const searchParams = new URLSearchParams()
   if (params?.game) searchParams.set('game', params.game)
   if (params?.status) searchParams.set('status', params.status)
+  if (params?.search) searchParams.set('search', params.search.trim())
   const q = searchParams.toString() ? `?${searchParams.toString()}` : ''
   return apiClient<Tournament[]>(`/tournaments${q}`)
 }
@@ -229,7 +294,7 @@ export interface DirectUpiInitResponse {
 
 export async function registerTournamentDirectUpi(
   tournamentId: string,
-  payload: { team_id: string; selected_roster_ids?: string[] }
+  payload: { team_id?: string; selected_roster_ids?: string[] }
 ): Promise<DirectUpiInitResponse> {
   return apiClient<DirectUpiInitResponse>(`/tournaments/${tournamentId}/register/upi`, {
     method: 'POST',
@@ -294,4 +359,68 @@ export async function reopenTournamentRegistration(tournamentId: string): Promis
   return apiClient(`/admin/tournaments/${tournamentId}/reopen-registration`, {
     method: 'POST',
   })
+}
+
+export interface TournamentRosterMember {
+  user_id: string
+  username: string
+  full_name?: string
+  display_name?: string
+  avatar_url?: string
+  equipped_avatar_url?: string
+  role?: string
+}
+
+export interface TournamentTeamDetails {
+  id?: string
+  name: string
+  tag?: string
+  logo_url?: string
+  captain_id?: string
+  captain_handle?: string
+  captain_name?: string
+  my_role?: 'CAPTAIN' | 'PLAYER' | string
+  roster?: TournamentRosterMember[]
+  members?: TournamentRosterMember[]
+}
+
+export interface TournamentRegistrationDetails {
+  id?: string
+  tournament_id?: string
+  team_id?: string
+  team_name?: string
+  payment_status: 'PAID' | 'FREE' | 'PENDING' | 'PENDING_VERIFICATION' | 'REJECTED' | string
+  status?: string
+  registered_at?: string
+  fee_paid?: number
+  utr?: string
+  [key: string]: any
+}
+
+export interface TournamentRegistrationStatusResponse {
+  is_registered: boolean
+  status?: string | null
+  payment_status?: string | null
+  registration?: TournamentRegistrationDetails | null
+  team?: TournamentTeamDetails | null
+  position?: number | null
+}
+
+export interface TournamentCommunityLinkResponse {
+  community_link?: string
+  whatsapp_group_url?: string
+  instructions?: string
+  tournament_title?: string
+}
+
+export async function getTournamentRegistrationStatus(
+  slugOrId: string
+): Promise<TournamentRegistrationStatusResponse> {
+  return apiClient<TournamentRegistrationStatusResponse>(`/tournaments/${slugOrId}/registration-status`)
+}
+
+export async function getTournamentCommunityLink(
+  slugOrId: string
+): Promise<TournamentCommunityLinkResponse> {
+  return apiClient<TournamentCommunityLinkResponse>(`/tournaments/${slugOrId}/community`)
 }

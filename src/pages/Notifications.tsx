@@ -140,7 +140,9 @@ export default function Notifications() {
       <Container className="max-w-5xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <Hud className="text-cyan">◇ {unreadCount} unread · {items.length} total</Hud>
+            <Hud className="text-cyan font-bold tracking-wider">
+              {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All notifications read'}
+            </Hud>
             <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,7rem)] font-black uppercase leading-[0.85]">
               Notifications
             </h1>

@@ -78,15 +78,17 @@ export function Cta({ children, ghost, to, onClick, className = '', small, arrow
 export const CTAButton = Cta
 
 /** Section heading: index + kicker + big display title. */
-export function SectionHead({ idx, kicker, title, sub, right, className = '', size = 'lg' }: { idx?: string; kicker: string; title: ReactNode; sub?: ReactNode; right?: ReactNode; className?: string; size?: 'lg' | 'md' }) {
+export function SectionHead({ idx, kicker, title, sub, right, className = '', size = 'lg' }: { idx?: string; kicker?: string; title: ReactNode; sub?: ReactNode; right?: ReactNode; className?: string; size?: 'lg' | 'md' }) {
   return (
     <div className={`flex flex-col gap-6 md:flex-row md:items-end md:justify-between ${className}`}>
       <div>
-        <div className="mb-5 flex items-center gap-4">
-          {idx && <Hud className="text-cyan">{idx}</Hud>}
-          <span className="h-px w-12 bg-cyan/50" />
-          <Hud>{kicker}</Hud>
-        </div>
+        {(idx || kicker) && (
+          <div className="mb-5 flex items-center gap-4">
+            {idx && <Hud className="text-cyan">{idx}</Hud>}
+            {idx && kicker && <span className="h-px w-12 bg-cyan/50" />}
+            {kicker && <Hud>{kicker}</Hud>}
+          </div>
+        )}
         <h2 className={`font-display font-black uppercase leading-[0.85] ${size === 'lg' ? 'text-[clamp(3rem,8vw,8rem)]' : 'text-[clamp(2.25rem,5vw,4.5rem)]'}`}>{title}</h2>
         {sub && <p className="mt-5 max-w-lg text-lg text-dim">{sub}</p>}
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router'
-import { PageHero, Container, Chips, EmptyState, Hud, Badge, Crest, Brackets } from '../components/ui'
+import { PageHero, Container, Chips, Hud, Badge, Crest, Brackets, Cta } from '../components/ui'
 import { gameBy, img, tourBy, type Match } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import DynamicImage from '../components/DynamicImage'
@@ -310,7 +310,6 @@ export default function Matches() {
   return (
     <>
       <PageHero
-        kicker={liveCount > 0 ? `◉ ${liveCount} ${liveCount === 1 ? 'match' : 'matches'} live now` : '◉ Live Matches'}
         title="MATCHES"
         sub="Track live verified matches across Ametheus."
         variant="matches"
@@ -318,15 +317,7 @@ export default function Matches() {
       />
 
       <Container className="py-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-6">
-          <div className="flex items-center gap-3">
-            <span className="size-2 rounded-full bg-live animate-pulse shadow-[0_0_8px_#ff3b4e]" />
-            <Hud className="text-ink font-bold">SANCTIONED LIVE ARENA</Hud>
-            <span className="font-mono text-xs text-dim">·</span>
-            <span className="font-mono text-xs text-dim uppercase">
-              {list.length} {list.length === 1 ? 'Match Live' : 'Matches Live'}
-            </span>
-          </div>
+        <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <Chips items={GAMES} value={game} onChange={setGame} />
         </div>
 
@@ -337,13 +328,14 @@ export default function Matches() {
               <Hud className="text-cyan">Loading matches...</Hud>
             </div>
           ) : list.length === 0 ? (
-            <EmptyState
-              code="0:0"
-              title="No live matches"
-              body="No matches currently live for this game filter. Check back when tournament rounds begin."
-              cta="Browse Tournaments"
-              to="/tournaments"
-            />
+            <div className="border border-white/10 bg-surface/40 py-16 px-6 text-center flex flex-col items-center justify-center">
+              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-wider text-ink mb-6">
+                No live matches
+              </h2>
+              <Cta to="/tournaments" small>
+                Browse Tournaments
+              </Cta>
+            </div>
           ) : (
             <div className="space-y-4">
               <LiveFeature

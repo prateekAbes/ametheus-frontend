@@ -159,8 +159,7 @@ export default function Wallet() {
     <div className="relative min-h-screen bg-void pb-28 pt-32 overflow-hidden">
       <EsportsHeroVisual variant="wallet" accent="#10b981" />
       <Container className="relative">
-        <Hud className="text-cyan">◇ Encrypted</Hud>
-        <h1 className="reveal mt-3 font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85]">
+        <h1 className="reveal font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85]">
           Ametheus wallet
         </h1>
 
@@ -168,8 +167,8 @@ export default function Wallet() {
           <Panel className="overflow-hidden p-6 md:p-10">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_0%_100%,rgb(62_242_255/0.15),transparent_60%)]" />
             <div className="relative">
-              <Hud>Available balance</Hud>
-              <p className="mt-2 font-display text-[clamp(4rem,12vw,9rem)] font-black leading-none tabular-nums">
+              <Hud className="text-sm font-bold uppercase tracking-wider text-white/80">Available balance</Hud>
+              <p className="mt-2 font-display text-[clamp(4rem,12vw,9rem)] font-black leading-none tabular-nums text-white">
                 {inr(available)}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -187,16 +186,16 @@ export default function Wallet() {
           </Panel>
           <div className="grid gap-px border border-white/10 bg-white/10">
             {[
-              ['Total Balance', total, 'Total account funds', '#e8eaf2'],
-              ['Withdrawable / Available', available, 'Instant tournament entry / withdrawal', '#2fe6b0'],
+              ['Total Balance', total, 'Total account funds', '#ffffff'],
+              ['Withdraw Available', available, 'Instant tournament entry / withdrawal', '#2fe6b0'],
               ['Reserved / Locked', reserved, 'In active tournaments / pending withdrawals', '#ffb547'],
             ].map(([k, v, s, c]) => (
-              <div key={k as string} className="flex items-center justify-between bg-void p-5 md:p-6">
+              <div key={k as string} className="flex items-center justify-between bg-void p-5 sm:p-6 md:p-7">
                 <div>
-                  <Hud>{k}</Hud>
-                  <p className="mt-1 text-xs text-dim">{s}</p>
+                  <h3 className="font-display text-lg sm:text-xl font-black uppercase tracking-wider text-white">{k}</h3>
+                  <p className="mt-1 text-xs sm:text-sm text-dim/90">{s}</p>
                 </div>
-                <p className="font-display text-3xl font-black tabular-nums" style={{ color: c as string }}>
+                <p className="font-display text-3xl sm:text-4xl md:text-5xl font-black tabular-nums tracking-tight" style={{ color: c as string }}>
                   {inr(v as number)}
                 </p>
               </div>
@@ -204,11 +203,18 @@ export default function Wallet() {
           </div>
         </div>
 
-        <div className="mt-16 flex items-end justify-between">
-          <Hud className="text-cyan">◇ Recent transactions</Hud>
+        <div className="mt-16 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-wider text-white">
+              Transaction History
+            </h2>
+            <p className="mt-1 font-mono text-xs text-dim">
+              Verified ledger entries, deposits, prize payouts, and entry deductions.
+            </p>
+          </div>
           <Link
             to="/transactions"
-            className="font-mono text-[10px] uppercase tracking-[0.2em] text-dim hover:text-cyan"
+            className="font-mono text-xs uppercase tracking-[0.18em] font-bold text-cyan hover:underline transition-colors"
           >
             View all →
           </Link>

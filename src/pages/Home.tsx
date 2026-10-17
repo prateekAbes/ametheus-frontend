@@ -274,8 +274,6 @@ function Featured({
       <Container>
         <SectionHead
           className="in-view"
-          idx="01"
-          kicker={`Featured · ${tournaments.length}`}
           title={<>Featured<br /><span className="outline-text">Tournaments</span></>}
           right={<Cta ghost small to="/tournaments">All tournaments</Cta>}
         />
@@ -365,7 +363,7 @@ function Featured({
                     <div className="flex min-w-0 flex-col justify-between gap-3">
                       <div>
                         <div className="flex items-center justify-between gap-3">
-                          <Hud className="text-ink/70">0{idx + 2} · {sideGameName}</Hud>
+                          <Hud className="text-ink/70">{sideGameName}</Hud>
                           <Badge s={t.status} />
                         </div>
                         <p className="mt-2 line-clamp-2 text-balance font-display text-2xl font-black uppercase leading-[0.9] transition-transform duration-300 group-hover:translate-x-1">
@@ -436,8 +434,6 @@ function Upcoming({
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <SectionHead
             className="in-view"
-            idx="02"
-            kicker="On the horizon"
             title="Upcoming"
             size="md"
             right={<Hud>{total} events</Hud>}
@@ -510,7 +506,7 @@ function Why() {
   return (
     <section className="relative overflow-hidden bg-graphite py-24 md:py-36">
       <Container>
-        <SectionHead idx="03" kicker="Why Ametheus" title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
+        <SectionHead title={<>Built for<br /><span className="text-cyan">competitors.</span></>} />
         <ol className="mt-16">
           {WHY.map(([t, b], i) => (
             <li key={t} className={`group grid items-baseline gap-4 border-t border-white/10 py-8 md:grid-cols-12 md:py-10 ${i % 2 ? 'md:pl-[12%]' : ''}`}>

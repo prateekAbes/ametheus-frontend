@@ -265,8 +265,6 @@ export default function Games() {
               <Container>
                 <div className="mb-8">
                   <SectionHead
-                    idx="01"
-                    kicker="Competitive Genres"
                     title="Games"
                     sub="Explore official esports battlegrounds grouped by discipline. Select any discipline to inspect registered games."
                   />
@@ -398,8 +396,6 @@ export default function Games() {
             <Container>
               <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
                 <SectionHead
-                  idx="02"
-                  kicker="Direct Catalog"
                   title={<>Active <span className="text-cyan">Games</span></>}
                   sub="Direct access to every active competitive game. Enter world to browse tournament brackets, rules, and squads."
                 />
@@ -435,8 +431,6 @@ export default function Games() {
             <section className="in-view border-t border-white/10 bg-graphite/40 py-20 pb-32 md:pb-40" id="coming-soon-games">
               <Container>
                 <SectionHead
-                  idx="03"
-                  kicker="Locked Worlds"
                   title={<span className="outline-text">Coming soon</span>}
                   size="md"
                   sub="New esports battlegrounds unlocking soon. Follow the community discord to get notified when registrations open."

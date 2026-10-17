@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router'
 import { useAuthContext } from '../context/AuthContext'
 import {
@@ -18,7 +18,7 @@ import {
 } from '../services/leaderboard'
 import { Avatar } from '../components/leaderboard/Avatar'
 import { PodiumSlot, Mono } from '../components/leaderboard/PodiumSlot'
-import { LeaderboardSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
+import { ChallengersLadderSkeleton } from '../components/leaderboard/LeaderboardSkeleton'
 import { LeaderboardEmptyState } from '../components/leaderboard/LeaderboardEmptyState'
 import { LeaderboardErrorState } from '../components/leaderboard/LeaderboardErrorState'
 import { PlatformStatsStrip } from '../components/leaderboard/PlatformStatsStrip'
@@ -49,6 +49,7 @@ export default function Leaderboard() {
   const [disqualifiedIds, setDisqualifiedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<boolean>(false)
+  const isFirstLoad = useRef<boolean>(true)
 
   // 4. Pagination state: player rankings displayed in groups of 10
   const [page, setPage] = useState<number>(1)
@@ -75,7 +76,7 @@ export default function Leaderboard() {
     }
   }, [])
 
-  // Sync metric and timeRange states to URL query parameter
+  // Sync metric and timeRange states to URL query parameter without resetting scroll position
   useEffect(() => {
     const params = new URLSearchParams()
     if (metric !== 'overall') {
@@ -84,12 +85,14 @@ export default function Leaderboard() {
     if (timeRange !== 'all_time') {
       params.set('time_range', timeRange)
     }
-    setSearchParams(params, { replace: true })
+    setSearchParams(params, { replace: true, preventScrollReset: true })
   }, [metric, timeRange, setSearchParams])
 
   // Fetch authoritative leaderboard entries and platform stats from backend
   const fetchLeaderboardData = useCallback(async () => {
-    setLoading(true)
+    if (isFirstLoad.current) {
+      setLoading(true)
+    }
     setError(false)
     try {
       const [entriesData, statsData] = await Promise.all([
@@ -112,6 +115,7 @@ export default function Leaderboard() {
       setError(true)
     } finally {
       setLoading(false)
+      isFirstLoad.current = false
     }
   }, [metric, timeRange])
 
@@ -259,9 +263,6 @@ export default function Leaderboard() {
         break
       case 'matches':
         list.sort((a, b) => b.matches - a.matches || b.wins - a.wins || b.points - a.points)
-        break
-      case 'top3':
-        list.sort((a, b) => b.top3 - a.top3 || b.wins - a.wins || b.points - a.points)
         break
       case 'earnings':
         list.sort((a, b) => b.earnings - a.earnings || b.wins - a.wins || b.points - a.points)
@@ -487,8 +488,8 @@ export default function Leaderboard() {
 
         {/* MAIN CONTENT CONTAINER: Aligned with page header at max-w-[1600px] px-5 md:px-10 */}
         <div className="relative mx-auto w-full max-w-[1600px] px-5 md:px-10 pb-16 space-y-8 md:space-y-10">
-          {/* Horizontal Platform Statistics Strip (left-aligned with header, max-w 1120px) */}
-          <div className="w-full max-w-[1120px]">
+          {/* Horizontal Platform Statistics Strip (left edge frozen, right outer offset matches left outer offset) */}
+          <div className="w-full">
             <PlatformStatsStrip stats={statBlocks} />
           </div>
 
@@ -557,7 +558,10 @@ export default function Leaderboard() {
                           <button
                             key={x.id}
                             type="button"
-                            onClick={() => setMetric(x.id)}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setMetric(x.id)
+                            }}
                             className={`px-3 py-1.5 rounded-xs font-mono text-xs whitespace-nowrap transition-colors cursor-pointer ${
                               on
                                 ? 'border border-cyan bg-cyan/15 text-white font-bold'
@@ -588,8 +592,8 @@ export default function Leaderboard() {
 
                 {/* Right Column: Challenger Ladder, Skeleton, Error, or Empty State */}
                 <div className="min-w-0 space-y-4">
-                  {loading ? (
-                    <LeaderboardSkeleton />
+                  {loading && entries.length === 0 ? (
+                    <ChallengersLadderSkeleton />
                   ) : error ? (
                     <LeaderboardErrorState onRetry={fetchLeaderboardData} />
                   ) : sortedPlayers.length === 0 ? (
@@ -604,10 +608,6 @@ export default function Leaderboard() {
                         <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
                           Challengers Ladder
                         </h2>
-                        <span className="text-white/20">·</span>
-                        <Mono className="normal-case tracking-normal">
-                          {sortedPlayers.length} contenders ranked
-                        </Mono>
                         <span className="text-white/20">·</span>
                         <Mono className="uppercase text-cyan font-bold tracking-wider">
                           {TIME_RANGES.find((t) => t.id === timeRange)?.label || 'ALL TIME'}

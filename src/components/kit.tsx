@@ -22,7 +22,13 @@ export function AdaptiveGrid({ count, children, min = 300, className = '' }: { c
 export function useLoadMore<T>(items: T[], step = 6) {
   const [n, setN] = useState(step)
   useEffect(() => setN(step), [items.length, step])
-  return { shown: items.slice(0, n), more: n < items.length, rest: items.length - n, next: () => setN((v) => v + step) }
+  return {
+    shown: items.slice(0, n),
+    more: n < items.length,
+    rest: items.length - n,
+    next: () => setN((v) => v + step),
+    reset: () => setN(step),
+  }
 }
 export function LoadMore({ more, rest, onClick, label = 'Load more' }: { more: boolean; rest: number; onClick: () => void; label?: string }) {
   if (!more) return null

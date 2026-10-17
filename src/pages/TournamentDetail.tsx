@@ -14,6 +14,11 @@ import {
   normalizeTournament,
   NormalizedTournament,
   DirectUpiInitResponse,
+  getRequiredTeamSizeDisplay,
+  getTournamentRegistrationStatus,
+  getTournamentCommunityLink,
+  type TournamentRegistrationStatusResponse,
+  type TournamentCommunityLinkResponse,
 } from '../services/tournaments'
 import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games'
 import { getMyTeams, Team } from '../services/teams'
@@ -171,6 +176,9 @@ export default function TournamentDetail() {
   const [loading, setLoading] = useState(true)
   const [regModalOpen, setRegModalOpen] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
+  const [regStatus, setRegStatus] = useState<TournamentRegistrationStatusResponse | null>(null)
+  const [communityInfo, setCommunityInfo] = useState<TournamentCommunityLinkResponse | null>(null)
+  const [loadingStatus, setLoadingStatus] = useState(false)
 
   const fetchTour = async () => {
     try {
@@ -196,9 +204,43 @@ export default function TournamentDetail() {
     } catch {}
   }
 
+  const fetchStatus = async (slugOrId: string) => {
+    if (!isSignedIn) {
+      setRegStatus(null)
+      setCommunityInfo(null)
+      return
+    }
+    setLoadingStatus(true)
+    try {
+      const statusRes = await getTournamentRegistrationStatus(slugOrId)
+      setRegStatus(statusRes)
+      if (statusRes.is_registered) {
+        setIsRegistered(true)
+        const pStatus = statusRes.registration?.payment_status || statusRes.payment_status
+        if (pStatus === 'PAID' || pStatus === 'FREE') {
+          try {
+            const comm = await getTournamentCommunityLink(slugOrId)
+            setCommunityInfo(comm)
+          } catch {
+            // Unconfirmed or unauthorized
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setLoadingStatus(false)
+    }
+  }
+
   useEffect(() => {
     fetchTour()
-  }, [id])
+    fetchStatus(id)
+  }, [id, isSignedIn])
+
+  const paymentStatus = regStatus?.registration?.payment_status || regStatus?.payment_status
+  const isConfirmedParticipant = Boolean(regStatus?.is_registered && (paymentStatus === 'PAID' || paymentStatus === 'FREE'))
+  const isPendingParticipant = Boolean(regStatus?.is_registered && ['PENDING', 'PENDING_VERIFICATION'].includes(paymentStatus || ''))
 
   // Resolve visual metadata
   const gameSlug = tourData?.gameId || tourData?.gameName || ''
@@ -305,7 +347,19 @@ export default function TournamentDetail() {
               </span>
             </Link>
             <Status s={tourStatus} />
-            {isRegistered && <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-ok">✓ You're registered</span>}
+            {isConfirmedParticipant ? (
+              <span className="inline-flex items-center gap-1.5 border border-ok/40 bg-ok/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.22em] text-ok">
+                <span className="size-1.5 rounded-full bg-ok animate-pulse" />
+                Confirmed Entry · #{regStatus?.position ?? 1}
+              </span>
+            ) : isPendingParticipant ? (
+              <span className="inline-flex items-center gap-1.5 border border-warn/40 bg-warn/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.22em] text-warn">
+                <span className="size-1.5 rounded-full bg-warn" />
+                Seat Reserved · Pending Verification
+              </span>
+            ) : isRegistered ? (
+              <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-ok">✓ You're registered</span>
+            ) : null}
           </div>
 
           <h1 className={`mt-8 max-w-6xl font-display font-black uppercase leading-[0.84] ${long ? 'text-[clamp(2.75rem,7.5vw,7.5rem)]' : 'text-[clamp(3.5rem,11vw,11rem)]'}`}>
@@ -333,24 +387,42 @@ export default function TournamentDetail() {
                 <p className="mt-1 font-display text-2xl font-extrabold uppercase">{tourData?.format || 'Single Elimination'}</p>
               </div>
               <div>
-                <Hud>Registered Teams</Hud>
+                <Hud>Team Size</Hud>
+                <p className="mt-1 font-display text-2xl font-extrabold uppercase text-ink">
+                  {getRequiredTeamSizeDisplay(tourData)}
+                </p>
+              </div>
+              <div>
+                <Hud>Confirmed Teams</Hud>
                 <p className="mt-1 font-display text-2xl font-extrabold uppercase text-cyan tabular-nums">
-                  {registeredCount} / {maxTeams}
+                  {tourData?.confirmedTeams !== undefined ? tourData.confirmedTeams : registeredCount} / {maxTeams}
+                </p>
+              </div>
+              <div>
+                <Hud>Available Slots</Hud>
+                <p className="mt-1 font-display text-2xl font-extrabold uppercase text-ok tabular-nums">
+                  {tourData?.availableSlots !== undefined ? tourData.availableSlots : Math.max(0, maxTeams - registeredCount)}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="mt-12 flex flex-wrap items-center gap-3">
-            {isRegOpen ? (
+            {isConfirmedParticipant ? (
+              <Cta onClick={() => document.getElementById('participant-hub')?.scrollIntoView({ behavior: 'smooth' })}>
+                View Participant Hub
+              </Cta>
+            ) : isPendingParticipant ? (
+              <Cta onClick={() => document.getElementById('participant-hub')?.scrollIntoView({ behavior: 'smooth' })}>
+                View Reserved Seat
+              </Cta>
+            ) : isRegOpen ? (
               <Cta onClick={() => setRegModalOpen(true)}>
-                {isRegistered ? 'Already Registered' : 'Register Now'}
+                Register Now
               </Cta>
             ) : (
               <Cta disabled>
-                {isRegistered
-                  ? 'Registered'
-                  : tourStatus === 'upcoming'
+                {tourStatus === 'upcoming'
                   ? 'Registration soon'
                   : tourStatus === 'live'
                   ? 'In progress'
@@ -362,14 +434,342 @@ export default function TournamentDetail() {
             <Cta ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
               View Rules
             </Cta>
-            {isRegOpen && (
+            {isRegOpen && !isConfirmedParticipant && !isPendingParticipant && (
               <Hud className="ml-2">
-                {Math.max(0, maxTeams - registeredCount)} slots remaining
+                {tourData?.availableSlots !== undefined ? tourData.availableSlots : Math.max(0, maxTeams - registeredCount)} slots remaining
               </Hud>
             )}
           </div>
         </Container>
       </section>
+
+      {/* Confirmed Participant Hub */}
+      {isConfirmedParticipant && (
+        <section id="participant-hub" className="scroll-mt-24 border-b border-white/10 bg-graphite/40 py-16">
+          <Container>
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="size-2.5 rounded-full bg-ok animate-pulse" />
+                  <Hud className="text-ok">Confirmed Competitor Hub</Hud>
+                </div>
+                <h2 className="mt-2 font-display text-4xl font-black uppercase text-ink md:text-5xl">
+                  Participant Headquarters
+                </h2>
+                <p className="mt-1 font-mono text-xs uppercase tracking-wider text-dim">
+                  Your entry is officially confirmed. Review your roster, tournament schedule, and join the official communication channel.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="border border-ok/30 bg-ok/10 px-4 py-2 font-display text-lg font-bold text-ok uppercase">
+                  Confirmed #{regStatus?.position ?? 1}
+                </span>
+              </div>
+            </div>
+
+            {/* Official Announcement Banner if exists */}
+            {tourData?.announcementText && (
+              <div className="mb-8 border border-cyan/40 bg-cyan/10 p-5 md:p-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-2xl text-cyan">📢</span>
+                  <div>
+                    <Hud className="text-cyan">Official Tournament Announcement</Hud>
+                    <p className="mt-1 font-mono text-sm leading-relaxed text-ink/90">
+                      {tourData.announcementText}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Join Official WhatsApp Group — Top Priority Action */}
+            <div className="mb-8 border-2 border-emerald-500/40 bg-emerald-950/25 p-6 md:p-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="grid size-12 shrink-0 place-items-center rounded bg-emerald-500 font-display text-xl font-black text-void">
+                    WA
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="font-display text-2xl font-black uppercase text-ink">
+                        Official Tournament WhatsApp Group
+                      </h3>
+                      <span className="border border-emerald-500/50 bg-emerald-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-400">
+                        Confirmed Participants Only
+                      </span>
+                    </div>
+                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
+                      {communityInfo?.instructions ||
+                        'Custom Lobby Room ID, Password, Bracket calls, Coin toss, and real-time referee communications will be broadcasted exclusively in this channel.'}
+                    </p>
+                    <p className="mt-2 font-mono text-xs text-emerald-400/90">
+                      Important: Ensure all squad members or your team captain have joined before roster lock.
+                    </p>
+                  </div>
+                </div>
+                {communityInfo?.whatsapp_group_url ? (
+                  <a
+                    href={communityInfo.whatsapp_group_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center justify-center gap-3 bg-emerald-500 px-8 py-3.5 font-display text-base font-black uppercase tracking-wider text-void shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 active:scale-95"
+                  >
+                    <span>Join WhatsApp Group</span>
+                    <span>→</span>
+                  </a>
+                ) : (
+                  <div className="border border-white/10 bg-void/50 px-4 py-2 font-mono text-xs text-dim">
+                    Link will activate prior to match day
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3 Core Cards Grid */}
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Card A: Registration Status */}
+              <div className="flex flex-col justify-between border border-white/10 bg-surface p-6">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Hud className="text-cyan">Registration Record</Hud>
+                    <span className="font-mono text-[10px] uppercase text-ok">Verified</span>
+                  </div>
+                  <h4 className="mt-2 font-display text-2xl font-black uppercase text-ink truncate">
+                    {regStatus?.team?.name || 'Registered Entry'}
+                  </h4>
+                  <dl className="mt-4 space-y-3 font-mono text-xs">
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Position in Field</dt>
+                      <dd className="font-bold text-ink">#{regStatus?.position ?? 1} / {maxTeams}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Entry Fee Paid</dt>
+                      <dd className="font-bold text-ok">{entryFee ? inr(entryFee) : 'FREE'}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Payment Status</dt>
+                      <dd className="font-bold uppercase text-ok">{paymentStatus}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Registered At</dt>
+                      <dd className="text-ink">
+                        {regStatus?.registration?.registered_at
+                          ? new Date(regStatus.registration.registered_at).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'Confirmed'}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <dt className="text-dim">Registration ID</dt>
+                      <dd className="text-[10px] text-dim truncate max-w-[140px]">
+                        {regStatus?.registration?.id || 'VERIFIED'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              {/* Card B: My Team & Roster */}
+              <div className="flex flex-col justify-between border border-white/10 bg-surface p-6">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Hud className="text-cyan">Squad & Roster</Hud>
+                    <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan">
+                      {regStatus?.team?.my_role === 'CAPTAIN' ? '⭐ Squad Captain' : '🛡️ Roster Player'}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <Crest name={regStatus?.team?.name || 'Squad'} size={38} color={accent} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-xl font-black uppercase text-ink">
+                        {regStatus?.team?.name || 'Registered Squad'}
+                      </p>
+                      <p className="font-mono text-xs text-dim truncate">
+                        Tag: [{regStatus?.team?.tag || 'SQUAD'}] · Captain: {regStatus?.team?.captain_name || regStatus?.team?.captain_handle || 'Leader'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-white/10 pt-3">
+                    <p className="font-mono text-[11px] uppercase tracking-wider text-dim">Roster Members</p>
+                    <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
+                      {(regStatus?.team?.roster || regStatus?.team?.members || []).map((m, idx) => (
+                        <div key={m.user_id || idx} className="flex items-center justify-between rounded bg-void/50 p-2 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Avatar id={m.equipped_avatar_url || m.avatar_url || m.username || 'PL'} size={24} />
+                            <div className="min-w-0">
+                              <p className="font-bold text-ink truncate max-w-[110px]">{m.display_name || m.username}</p>
+                              <span className="text-[10px] font-mono text-dim block truncate">@{m.username}</span>
+                            </div>
+                          </div>
+                          <span className={`font-mono text-[10px] uppercase px-1.5 py-0.5 shrink-0 ${
+                            m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN'
+                              ? 'border border-cyan/30 text-cyan bg-cyan/10'
+                              : 'text-dim'
+                          }`}>
+                            {m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN' ? 'Captain' : 'Player'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card C: Participation Statistics */}
+              <div className="flex flex-col justify-between border border-white/10 bg-surface p-6">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Hud className="text-cyan">Field & Capacity</Hud>
+                    <span className="font-mono text-[10px] uppercase text-cyan">Live Stats</span>
+                  </div>
+                  <h4 className="mt-2 font-display text-2xl font-black uppercase text-ink">
+                    Tournament Capacity
+                  </h4>
+                  <dl className="mt-4 space-y-3 font-mono text-xs">
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Confirmed Squads</dt>
+                      <dd className="font-bold text-cyan">{tourData?.confirmedTeams || registeredCount}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Reserved / Pending</dt>
+                      <dd className="font-bold text-warn">{tourData?.reservedTeams || 0}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Available Remaining</dt>
+                      <dd className="font-bold text-ok">
+                        {tourData?.availableSlots !== undefined ? tourData.availableSlots : Math.max(0, maxTeams - registeredCount)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <dt className="text-dim">Total Field Size</dt>
+                      <dd className="font-bold text-ink">{maxTeams} Teams</dd>
+                    </div>
+                  </dl>
+
+                  {/* Visual Capacity Bar */}
+                  <div className="mt-4 pt-2">
+                    <div className="flex justify-between font-mono text-[10px] text-dim mb-1">
+                      <span>Field Fill Rate</span>
+                      <span>{Math.round(((tourData?.confirmedTeams || registeredCount) / maxTeams) * 100)}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-void overflow-hidden flex">
+                      <div
+                        className="bg-cyan transition-all"
+                        style={{ width: `${Math.min(100, (((tourData?.confirmedTeams || registeredCount) / maxTeams) * 100))}%` }}
+                      />
+                      <div
+                        className="bg-warn/60 transition-all"
+                        style={{ width: `${Math.min(100, (((tourData?.reservedTeams || 0) / maxTeams) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card D: Schedule & Custom Lobby Instructions */}
+            <div className="mt-8 border border-white/10 bg-surface p-6 md:p-8">
+              <div className="flex items-center gap-3">
+                <Hud className="text-cyan">Match Day Protocol</Hud>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <h3 className="mt-3 font-display text-2xl font-black uppercase text-ink">
+                Lobby Credentials & Match Instructions
+              </h3>
+              <div className="mt-6 grid gap-6 md:grid-cols-3">
+                <div className="border border-white/5 bg-void/50 p-4">
+                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">01 · Match Start</p>
+                  <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
+                    {tourData?.startsAt
+                      ? new Date(tourData.startsAt).toLocaleString('en-IN', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'Check Stage Schedule'}
+                  </p>
+                  <p className="mt-1 text-xs text-dim">Official match commencement time.</p>
+                </div>
+                <div className="border border-white/5 bg-void/50 p-4">
+                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">02 · Roster Lock</p>
+                  <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
+                    {tourData?.rosterLockTime
+                      ? new Date(tourData.rosterLockTime).toLocaleString('en-IN', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '2 Hours Before Match'}
+                  </p>
+                  <p className="mt-1 text-xs text-dim">No roster modifications allowed after this point.</p>
+                </div>
+                <div className="border border-white/5 bg-void/50 p-4">
+                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">03 · Server & Region</p>
+                  <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
+                    {tourData?.serverRegion || 'India / South Asia'}
+                  </p>
+                  <p className="mt-1 text-xs text-dim">Authoritative match server region.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-white/10 pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <p className="text-xs text-dim max-w-2xl leading-relaxed">
+                  <strong className="text-ink">Lobby Delivery:</strong> Custom Room ID and Password will be posted 15 minutes before match start in the Official WhatsApp Group and sent via platform notification. Teams that fail to enter within 10 minutes of scheduled start will receive a forfeit loss.
+                </p>
+                <Cta small ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
+                  Review Full Rulebook ↓
+                </Cta>
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* Pending Reservation Notice */}
+      {isPendingParticipant && (
+        <section id="participant-hub" className="scroll-mt-24 border-b border-warn/30 bg-warn/5 py-12">
+          <Container>
+            <div className="border-2 border-warn/40 bg-surface p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-warn animate-ping" />
+                    <Hud className="text-warn">Seat Reserved — Verification Pending</Hud>
+                  </div>
+                  <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink">
+                    Squad Seat Is Held
+                  </h3>
+                  <p className="mt-2 text-sm text-dim max-w-2xl leading-relaxed">
+                    Your registration has been received and your seat in this tournament is reserved. Our admin team is verifying your payment record (UTR: <strong className="text-cyan font-mono">{regStatus?.registration?.utr || 'Under Review'}</strong>).
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-4 text-xs font-mono text-dim">
+                    <span>Squad: <strong className="text-ink">{regStatus?.team?.name || 'Your Team'}</strong></span>
+                    <span>•</span>
+                    <span>Concurrency Status: <strong className="text-ok">Slot Protected</strong></span>
+                    <span>•</span>
+                    <span>Fee: <strong className="text-ink">{entryFee ? inr(entryFee) : 'FREE'}</strong></span>
+                  </div>
+                </div>
+                <div className="border border-warn/30 bg-warn/10 p-4 text-center shrink-0">
+                  <p className="font-mono text-xs uppercase text-warn font-bold">Awaiting Admin Approval</p>
+                  <p className="mt-1 text-[11px] text-dim max-w-[200px]">
+                    Once approved, WhatsApp channel access and room credentials unlock automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* Rules */}
       <Block id="Rules" idx="01" kicker="Rulebook" title="The Rules" tone="graphite">
@@ -450,6 +850,7 @@ export default function TournamentDetail() {
           onSuccess={() => {
             setIsRegistered(true)
             fetchTour()
+            fetchStatus(id)
           }}
         />
       )}
@@ -479,6 +880,11 @@ function RegistrationModal({
   const [upiData, setUpiData] = useState<DirectUpiInitResponse | null>(null)
   const [utr, setUtr] = useState('')
   const [utrSubmitted, setUtrSubmitted] = useState(false)
+
+  const isSolo =
+    (tournament?.format || '').toLowerCase().includes('solo') ||
+    ((tournament as any)?.minTeamSize === 1 && (tournament as any)?.maxTeamSize === 1) ||
+    ((tournament as any)?.min_team_size === 1 && (tournament as any)?.max_team_size === 1)
 
   useEffect(() => {
     getMyTeams().then((res) => {
@@ -511,14 +917,14 @@ function RegistrationModal({
   }
 
   const handleInitUpi = async () => {
-    if (!selectedTeamId) {
+    if (!isSolo && !selectedTeamId) {
       alert('Please select a team first')
       return
     }
     setLoading(true)
     try {
       const resp = await registerTournamentDirectUpi(tournament.id, {
-        team_id: selectedTeamId,
+        team_id: selectedTeamId || undefined,
       })
       setUpiData(resp)
       setStep(1)
@@ -560,16 +966,36 @@ function RegistrationModal({
         {step === 0 && (
           <div className="space-y-6">
             <div>
-              <Hud className="text-cyan">Step 1 · Choose Your Squad</Hud>
-              {teams.length === 0 ? (
+              <Hud className="text-cyan">Step 1 · {isSolo ? 'Solo Contender' : 'Choose Your Squad'}</Hud>
+              {isSolo ? (
+                <div className="mt-3 border border-cyan/40 bg-cyan/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-display text-lg font-black uppercase text-ink">
+                      {profile?.display_name || profile?.username || 'Player Entry'}
+                    </p>
+                    <span className="font-mono text-[10px] uppercase text-cyan border border-cyan/30 px-2 py-0.5">
+                      1v1 Solo Entry
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs font-mono text-dim">
+                    This is a solo competition. You will register and compete as an individual contender linked to your verified account.
+                  </p>
+                </div>
+              ) : teams.length === 0 ? (
                 <div className="mt-3 border border-dashed border-white/15 p-6 text-center">
                   <p className="text-sm text-dim">You don't have any created teams yet.</p>
+                  <p className="mt-1 font-mono text-xs text-cyan">
+                    Required roster: {getRequiredTeamSizeDisplay(tournament)}
+                  </p>
                   <Link to="/teams/create" className="mt-4 inline-block font-mono text-xs text-cyan uppercase hover:underline">
                     Create Team First →
                   </Link>
                 </div>
               ) : (
                 <div className="mt-3 space-y-2">
+                  <p className="font-mono text-xs text-dim mb-2">
+                    Required roster: <span className="font-bold text-cyan">{getRequiredTeamSizeDisplay(tournament)}</span>
+                  </p>
                   {teams.map((t) => (
                     <label
                       key={t.id || (t as any)._id}
@@ -640,7 +1066,7 @@ function RegistrationModal({
               {paymentMode === 'WALLET' || fee === 0 ? (
                 <button
                   onClick={handleWalletSubmit}
-                  disabled={loading || (fee > 0 && !hasEnoughWallet) || !selectedTeamId}
+                  disabled={loading || (fee > 0 && !hasEnoughWallet) || (!isSolo && !selectedTeamId)}
                   className="px-6 py-2 bg-ink text-void font-bold text-xs uppercase hover:bg-cyan transition-colors disabled:opacity-40"
                 >
                   {loading ? 'Registering...' : fee === 0 ? 'Confirm Free Entry' : 'Pay & Register'}
@@ -648,7 +1074,7 @@ function RegistrationModal({
               ) : (
                 <button
                   onClick={handleInitUpi}
-                  disabled={loading || !selectedTeamId}
+                  disabled={loading || (!isSolo && !selectedTeamId)}
                   className="px-6 py-2 bg-cyan text-void font-bold text-xs uppercase hover:brightness-110 transition-colors disabled:opacity-40"
                 >
                   {loading ? 'Generating QR...' : 'Proceed to UPI'}

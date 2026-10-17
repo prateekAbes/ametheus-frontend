@@ -347,7 +347,7 @@ export default function Layout() {
   }, [pathname, hash])
   return (
     <div className="min-h-screen bg-void text-ink">
-      <ScrollRestoration />
+      <ScrollRestoration getKey={(location) => location.pathname} />
       {/* Directional neon line-transfer beam triggered on route transitions */}
       <div
         key={`beam-${pathname}`}

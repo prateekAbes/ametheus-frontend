@@ -15,6 +15,8 @@ export interface UserProfile {
   inr_reserved_paise?: number
   riot_id?: string
   steam_id?: string
+  rating?: number
+  elo?: number
   preferences?: Record<string, any>
   privacy_settings?: Record<string, any>
   has_chosen_username?: boolean
