@@ -356,7 +356,7 @@ export default function Leaderboard() {
           ? platformStats.prize_paid_out
           : loading
           ? '—'
-          : '$0',
+          : '₹0',
       },
       {
         label: 'Active Streaks',
@@ -518,25 +518,13 @@ export default function Leaderboard() {
             </div>
           </div>
 
-          {loading ? (
-            <LeaderboardSkeleton />
-          ) : error ? (
-            <LeaderboardErrorState onRetry={fetchLeaderboardData} />
-          ) : sortedPlayers.length === 0 ? (
-            <LeaderboardEmptyState
-              hasFilters={metric !== 'overall' || timeRange !== 'all_time'}
-              onResetFilters={handleResetFilters}
-            />
-          ) : (
-            <div className="space-y-12 md:space-y-16">
-              {/* Centered Three-Player Podium (sitting above the divider) */}
-              {top.length > 0 && (
-                <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
-                  <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" />
-                  <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" />
-                  <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" />
-                </section>
-              )}
+          <div className="space-y-12 md:space-y-16">
+            {/* Centered Three-Player Podium (always visible, handles 0, 1, 2, or 3+ players) */}
+            <section className="mx-auto grid max-w-4xl items-end gap-12 md:grid-cols-[1fr_1.25fr_1fr] md:gap-0">
+              <PodiumSlot p={top[0]} m={metric} order="order-1 md:order-2" placeholderRank={1} />
+              <PodiumSlot p={top[1]} m={metric} order="order-2 md:order-1" placeholderRank={2} />
+              <PodiumSlot p={top[2]} m={metric} order="order-3 md:order-3" placeholderRank={3} />
+            </section>
 
               {/* Full-width Divider spanning the restricted 1120px container */}
               <div className="w-full max-w-[1120px] border-b border-white/10" />
@@ -598,9 +586,19 @@ export default function Leaderboard() {
                   </div>
                 </div>
 
-                {/* Right Column: Challenger Ladder & Search */}
+                {/* Right Column: Challenger Ladder, Skeleton, Error, or Empty State */}
                 <div className="min-w-0 space-y-4">
-                  <section id="challengers-ladder" className="scroll-mt-20">
+                  {loading ? (
+                    <LeaderboardSkeleton />
+                  ) : error ? (
+                    <LeaderboardErrorState onRetry={fetchLeaderboardData} />
+                  ) : sortedPlayers.length === 0 ? (
+                    <LeaderboardEmptyState
+                      hasFilters={metric !== 'overall' || timeRange !== 'all_time'}
+                      onResetFilters={handleResetFilters}
+                    />
+                  ) : (
+                    <section id="challengers-ladder" className="scroll-mt-20">
                     <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
                         <h2 className="font-display text-xl font-bold uppercase tracking-wide text-white">
@@ -838,10 +836,10 @@ export default function Leaderboard() {
                       </nav>
                     )}
                   </section>
-                </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </main>
     </div>

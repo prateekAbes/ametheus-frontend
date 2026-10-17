@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { LiveMatchesManager } from '../components/admin/LiveMatchesManager'
+import { RatingManager } from '../components/admin/RatingManager'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getAdminStats,
@@ -154,6 +155,7 @@ const TABS = [
   'MEDIA & ARTWORK MANAGER',
   'TOURNAMENTS',
   'LIVE MATCHES',
+  'RATING MANAGEMENT',
   'ORGANIZER MATCH REQUESTS',
   'ORGANIZER EMAILS',
   'FEATURED TOURNAMENT',
@@ -1830,6 +1832,13 @@ export default function Admin() {
               onMatchesUpdated={loadData}
               initialTournamentId={selectedFormationTourId}
             />
+          </div>
+        )}
+
+        {/* TAB: RATING MANAGEMENT */}
+        {tab === 'RATING MANAGEMENT' && (
+          <div className="mt-8">
+            <RatingManager onRatingUpdated={loadData} />
           </div>
         )}
 

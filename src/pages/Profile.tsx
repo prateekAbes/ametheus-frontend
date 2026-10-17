@@ -13,6 +13,7 @@ import { updateUserProfile } from '../services/auth'
 import { uploadMediaFile } from '../services/admin'
 
 import { getSupportTickets, formatTicketStatus, type SupportTicket } from '../services/support'
+import { getMyRatingHistory, type RatingAuditLogItem } from '../services/leaderboard'
 
 type FeedFilter = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'
 
@@ -30,6 +31,34 @@ export default function Profile() {
   const [availableCrests, setAvailableCrests] = useState<CrestType[]>([])
   const [isUploadingCrest, setIsUploadingCrest] = useState(false)
   const [crestModalMsg, setCrestModalMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  
+  // Authoritative Rating History States
+  const [ratingHistory, setRatingHistory] = useState<RatingAuditLogItem[]>([])
+  const [isLoadingRatingHistory, setIsLoadingRatingHistory] = useState(false)
+  const [selectedRatingGame, setSelectedRatingGame] = useState<string>('all')
+
+  const fetchRatingHistory = () => {
+    if (!isSignedIn) return
+    setIsLoadingRatingHistory(true)
+    getMyRatingHistory(selectedRatingGame)
+      .then((res) => setRatingHistory(res.history || []))
+      .catch(() => setRatingHistory([]))
+      .finally(() => setIsLoadingRatingHistory(false))
+  }
+
+  useEffect(() => {
+    fetchRatingHistory()
+  }, [isSignedIn, selectedRatingGame])
+
+  useEffect(() => {
+    const handleRatingUpdated = () => {
+      fetchRatingHistory()
+    }
+    window.addEventListener('ametheus:rating_updated', handleRatingUpdated)
+    return () => {
+      window.removeEventListener('ametheus:rating_updated', handleRatingUpdated)
+    }
+  }, [selectedRatingGame, isSignedIn])
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -744,6 +773,136 @@ export default function Profile() {
                         <span>Activity: {lastActivity}</span>
                       </div>
                     </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* AUTHORITATIVE RATING HISTORY */}
+        <div className="mt-16">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <Hud className="text-cyan">◇ Authoritative Rating History</Hud>
+              <h3 className="mt-1 font-display text-xl font-black uppercase text-white tracking-wide">
+                Competitive Elo & Points Record
+              </h3>
+            </div>
+
+            {/* Game Selector Filter */}
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+              {[
+                ['all', 'All Titles'],
+                ['valorant', 'Valorant'],
+                ['cs2', 'CS2'],
+                ['bgmi', 'BGMI'],
+                ['free-fire', 'Free Fire'],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedRatingGame(key)}
+                  className={`px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors border ${
+                    selectedRatingGame === key
+                      ? 'border-cyan bg-cyan/15 text-cyan font-bold'
+                      : 'border-white/10 text-dim hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {isLoadingRatingHistory ? (
+              <div className="border border-white/10 bg-surface/30 p-8 text-center font-mono text-xs text-dim animate-pulse">
+                Loading competitive rating records...
+              </div>
+            ) : ratingHistory.length === 0 ? (
+              <div className="border border-white/10 bg-surface/30 p-8 text-center">
+                <p className="font-mono text-xs text-dim uppercase tracking-wider">
+                  No Rating Adjustments Recorded Yet
+                </p>
+                <p className="mt-1 text-sm text-dim">
+                  Contenders start at an initial authoritative rating of 500 per competitive title.
+                  Points are awarded or penalized based on tournament bracket outcomes and MVP performances.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-white/10 bg-surface/40 divide-y divide-white/5">
+                {ratingHistory.map((item) => {
+                  const dt = item.created_at
+                    ? new Date(item.created_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'
+                  const isPositive = item.adjustment > 0
+                  const isNegative = item.adjustment < 0
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display text-xs font-black uppercase text-cyan">
+                            {item.game_name || item.game_slug || 'Competition'}
+                          </span>
+                          <span className="text-white/20">·</span>
+                          <span className="font-mono text-[10px] uppercase text-dim">{dt}</span>
+                          <span className="text-white/20">·</span>
+                          <span className="border border-white/20 px-2 py-0.5 font-mono text-[9px] uppercase font-bold text-white tracking-wider">
+                            {item.reason}
+                          </span>
+                          {item.is_reversal && (
+                            <span className="border border-warn/40 bg-warn/10 text-warn px-2 py-0.5 font-mono text-[9px] uppercase font-bold tracking-wider">
+                              Reversal
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="font-mono text-sm text-white pt-1">
+                          {item.explanation || 'Official administrative rating adjustment'}
+                        </p>
+
+                        {(item.tournament_name || item.round_name) && (
+                          <div className="font-mono text-[11px] text-dim">
+                            Event: <strong className="text-ink">{item.tournament_name || 'Tournament'}</strong>
+                            {item.round_name ? ` · ${item.round_name}` : ''}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-6 sm:shrink-0">
+                        {/* Previous -> New */}
+                        <div className="text-right font-mono">
+                          <div className="text-[10px] uppercase text-dim">Rating Progression</div>
+                          <div className="text-sm font-bold tabular-nums text-white">
+                            <span className="text-dim">{item.previous_rating}</span> →{' '}
+                            <span className="text-cyan">{item.new_rating}</span>
+                          </div>
+                        </div>
+
+                        {/* Adjustment Badge */}
+                        <div
+                          className={`px-3 py-1.5 font-display text-sm font-black tabular-nums border text-center min-w-[70px] ${
+                            isPositive
+                              ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
+                              : isNegative
+                              ? 'border-rose-500/40 bg-rose-500/15 text-rose-400'
+                              : 'border-white/20 bg-white/5 text-dim'
+                          }`}
+                        >
+                          {isPositive ? `+${item.adjustment}` : item.adjustment} PTS
+                        </div>
+                      </div>
+                    </div>
                   )
                 })}
               </div>

@@ -767,3 +767,88 @@ export async function deleteMediaFile(
   )
 }
 
+// --- RATING MANAGEMENT WORKFLOW ---
+
+export interface RatingParticipant {
+  player_id: string
+  username: string
+  display_name: string
+  avatar_url?: string
+  team_id?: string
+  team_name?: string
+  current_rating: number
+}
+
+export interface RatingMatchInfo {
+  match_id: string
+  title: string
+  status: string
+  round_id: string
+  participants: RatingParticipant[]
+}
+
+export interface RatingRoundInfo {
+  round_id: string
+  round_name: string
+  status: string
+  matches: RatingMatchInfo[]
+}
+
+export interface RatingTournamentInfo {
+  tournament_id: string
+  title: string
+  status: string
+  rounds: RatingRoundInfo[]
+}
+
+export interface RatingGameHierarchy {
+  game_id: string
+  game_slug: string
+  game_name: string
+  tournaments: RatingTournamentInfo[]
+}
+
+export interface RatingAdjustmentPayloadItem {
+  player_id: string
+  game_id: string
+  adjustment: number
+  reason: string
+  explanation: string
+  tournament_id?: string
+  round_id?: string
+  match_id?: string
+}
+
+export async function getRatingManagementHierarchy(): Promise<{ status: string; hierarchy: RatingGameHierarchy[] }> {
+  return apiClient<{ status: string; hierarchy: RatingGameHierarchy[] }>('/admin/rating-management/hierarchy')
+}
+
+export async function adjustRatingsBulk(adjustments: RatingAdjustmentPayloadItem[]): Promise<{ status: string; message: string; audit_logs: any[] }> {
+  return apiClient<{ status: string; message: string; audit_logs: any[] }>('/admin/rating-management/adjust-bulk', {
+    method: 'POST',
+    body: JSON.stringify({ adjustments }),
+  })
+}
+
+export async function reverseRatingAdjustment(logId: string, reason?: string): Promise<{ status: string; message: string; reversal_log: any }> {
+  return apiClient<{ status: string; message: string; reversal_log: any }>(`/admin/rating-management/reverse/${logId}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+export async function getRatingAuditLogs(params?: {
+  game_id?: string
+  player_id?: string
+  limit?: number
+  skip?: number
+}): Promise<{ status: string; total: number; logs: any[] }> {
+  const q = new URLSearchParams()
+  if (params?.game_id && params.game_id !== 'all') q.append('game_id', params.game_id)
+  if (params?.player_id) q.append('player_id', params.player_id)
+  if (params?.limit) q.append('limit', String(params.limit))
+  if (params?.skip) q.append('skip', String(params.skip))
+  return apiClient<{ status: string; total: number; logs: any[] }>(`/admin/rating-management/audit-logs?${q.toString()}`)
+}
+
+

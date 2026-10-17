@@ -143,9 +143,9 @@ export const showPlayerMetricValue = (p: LeaderboardPlayer, m: MetricId) => {
     case 'streak':
       return p.streak > 0 ? `${p.streak}W` : '0'
     case 'earnings':
-      return `$${p.earnings.toLocaleString()}`
+      return `₹${p.earnings.toLocaleString()}`
     case 'spending':
-      return `$${p.spent.toLocaleString()}`
+      return `₹${p.spent.toLocaleString()}`
     case 'matches':
       return p.matches.toLocaleString()
     case 'top3':
@@ -261,4 +261,39 @@ export function isEntryDisqualified(
   const name = (entry.name || '').toLowerCase()
   return disqualifiedIds.has(id) || disqualifiedIds.has(name)
 }
+
+export interface RatingAuditLogItem {
+  id: string
+  player_id: string
+  player_username?: string
+  player_display_name?: string
+  game_id: string
+  game_slug?: string
+  game_name?: string
+  previous_rating: number
+  adjustment: number
+  new_rating: number
+  reason: string
+  explanation: string
+  admin_id: string
+  admin_username: string
+  tournament_id?: string
+  tournament_name?: string
+  round_id?: string
+  round_name?: string
+  match_id?: string
+  is_reversal: boolean
+  original_log_id?: string
+  created_at: string
+}
+
+export async function getMyRatingHistory(
+  game?: string
+): Promise<{ status: string; user_id: string; history: RatingAuditLogItem[] }> {
+  const qs = game && game !== 'all' ? `?game=${game}` : ''
+  return apiClient<{ status: string; user_id: string; history: RatingAuditLogItem[] }>(
+    `/leaderboard/ratings/me${qs}`
+  )
+}
+
 
