@@ -147,6 +147,19 @@ export interface ApiMatch {
   check_in_status?: Record<string, boolean>
   evidence_url?: string
   dispute_notes?: string
+  is_solo?: boolean
+  match_message?: string
+  match_order?: number
+  squads_count?: number
+  qualifier_team_ids?: string[]
+  qualifiers_count?: number
+  is_final_round?: boolean
+  current_encounter_id?: string
+  current_encounter_number?: number
+  current_encounter_title?: string
+  current_round_name?: string
+  current_round_number?: number
+  encounter_history?: any[]
 }
 
 export function mapApiMatchToUiMatch(m: ApiMatch) {
@@ -187,14 +200,23 @@ export function mapApiMatchToUiMatch(m: ApiMatch) {
     tour: m.tournament_id || 'tour',
     tourName: m.tournament_title || 'Ametheus Tournament',
     game: m.game_slug || 'valorant',
-    no: m.match_number || m.order || 1,
-    round: m.round_name || m.stage || m.match_type || 'Match',
+    no: m.current_encounter_number ?? m.match_number ?? m.order ?? 1,
+    round: m.current_round_name || m.current_encounter_title || m.round_name || m.stage || m.match_type || 'Match',
     a: nameA,
     b: nameB,
     hasParticipants,
     isBattleRoyale,
-    squadsCount: m.teams_details?.length || m.teams?.length || m.team_ids?.length || 0,
+    isSolo: Boolean(
+      m.is_solo ||
+      (m as any).isSolo ||
+      (m as any).tournament_is_solo ||
+      (m as any).tournament?.is_solo ||
+      (m as any).tournament?.min_team_size === 1
+    ),
+    squadsCount: m.squads_count || m.teams_details?.length || m.teams?.length || m.team_ids?.length || 0,
     squads: m.teams_details || m.teams || [],
+    teamAId: m.team_a_id || m.team_a?.id,
+    teamBId: m.team_b_id || m.team_b?.id,
     teamALogo: m.team_a_details?.logo_url,
     teamBLogo: m.team_b_details?.logo_url,
     date: dateStr,
@@ -665,6 +687,7 @@ export async function updateMatchCredentialsAdmin(
     lobby_code?: string
     lobby_password?: string
     custom_instructions?: string
+    server_region?: string
   }
 ): Promise<{ status: string; message: string; match_id: string; credentials_released: boolean }> {
   return apiClient(`/admin/matches/${matchId}/credentials`, {
@@ -715,20 +738,40 @@ export async function updateMatchAliveStatusAdmin(
 export interface BattleRoyaleTeamResultInput {
   team_id: string
   team_name: string
-  placement: number
-  kills: number
+  placement?: number
+  kills?: number
   placement_points?: number
   elimination_points?: number
   total_points?: number
+  qualified?: boolean
+}
+
+export interface BattleRoyaleSubmitPayload {
+  team_results?: BattleRoyaleTeamResultInput[]
+  qualifier_team_ids?: string[]
+  qualifiers_count?: number
+  advance_to_next_round?: boolean
+  next_round_name?: string
+  is_final_round?: boolean
+  scoring_matrix?: Record<string, any>
 }
 
 export async function submitBattleRoyaleResultsAdmin(
   matchId: string,
-  payload: {
-    team_results: BattleRoyaleTeamResultInput[]
-    scoring_matrix?: Record<string, number>
+  payload: BattleRoyaleSubmitPayload
+): Promise<{
+  status: string
+  message: string
+  match_id: string
+  winner_team_id: string
+  winner_team_name?: string
+  advancement?: {
+    qualifiers_count: number
+    next_round_name?: string
+    next_match_id?: string
+    tournament_completed: boolean
   }
-): Promise<{ status: string; message: string; match_id: string; winner_team_id: string; winner_team_name: string }> {
+}> {
   return apiClient(`/admin/matches/${matchId}/battle-royale-results`, {
     method: 'POST',
     body: JSON.stringify(payload),

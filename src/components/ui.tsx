@@ -266,7 +266,15 @@ export function TournamentCard({ t, wide, tilt = true }: { t: Partial<Tournament
   const g = gameKey ? gameBy(gameKey) : undefined
   const accent = g?.accent ?? '#3ef2ff'
   const long = t.name.length > 28
-  const meta = [t.date, g?.squad, t.format].filter(Boolean).join(' · ')
+  const isSolo = Boolean(
+    (t as any).isSolo ||
+    (t as any).is_solo ||
+    (t as any).min_team_size === 1 ||
+    (t as any).max_team_size === 1
+  )
+  const formatStr = t.format || ''
+  const displaySquad = isSolo ? (formatStr.toLowerCase().includes('solo') ? undefined : 'Solo') : g?.squad
+  const meta = [t.date, displaySquad, t.format].filter(Boolean).join(' · ')
   const mediaCfg = (t as any).mediaConfig || (t as any).media_config
   const cardCfg = mediaCfg?.upcoming_card || mediaCfg?.card
 

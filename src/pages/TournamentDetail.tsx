@@ -257,6 +257,16 @@ export default function TournamentDetail() {
   const title = tourData ? tourData.title : 'Tournament'
   const tourStatus = tourData ? tourData.status.toLowerCase() : 'open'
   const isRegOpen = tourStatus === 'open' || tourStatus === 'registration_open'
+  const isBattleRoyale = Boolean(
+    (tourData?.format || '').toLowerCase().includes('battle royale') ||
+    (tourData as any)?.tournament_type?.toLowerCase().includes('battle royale')
+  )
+  const isSolo = Boolean(
+    (tourData?.format || '').toLowerCase().includes('solo') ||
+    (tourData as any)?.isSolo ||
+    (tourData as any)?.is_solo ||
+    (tourData?.minTeamSize === 1 && tourData?.maxTeamSize === 1)
+  )
 
   // Authoritative check: Registration is closed when capacity is reached, deadline passes, or admin closed it
   const isRegistrationClosed = useMemo(() => {
@@ -593,7 +603,7 @@ export default function TournamentDetail() {
             )}
 
             {/* Stay Connected — Official Coordination Channels for Confirmed Competitors */}
-            {isConfirmedParticipant && (communityInfo?.whatsapp_group_url || communityInfo?.discord_url || communityInfo?.community_link) && (
+            {(isConfirmedParticipant || isPendingParticipant) && (communityInfo?.whatsapp_group_url || (tourData as any)?.whatsapp_group_url || communityInfo?.discord_url || communityInfo?.community_link) && (
               <div className="mb-8 border border-white/10 bg-graphite/40 p-5 backdrop-blur-md">
                 <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
                   <div className="flex items-center gap-2">
@@ -608,9 +618,9 @@ export default function TournamentDetail() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {communityInfo?.whatsapp_group_url && (
+                  {(communityInfo?.whatsapp_group_url || (tourData as any)?.whatsapp_group_url) && (
                     <a
-                      href={communityInfo.whatsapp_group_url}
+                      href={communityInfo?.whatsapp_group_url || (tourData as any)?.whatsapp_group_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group flex flex-col justify-between border border-emerald-500/30 bg-emerald-950/20 p-4 hover:border-emerald-400 hover:bg-emerald-950/40 transition-all duration-200"
@@ -1269,52 +1279,105 @@ export default function TournamentDetail() {
       </Block>
 
       {/* Bracket & Pairings */}
-      <Block id="Bracket" idx="04" kicker="Bracket & Pairings" title="The Bracket" tone="graphite">
+      <Block id="Bracket" idx="04" kicker={isBattleRoyale ? "Lobbies & Sessions" : "Bracket & Pairings"} title={isBattleRoyale ? "The Lobbies" : "The Bracket"} tone="graphite">
         {matchesData.length > 0 ? (
           <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {matchesData.map((m, idx) => (
-                <div key={m.id || idx} className="border border-white/10 bg-void p-5 space-y-3">
-                  <div className="flex items-center justify-between font-mono text-xs">
-                    <span className="text-cyan font-bold">{m.round_name || `Match 0${idx + 1}`}</span>
-                    <span className="text-dim uppercase">{m.format || 'BO1'}</span>
-                  </div>
-                  <div className="space-y-2 border-y border-white/10 py-3 font-display">
-                    <div className="flex items-center justify-between">
-                      <span className="font-black uppercase text-ink">{m.team_a_name || 'Team 1'}</span>
-                      <span className="text-sm font-bold text-cyan">{m.team_a_score ?? '-'}</span>
+              {matchesData.map((m, idx) => {
+                const isBrMatch = isBattleRoyale || (m.format || '').toLowerCase().includes('battle royale') || (m.teams && m.teams.length > 2) || (m.team_ids && m.team_ids.length > 2)
+                const teamsList = m.teams_details || m.teams || []
+                const contendersCount = teamsList.length || m.team_ids?.length || 0
+
+                if (isBrMatch) {
+                  return (
+                    <div key={m.id || idx} className="border border-white/10 bg-void p-5 space-y-3">
+                      <div className="flex items-center justify-between font-mono text-xs">
+                        <span className="text-cyan font-bold">{m.round_name || `Lobby 0${idx + 1}`}</span>
+                        <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] text-cyan font-bold uppercase">
+                          Battle Royale
+                        </span>
+                      </div>
+                      <div className="border-y border-white/10 py-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-display font-black uppercase text-ink text-base">
+                            {contendersCount > 0
+                              ? `${contendersCount} ${isSolo ? 'Solo Contenders' : 'Squads'}`
+                              : (isSolo ? 'Solo Contenders' : 'Multi-Squad Lobby')}
+                          </span>
+                          <span className="font-mono text-xs text-dim">
+                            {m.server_region || 'AWS Mumbai'}
+                          </span>
+                        </div>
+                        {teamsList.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {teamsList.slice(0, 4).map((sq: any, sIdx: number) => (
+                              <span key={sq.id || sIdx} className="border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-dim truncate max-w-[120px]">
+                                {sq.name || sq.team_name || (isSolo ? `Player ${sIdx + 1}` : `Squad ${sIdx + 1}`)}
+                              </span>
+                            ))}
+                            {teamsList.length > 4 && (
+                              <span className="border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-dim">
+                                +{teamsList.length - 4} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-dim">
+                        <span>{m.scheduled_time || 'TBD'}</span>
+                        <span className={`uppercase font-bold ${m.status === 'COMPLETED' ? 'text-ok' : m.status === 'LIVE' ? 'text-live' : 'text-dim'}`}>
+                          {m.status || 'SCHEDULED'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-black uppercase text-ink">{m.team_b_name || 'Team 2'}</span>
-                      <span className="text-sm font-bold text-cyan">{m.team_b_score ?? '-'}</span>
+                  )
+                }
+
+                return (
+                  <div key={m.id || idx} className="border border-white/10 bg-void p-5 space-y-3">
+                    <div className="flex items-center justify-between font-mono text-xs">
+                      <span className="text-cyan font-bold">{m.round_name || `Match 0${idx + 1}`}</span>
+                      <span className="text-dim uppercase">{m.format || 'BO1'}</span>
+                    </div>
+                    <div className="space-y-2 border-y border-white/10 py-3 font-display">
+                      <div className="flex items-center justify-between">
+                        <span className="font-black uppercase text-ink">{m.team_a_name || 'Team 1'}</span>
+                        <span className="text-sm font-bold text-cyan">{m.team_a_score ?? '-'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-black uppercase text-ink">{m.team_b_name || 'Team 2'}</span>
+                        <span className="text-sm font-bold text-cyan">{m.team_b_score ?? '-'}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono text-dim">
+                      <span>{m.scheduled_time || 'TBD'}</span>
+                      <span className={`uppercase font-bold ${m.status === 'COMPLETED' ? 'text-ok' : m.status === 'LIVE' ? 'text-live' : 'text-dim'}`}>
+                        {m.status || 'SCHEDULED'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] font-mono text-dim">
-                    <span>{m.scheduled_time || 'TBD'}</span>
-                    <span className={`uppercase font-bold ${m.status === 'COMPLETED' ? 'text-ok' : m.status === 'LIVE' ? 'text-live' : 'text-dim'}`}>
-                      {m.status || 'SCHEDULED'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : (
           <div className="border border-dashed border-white/15 bg-void p-8 md:p-12 text-center">
             <div className="mx-auto max-w-xl space-y-4">
               <span className="grid size-14 mx-auto place-items-center border border-cyan/40 bg-cyan/10 font-display text-2xl text-cyan">
-                ⚔️
+                {isBattleRoyale ? '🪂' : '⚔️'}
               </span>
               <h3 className="font-display text-3xl font-black uppercase text-ink">
-                Automated Bracket Seeding
+                {isBattleRoyale ? 'Battle Royale Lobby Formation' : 'Automated Bracket Seeding'}
               </h3>
               <p className="text-sm text-dim leading-relaxed">
-                Bracket trees and custom match pairings generate automatically upon tournament registration close. Competing squads will be seeded into single-elimination brackets based on authoritative player ratings and registration order.
+                {isBattleRoyale
+                  ? `Lobby assignments and group stages generate automatically upon tournament registration close. Competing ${isSolo ? 'solo contenders' : 'squads'} will be seeded into custom Battle Royale lobbies based on lobby capacity.`
+                  : `Bracket trees and custom match pairings generate automatically upon tournament registration close. Competing ${isSolo ? 'contenders' : 'squads'} will be seeded into single-elimination brackets based on authoritative player ratings and registration order.`}
               </p>
               <div className="pt-2 flex flex-wrap justify-center gap-3 font-mono text-xs text-dim">
-                <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || 'Knockout'}</span>
-                <span className="border border-white/10 bg-white/5 px-3 py-1">Series: BO1 Qualifiers · BO3 Finals</span>
-                <span className="border border-white/10 bg-white/5 px-3 py-1">Slots: {maxTeams} Squads</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || (isBattleRoyale ? 'Battle Royale' : 'Knockout')}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">{isBattleRoyale ? 'Scoring: Placement + Eliminations' : 'Series: BO1 Qualifiers · BO3 Finals'}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Slots: {maxTeams} {isSolo ? 'Solo Contenders' : 'Squads'}</span>
               </div>
             </div>
           </div>
@@ -1806,9 +1869,34 @@ function RegistrationModal({
             </h3>
             <p className="mt-2 text-sm text-dim max-w-sm mx-auto">
               {utrSubmitted
-                ? 'Your payment record is queued for admin approval. Once confirmed, your squad will be verified on the bracket.'
-                : 'Your squad is officially registered. Check your notifications for match lobby credentials.'}
+                ? `Your payment record is queued for admin approval. Once confirmed, your ${isSolo ? 'entry' : 'squad'} will be verified on the board.`
+                : `Your ${isSolo ? 'entry' : 'squad'} is officially registered. Check your notifications for match lobby credentials.`}
             </p>
+
+            {(tournament?.whatsapp_group_url || (tournament as any)?.community_link) && (
+              <div className="mt-6 border border-emerald-500/30 bg-emerald-950/25 p-4 text-left max-w-md mx-auto">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="size-5 shrink-0 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.588-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.694.074-2.127-.47-1.425-.54-2.344-1.956-2.415-2.05-.072-.095-.572-.76-.572-1.45 0-.69.36-1.029.488-1.173.128-.144.28-.18.375-.18.094 0 .188.001.27.006.086.005.201-.033.314.24.118.283.404.985.44 1.056.036.072.06.156.012.252-.048.096-.072.156-.144.24-.072.084-.152.188-.217.252-.072.072-.148.15-.064.294.084.144.373.616.8 1.001.55.495 1.013.65 1.157.722.144.072.228.06.312-.036.084-.096.36-.42.456-.564.096-.144.192-.12.324-.072.132.048.837.395.981.467.144.072.24.108.276.168.036.06.036.353-.108.758zM12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.983-1.39A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18c-1.61 0-3.098-.44-4.38-1.206l-.314-.187-2.955.824.836-2.88-.205-.327C4.197 15.01 3.75 13.56 3.75 12c0-4.549 3.701-8.25 8.25-8.25 4.548 0 8.25 3.701 8.25 8.25 0 4.549-3.702 8.25-8.25 8.25z"/>
+                  </svg>
+                  <span className="font-display font-bold text-xs uppercase text-emerald-300">
+                    Official WhatsApp Community
+                  </span>
+                </div>
+                <p className="text-xs text-dim mb-3 leading-relaxed">
+                  Join the official tournament WhatsApp group for match announcements, bracket releases, and captain coordination.
+                </p>
+                <a
+                  href={tournament.whatsapp_group_url || (tournament as any).community_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full border border-emerald-500/50 bg-emerald-500/20 px-3 py-2.5 font-mono text-xs font-bold uppercase text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                >
+                  Join Official WhatsApp Group →
+                </a>
+              </div>
+            )}
+
             <div className="mt-8 flex justify-center gap-3">
               <Cta small to="/my/registrations">View Registrations</Cta>
               <Cta small ghost onClick={onClose}>Done</Cta>

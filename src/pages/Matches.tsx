@@ -54,12 +54,14 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
         {m.isBattleRoyale ? (
           <div className="my-auto py-6 text-center">
             <div className="inline-flex items-center gap-2 border border-cyan/30 bg-cyan/10 px-3 py-1 font-mono text-xs uppercase tracking-wider text-cyan mb-3">
-              <span>Multi-Squad Battle Royale</span>
+              <span>{m.isSolo ? 'Multi-Player Battle Royale' : 'Multi-Squad Battle Royale'}</span>
               <span>•</span>
               <span>Match {String(m.no).padStart(2, '0')}</span>
             </div>
             <h3 className="font-display text-3xl @xl:text-4xl font-black uppercase text-ink">
-              {m.squadsCount > 0 ? `${m.squadsCount} Competing Squads` : (m.hasParticipants ? 'Competing Squads' : 'Participants TBD')}
+              {m.squadsCount > 0
+                ? `${m.squadsCount} ${m.isSolo ? 'Solo Contenders' : 'Competing Squads'}`
+                : (m.hasParticipants ? (m.isSolo ? 'Solo Contenders' : 'Competing Squads') : 'Participants TBD')}
             </h3>
             {m.squads && m.squads.length > 0 ? (
               <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
@@ -68,7 +70,7 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
                     key={sq.id || sq.name || i}
                     className="border border-white/10 bg-void/80 px-2.5 py-1 font-mono text-[11px] text-ink font-bold uppercase"
                   >
-                    {sq.name || sq.team_name || `Squad ${i + 1}`}
+                    {sq.name || sq.team_name || (m.isSolo ? `Player ${i + 1}` : `Squad ${i + 1}`)}
                   </span>
                 ))}
                 {m.squads.length > 6 && (
@@ -79,7 +81,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
               </div>
             ) : (
               <p className="mt-3 font-mono text-xs text-dim">
-                Squad lobby registration in progress. Check match details for full lineup.
+                {m.isSolo
+                  ? 'Contender lobby registration in progress. Check match details for full lineup.'
+                  : 'Squad lobby registration in progress. Check match details for full lineup.'}
               </p>
             )}
           </div>
@@ -106,7 +110,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
               ) : (
                 <Crest name={m.a} size={48} color={g.accent} />
               )}
-              <span className="max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words text-ink">
+              <span className={`max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words ${
+                m.status === 'completed' && m.winnerTeamId && m.teamAId && m.winnerTeamId !== m.teamAId ? 'text-dim/50' : 'text-ink'
+              }`}>
                 {m.a}
               </span>
             </div>
@@ -125,7 +131,7 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
                 </p>
               )}
               <Hud className="mt-2 block">
-                Match {String(m.no).padStart(2, '0')}
+                {m.status === 'completed' ? 'Final Result' : `Match ${String(m.no).padStart(2, '0')}`}
               </Hud>
             </div>
 
@@ -136,7 +142,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
               ) : (
                 <Crest name={m.b} size={48} color={g.accent} />
               )}
-              <span className="max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words text-ink">
+              <span className={`max-w-full font-display text-[clamp(1.1rem,4.2cqw,3.25rem)] font-black uppercase leading-[0.9] break-words ${
+                m.status === 'completed' && m.winnerTeamId && m.teamBId && m.winnerTeamId !== m.teamBId ? 'text-dim/50' : 'text-ink'
+              }`}>
                 {m.b}
               </span>
             </div>

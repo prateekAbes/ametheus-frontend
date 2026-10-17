@@ -34,6 +34,7 @@ import { type Tournament } from '../../services/tournaments'
 import { resolveMediaUrl } from '../../services/apiClient'
 import { Panel, Hud, Badge, Brackets } from '../ui'
 import { Portal } from '../Modal'
+import { BattleRoyaleResultsModal } from './BattleRoyaleResultsModal'
 
 function normalizeStreamUrl(url?: string): string {
   if (!url) return ''
@@ -711,115 +712,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
   // Battle Royale Modal State & Handlers
   const [brResultsMatch, setBrResultsMatch] = useState<ApiMatch | null>(null)
-  const [brTeamResults, setBrTeamResults] = useState<BattleRoyaleTeamResultInput[]>([])
-  const [brScoringMatrix, setBrScoringMatrix] = useState<Record<string, number>>({
-    '1': 10,
-    '2': 6,
-    '3': 5,
-    '4': 4,
-    '5': 3,
-    '6': 2,
-    '7': 1,
-    '8': 1,
-  })
-  const [submittingBrResults, setSubmittingBrResults] = useState(false)
 
   const handleOpenBrResultsModal = (m: ApiMatch) => {
     setBrResultsMatch(m)
-    const squads: BattleRoyaleTeamResultInput[] = []
-    if (Array.isArray(m.teams) && m.teams.length > 0) {
-      m.teams.forEach((t: any, idx: number) => {
-        const place = idx + 1
-        const pts = brScoringMatrix[String(place)] ?? 0
-        squads.push({
-          team_id: String(t.id || t._id || `squad-${idx}`),
-          team_name: t.name || `Squad ${idx + 1}`,
-          placement: place,
-          kills: 0,
-          placement_points: pts,
-          elimination_points: 0,
-          total_points: pts,
-        })
-      })
-    } else if (Array.isArray(m.team_ids) && m.team_ids.length > 0) {
-      m.team_ids.forEach((tid: string, idx: number) => {
-        const found = tournRosters.find((r) => r.team_id === tid)
-        const place = idx + 1
-        const pts = brScoringMatrix[String(place)] ?? 0
-        squads.push({
-          team_id: tid,
-          team_name: found?.team_name || `Squad ${idx + 1}`,
-          placement: place,
-          kills: 0,
-          placement_points: pts,
-          elimination_points: 0,
-          total_points: pts,
-        })
-      })
-    } else {
-      if (m.team_a_id) {
-        squads.push({
-          team_id: m.team_a_id,
-          team_name: m.team_a?.name || m.team_a_name || 'Squad A',
-          placement: 1,
-          kills: 0,
-          placement_points: 10,
-          elimination_points: 0,
-          total_points: 10,
-        })
-      }
-      if (m.team_b_id) {
-        squads.push({
-          team_id: m.team_b_id,
-          team_name: m.team_b?.name || m.team_b_name || 'Squad B',
-          placement: 2,
-          kills: 0,
-          placement_points: 6,
-          elimination_points: 0,
-          total_points: 6,
-        })
-      }
-    }
-    setBrTeamResults(squads)
-  }
-
-  const handleUpdateBrRow = (index: number, field: 'placement' | 'kills', val: number) => {
-    setBrTeamResults((prev) => {
-      const copy = [...prev]
-      const row = { ...copy[index] }
-      if (field === 'placement') row.placement = val
-      if (field === 'kills') row.kills = val
-
-      const placementPts = brScoringMatrix[String(row.placement)] ?? 0
-      const elimPts = Number(row.kills || 0) * 1
-      row.placement_points = placementPts
-      row.elimination_points = elimPts
-      row.total_points = placementPts + elimPts
-
-      copy[index] = row
-      return copy
-    })
-  }
-
-  const handleSubmitBrResults = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!brResultsMatch) return
-    setSubmittingBrResults(true)
-    try {
-      const res = await submitBattleRoyaleResultsAdmin(brResultsMatch.id, {
-        team_results: brTeamResults,
-        scoring_matrix: brScoringMatrix,
-      })
-      showBanner(`✓ Battle Royale match finalized! Winner: ${res.winner_team_name}`)
-      setBrResultsMatch(null)
-      fetchMatches()
-      if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
-      onMatchesUpdated?.()
-    } catch (err: any) {
-      alert(err?.message || 'Failed to submit Battle Royale results')
-    } finally {
-      setSubmittingBrResults(false)
-    }
   }
 
   const handleToggleSquadAlive = async (matchId: string, teamId: string, currentAlive: boolean) => {
@@ -947,7 +842,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const fetchMatches = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getMatches()
+      const params = selectedTournId && selectedTournId !== 'ALL' ? { tournament_id: selectedTournId } : undefined
+      const data = await getMatches(params)
       if (Array.isArray(data)) {
         setMatches(data)
       }
@@ -956,7 +852,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedTournId])
 
   useEffect(() => {
     fetchMatches()
@@ -2499,7 +2395,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                           onClick={() => handleOpenBrResultsModal(m)}
                           className="border border-ok bg-ok/20 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
                         >
-                          🏆 Submit BR Results
+                          {isDone ? '🏆 View / Edit Qualifiers' : '🏆 Enter Results & Qualifiers'}
                         </button>
                       ) : (
                         <button
@@ -3503,115 +3399,22 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         </Portal>
       )}
 
-      {/* BATTLE ROYALE RESULTS MODAL */}
-      {brResultsMatch && (
-        <Portal lockScroll>
-          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
-            <div className="relative w-full max-w-2xl border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
-              <Brackets color="border-cyan/50" />
-              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-ink">
-                    Battle Royale Scoring &amp; Finalization
-                  </h3>
-                  <p className="text-xs text-dim mt-0.5">
-                    {brResultsMatch.tournament_title || 'Tournament'} · {brResultsMatch.round_name || brResultsMatch.stage} · Match #{brResultsMatch.match_number || 1}
-                  </p>
-                </div>
-                <span className="border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] text-cyan font-bold uppercase">
-                  Battle Royale
-                </span>
-              </div>
-
-              <form onSubmit={handleSubmitBrResults} className="mt-4 space-y-4 font-mono text-xs">
-                {/* Scoring Matrix reference */}
-                <div className="p-2.5 border border-white/10 bg-void/60 text-[11px] text-dim flex flex-wrap items-center gap-3">
-                  <span className="font-bold text-ink">Matrix:</span>
-                  <span>#1: 10pts</span>
-                  <span>#2: 6pts</span>
-                  <span>#3: 5pts</span>
-                  <span>#4: 4pts</span>
-                  <span>#5: 3pts</span>
-                  <span>#6: 2pts</span>
-                  <span>#7-#8: 1pt</span>
-                  <span className="text-cyan font-bold">1 Elimination = 1pt</span>
-                </div>
-
-                {/* Team Results Table */}
-                <div className="border border-white/10 bg-surface/50 max-h-[340px] overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-void/80 text-[10px] uppercase text-dim">
-                        <th className="p-2">Squad / Team</th>
-                        <th className="p-2 w-20">Placement</th>
-                        <th className="p-2 w-20">Kills</th>
-                        <th className="p-2 w-20">Place Pts</th>
-                        <th className="p-2 w-20">Elim Pts</th>
-                        <th className="p-2 w-20 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {brTeamResults.map((team, idx) => (
-                        <tr key={team.team_id || idx} className="hover:bg-white/[0.02]">
-                          <td className="p-2 font-display font-black text-ink text-xs uppercase">
-                            {team.team_name}
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={team.placement}
-                              onChange={(e) => handleUpdateBrRow(idx, 'placement', Math.max(1, parseInt(e.target.value) || 1))}
-                              className="w-16 border border-white/20 bg-void px-2 py-1 text-xs text-ink outline-none focus:border-cyan text-center font-bold"
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={team.kills}
-                              onChange={(e) => handleUpdateBrRow(idx, 'kills', Math.max(0, parseInt(e.target.value) || 0))}
-                              className="w-16 border border-white/20 bg-void px-2 py-1 text-xs text-ink outline-none focus:border-cyan text-center font-bold text-live"
-                            />
-                          </td>
-                          <td className="p-2 text-dim tabular-nums font-bold">
-                            {team.placement_points}
-                          </td>
-                          <td className="p-2 text-dim tabular-nums font-bold">
-                            {team.elimination_points}
-                          </td>
-                          <td className="p-2 text-right font-display font-black text-cyan tabular-nums text-sm">
-                            {team.total_points}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setBrResultsMatch(null)}
-                    className="border border-white/20 px-4 py-2 uppercase text-dim hover:text-ink cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingBrResults}
-                    className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
-                  >
-                    {submittingBrResults ? 'Finalizing...' : '🏆 Finalize Battle Royale Match'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </Portal>
-      )}
+      {/* BATTLE ROYALE RESULTS & QUALIFIERS MODAL */}
+      <BattleRoyaleResultsModal
+        isOpen={!!brResultsMatch}
+        onClose={() => setBrResultsMatch(null)}
+        match={brResultsMatch}
+        tournamentTitle={
+          tournaments.find((t) => t.id === brResultsMatch?.tournament_id || t.slug === brResultsMatch?.tournament_id)?.title
+        }
+        onSuccess={(res) => {
+          showBanner(res?.message || '✓ Battle Royale results finalized and qualifiers advanced!')
+          setBrResultsMatch(null)
+          fetchMatches()
+          if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+          onMatchesUpdated?.()
+        }}
+      />
 
       {/* PARTICIPANT RATINGS MODAL */}
       {ratingsModalMatch && (

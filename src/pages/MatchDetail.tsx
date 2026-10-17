@@ -12,6 +12,7 @@ import {
   type ApiMatch,
 } from '../services/matches'
 import { useAuthContext } from '../context/AuthContext'
+import { BattleRoyaleResultsModal } from '../components/admin/BattleRoyaleResultsModal'
 
 function normalizeStreamUrl(url?: string): string {
   if (!url) return ''
@@ -109,6 +110,7 @@ export default function MatchDetail() {
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [checkInMsg, setCheckInMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [brModalOpen, setBrModalOpen] = useState(false)
 
   const handleCopy = (value?: string, fieldName?: string) => {
     if (!value || !fieldName) return
@@ -517,24 +519,55 @@ export default function MatchDetail() {
               {/* Placements Standings if match completed */}
               {match.placements && match.placements.length > 0 ? (
                 <div className="border border-white/10 bg-surface/50 overflow-hidden">
-                  <div className="bg-void/90 px-4 py-3 text-left font-mono text-xs font-bold text-cyan uppercase border-b border-white/10 flex items-center justify-between">
-                    <span>Official Lobby Standings &amp; Points</span>
-                    <span className="text-dim text-[11px] font-normal">{match.placements.length} Entrants Ranked</span>
+                  <div className="bg-void/90 px-4 py-3 text-left font-mono text-xs font-bold text-cyan uppercase border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span>Official Lobby Standings &amp; Points</span>
+                      {match.qualifier_team_ids && match.qualifier_team_ids.length > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] bg-ok/20 border border-ok/50 text-ok uppercase font-bold">
+                          {match.qualifier_team_ids.length} Advanced to Next Round
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-dim text-[11px] font-normal">{match.placements.length} Entrants Ranked</span>
+                      {match.next_match_id && (
+                        <Link
+                          to={`/matches/${match.next_match_id}`}
+                          className="px-2.5 py-1 border border-cyan bg-cyan/15 hover:bg-cyan hover:text-void text-cyan text-[11px] font-bold uppercase transition-colors"
+                        >
+                          Next Round Lobby →
+                        </Link>
+                      )}
+                    </div>
                   </div>
                   <div className="divide-y divide-white/5 font-mono text-xs">
-                    {match.placements.map((pl: any, idx: number) => (
-                      <div key={pl.team_id || idx} className="grid grid-cols-[60px_1fr_80px_80px_100px] items-center p-3 text-left hover:bg-white/[0.02]">
-                        <span className={`font-bold ${idx === 0 ? 'text-amber-400 font-display text-base' : 'text-dim'}`}>
-                          #{pl.placement || idx + 1}
-                        </span>
-                        <span className="font-bold text-ink uppercase truncate">
-                          {pl.team_name || pl.player_name || `Contender ${idx + 1}`}
-                        </span>
-                        <span className="text-dim">Kills: <strong className="text-ink">{pl.kills ?? 0}</strong></span>
-                        <span className="text-dim">Place Pts: <strong className="text-ink">{pl.placement_points ?? 0}</strong></span>
-                        <span className="text-right text-cyan font-bold tabular-nums">{pl.total_points ?? 0} PTS</span>
-                      </div>
-                    ))}
+                    {match.placements.map((pl: any, idx: number) => {
+                      const isQual = Boolean(
+                        pl.qualified ||
+                        (match.qualifier_team_ids && match.qualifier_team_ids.includes(pl.team_id))
+                      )
+                      return (
+                        <div key={pl.team_id || idx} className="grid grid-cols-[50px_1fr_auto_80px_80px_90px] items-center p-3 text-left hover:bg-white/[0.02] gap-2">
+                          <span className={`font-bold ${idx === 0 ? 'text-amber-400 font-display text-base' : 'text-dim'}`}>
+                            #{pl.placement || idx + 1}
+                          </span>
+                          <span className="font-bold text-ink uppercase truncate">
+                            {pl.team_name || pl.player_name || `Contender ${idx + 1}`}
+                          </span>
+                          <div>
+                            {isQual && (
+                              <span className="px-2 py-0.5 text-[10px] font-bold uppercase border border-ok/40 bg-ok/10 text-ok inline-flex items-center gap-1">
+                                <span>✓</span>
+                                <span>Qualified</span>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-dim">Kills: <strong className="text-ink">{pl.kills ?? 0}</strong></span>
+                          <span className="text-dim">Place Pts: <strong className="text-ink">{pl.placement_points ?? 0}</strong></span>
+                          <span className="text-right text-cyan font-bold tabular-nums">{pl.total_points ?? 0} PTS</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ) : multiTeams.length > 0 ? (
@@ -715,18 +748,20 @@ export default function MatchDetail() {
                     </div>
                   </div>
                   <span className="font-mono text-xs text-dim">
-                    {teamA.members?.length || 1} Registered Contenders
+                    {isSolo ? 'Solo Contender' : `${teamA.members?.length || 1} Registered Contenders`}
                   </span>
                 </div>
 
                 {/* Captain Bar */}
                 <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
-                  <span className="text-[10px] uppercase text-cyan block font-bold">TEAM LEADER / CAPTAIN:</span>
+                  <span className="text-[10px] uppercase text-cyan block font-bold">
+                    {isSolo ? 'SOLO CONTENDER:' : 'TEAM LEADER / CAPTAIN:'}
+                  </span>
                   <p className="font-display text-base font-black text-ink uppercase mt-0.5">
-                    {teamA.captain?.name || teamA.captain?.handle || 'Captain'}
+                    {teamA.captain?.name || teamA.captain?.handle || teamA.name || 'Contender'}
                   </p>
                   <p className="text-[11px] text-dim">
-                    Handle: @{teamA.captain?.handle || teamA.captain?.name || 'TBD'}
+                    Handle: @{teamA.captain?.handle || teamA.captain?.name || teamA.name || 'TBD'}
                   </p>
                 </div>
 
@@ -764,18 +799,20 @@ export default function MatchDetail() {
                     </div>
                   </div>
                   <span className="font-mono text-xs text-dim">
-                    {teamB.members?.length || 1} Registered Contenders
+                    {isSolo ? 'Solo Contender' : `${teamB.members?.length || 1} Registered Contenders`}
                   </span>
                 </div>
 
                 {/* Captain Bar */}
                 <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
-                  <span className="text-[10px] uppercase text-cyan block font-bold">TEAM LEADER / CAPTAIN:</span>
+                  <span className="text-[10px] uppercase text-cyan block font-bold">
+                    {isSolo ? 'SOLO CONTENDER:' : 'TEAM LEADER / CAPTAIN:'}
+                  </span>
                   <p className="font-display text-base font-black text-ink uppercase mt-0.5">
-                    {teamB.captain?.name || teamB.captain?.handle || 'Captain'}
+                    {teamB.captain?.name || teamB.captain?.handle || teamB.name || 'Contender'}
                   </p>
                   <p className="text-[11px] text-dim">
-                    Handle: @{teamB.captain?.handle || teamB.captain?.name || 'TBD'}
+                    Handle: @{teamB.captain?.handle || teamB.captain?.name || teamB.name || 'TBD'}
                   </p>
                 </div>
 
@@ -941,6 +978,22 @@ export default function MatchDetail() {
                     {updatingStatus && (
                       <p className="text-cyan text-[11px] animate-pulse">Broadcasting status change...</p>
                     )}
+
+                    {isBattleRoyale && (
+                      <div className="pt-2 border-t border-white/10 space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setBrModalOpen(true)}
+                          className="w-full border border-amber-400/60 bg-amber-400/15 px-3 py-2.5 font-mono text-xs font-bold text-amber-300 hover:bg-amber-400/25 transition-colors uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.15)]"
+                        >
+                          <span>🏆</span>
+                          <span>{isDone ? 'View / Edit Qualifiers' : 'Enter Results & Qualifiers'}</span>
+                        </button>
+                        <p className="text-[10px] text-dim/70">
+                          Select multiple advancing qualifiers (e.g. top 10 from 25) and progress rounds.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="border border-white/10 bg-void/50 p-3 text-center font-mono text-xs text-dim">
@@ -1059,6 +1112,18 @@ export default function MatchDetail() {
           </Panel>
         </section>
       </Container>
+
+      {isBattleRoyale && (
+        <BattleRoyaleResultsModal
+          isOpen={brModalOpen}
+          onClose={() => setBrModalOpen(false)}
+          match={match}
+          onSuccess={() => {
+            setBrModalOpen(false)
+            loadData()
+          }}
+        />
+      )}
     </div>
   )
 }

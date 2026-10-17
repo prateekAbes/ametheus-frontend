@@ -87,9 +87,12 @@ export interface NormalizedTournament {
   serverRegion?: string
   announcementText?: string
   whatsappGroupUrl?: string
+  whatsapp_group_url?: string
   discordUrl?: string
   discord_url?: string
   communityLink?: string
+  isSolo?: boolean
+  is_solo?: boolean
   bannerUrl?: string
   heroBannerUrl?: string
   bannerTabletUrl?: string
@@ -245,9 +248,12 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     serverRegion: t.server_region || (t as any).serverRegion || 'AWS Mumbai (ap-south-1)',
     announcementText: (t as any).announcement_text || (t as any).announcementText,
     whatsappGroupUrl: t.whatsapp_group_url || (t as any).whatsappGroupUrl,
+    whatsapp_group_url: t.whatsapp_group_url || (t as any).whatsappGroupUrl,
     discordUrl: t.discord_url || (t as any).discordUrl,
     discord_url: t.discord_url || (t as any).discordUrl,
     communityLink: t.community_link || (t as any).communityLink,
+    isSolo: isSolo || !!(t as any).is_solo || !!(t as any).isSolo,
+    is_solo: isSolo || !!(t as any).is_solo || !!(t as any).isSolo,
     bannerUrl,
     heroBannerUrl,
     bannerTabletUrl,

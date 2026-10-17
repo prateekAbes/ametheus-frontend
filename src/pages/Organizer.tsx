@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
+import { BattleRoyaleResultsModal } from '../components/admin/BattleRoyaleResultsModal'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getMyOrganizedTournaments,
@@ -20,7 +21,14 @@ import {
   normalizeTournament,
   getTournamentRegistrations,
 } from '../services/tournaments'
-import { getMatches, submitMatchResult, updateMatch, ApiMatch } from '../services/matches'
+import {
+  getMatches,
+  submitMatchResult,
+  updateMatch,
+  updateMatchCredentialsAdmin,
+  releaseMatchCredentialsAdmin,
+  ApiMatch,
+} from '../services/matches'
 import {
   createMatchRequest,
   getMyMatchRequests,
@@ -117,13 +125,27 @@ export default function Organizer() {
   const [scoreB, setScoreB] = useState(0)
   const [winnerTeamId, setWinnerTeamId] = useState('')
   const [isSubmittingScore, setIsSubmittingScore] = useState(false)
+  const [selectedBrMatch, setSelectedBrMatch] = useState<ApiMatch | null>(null)
+
+  // Tournament Cockpit State (Drill-down from Overview)
+  const [managingTournament, setManagingTournament] = useState<any | null>(null)
+  const [cockpitMatches, setCockpitMatches] = useState<ApiMatch[]>([])
+  const [cockpitRosters, setCockpitRosters] = useState<any[]>([])
+  const [loadingCockpit, setLoadingCockpit] = useState(false)
+  const [cockpitTab, setCockpitTab] = useState<'MATCHES' | 'ROSTERS' | 'COMMUNITY'>('MATCHES')
+  const [cockpitWhatsappUrl, setCockpitWhatsappUrl] = useState('')
+  const [cockpitDiscordUrl, setCockpitDiscordUrl] = useState('')
+  const [savingCommunityLinks, setSavingCommunityLinks] = useState(false)
 
   // Stream & Room Creds State
   const [selectedLobbyMatch, setSelectedLobbyMatch] = useState<ApiMatch | null>(null)
   const [lobbyCode, setLobbyCode] = useState('')
   const [lobbyPassword, setLobbyPassword] = useState('')
+  const [serverRegion, setServerRegion] = useState('')
+  const [customInstructions, setCustomInstructions] = useState('')
   const [streamUrl, setStreamUrl] = useState('')
   const [isSavingLobby, setIsSavingLobby] = useState(false)
+  const [isReleasingCreds, setIsReleasingCreds] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -177,7 +199,59 @@ export default function Organizer() {
     }))
   }
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreateModal = () => {
+    setEditingTournament(null)
+    setFormData({
+      title: '',
+      game_id: games[0]?.slug || games[0]?.id || '',
+      is_solo: false,
+      min_team_size: 5,
+      max_team_size: 5,
+      format: 'Knockout',
+      tournament_type: 'Knockout',
+      match_format: 'Best of 1',
+      whatsapp_group_url: '',
+      discord_url: '',
+      server_region: 'AWS Mumbai (ap-south-1)',
+      prize_pool_inr: 10000,
+      entry_fee_inr: 0,
+      max_teams: 16,
+      starts_at: '',
+      roster_lock_time: '',
+      rank_requirement: 'Open to All Ranks',
+      description: 'Sanctioned competitive esports tournament. Anti-cheat verification mandatory.',
+      rules: '1. Standard competitive rules apply.\n2. Roster check-in required 15 mins prior to match start.\n3. Toxic conduct or cheating results in immediate disqualification.',
+    })
+    setIsCreateModalOpen(true)
+  }
+
+  const openEditModal = (t: any) => {
+    setEditingTournament(t)
+    setFormData({
+      title: t.title || '',
+      game_id: t.game_id || t.gameId || games[0]?.slug || '',
+      is_solo: !!(t.is_solo || t.isSolo),
+      min_team_size: t.min_team_size || t.minTeamSize || 5,
+      max_team_size: t.max_team_size || t.maxTeamSize || 5,
+      format: t.format || 'Knockout',
+      tournament_type: t.tournament_type || t.format || 'Knockout',
+      match_format: t.match_format || 'Best of 1',
+      whatsapp_group_url: t.whatsapp_group_url || '',
+      discord_url: t.discord_url || '',
+      server_region: t.server_region || 'AWS Mumbai (ap-south-1)',
+      prize_pool_inr: t.prize_pool_inr ?? t.prizePoolInr ?? 10000,
+      entry_fee_inr: t.entry_fee_inr ?? t.entryFeeInr ?? 0,
+      max_teams: t.max_teams || t.maxTeams || 16,
+      starts_at: t.starts_at || '',
+      roster_lock_time: t.roster_lock_time || '',
+      rank_requirement: t.rank_requirement || 'Open to All Ranks',
+      description: t.description || '',
+      rules: Array.isArray(t.rules) ? t.rules.join('\n') : (t.rules || ''),
+    })
+    setIsCreateModalOpen(true)
+  }
+
+  const handleSaveTournament = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
     try {
@@ -185,7 +259,7 @@ export default function Organizer() {
       const startIso = formData.starts_at || new Date(Date.now() + 86400000 * 3).toISOString()
       const lockIso = formData.roster_lock_time || new Date(Date.now() + 86400000 * 2).toISOString()
 
-      await createTournamentOrganizer({
+      const payload = {
         title: formData.title,
         game_id: formData.game_id,
         prize_pool_inr: Number(formData.prize_pool_inr),
@@ -204,14 +278,25 @@ export default function Organizer() {
         discord_url: formData.discord_url || undefined,
         description: formData.description,
         rules: rulesArr,
-      })
+      }
+
+      if (editingTournament) {
+        await updateTournamentOrganizer(editingTournament.id, payload)
+        setActionMsg(`Tournament "${formData.title}" updated successfully!`)
+      } else {
+        await createTournamentOrganizer(payload)
+        setActionMsg(`Tournament "${formData.title}" created in DRAFT state!`)
+      }
 
       setIsCreateModalOpen(false)
-      setActionMsg(`Tournament "${formData.title}" created in DRAFT state!`)
+      setEditingTournament(null)
       setTimeout(() => setActionMsg(null), 4000)
       loadData()
+      if (managingTournament && editingTournament?.id === managingTournament?.id) {
+        openManageTournament({ ...managingTournament, ...payload })
+      }
     } catch (err: any) {
-      alert(err.message || 'Failed to create tournament')
+      alert(err.message || 'Failed to save tournament')
     } finally {
       setCreating(false)
     }
@@ -337,31 +422,130 @@ export default function Organizer() {
     }
   }
 
+  const openManageTournament = async (t: any) => {
+    setManagingTournament(t)
+    setCockpitTab('MATCHES')
+    setCockpitWhatsappUrl(t.whatsapp_group_url || t.community_link || '')
+    setCockpitDiscordUrl(t.discord_url || '')
+    setLoadingCockpit(true)
+    try {
+      const [allM, rosters] = await Promise.all([
+        getMatches({ tournament_id: t.id || t.slug }),
+        getTournamentRegistrations(t.id || t.slug).catch(() => []),
+      ])
+      const tid = t.id || t.slug
+      const filtered = allM.filter((m: ApiMatch) => m.tournament_id === tid || m.tournament_id === t.slug)
+      setCockpitMatches(filtered.length > 0 ? filtered : allM)
+      setCockpitRosters(rosters || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingCockpit(false)
+    }
+  }
+
+  const handleSaveCommunityLinks = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!managingTournament) return
+    setSavingCommunityLinks(true)
+    try {
+      await updateTournamentOrganizer(managingTournament.id, {
+        whatsapp_group_url: cockpitWhatsappUrl.trim(),
+        discord_url: cockpitDiscordUrl.trim(),
+      })
+      setActionMsg('✓ Official community links saved successfully.')
+      setTimeout(() => setActionMsg(null), 4000)
+      setManagingTournament((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              whatsapp_group_url: cockpitWhatsappUrl.trim(),
+              discord_url: cockpitDiscordUrl.trim(),
+            }
+          : null
+      )
+      loadData()
+    } catch (err: any) {
+      alert(err.message || 'Failed to update community links')
+    } finally {
+      setSavingCommunityLinks(false)
+    }
+  }
+
   const openLobbyModal = (m: ApiMatch) => {
     setSelectedLobbyMatch(m)
-    setLobbyCode(m.lobby_code || '')
-    setLobbyPassword(m.lobby_password || '')
+    setLobbyCode(m.room_id || m.lobby_code || '')
+    setLobbyPassword(m.room_password || m.lobby_password || '')
+    setServerRegion(m.server_region || 'AWS Mumbai (ap-south-1)')
+    setCustomInstructions(m.custom_instructions || m.match_message || '')
     setStreamUrl(m.youtube_live_url || m.live_link || '')
   }
 
-  const handleSaveLobbyCredentials = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSaveLobbyCredentials = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!selectedLobbyMatch) return
     setIsSavingLobby(true)
     try {
-      await updateMatch(selectedLobbyMatch.id, {
+      await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
+        room_id: lobbyCode.trim(),
+        room_password: lobbyPassword.trim(),
         lobby_code: lobbyCode.trim(),
         lobby_password: lobbyPassword.trim(),
-        youtube_live_url: streamUrl.trim(),
+        server_region: serverRegion.trim(),
+        custom_instructions: customInstructions.trim(),
       })
-      setActionMsg('Lobby room credentials & stream URL updated successfully.')
+      if (streamUrl.trim()) {
+        await updateMatch(selectedLobbyMatch.id, {
+          youtube_live_url: streamUrl.trim(),
+        })
+      }
+      setActionMsg('✓ Match credentials saved (unreleased).')
       setTimeout(() => setActionMsg(null), 4000)
       setSelectedLobbyMatch(null)
-      loadData()
+      if (managingTournament) {
+        openManageTournament(managingTournament)
+      } else {
+        loadData()
+      }
     } catch (err: any) {
-      alert(err.message || 'Failed to update lobby credentials')
+      alert(err.message || 'Failed to save match credentials')
     } finally {
       setIsSavingLobby(false)
+    }
+  }
+
+  const handleReleaseCredentials = async () => {
+    if (!selectedLobbyMatch) return
+    if (!lobbyCode.trim() || !lobbyPassword.trim()) {
+      alert('Please enter and save Room ID and Password before releasing.')
+      return
+    }
+    if (!confirm('Release room credentials to registered participants now? Captain check-in will immediately open.')) {
+      return
+    }
+    setIsReleasingCreds(true)
+    try {
+      await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
+        room_id: lobbyCode.trim(),
+        room_password: lobbyPassword.trim(),
+        lobby_code: lobbyCode.trim(),
+        lobby_password: lobbyPassword.trim(),
+        server_region: serverRegion.trim(),
+        custom_instructions: customInstructions.trim(),
+      })
+      await releaseMatchCredentialsAdmin(selectedLobbyMatch.id)
+      setActionMsg('✓ Credentials released and check-in window opened!')
+      setTimeout(() => setActionMsg(null), 5000)
+      setSelectedLobbyMatch(null)
+      if (managingTournament) {
+        openManageTournament(managingTournament)
+      } else {
+        loadData()
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to release credentials')
+    } finally {
+      setIsReleasingCreds(false)
     }
   }
 
@@ -523,7 +707,7 @@ export default function Organizer() {
             >
               ↻ Refresh
             </button>
-            <Cta onClick={() => setIsCreateModalOpen(true)}>+ New Tournament</Cta>
+            <Cta onClick={openCreateModal}>+ New Tournament</Cta>
           </div>
         </div>
 
@@ -589,198 +773,493 @@ export default function Organizer() {
 
         {activeTab === 'TOURNAMENTS' && (
           <>
-            {/* Tournament Management Section */}
-            <div className="mt-12 space-y-6">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <h2 className="font-display text-3xl font-black uppercase">My Organized Tournaments</h2>
-                <Hud className="text-cyan">{tournaments.length} REGISTERED</Hud>
-              </div>
+            {managingTournament ? (
+              /* Dedicated Tournament Operations Cockpit */
+              <div className="mt-8 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setManagingTournament(null)}
+                      className="font-mono text-xs uppercase text-cyan hover:underline flex items-center gap-1 mb-2"
+                    >
+                      ← Back to All Tournaments
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <Badge s={managingTournament.status} />
+                      <span className="font-mono text-xs text-dim">· {managingTournament.format || managingTournament.tournament_type || 'Knockout'}</span>
+                      {managingTournament.is_solo && <span className="font-mono text-[10px] px-2 py-0.5 bg-cyan/10 border border-cyan/30 text-cyan">SOLO</span>}
+                    </div>
+                    <h2 className="font-display text-3xl md:text-4xl font-black uppercase text-ink">
+                      {managingTournament.title}
+                    </h2>
+                    <p className="font-mono text-xs text-dim">
+                      Game: <strong className="text-cyan">{managingTournament.game_name || managingTournament.game_id}</strong> · Prize: <strong className="text-ink">{inr(managingTournament.prize_pool_inr || 0)}</strong> · Entries: <strong className="text-ink">{cockpitRosters.length} / {managingTournament.max_teams || 16}</strong>
+                    </p>
+                  </div>
 
-              {loading ? (
-                <div className="border border-white/10 p-12 text-center">
-                  <Hud className="animate-pulse text-cyan">FETCHING ORGANIZER TOURNAMENTS...</Hud>
-                </div>
-              ) : tournaments.length === 0 ? (
-                <div className="border border-dashed border-white/15 p-16 text-center">
-                  <p className="font-display text-3xl font-black uppercase text-dim">No Tournaments Organized Yet</p>
-                  <p className="mt-2 text-sm text-dim">Click "+ New Tournament" to launch your first sanctioned competitive event.</p>
-                  <div className="mt-8">
-                    <Cta onClick={() => setIsCreateModalOpen(true)}>Create Tournament</Cta>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={`/tournaments/${managingTournament.slug || managingTournament.id}`}
+                      target="_blank"
+                      className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
+                    >
+                      Public Page ↗
+                    </Link>
+                    <button
+                      onClick={() => openEditModal(managingTournament)}
+                      className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-ink text-ink transition-colors"
+                    >
+                      Edit Tournament
+                    </button>
+                    {managingTournament.status === 'DRAFT' && (
+                      <button
+                        onClick={() => handlePublish(managingTournament.id)}
+                        className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                      >
+                        Publish Open
+                      </button>
+                    )}
+                    {managingTournament.status === 'REGISTRATION_OPEN' && (
+                      <button
+                        onClick={() => handleCloseReg(managingTournament.id)}
+                        className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
+                      >
+                        Lock Rosters
+                      </button>
+                    )}
+                    {managingTournament.status === 'REGISTRATION_CLOSED' && (
+                      <>
+                        <button
+                          onClick={() => handleGenBracket(managingTournament.id)}
+                          className="border border-cyan bg-cyan/15 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold"
+                        >
+                          ⚡ Gen Bracket & Start Live
+                        </button>
+                        <button
+                          onClick={() => handleReopenReg(managingTournament.id)}
+                          className="border border-white/20 bg-surface px-3 py-2 font-mono text-xs uppercase text-dim hover:text-ink hover:border-cyan transition-colors"
+                        >
+                          Reopen Reg
+                        </button>
+                      </>
+                    )}
+                    {managingTournament.status === 'LIVE' && (
+                      <button
+                        onClick={() => handleCompleteTournament(managingTournament.id)}
+                        className="border border-ok bg-ok/20 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors font-bold"
+                      >
+                        ✓ Complete Event
+                      </button>
+                    )}
                   </div>
                 </div>
-              ) : (
-                tournaments.map((raw) => {
-                  const t = normalizeTournament(raw)
-                  return (
-                    <div
-                      key={t.id}
-                      className="border border-white/15 bg-graphite p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          <Badge s={t.status} />
-                          <Hud className="text-cyan">{t.gameName || t.gameId}</Hud>
-                          <span className="text-xs text-dim">· {t.format}</span>
-                        </div>
-                        <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink truncate">
-                          {t.title}
-                        </h3>
-                        <div className="mt-3 flex flex-wrap gap-6 text-xs text-dim font-mono">
-                          <span>Prize: <strong className="text-ink">{inr(t.prizePoolInr)}</strong></span>
-                          <span>Entry: <strong className="text-ink">{t.entryFeeInr ? inr(t.entryFeeInr) : 'FREE'}</strong></span>
-                          <span>
-                            Registrations:{' '}
-                            <strong className="text-cyan">
-                              {t.registeredTeams} / {t.maxTeams} Teams
-                            </strong>
-                          </span>
-                        </div>
+
+                {/* Cockpit Navigation Tabs */}
+                <div className="flex border-b border-white/10 gap-2 font-mono text-xs uppercase">
+                  <button
+                    onClick={() => setCockpitTab('MATCHES')}
+                    className={`px-4 py-2 border-b-2 transition-colors ${
+                      cockpitTab === 'MATCHES'
+                        ? 'border-cyan bg-cyan/10 text-cyan font-bold'
+                        : 'border-transparent text-dim hover:text-ink'
+                    }`}
+                  >
+                    Match Cockpit & Room Credentials ({cockpitMatches.length})
+                  </button>
+                  <button
+                    onClick={() => setCockpitTab('ROSTERS')}
+                    className={`px-4 py-2 border-b-2 transition-colors ${
+                      cockpitTab === 'ROSTERS'
+                        ? 'border-cyan bg-cyan/10 text-cyan font-bold'
+                        : 'border-transparent text-dim hover:text-ink'
+                    }`}
+                  >
+                    Confirmed Rosters ({cockpitRosters.length})
+                  </button>
+                  <button
+                    onClick={() => setCockpitTab('COMMUNITY')}
+                    className={`px-4 py-2 border-b-2 transition-colors ${
+                      cockpitTab === 'COMMUNITY'
+                        ? 'border-cyan bg-cyan/10 text-cyan font-bold'
+                        : 'border-transparent text-dim hover:text-ink'
+                    }`}
+                  >
+                    Official Community Links
+                  </button>
+                </div>
+
+                {/* Cockpit Tab 1: Matches & Credentials */}
+                {cockpitTab === 'MATCHES' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-display text-xl font-bold uppercase text-ink">Scheduled Tournament Matches</h3>
+                        <p className="text-xs text-dim">Configure room credentials, stream broadcast links, and arbitrate scores for this tournament.</p>
+                      </div>
+                      <button
+                        onClick={() => openManageTournament(managingTournament)}
+                        className="border border-white/20 px-3 py-1 font-mono text-xs text-dim hover:text-ink hover:border-cyan"
+                      >
+                        ↻ Refresh Matches
+                      </button>
+                    </div>
+
+                    {loadingCockpit ? (
+                      <div className="p-12 text-center border border-white/10 font-mono text-xs text-cyan animate-pulse">
+                        FETCHING TOURNAMENT MATCHES & CREDENTIALS...
+                      </div>
+                    ) : cockpitMatches.length === 0 ? (
+                      <div className="border border-dashed border-white/15 p-12 text-center space-y-3">
+                        <p className="font-display text-2xl font-bold uppercase text-dim">No Matches Scheduled Yet</p>
+                        <p className="text-xs text-dim max-w-md mx-auto">
+                          Matches are generated once registrations are closed and the bracket is seeded.
+                        </p>
+                        {managingTournament.status === 'REGISTRATION_CLOSED' && (
+                          <button
+                            onClick={() => handleGenBracket(managingTournament.id)}
+                            className="mt-3 border border-cyan bg-cyan/15 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold"
+                          >
+                            ⚡ Generate Bracket / Lobbies Now
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {cockpitMatches.map((m) => {
+                          const hasCreds = !!(m.room_id || m.lobby_code)
+                          const isReleased = !!m.credentials_released
+                          const isBR = (managingTournament.format || '').toLowerCase().includes('battle') || (managingTournament.tournament_type || '').toLowerCase().includes('battle')
+                          const isSolo = !!(managingTournament.is_solo)
+
+                          return (
+                            <div key={m.id} className="border border-white/15 bg-graphite p-5 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs text-cyan font-bold uppercase">
+                                  {m.stage || (isBR ? `Lobby Match ${m.match_order || 1}` : `Match ${m.match_order || 1}`)}
+                                </span>
+                                <Badge s={m.status || 'SCHEDULED'} />
+                              </div>
+
+                              {isBR ? (
+                                <div className="border-y border-white/5 py-3 space-y-2">
+                                  <div className="flex items-center justify-between font-mono text-xs">
+                                    <span className="text-dim">Contenders:</span>
+                                    <strong className="text-cyan">{m.squads_count || (m.teams ? m.teams.length : (m.team_ids ? m.team_ids.length : 0))} Participants</strong>
+                                  </div>
+                                  {m.teams && m.teams.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pt-1">
+                                      {m.teams.map((tm: any, idx: number) => (
+                                        <span key={idx} className="font-mono text-[10px] px-2 py-0.5 bg-surface border border-white/10 text-dim">
+                                          {tm.name || `Team ${idx + 1}`}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between border-y border-white/5 py-3">
+                                  <div className="text-sm font-bold truncate max-w-[140px] text-ink">
+                                    {m.team_a?.name || (isSolo ? 'Contender 1' : 'Team 1')}
+                                  </div>
+                                  <div className="font-mono text-xs px-2.5 py-1 bg-surface border border-white/10 font-bold">
+                                    {m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}
+                                  </div>
+                                  <div className="text-sm font-bold truncate max-w-[140px] text-right text-ink">
+                                    {m.team_b?.name || (isSolo ? 'Contender 2' : 'Team 2')}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <div className="flex items-center gap-2">
+                                  {isReleased ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-ok/10 border border-ok/30 text-ok text-[11px] font-bold">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
+                                      Credentials Released (Check-in Open)
+                                    </span>
+                                  ) : hasCreds ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-warn/10 border border-warn/30 text-warn text-[11px]">
+                                      🔒 Draft Saved (Unreleased)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 text-dim text-[11px]">
+                                      ⚠️ No Credentials Set
+                                    </span>
+                                  )}
+                                </div>
+
+                                <span className="text-[11px] text-dim">{m.server_region || 'AWS Mumbai'}</span>
+                              </div>
+
+                              {hasCreds && (
+                                <div className="bg-surface/60 border border-white/10 p-2.5 font-mono text-[11px] grid grid-cols-2 gap-2">
+                                  <div>
+                                    <span className="text-dim block text-[10px]">ROOM ID:</span>
+                                    <span className="text-ink font-bold">{m.room_id || m.lobby_code}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-dim block text-[10px]">PASSWORD:</span>
+                                    <span className="text-ink font-bold">{m.room_password || m.lobby_password}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/5">
+                                <button
+                                  onClick={() => openLobbyModal(m)}
+                                  className="border border-white/20 bg-surface px-3 py-1.5 font-mono text-xs text-ink hover:border-cyan hover:text-cyan transition-colors"
+                                >
+                                  Room & Credentials
+                                </button>
+                                {isBR ? (
+                                  <button
+                                    onClick={() => setSelectedBrMatch(m)}
+                                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors font-bold"
+                                  >
+                                    {m.status === 'COMPLETED' ? 'View / Edit Qualifiers' : 'Enter Results & Qualifiers'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => openArbitrationModal(m)}
+                                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors font-bold"
+                                  >
+                                    Submit Score
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cockpit Tab 2: Rosters */}
+                {cockpitTab === 'ROSTERS' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-display text-xl font-bold uppercase text-ink">Registered Rosters & Contenders</h3>
+                        <p className="text-xs text-dim">Review verified teams and solo participants entered into this event.</p>
+                      </div>
+                    </div>
+                    {cockpitRosters.length === 0 ? (
+                      <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                        NO PARTICIPANTS REGISTERED YET
+                      </div>
+                    ) : (
+                      <div className="border border-white/15 divide-y divide-white/10 bg-graphite">
+                        {cockpitRosters.map((reg: any, i: number) => (
+                          <div key={reg.id || i} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono text-xs text-cyan font-bold">#{i + 1}</span>
+                                <span className="font-display text-lg font-bold text-ink">{reg.team_name || reg.name || `Contender ${i + 1}`}</span>
+                                <Badge s={reg.payment_status === 'COMPLETED' ? 'CONFIRMED' : reg.payment_status || 'PENDING'} />
+                              </div>
+                              <div className="mt-1 font-mono text-xs text-dim">
+                                Captain / Lead: <span className="text-ink">{reg.captain_name || reg.user?.name || 'Player'}</span>
+                                {reg.game_user_id && <span className="ml-3 text-cyan">IGN: {reg.game_user_id}</span>}
+                              </div>
+                            </div>
+                            <div className="font-mono text-xs text-dim">
+                              Registered: {new Date(reg.created_at || Date.now()).toLocaleDateString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cockpit Tab 3: Official Community Links */}
+                {cockpitTab === 'COMMUNITY' && (
+                  <div className="border border-white/15 bg-graphite p-6 md:p-8 max-w-xl space-y-6">
+                    <div>
+                      <h3 className="font-display text-2xl font-black uppercase text-ink">Official Tournament Community Links</h3>
+                      <p className="text-xs text-dim mt-1">
+                        These links are securely displayed to verified registered competitors on their confirmation screen and Competitor Hub to coordinate lobbies and match scheduling.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleSaveCommunityLinks} className="space-y-4 font-mono text-xs">
+                      <div>
+                        <label className="text-ink block uppercase font-bold mb-1">Official WhatsApp Group Invite URL</label>
+                        <input
+                          type="url"
+                          value={cockpitWhatsappUrl}
+                          onChange={(e) => setCockpitWhatsappUrl(e.target.value)}
+                          placeholder="https://chat.whatsapp.com/..."
+                          className="w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                        <span className="text-[10px] text-dim mt-1 block">
+                          Used for urgent announcements, lobby coordinator broadcasts, and match timing.
+                        </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <Link
-                          to={`/tournaments/${t.slug || t.id}`}
-                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
-                        >
-                          Public Page
-                        </Link>
+                      <div>
+                        <label className="text-ink block uppercase font-bold mb-1">Official Discord Server / Voice Channel</label>
+                        <input
+                          type="url"
+                          value={cockpitDiscordUrl}
+                          onChange={(e) => setCockpitDiscordUrl(e.target.value)}
+                          placeholder="https://discord.gg/..."
+                          className="w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                        <span className="text-[10px] text-dim mt-1 block">
+                          Used for match referee voice communications and lobby coordination.
+                        </span>
+                      </div>
 
+                      <div className="pt-2">
                         <button
-                          onClick={() => openRostersModal(raw)}
-                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-ink text-ink transition-colors"
+                          type="submit"
+                          disabled={savingCommunityLinks}
+                          className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
                         >
-                          View Rosters
+                          {savingCommunityLinks ? 'Saving...' : 'Save Community Links'}
                         </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* General Tournament Overview List */
+              <div className="mt-12 space-y-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <h2 className="font-display text-3xl font-black uppercase">My Organized Tournaments</h2>
+                  <div className="flex items-center gap-3">
+                    <Hud className="text-cyan">{tournaments.length} REGISTERED</Hud>
+                    <button
+                      onClick={openCreateModal}
+                      className="px-4 py-1.5 bg-cyan text-void font-bold font-mono text-xs uppercase hover:bg-white transition-colors"
+                    >
+                      + New Tournament
+                    </button>
+                  </div>
+                </div>
 
-                        {t.status === 'DRAFT' && (
+                {loading ? (
+                  <div className="border border-white/10 p-12 text-center">
+                    <Hud className="animate-pulse text-cyan">FETCHING ORGANIZER TOURNAMENTS...</Hud>
+                  </div>
+                ) : tournaments.length === 0 ? (
+                  <div className="border border-dashed border-white/15 p-16 text-center">
+                    <p className="font-display text-3xl font-black uppercase text-dim">No Tournaments Organized Yet</p>
+                    <p className="mt-2 text-sm text-dim">Click "+ New Tournament" to launch your first sanctioned competitive event.</p>
+                    <div className="mt-8">
+                      <Cta onClick={openCreateModal}>Create Tournament</Cta>
+                    </div>
+                  </div>
+                ) : (
+                  tournaments.map((raw) => {
+                    const t = normalizeTournament(raw)
+                    return (
+                      <div
+                        key={t.id}
+                        className="border border-white/15 bg-graphite p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:border-white/30 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <Badge s={t.status} />
+                            <Hud className="text-cyan">{t.gameName || t.gameId}</Hud>
+                            <span className="text-xs text-dim">· {t.format}</span>
+                            {t.isSolo && (
+                              <span className="font-mono text-[10px] px-2 py-0.5 bg-cyan/10 border border-cyan/30 text-cyan">
+                                SOLO
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink truncate">
+                            {t.title}
+                          </h3>
+                          <div className="mt-3 flex flex-wrap gap-6 text-xs text-dim font-mono">
+                            <span>Prize: <strong className="text-ink">{inr(t.prizePoolInr)}</strong></span>
+                            <span>Entry: <strong className="text-ink">{t.entryFeeInr ? inr(t.entryFeeInr) : 'FREE'}</strong></span>
+                            <span>
+                              Registrations:{' '}
+                              <strong className="text-cyan">
+                                {t.registeredTeams} / {t.maxTeams} {t.isSolo ? 'Players' : 'Teams'}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
                           <button
-                            onClick={() => handlePublish(t.id)}
-                            className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                            onClick={() => openManageTournament(raw)}
+                            className="border-2 border-cyan bg-cyan/15 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold shadow-[0_0_15px_rgba(0,240,255,0.15)]"
                           >
-                            Publish Open
+                            Manage Tournament →
                           </button>
-                        )}
 
-                        {t.status === 'REGISTRATION_OPEN' && (
                           <button
-                            onClick={() => handleCloseReg(t.id)}
-                            className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
+                            onClick={() => openEditModal(raw)}
+                            className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-ink text-ink transition-colors"
                           >
-                            Lock Rosters
+                            Edit
                           </button>
-                        )}
 
-                        {t.status === 'REGISTRATION_CLOSED' && (
-                          <>
+                          <Link
+                            to={`/tournaments/${t.slug || t.id}`}
+                            className="border border-white/20 px-3 py-2 font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
+                          >
+                            Public Page ↗
+                          </Link>
+
+                          {t.status === 'DRAFT' && (
+                            <button
+                              onClick={() => handlePublish(t.id)}
+                              className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                            >
+                              Publish Open
+                            </button>
+                          )}
+
+                          {t.status === 'REGISTRATION_OPEN' && (
+                            <button
+                              onClick={() => handleCloseReg(t.id)}
+                              className="border border-warn/50 bg-warn/10 px-3 py-2 font-mono text-xs uppercase text-warn hover:bg-warn/20 transition-colors"
+                            >
+                              Lock Rosters
+                            </button>
+                          )}
+
+                          {t.status === 'REGISTRATION_CLOSED' && (
                             <button
                               onClick={() => handleGenBracket(t.id)}
                               className="border border-cyan bg-cyan/15 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold"
                             >
-                              ⚡ Gen Bracket & Start Live
+                              ⚡ Gen Bracket
                             </button>
+                          )}
+
+                          {t.status === 'LIVE' && (
                             <button
-                              onClick={() => handleStartLive(t.id)}
-                              className="border border-ok/50 bg-ok/10 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/20 transition-colors"
+                              onClick={() => handleCompleteTournament(t.id)}
+                              className="border border-ok bg-ok/20 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors font-bold"
                             >
-                              ▶ Start Live
+                              ✓ Complete
                             </button>
+                          )}
+
+                          {t.status !== 'CANCELLED' && t.status !== 'COMPLETED' && (
                             <button
-                              onClick={() => handleReopenReg(t.id)}
-                              className="border border-white/20 bg-surface px-3 py-2 font-mono text-xs uppercase text-dim hover:text-ink hover:border-cyan transition-colors"
+                              onClick={() => handleCancel(t.id)}
+                              className="border border-live/30 px-3 py-2 font-mono text-xs uppercase text-live/80 hover:bg-live/10 transition-colors"
                             >
-                              Reopen Reg
+                              Cancel
                             </button>
-                          </>
-                        )}
-
-                        {t.status === 'LIVE' && (
-                          <button
-                            onClick={() => handleCompleteTournament(t.id)}
-                            className="border border-ok bg-ok/20 px-3 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors font-bold"
-                          >
-                            ✓ Complete Event
-                          </button>
-                        )}
-
-                        {(t.status === 'REGISTRATION_CLOSED' || t.status === 'REGISTRATION_OPEN') && (
-                          <button
-                            onClick={() => handleOpenMatchRequest(t.id)}
-                            className="border border-cyan/50 bg-cyan/10 px-3 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/20 transition-colors"
-                          >
-                            Request Match
-                          </button>
-                        )}
-
-                        {t.status !== 'CANCELLED' && t.status !== 'COMPLETED' && (
-                          <button
-                            onClick={() => handleCancel(t.id)}
-                            className="border border-live/30 px-3 py-2 font-mono text-xs uppercase text-live/80 hover:bg-live/10 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-        {/* Live Matches & Arbitration Queue */}
-        <div className="mt-16 space-y-6">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <div>
-              <h2 className="font-display text-3xl font-black uppercase">Live Match Arbitration</h2>
-              <p className="text-xs text-dim">Review live brackets, submit verified results, and update lobby room credentials.</p>
-            </div>
-            <Hud className="text-cyan">{matches.length} MATCHES</Hud>
-          </div>
-
-          {matches.length === 0 ? (
-            <div className="border border-white/10 p-8 text-center font-mono text-xs text-dim">
-              NO MATCHES SCHEDULED ACROSS ORGANIZED BRACKETS
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {matches.slice(0, 8).map((m) => (
-                <div key={m.id} className="border border-white/15 bg-graphite p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs text-cyan uppercase">{m.stage || 'Round 1'}</span>
-                    <Badge s={m.status || 'SCHEDULED'} />
-                  </div>
-
-                  <div className="flex items-center justify-between border-y border-white/5 py-3">
-                    <div className="text-sm font-bold truncate max-w-[140px]">{m.team_a?.name || 'TBD Team A'}</div>
-                    <div className="font-mono text-xs px-2 py-1 bg-surface border border-white/10">
-                      {m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}
-                    </div>
-                    <div className="text-sm font-bold truncate max-w-[140px] text-right">{m.team_b?.name || 'TBD Team B'}</div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] font-mono text-dim">
-                      {m.server_region || 'AWS Mumbai'}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openArbitrationModal(m)}
-                        className="border border-cyan/40 bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors"
-                      >
-                        Submit Score
-                      </button>
-                      <button
-                        onClick={() => openLobbyModal(m)}
-                        className="border border-white/20 bg-surface px-3 py-1 font-mono text-xs text-ink hover:border-cyan hover:text-cyan transition-colors"
-                      >
-                        Room & Stream
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-            </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1082,13 +1561,15 @@ export default function Organizer() {
             >
             <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
               <div>
-                <h2 className="font-display text-3xl font-black uppercase">Tournament Specification Wizard</h2>
+                <h2 className="font-display text-3xl font-black uppercase">
+                  {editingTournament ? 'Edit Tournament Specification' : 'Tournament Specification Wizard'}
+                </h2>
                 <p className="text-xs text-dim">Configure competition format, prize vault, and rules.</p>
               </div>
-              <button onClick={() => setIsCreateModalOpen(false)} className="text-dim hover:text-ink text-xl">✕</button>
+              <button onClick={() => { setIsCreateModalOpen(false); setEditingTournament(null); }} className="text-dim hover:text-ink text-xl">✕</button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleSaveTournament} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Hud>Game / Discipline</Hud>
@@ -1314,7 +1795,7 @@ export default function Organizer() {
                   disabled={creating}
                   className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
                 >
-                  {creating ? 'Creating...' : 'Create Tournament Draft'}
+                  {creating ? 'Saving...' : editingTournament ? 'Save Tournament Changes' : 'Create Tournament Draft'}
                 </button>
               </div>
             </form>
@@ -1452,6 +1933,21 @@ export default function Organizer() {
         </Portal>
       )}
 
+      {/* Battle Royale Results & Qualifiers Modal */}
+      <BattleRoyaleResultsModal
+        isOpen={!!selectedBrMatch}
+        onClose={() => setSelectedBrMatch(null)}
+        match={selectedBrMatch}
+        tournamentTitle={managingTournament?.title}
+        onSuccess={(res) => {
+          setActionMsg(res?.message || '✓ Battle Royale results finalized and qualifiers advanced!')
+          setSelectedBrMatch(null)
+          if (managingTournament) {
+            openManageTournament(managingTournament)
+          }
+        }}
+      />
+
       {/* Room & Stream Modal */}
       {selectedLobbyMatch && (
         <Portal lockScroll>
@@ -1463,36 +1959,79 @@ export default function Organizer() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
+              className="relative w-full max-w-lg border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
             >
               <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                 <div>
                   <h3 className="font-display text-2xl font-black uppercase text-ink">Room & Stream Settings</h3>
-                  <p className="text-xs text-dim">Set custom room code, password, and live stream URL.</p>
+                  <p className="text-xs text-dim">Configure room credentials, instructions, and live broadcast.</p>
                 </div>
                 <button onClick={() => setSelectedLobbyMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
               </div>
 
-              <form onSubmit={handleSaveLobbyCredentials} className="space-y-4">
+              {/* Credential Status Banner */}
+              <div className="mb-4 p-3 border font-mono text-xs flex items-center justify-between bg-surface/50">
+                <span className="text-dim">STATUS:</span>
+                {selectedLobbyMatch.credentials_released ? (
+                  <span className="text-ok font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-ok animate-pulse" />
+                    ✓ RELEASED TO PARTICIPANTS
+                  </span>
+                ) : (selectedLobbyMatch.room_id || selectedLobbyMatch.lobby_code) ? (
+                  <span className="text-warn font-bold flex items-center gap-1.5">
+                    🔒 DRAFT SAVED (PRIVATE TO ORGANIZER)
+                  </span>
+                ) : (
+                  <span className="text-dim">
+                    ⚠️ CREDENTIALS NOT CONFIGURED
+                  </span>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveLobbyCredentials} className="space-y-4 font-mono text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Hud>Room ID / Lobby Code</Hud>
+                    <input
+                      type="text"
+                      value={lobbyCode}
+                      onChange={(e) => setLobbyCode(e.target.value)}
+                      placeholder="e.g. AMT-ROOM-01"
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                    />
+                  </div>
+
+                  <div>
+                    <Hud>Room Password</Hud>
+                    <input
+                      type="text"
+                      value={lobbyPassword}
+                      onChange={(e) => setLobbyPassword(e.target.value)}
+                      placeholder="e.g. PASS123"
+                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <Hud>Lobby / Room Code</Hud>
+                  <Hud>Server Region</Hud>
                   <input
                     type="text"
-                    value={lobbyCode}
-                    onChange={(e) => setLobbyCode(e.target.value)}
-                    placeholder="e.g. AMT-ROOM-01"
+                    value={serverRegion}
+                    onChange={(e) => setServerRegion(e.target.value)}
+                    placeholder="e.g. AWS Mumbai (ap-south-1)"
                     className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
                   />
                 </div>
 
                 <div>
-                  <Hud>Lobby Password</Hud>
-                  <input
-                    type="text"
-                    value={lobbyPassword}
-                    onChange={(e) => setLobbyPassword(e.target.value)}
-                    placeholder="e.g. PASS123"
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
+                  <Hud>Custom Match Instructions / Notes</Hud>
+                  <textarea
+                    rows={2}
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    placeholder="e.g. Join lobby 10 mins prior. Map: Erangel. Spectating disallowed."
+                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-xs outline-none focus:border-cyan"
                   />
                 </div>
 
@@ -1505,10 +2044,12 @@ export default function Organizer() {
                     placeholder="https://www.youtube.com/watch?v=..."
                     className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
                   />
-                  <span className="mt-1 block text-[10px] text-dim">Stream will appear on the match details page and broadcast hubs.</span>
+                  <span className="mt-1 block text-[10px] text-dim font-sans">
+                    Stream will be featured on public match details page and official broadcasts.
+                  </span>
                 </div>
 
-                <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
+                <div className="pt-4 flex flex-col sm:flex-row justify-end gap-2 border-t border-white/10">
                   <button
                     type="button"
                     onClick={() => setSelectedLobbyMatch(null)}
@@ -1518,10 +2059,18 @@ export default function Organizer() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSavingLobby}
-                    className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
+                    disabled={isSavingLobby || isReleasingCreds}
+                    className="px-4 py-2 border border-white/20 bg-surface text-ink font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
                   >
-                    {isSavingLobby ? 'Saving...' : 'Save Settings'}
+                    {isSavingLobby ? 'Saving...' : 'Save Draft (Private)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReleaseCredentials}
+                    disabled={isSavingLobby || isReleasingCreds}
+                    className="px-5 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs font-mono"
+                  >
+                    {isReleasingCreds ? 'Releasing...' : '⚡ Release & Open Check-in'}
                   </button>
                 </div>
               </form>
