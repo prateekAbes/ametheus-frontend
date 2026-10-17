@@ -134,50 +134,42 @@ export default function Teams() {
             <p className="mt-6 max-w-lg text-lg text-dim">
               Tournaments are played as teams. Start your own and invite players, or join an existing roster with a team code.
             </p>
-            <div className="mt-14 grid gap-6 md:grid-cols-2">
+            <div className="mt-14 grid gap-4 md:grid-cols-2">
               <Link
                 to="/teams/create"
-                className="group relative flex min-h-[300px] flex-col justify-between overflow-hidden border border-white/15 bg-surface/60 p-8 transition-colors hover:border-amber-400/60 md:p-10"
+                className="group relative flex min-h-[340px] flex-col justify-end overflow-hidden bg-ink p-8 text-void transition-all duration-500 md:p-12"
               >
-                <div>
-                  <div className="inline-flex items-center justify-center size-12 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-400 mb-6">
-                    <svg className="size-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
-                    </svg>
-                  </div>
-                  <h2 className="font-display text-3xl font-black uppercase tracking-wide text-ink md:text-4xl">
-                    Create a Team
-                  </h2>
-                  <p className="mt-3 max-w-sm font-sans text-sm text-dim leading-relaxed">
-                    Found your own esports squad, register rosters, and lead tournament entries as team captain.
-                  </p>
-                </div>
-                <div className="mt-8 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-amber-400 group-hover:gap-3 transition-all">
-                  <span>Start Building</span>
-                  <span>→</span>
-                </div>
+                <span className="absolute right-6 top-4 font-display text-[10rem] font-black leading-none text-void/10 transition-transform duration-700 group-hover:scale-110">
+                  +
+                </span>
+                <h2 className="mt-3 font-display text-6xl font-black uppercase leading-[0.85] md:text-7xl">
+                  Create<br />Team
+                </h2>
+                <p className="mt-4 max-w-sm text-void/70">
+                  Name it, pick a game, add your players. Get a team code instantly.
+                </p>
+                <span className="mt-6 inline-flex items-center gap-2 font-display font-extrabold uppercase tracking-[0.08em] transition-all group-hover:gap-4">
+                  Start building →
+                </span>
               </Link>
               <Link
                 to="/teams/join"
-                className="group relative flex min-h-[300px] flex-col justify-between overflow-hidden border border-white/15 bg-surface/60 p-8 transition-colors hover:border-cyan/60 md:p-10"
+                className="group relative flex min-h-[340px] flex-col justify-end overflow-hidden border border-white/15 bg-surface p-8 transition-all duration-500 hover:border-violet md:p-12"
               >
-                <div>
-                  <div className="inline-flex items-center justify-center size-12 rounded-lg bg-cyan/10 border border-cyan/30 text-cyan mb-6">
-                    <svg className="size-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
-                    </svg>
-                  </div>
-                  <h2 className="font-display text-3xl font-black uppercase tracking-wide text-ink md:text-4xl">
-                    Join a Team
-                  </h2>
-                  <p className="mt-3 max-w-sm font-sans text-sm text-dim leading-relaxed">
-                    Received an invite code from your captain? Enter your team code to claim your roster slot.
-                  </p>
-                </div>
-                <div className="mt-8 flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan group-hover:gap-3 transition-all">
-                  <span>Enter Code</span>
-                  <span>→</span>
-                </div>
+                <Particles n={16} />
+                <Brackets color="border-violet/60" />
+                <span className="absolute right-6 top-4 font-display text-[10rem] font-black leading-none text-violet/15 transition-transform duration-700 group-hover:scale-110">
+                  #
+                </span>
+                <h2 className="relative mt-3 font-display text-6xl font-black uppercase leading-[0.85] md:text-7xl">
+                  Join<br />Team
+                </h2>
+                <p className="relative mt-4 max-w-sm text-dim">
+                  Got a code from your captain? Enter it and lock in your slot.
+                </p>
+                <span className="relative mt-6 inline-flex items-center gap-2 font-display font-extrabold uppercase tracking-[0.08em] transition-all group-hover:gap-4 group-hover:text-violet">
+                  Enter code →
+                </span>
               </Link>
             </div>
           </div>
