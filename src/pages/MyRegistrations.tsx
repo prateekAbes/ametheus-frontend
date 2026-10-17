@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
-import { Container, Hud, Tabs, Badge, Cta, EmptyState } from '../components/ui'
+import { Container, Hud, Tabs, Badge, Cta } from '../components/ui'
 import { gameBy, inr } from '../lib/data'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
 import { useAuthContext } from '../context/AuthContext'
@@ -57,7 +57,7 @@ export default function MyRegistrations() {
             </div>
           ) : list.length === 0 ? (
             <div className="border border-white/10 bg-surface/30 p-12 text-center flex flex-col items-center justify-center">
-              <h3 className="font-display text-xl font-bold uppercase tracking-wider text-white mb-4">
+              <h3 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white mb-4">
                 {tab === 'Upcoming'
                   ? 'No Upcoming Entries'
                   : tab === 'Active'

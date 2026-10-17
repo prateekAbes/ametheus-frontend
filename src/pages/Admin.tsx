@@ -11,10 +11,12 @@ import {
   promoteUserToOrganizer,
   getPendingPayments,
   getAdminPayments,
+  getRegistrationRevenueAnalytics,
   approvePayment,
   rejectPayment,
   getAdminUpiAccounts,
   createUpiAccount,
+  updateUpiAccount,
   deleteUpiAccount,
   toggleUpiAccountStatus,
   uploadUpiAccountQr,
@@ -53,6 +55,7 @@ import {
   AdminStats,
   AdminUser,
   PendingPayment,
+  RegistrationRevenueAnalytics,
   PayoutRecord,
   UpiAccount,
   SupportTicket,
@@ -260,6 +263,10 @@ export default function Admin() {
   const [paymentViewMode, setPaymentViewMode] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE')
   const [archivedPayments, setArchivedPayments] = useState<PendingPayment[]>([])
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<PendingPayment | null>(null)
+  const [revenueAnalytics, setRevenueAnalytics] = useState<RegistrationRevenueAnalytics | null>(null)
+  const [revenueTimeRange, setRevenueTimeRange] = useState<string>('all')
+  const [loadingRevenue, setLoadingRevenue] = useState(false)
+  const [paymentFilterQuery, setPaymentFilterQuery] = useState('')
 
   // Audit Logs Filtering & Pagination
   const [auditAction, setAuditAction] = useState<string>('ALL')
@@ -286,7 +293,10 @@ export default function Admin() {
 
   // UPI Modal & QR States
   const [isNewUpiOpen, setIsNewUpiOpen] = useState(false)
-  const [newUpi, setNewUpi] = useState({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '' })
+  const [editingUpi, setEditingUpi] = useState<UpiAccount | null>(null)
+  const [newUpi, setNewUpi] = useState({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '', status: 'ACTIVE' })
+  const [isSavingUpi, setIsSavingUpi] = useState(false)
+  const [upiFormError, setUpiFormError] = useState('')
   const [uploadingQrAccId, setUploadingQrAccId] = useState<string | null>(null)
   const [isUploadingNewUpiQr, setIsUploadingNewUpiQr] = useState(false)
 
@@ -699,6 +709,7 @@ export default function Admin() {
         notifs,
         crestList,
         sCounts,
+        revAnalytics,
       ] = await Promise.all([
         getAdminStats().catch(() => null),
         getAdminUsers().catch(() => []),
@@ -726,6 +737,7 @@ export default function Admin() {
         getAdminPlatformNotifications({ limit: 50, skip: 0 }).catch(() => ({ items: [], total: 0 })),
         getAllCrestsAdmin().catch(() => []),
         getAdminSupportTicketCounts().catch(() => ({ active: 0, archived: 0, total: 0 })),
+        getRegistrationRevenueAnalytics({ time_range: revenueTimeRange }).catch(() => null),
       ])
 
       if (s) setStats(s)
@@ -743,6 +755,7 @@ export default function Admin() {
       setPayouts(Array.isArray(payList) ? payList : [])
       setTickets(Array.isArray(tixList) ? tixList : ((tixList as any)?.tickets || []))
       if (sCounts) setSupportTicketCounts(sCounts)
+      if (revAnalytics) setRevenueAnalytics(revAnalytics)
       setRegulations(Array.isArray(regList) ? regList : [])
       setEmailStatus(eStat)
       setDisputes(Array.isArray(dispList) ? dispList : [])
@@ -763,6 +776,19 @@ export default function Admin() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleTimeRangeChange = async (newRange: string) => {
+    setRevenueTimeRange(newRange)
+    setLoadingRevenue(true)
+    try {
+      const data = await getRegistrationRevenueAnalytics({ time_range: newRange })
+      setRevenueAnalytics(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoadingRevenue(false)
     }
   }
 
@@ -1000,16 +1026,79 @@ export default function Admin() {
     }
   }
 
-  const handleCreateUpi = async (e: React.FormEvent) => {
+  const handleOpenAddUpi = () => {
+    setEditingUpi(null)
+    setUpiFormError('')
+    setNewUpi({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '', status: 'ACTIVE' })
+    setIsNewUpiOpen(true)
+  }
+
+  const handleOpenEditUpi = (acc: UpiAccount) => {
+    setEditingUpi(acc)
+    setUpiFormError('')
+    setNewUpi({
+      code: acc.code || '',
+      upi_id: acc.upi_id || '',
+      payee_name: acc.payee_name || '',
+      display_name: acc.display_name || '',
+      qr_url: acc.qr_url || '',
+      status: acc.status || 'ACTIVE',
+    })
+    setIsNewUpiOpen(true)
+  }
+
+  const handleSaveUpi = async (e: React.FormEvent) => {
     e.preventDefault()
+    setUpiFormError('')
+
+    const cleanUpiId = newUpi.upi_id.trim()
+    const cleanPayee = newUpi.payee_name.trim()
+    const cleanCode = newUpi.code.trim().toUpperCase()
+
+    if (!cleanUpiId || !cleanUpiId.includes('@') || cleanUpiId.length < 3) {
+      setUpiFormError('Please enter a valid UPI VPA handle containing "@" (e.g. company@bank).')
+      return
+    }
+    if (!cleanPayee) {
+      setUpiFormError('Payee Name cannot be empty.')
+      return
+    }
+
+    setIsSavingUpi(true)
     try {
-      await createUpiAccount(newUpi)
-      showToast(`UPI Account ${newUpi.code} registered!`)
+      if (editingUpi) {
+        const updated = await updateUpiAccount(editingUpi.id, {
+          upi_id: cleanUpiId,
+          payee_name: cleanPayee,
+          display_name: newUpi.display_name.trim() || undefined,
+          status: newUpi.status,
+          qr_url: newUpi.qr_url.trim() || undefined,
+        })
+        setUpiAccounts((prev) => prev.map((a) => (a.id === editingUpi.id ? { ...a, ...updated } : a)))
+        showToast(`UPI Account ${editingUpi.code} updated successfully!`)
+      } else {
+        if (!cleanCode) {
+          setUpiFormError('Account Code is required.')
+          setIsSavingUpi(false)
+          return
+        }
+        const created = await createUpiAccount({
+          code: cleanCode,
+          upi_id: cleanUpiId,
+          payee_name: cleanPayee,
+          display_name: newUpi.display_name.trim() || undefined,
+          qr_url: newUpi.qr_url.trim() || undefined,
+        })
+        setUpiAccounts((prev) => [created, ...prev])
+        showToast(`UPI Account ${cleanCode} registered successfully!`)
+      }
       setIsNewUpiOpen(false)
-      setNewUpi({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '' })
-      loadData()
+      setEditingUpi(null)
+      setNewUpi({ code: '', upi_id: '', payee_name: '', display_name: '', qr_url: '', status: 'ACTIVE' })
     } catch (err: any) {
-      alert(err.message || 'Failed to create UPI account')
+      setUpiFormError(err.message || 'Failed to save UPI account')
+    } finally {
+      setIsSavingUpi(false)
     }
   }
 
@@ -3217,86 +3306,289 @@ export default function Admin() {
               <Hud className="text-warn">{payments.length} AWAITING APPROVAL</Hud>
             </div>
 
-            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-              <button
-                type="button"
-                onClick={() => setPaymentViewMode('ACTIVE')}
-                className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
-                  paymentViewMode === 'ACTIVE'
-                    ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
-                    : 'text-dim hover:text-ink'
-                }`}
-              >
-                Active Pending ({payments.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentViewMode('ARCHIVED')}
-                className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
-                  paymentViewMode === 'ARCHIVED'
-                    ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
-                    : 'text-dim hover:text-ink'
-                }`}
-              >
-                Archived Records ({archivedPayments.length})
-              </button>
+            {/* Revenue Analytics Dashboard Card */}
+            <div className="border border-white/10 bg-graphite p-6 space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                    <Hud className="text-cyan">Tournament Revenue & Registration Analytics</Hud>
+                  </div>
+                  <h3 className="mt-1 font-display text-2xl font-black uppercase text-ink">
+                    Registration Financial Ledger
+                  </h3>
+                  <p className="text-xs text-dim">
+                    Accurate revenue accounting: Distinguishes tournament entry fees from user wallet top-ups to prevent double counting.
+                  </p>
+                </div>
+
+                {/* Time Range Filter Pills */}
+                <div className="flex items-center gap-1.5 bg-void p-1 border border-white/10 font-mono text-[11px] uppercase">
+                  {[
+                    { id: 'all', label: 'All Time' },
+                    { id: 'this_week', label: 'This Week' },
+                    { id: 'last_week', label: 'Last Week' },
+                    { id: 'this_month', label: 'This Month' },
+                  ].map((tr) => (
+                    <button
+                      key={tr.id}
+                      type="button"
+                      onClick={() => handleTimeRangeChange(tr.id)}
+                      className={`px-3 py-1 transition-colors cursor-pointer ${
+                        revenueTimeRange === tr.id
+                          ? 'bg-cyan text-void font-bold shadow'
+                          : 'text-dim hover:text-ink'
+                      }`}
+                    >
+                      {tr.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loadingRevenue ? (
+                <div className="py-8 text-center font-mono text-xs text-dim animate-pulse">
+                  Aggregating ledger data and capacity metrics...
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                    {/* Tile 1: Approved Tournament Revenue */}
+                    <div className="border border-ok/30 bg-ok/5 p-4 space-y-1">
+                      <Hud className="text-ok">Approved Entry Revenue</Hud>
+                      <p className="font-display text-2xl md:text-3xl font-black text-ok tabular-nums">
+                        {inr(revenueAnalytics?.approved_tournament_revenue_inr || 0)}
+                      </p>
+                      <p className="text-[10px] text-dim font-mono">Platform earned tournament fees</p>
+                    </div>
+
+                    {/* Tile 2: Pending Verification Volume */}
+                    <div className="border border-warn/30 bg-warn/5 p-4 space-y-1">
+                      <Hud className="text-warn">Pending Verification</Hud>
+                      <p className="font-display text-2xl md:text-3xl font-black text-warn tabular-nums">
+                        {inr(revenueAnalytics?.pending_verification_volume_inr || 0)}
+                      </p>
+                      <p className="text-[10px] text-dim font-mono">Awaiting admin UTR verification</p>
+                    </div>
+
+                    {/* Tile 3: Confirmed Registrations */}
+                    <div className="border border-white/10 bg-void/50 p-4 space-y-1">
+                      <Hud className="text-cyan">Confirmed Squads</Hud>
+                      <p className="font-display text-2xl md:text-3xl font-black text-cyan tabular-nums">
+                        {revenueAnalytics?.confirmed_registrations ?? 0}
+                      </p>
+                      <p className="text-[10px] text-dim font-mono">Paid or free verified entries</p>
+                    </div>
+
+                    {/* Tile 4: Reserved Seats */}
+                    <div className="border border-white/10 bg-void/50 p-4 space-y-1">
+                      <Hud className="text-dim">Reserved Seats</Hud>
+                      <p className="font-display text-2xl md:text-3xl font-black text-ink tabular-nums">
+                        {revenueAnalytics?.reserved_seats ?? 0}
+                      </p>
+                      <p className="text-[10px] text-dim font-mono">Held pending payment audit</p>
+                    </div>
+
+                    {/* Tile 5: Wallet Top-Up Volume (Separated) */}
+                    <div className="border border-purple-500/30 bg-purple-950/15 p-4 space-y-1">
+                      <Hud className="text-purple-400">Wallet Deposits</Hud>
+                      <p className="font-display text-2xl md:text-3xl font-black text-purple-300 tabular-nums">
+                        {inr(revenueAnalytics?.wallet_topup_volume_inr || 0)}
+                      </p>
+                      <p className="text-[10px] text-dim font-mono">User balance · Not direct entry revenue</p>
+                    </div>
+                  </div>
+
+                  {/* Tournament-by-tournament breakdown table if exists */}
+                  {revenueAnalytics?.tournaments && revenueAnalytics.tournaments.length > 0 && (
+                    <div className="border border-white/10 bg-void/40 overflow-x-auto">
+                      <table className="w-full text-left font-mono text-xs">
+                        <thead className="border-b border-white/10 bg-void/70 uppercase text-dim text-[10px]">
+                          <tr>
+                            <th className="p-3">Tournament</th>
+                            <th className="p-3">Slots (Max)</th>
+                            <th className="p-3">Confirmed</th>
+                            <th className="p-3">Available</th>
+                            <th className="p-3">Entry Fee</th>
+                            <th className="p-3 text-right">Approved Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {revenueAnalytics.tournaments.map((t) => (
+                            <tr key={t.id} className="hover:bg-white/5">
+                              <td className="p-3 font-display font-bold uppercase text-ink truncate max-w-[220px]">
+                                {t.title}
+                              </td>
+                              <td className="p-3 text-dim">{t.max_teams}</td>
+                              <td className="p-3 font-bold text-cyan">{t.confirmed_teams}</td>
+                              <td className="p-3 font-bold text-ok">{t.available_slots}</td>
+                              <td className="p-3 text-dim">{t.entry_fee_inr ? inr(t.entry_fee_inr) : 'FREE'}</td>
+                              <td className="p-3 text-right font-bold text-ok">{inr(t.approved_revenue_inr)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentViewMode('ACTIVE')}
+                  className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                    paymentViewMode === 'ACTIVE'
+                      ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                      : 'text-dim hover:text-ink'
+                  }`}
+                >
+                  Active Pending ({payments.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentViewMode('ARCHIVED')}
+                  className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors cursor-pointer ${
+                    paymentViewMode === 'ARCHIVED'
+                      ? 'border-b-2 border-cyan text-cyan font-bold bg-white/5'
+                      : 'text-dim hover:text-ink'
+                  }`}
+                >
+                  Archived Records ({archivedPayments.length})
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-80">
+                <input
+                  type="text"
+                  placeholder="Filter by UTR, User, or Tournament..."
+                  value={paymentFilterQuery}
+                  onChange={(e) => setPaymentFilterQuery(e.target.value)}
+                  className="w-full border border-white/15 bg-surface px-3 py-2 text-xs font-mono text-cyan placeholder:text-dim outline-none focus:border-cyan"
+                />
+                {paymentFilterQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFilterQuery('')}
+                    className="absolute right-2 top-2 font-mono text-xs text-dim hover:text-ink"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {paymentViewMode === 'ACTIVE' ? (
-              payments.length === 0 ? (
-                <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
-                  NO PENDING PAYMENTS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {payments.map((p) => (
-                    <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-warn">
-                      <div className="space-y-1 font-mono text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 border border-warn text-warn">{p.status}</span>
-                        </div>
-                        <div className="text-dim">User: {p.user_email || p.user_id}</div>
-                        <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
-                        <div className="text-dim">UTR Reference: <span className="text-cyan font-bold">{p.utr}</span></div>
-                        <div className="text-dim">Sender VPA: {p.sender_upi_id || 'Not Specified'}</div>
-                        <div className="text-[10px] text-dim">Initiated: {formatAuditTimestamp(p.created_at)}</div>
-                      </div>
+              (() => {
+                const query = paymentFilterQuery.trim().toLowerCase()
+                const activeFiltered = payments.filter((p) => {
+                  if (!query) return true
+                  return (
+                    p.id.toLowerCase().includes(query) ||
+                    (p.utr || '').toLowerCase().includes(query) ||
+                    (p.user_email || '').toLowerCase().includes(query) ||
+                    (p.user_id || '').toLowerCase().includes(query) ||
+                    (p.sender_upi_id || '').toLowerCase().includes(query) ||
+                    (p.payment_type || '').toLowerCase().includes(query) ||
+                    (p.tournament_id || '').toLowerCase().includes(query) ||
+                    (p.tournament_title || '').toLowerCase().includes(query) ||
+                    (p.team_name || '').toLowerCase().includes(query)
+                  )
+                })
 
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentDetail(p)}
-                          className="border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleApprovePayment(p.id)}
-                          className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors"
-                        >
-                          Approve & Credit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectPaymentId(p.id)}
-                          className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleArchivePayment(p.id)}
-                          className="border border-white/20 px-3 py-2 font-mono text-xs uppercase text-dim hover:text-warn hover:border-warn transition-colors"
-                        >
-                          Archive
-                        </button>
-                      </div>
-                    </Panel>
-                  ))}
-                </div>
-              )
+                if (activeFiltered.length === 0) {
+                  return (
+                    <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
+                      {paymentFilterQuery ? 'NO PENDING PAYMENTS MATCH YOUR SEARCH CRITERIA.' : 'NO PENDING PAYMENTS. ALL PLAYER DEPOSITS ARE AUDITED & VERIFIED.'}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {activeFiltered.map((p) => (
+                      <Panel key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 border-l-4 border-l-warn">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                          {/* Screenshot Proof Thumbnail */}
+                          {(p.proof_url || p.screenshot_url) ? (
+                            <div className="shrink-0 flex flex-col items-center gap-1">
+                              <img
+                                src={resolveMediaUrl(p.proof_url || p.screenshot_url)}
+                                alt="Proof thumbnail"
+                                onClick={() => setSelectedPaymentDetail(p)}
+                                className="size-16 object-cover rounded border border-white/20 hover:border-cyan cursor-pointer transition-colors"
+                              />
+                              <span className="font-mono text-[9px] text-cyan uppercase font-bold">
+                                📸 Proof
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="size-16 shrink-0 grid place-items-center border border-dashed border-white/15 bg-void/50 text-[10px] text-dim font-mono text-center p-1">
+                              No Proof
+                            </div>
+                          )}
+
+                          <div className="space-y-1 font-mono text-xs">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-bold text-ink">Payment #{p.id.slice(0, 8)}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 border border-warn text-warn">{p.status}</span>
+                              {p.payment_type && (
+                                <span className="text-[10px] px-1.5 py-0.5 border border-cyan/40 bg-cyan/10 text-cyan uppercase">
+                                  {p.payment_type}
+                                </span>
+                              )}
+                              {(p.tournament_title || p.tournament_id) && (
+                                <span className="text-[10px] px-1.5 py-0.5 border border-white/20 text-ink uppercase">
+                                  {p.tournament_title || `Tour #${(p.tournament_id || '').slice(0, 6)}`}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-dim">User: <span className="text-ink">{p.user_email || p.user_id}</span></div>
+                            <div className="text-dim">Amount: <span className="text-ok font-bold">{inr(p.amount_inr)}</span></div>
+                            <div className="text-dim">UTR Reference: <span className="text-cyan font-bold select-all">{p.utr}</span></div>
+                            <div className="text-dim">Sender VPA: {p.sender_upi_id || 'Not Specified'}</div>
+                            <div className="text-[10px] text-dim">Initiated: {formatAuditTimestamp(p.created_at)}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentDetail(p)}
+                            className="border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePayment(p.id)}
+                            className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs uppercase text-ok hover:bg-ok/30 transition-colors cursor-pointer"
+                          >
+                            Approve & Credit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRejectPaymentId(p.id)}
+                            className="border border-live bg-live/20 px-4 py-2 font-mono text-xs uppercase text-live hover:bg-live/30 transition-colors cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleArchivePayment(p.id)}
+                            className="border border-white/20 px-3 py-2 font-mono text-xs uppercase text-dim hover:text-warn hover:border-warn transition-colors cursor-pointer"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      </Panel>
+                    ))}
+                  </div>
+                )
+              })()
             ) : (
               archivedPayments.length === 0 ? (
                 <div className="border border-dashed border-white/15 p-12 text-center font-mono text-xs text-dim">
@@ -3351,8 +3643,8 @@ export default function Admin() {
                 <p className="text-xs text-dim">Corporate banking handles presented during tournament fee checkout.</p>
               </div>
               <button
-                onClick={() => setIsNewUpiOpen(true)}
-                className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 transition-all"
+                onClick={handleOpenAddUpi}
+                className="border border-cyan bg-cyan px-4 py-2 font-mono text-xs uppercase text-void font-bold hover:brightness-110 transition-all cursor-pointer"
               >
                 + Add Account
               </button>
@@ -3383,6 +3675,9 @@ export default function Admin() {
                     <div className="flex-1 space-y-1 min-w-0">
                       <div>UPI VPA: <span className="text-cyan font-bold break-all">{a.upi_id}</span></div>
                       <div>Payee Name: <span className="text-dim">{a.payee_name}</span></div>
+                      {a.display_name && (
+                        <div>Label: <span className="text-ink/80">{a.display_name}</span></div>
+                      )}
                       <div>Usage Count: <span className="text-dim">{a.payment_count || 0} checkouts</span></div>
                       <div className="pt-2">
                         <label className="inline-block cursor-pointer border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] uppercase text-cyan hover:bg-cyan/20">
@@ -3415,15 +3710,22 @@ export default function Admin() {
                   <div className="pt-2 border-t border-white/10 flex justify-end gap-2">
                     <button
                       type="button"
+                      onClick={() => handleOpenEditUpi(a)}
+                      className="border border-cyan/40 bg-cyan/10 px-3 py-1 text-cyan hover:bg-cyan/20 transition-colors font-bold cursor-pointer"
+                    >
+                      ✎ Edit
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleToggleUpi(a.id)}
-                      className="border border-white/20 px-3 py-1 text-dim hover:text-ink hover:border-cyan transition-colors"
+                      className="border border-white/20 px-3 py-1 text-dim hover:text-ink hover:border-cyan transition-colors cursor-pointer"
                     >
                       Toggle Active State
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteUpi(a.id, a.code)}
-                      className="border border-live/40 bg-live/10 px-3 py-1 text-live hover:bg-live/20 transition-colors"
+                      className="border border-live/40 bg-live/10 px-3 py-1 text-live hover:bg-live/20 transition-colors cursor-pointer"
                     >
                       Delete
                     </button>
@@ -5095,24 +5397,96 @@ export default function Admin() {
         </Portal>
       )}
 
-      {/* Add UPI Account Modal */}
+      {/* Add / Edit UPI Account Modal */}
       {isNewUpiOpen && (
         <Portal lockScroll>
           <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
             <div className="relative w-full max-w-md max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto border border-white/20 bg-graphite p-6 shadow-2xl select-text">
-              <h3 className="font-display text-2xl font-black uppercase text-ink">New UPI Account</h3>
-              <form onSubmit={handleCreateUpi} className="mt-4 space-y-3 font-mono text-xs">
-                <input required placeholder="Account Code (e.g. UPI_PRIMARY)" value={newUpi.code} onChange={(e) => setNewUpi({ ...newUpi, code: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
-                <input required placeholder="UPI VPA (e.g. company@kotak)" value={newUpi.upi_id} onChange={(e) => setNewUpi({ ...newUpi, upi_id: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
-                <input required placeholder="Payee Name (e.g. AMETHEUS ESPORTS PRIVATE LIMITED)" value={newUpi.payee_name} onChange={(e) => setNewUpi({ ...newUpi, payee_name: e.target.value })} className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
+              <h3 className="font-display text-2xl font-black uppercase text-ink">
+                {editingUpi ? `Edit UPI Account (${editingUpi.code})` : 'New UPI Account'}
+              </h3>
+
+              {upiFormError && (
+                <div className="mt-3 border border-live/40 bg-live/10 p-2.5 font-mono text-xs text-live">
+                  {upiFormError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveUpi} className="mt-4 space-y-3 font-mono text-xs">
                 <div>
-                  <label className="text-dim">QR Image (Optional)</label>
-                  <div className="flex gap-2 mt-1">
+                  <label className="text-[10px] uppercase text-dim block mb-1">
+                    Account Code {editingUpi && '(Permanent ID — Immutable)'}
+                  </label>
+                  {editingUpi ? (
                     <input
-                      placeholder="QR image URL (or upload)"
+                      disabled
+                      value={newUpi.code}
+                      className="w-full border border-white/10 bg-white/5 p-2.5 text-dim cursor-not-allowed outline-none select-all"
+                      title="Account code is immutable to preserve historical payments and audit integrity"
+                    />
+                  ) : (
+                    <input
+                      required
+                      placeholder="Account Code (e.g. UPI_PRIMARY)"
+                      value={newUpi.code}
+                      onChange={(e) => setNewUpi({ ...newUpi, code: e.target.value })}
+                      className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase text-dim block mb-1">UPI VPA Handle</label>
+                  <input
+                    required
+                    placeholder="UPI VPA (e.g. company@kotak)"
+                    value={newUpi.upi_id}
+                    onChange={(e) => setNewUpi({ ...newUpi, upi_id: e.target.value })}
+                    className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase text-dim block mb-1">Registered Payee Name</label>
+                  <input
+                    required
+                    placeholder="Payee Name (e.g. AMETHEUS ESPORTS PRIVATE LIMITED)"
+                    value={newUpi.payee_name}
+                    onChange={(e) => setNewUpi({ ...newUpi, payee_name: e.target.value })}
+                    className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase text-dim block mb-1">Display Name / Label (Optional)</label>
+                  <input
+                    placeholder="Display Label (e.g. Primary Corporate HDFC)"
+                    value={newUpi.display_name || ''}
+                    onChange={(e) => setNewUpi({ ...newUpi, display_name: e.target.value })}
+                    className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase text-dim block mb-1">Status</label>
+                  <select
+                    value={newUpi.status || 'ACTIVE'}
+                    onChange={(e) => setNewUpi({ ...newUpi, status: e.target.value })}
+                    className="w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan cursor-pointer"
+                  >
+                    <option value="ACTIVE">ACTIVE (Receives Checkout Traffic)</option>
+                    <option value="INACTIVE">INACTIVE (Disabled)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase text-dim block mb-1">QR Code Image (Optional)</label>
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="QR image URL (or upload image)"
                       value={newUpi.qr_url || ''}
                       onChange={(e) => setNewUpi({ ...newUpi, qr_url: e.target.value })}
-                      className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none"
+                      className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan"
                     />
                     <label className="cursor-pointer border border-cyan/40 bg-cyan/10 px-3 py-2 uppercase text-cyan hover:bg-cyan/20 shrink-0">
                       {isUploadingNewUpiQr ? '...' : 'Upload'}
@@ -5138,15 +5512,44 @@ export default function Admin() {
                     </label>
                   </div>
                   {newUpi.qr_url && (
-                    <div className="mt-2 flex items-center gap-3 bg-void p-2 border border-white/10">
-                      <img src={resolveMediaUrl(newUpi.qr_url)} alt="QR Preview" className="size-12 object-contain bg-white p-0.5 rounded" />
-                      <span className="text-[10px] text-ok truncate">QR Code attached</span>
+                    <div className="mt-2 flex items-center justify-between bg-void p-2 border border-white/10">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={resolveMediaUrl(newUpi.qr_url)}
+                          alt="QR Preview"
+                          className="size-12 object-contain bg-white p-0.5 rounded"
+                        />
+                        <span className="text-[10px] text-ok truncate">QR Code attached</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewUpi((prev) => ({ ...prev, qr_url: '' }))}
+                        className="text-[10px] text-live hover:underline cursor-pointer"
+                      >
+                        Remove QR
+                      </button>
                     </div>
                   )}
                 </div>
-                <div className="pt-2 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsNewUpiOpen(false)} className="border border-white/20 px-3 py-1.5 uppercase text-dim cursor-pointer">Cancel</button>
-                  <button type="submit" className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold cursor-pointer">Register Account</button>
+
+                <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNewUpiOpen(false)
+                      setEditingUpi(null)
+                    }}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim cursor-pointer hover:text-ink"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingUpi}
+                    className="border border-cyan bg-cyan px-5 py-1.5 uppercase text-void font-bold cursor-pointer hover:brightness-110 disabled:opacity-50"
+                  >
+                    {isSavingUpi ? 'Saving...' : editingUpi ? 'Update Account' : 'Register Account'}
+                  </button>
                 </div>
               </form>
             </div>

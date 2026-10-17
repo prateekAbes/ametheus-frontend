@@ -138,7 +138,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (forceSync = false) => {
       const devMock = typeof window !== 'undefined' ? (sessionStorage.getItem('ametheus_dev_role') || localStorage.getItem('ametheus_dev_role')) : null
       if (devMock === 'SUPER_ADMIN') {
-        setProfile({
+        let cachedData: any = {}
+        try {
+          const cached = localStorage.getItem('ametheus_user_profile_admin_dev_123')
+          if (cached) cachedData = JSON.parse(cached)
+        } catch {}
+
+        setProfile((prev) => ({
           id: 'admin_dev_123',
           clerk_user_id: 'user_admin_dev_123',
           email: 'admin@ametheus.gg',
@@ -146,7 +152,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           display_name: 'Ametheus Super Admin',
           role: 'SUPER_ADMIN',
           has_chosen_username: true,
-        } as any)
+          avatar_url: prev?.avatar_url || cachedData?.avatar_url || '',
+          avatar_source: prev?.avatar_source || cachedData?.avatar_source || 'DEFAULT',
+          ...cachedData,
+        } as any))
         setIsLoading(false)
         return
       }
@@ -266,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const finalProfile: UserProfile = {
                 ...synced,
                 email: cleanEmail,
-                avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : '',
+                avatar_url: synced.avatar_url ? resolveMediaUrl(synced.avatar_url) : (profile?.avatar_url || ''),
                 google_avatar_url: synced.google_avatar_url || incomingGooglePic,
                 role: canonical as any,
               }
@@ -293,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const finalProfile: UserProfile = {
                 ...me,
                 email: cleanEmail,
-                avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : '',
+                avatar_url: me.avatar_url ? resolveMediaUrl(me.avatar_url) : (profile?.avatar_url || ''),
                 google_avatar_url: me.google_avatar_url || incomingGooglePic,
                 role: canonical as any,
               }
@@ -327,6 +336,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return {
             ...base,
+            avatar_url: prev?.avatar_url || base.avatar_url,
+            avatar_source: prev?.avatar_source || base.avatar_source,
             role: fallbackCanonical as any,
             has_chosen_username: hasChosenUsername,
             needs_username: !hasChosenUsername,

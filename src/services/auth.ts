@@ -9,6 +9,7 @@ export interface UserProfile {
   avatar_url?: string
   avatar_source?: 'DEFAULT' | 'CREST' | 'GOOGLE' | 'UPLOADED' | string
   google_avatar_url?: string
+  equipped_crest_id?: string | null
   role: 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN' | 'TOURNAMENT_ADMIN' | 'MATCH_ARBITER' | 'COMMUNITY_MODERATOR'
   inr_balance: string
   inr_balance_paise?: number
@@ -31,6 +32,7 @@ export interface UserSyncPayload {
   avatar_url?: string
   avatar_source?: string
   google_avatar_url?: string
+  equipped_crest_id?: string | null
   has_chosen_username?: boolean
 }
 
@@ -74,6 +76,7 @@ export interface UserProfileUpdatePayload {
   avatar_url?: string
   avatar_source?: string
   google_avatar_url?: string
+  equipped_crest_id?: string | null
   preferences?: Record<string, any>
   privacy_settings?: Record<string, any>
 }

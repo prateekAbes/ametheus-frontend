@@ -141,7 +141,7 @@ export default function Notifications() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <Hud className="text-cyan font-bold tracking-wider">
-              {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All notifications read'}
+              {unreadCount > 0 ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}` : '0 unread notifications'}
             </Hud>
             <h1 className="reveal mt-3 font-display text-[clamp(3rem,9vw,7rem)] font-black uppercase leading-[0.85]">
               Notifications

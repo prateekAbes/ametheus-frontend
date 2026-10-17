@@ -102,6 +102,7 @@ export interface NormalizedTournament {
   schedule: any[]
   prizes: any[]
   bracketRounds: any[]
+  standings?: any[]
   registeredRosters: TournamentRoster[]
   matchesSummary: TournamentMatchSummary[]
   isRegistered?: boolean
@@ -111,12 +112,13 @@ export interface NormalizedTournament {
 }
 
 export function getRequiredTeamSizeDisplay(tour: NormalizedTournament | Tournament | null | undefined): string {
-  if (!tour) return 'Squad Roster'
+  if (!tour) return 'Squad Roster (4–5 Players)'
   const min = (tour as any).minTeamSize ?? (tour as any).min_team_size
   const max = (tour as any).maxTeamSize ?? (tour as any).max_team_size
   const fmt = ((tour as any).format || '').toLowerCase()
+  const game = (((tour as any).gameId || (tour as any).game_slug || (tour as any).gameName || '') + '').toLowerCase()
 
-  if (fmt.includes('solo') || fmt.includes('1v1') || (min === 1 && max === 1)) {
+  if (fmt.includes('solo') || fmt.includes('1v1') || game.includes('chess') || (min === 1 && max === 1)) {
     return '1 Player (Solo)'
   }
   if (fmt.includes('duo') || fmt.includes('2v2') || (min === 2 && max === 2)) {
@@ -126,9 +128,23 @@ export function getRequiredTeamSizeDisplay(tour: NormalizedTournament | Tourname
     return '3 Players (Trio)'
   }
 
-  const safeMin = Math.max(1, Number(min || 4))
-  const safeMax = Math.max(safeMin, Number(max || safeMin || 5))
+  // Determine game-specific squad defaults if min is missing or <= 0
+  let defaultMin = 4
+  let defaultMax = 5
+  if (game.includes('valorant') || game.includes('cs2') || game.includes('counter-strike')) {
+    defaultMin = 5
+    defaultMax = 5
+  } else if (game.includes('chess')) {
+    defaultMin = 1
+    defaultMax = 1
+  }
 
+  const safeMin = Math.max(1, Number(min && Number(min) > 0 ? min : defaultMin))
+  const safeMax = Math.max(safeMin, Number(max && Number(max) >= safeMin ? max : defaultMax))
+
+  if (safeMin === 1 && safeMax === 1) {
+    return '1 Player (Solo)'
+  }
   if (safeMin === safeMax) {
     return `${safeMin} Players (Squad)`
   }
@@ -176,11 +192,30 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
   const rawMin = t.min_team_size ?? (t as any).minTeamSize
   const rawMax = t.max_team_size ?? (t as any).maxTeamSize
   const formatLower = (t.format || '').toLowerCase()
-  const isSolo = formatLower.includes('solo') || formatLower.includes('1v1') || (rawMin === 1 && rawMax === 1)
-  const isDuo = formatLower.includes('duo') || formatLower.includes('2v2') || (rawMin === 2 && rawMax === 2)
+  const gameLower = (rawGameId + ' ' + rawGameName).toLowerCase()
 
-  const safeMin = isSolo ? 1 : isDuo ? 2 : Math.max(1, Number(rawMin || 1))
-  const safeMax = isSolo ? 1 : isDuo ? 2 : Math.max(safeMin, Number(rawMax || safeMin || 5))
+  const isSolo = formatLower.includes('solo') || formatLower.includes('1v1') || gameLower.includes('chess') || (rawMin === 1 && rawMax === 1)
+  const isDuo = formatLower.includes('duo') || formatLower.includes('2v2') || (rawMin === 2 && rawMax === 2)
+  const isTrio = formatLower.includes('trio') || formatLower.includes('3v3') || (rawMin === 3 && rawMax === 3)
+
+  let gameDefaultMin = 4
+  let gameDefaultMax = 5
+  if (isSolo) {
+    gameDefaultMin = 1
+    gameDefaultMax = 1
+  } else if (isDuo) {
+    gameDefaultMin = 2
+    gameDefaultMax = 2
+  } else if (isTrio) {
+    gameDefaultMin = 3
+    gameDefaultMax = 3
+  } else if (gameLower.includes('valorant') || gameLower.includes('cs2') || gameLower.includes('counter-strike')) {
+    gameDefaultMin = 5
+    gameDefaultMax = 5
+  }
+
+  const safeMin = Math.max(1, Number(rawMin && Number(rawMin) > 0 ? rawMin : gameDefaultMin))
+  const safeMax = Math.max(safeMin, Number(rawMax && Number(rawMax) >= safeMin ? rawMax : gameDefaultMax))
 
   return {
     id: t.id || t._id || t.slug,
@@ -223,6 +258,7 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     schedule: parseJsonField(t.schedule),
     prizes: parseJsonField(t.prizes),
     bracketRounds: parseJsonField(t.bracket_rounds),
+    standings: (t as any).standings || [],
     registeredRosters: t.registered_rosters || [],
     matchesSummary: t.matches_summary || [],
     isRegistered: t.is_registered,
@@ -307,8 +343,11 @@ export async function submitTournamentUpiUtr(
   payload: {
     payment_id: string
     utr: string
+    screenshot_url?: string
     sender_upi_id?: string
     sender_name?: string
+    game_id?: string
+    in_game_id?: string
   }
 ): Promise<any> {
   return apiClient(`/tournaments/${tournamentId}/submit-upi-utr`, {
@@ -394,6 +433,8 @@ export interface TournamentRegistrationDetails {
   registered_at?: string
   fee_paid?: number
   utr?: string
+  screenshot_url?: string
+  rejection_reason?: string
   [key: string]: any
 }
 
@@ -404,6 +445,7 @@ export interface TournamentRegistrationStatusResponse {
   registration?: TournamentRegistrationDetails | null
   team?: TournamentTeamDetails | null
   position?: number | null
+  rejection_reason?: string | null
 }
 
 export interface TournamentCommunityLinkResponse {

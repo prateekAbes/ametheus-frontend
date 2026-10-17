@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
-import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, EmptyState, Cta, Modal } from '../components/ui'
+import { Container, Hud, Avatar, Crest, Badge, Brackets, Particles, Cta, Modal } from '../components/ui'
 import { GAMES, gameBy, inr, AVATARS, img } from '../lib/data'
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
@@ -107,40 +107,116 @@ export default function Profile() {
     getAvailableCrests().then(setAvailableCrests).catch(() => {})
   }, [])
 
+  const username = profile?.username || authDisplayName || profile?.display_name || 'Player'
+  const email = profile?.email || 'player@ametheus.gg'
+  const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
+  const rawAvatar = profile?.avatar_url || authAvatarUrl
+  const [equippedAvatarUrl, setEquippedAvatarUrl] = useState<string | null | undefined>(rawAvatar)
+  const [equippingId, setEquippingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setEquippedAvatarUrl(rawAvatar)
+  }, [rawAvatar])
+
+  const normalizeAvatarPath = (url?: string | null) => {
+    if (!url) return ''
+    let clean = url.trim().replace(/^https?:\/\/[^/]+/, '')
+    try {
+      clean = decodeURIComponent(clean)
+    } catch {}
+    return clean.toLowerCase().replace(/\s+/g, ' ').trim()
+  }
+
+  const isAvatarEquipped = (crestUrl?: string | null, crestId?: string) => {
+    if (!crestUrl && !crestId) return false
+    // 1. Exact ID match from user document
+    if (crestId && profile?.equipped_crest_id === crestId) return true
+    if (profile?.equipped_crest_id && crestId && profile.equipped_crest_id !== crestId) {
+      return false
+    }
+
+    // 2. If user equipped GOOGLE or UPLOADED, crests are never equipped
+    if (profile?.avatar_source && profile.avatar_source !== 'CREST') {
+      return false
+    }
+
+    // 3. Normalized URL comparison
+    const active = equippedAvatarUrl || rawAvatar || profile?.avatar_url || ''
+    if (!active) return false
+    const normActive = normalizeAvatarPath(active)
+    const normTarget = normalizeAvatarPath(crestUrl)
+    if (normTarget && normActive === normTarget) return true
+    const resolvedActive = normalizeAvatarPath(resolveMediaUrl(active))
+    const resolvedTarget = normalizeAvatarPath(resolveMediaUrl(crestUrl || ''))
+    if (resolvedTarget && resolvedActive === resolvedTarget) return true
+    if (normTarget && normActive.endsWith(normTarget)) return true
+    if (normTarget && crestUrl && active.includes(crestUrl)) return true
+    return false
+  }
+
   const handleSelectCrest = async (crest: CrestType) => {
+    if (equippingId) return
+    setEquippingId(crest.id)
     setCrestModalMsg(null)
     try {
-      const updated = await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
-      if (updated) {
-        updateLocalProfile(updated)
-      } else {
-        updateLocalProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
+      const updated = await updateUserProfile({
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
+      })
+      setEquippedAvatarUrl(crest.image_url)
+      const merged = updated || {
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
       }
+      updateLocalProfile({
+        ...merged,
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
+      })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setCrestModalMsg({ type: 'ok', text: `Crest '${crest.name}' successfully equipped and saved!` })
       setTimeout(() => setCrestModalMsg(null), 4000)
     } catch (err: any) {
       setCrestModalMsg({ type: 'err', text: err.message || 'Failed to equip crest.' })
+    } finally {
+      setEquippingId(null)
     }
   }
 
   const handleEquipGooglePhoto = async () => {
-    if (!googleAvatarUrl) return
+    if (!googleAvatarUrl || equippingId) return
+    setEquippingId('google')
     setCrestModalMsg(null)
     try {
-      const updated = await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
-      if (updated) {
-        updateLocalProfile(updated)
-      } else {
-        updateLocalProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
+      const updated = await updateUserProfile({
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
+      })
+      setEquippedAvatarUrl(googleAvatarUrl)
+      const merged = updated || {
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
       }
+      updateLocalProfile({
+        ...merged,
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
+      })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setCrestModalMsg({ type: 'ok', text: 'Google Profile Photo successfully equipped and saved!' })
       setTimeout(() => setCrestModalMsg(null), 4000)
     } catch (err: any) {
       setCrestModalMsg({ type: 'err', text: err.message || 'Failed to equip Google profile photo.' })
+    } finally {
+      setEquippingId(null)
     }
   }
 
@@ -152,12 +228,23 @@ export default function Profile() {
     try {
       const res = await uploadMediaFile(file)
       if (res && res.url) {
-        const updated = await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
-        if (updated) {
-          updateLocalProfile(updated)
-        } else {
-          updateLocalProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
+        const updated = await updateUserProfile({
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
+        })
+        setEquippedAvatarUrl(res.url)
+        const merged = updated || {
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
         }
+        updateLocalProfile({
+          ...merged,
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
+        })
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setCrestModalMsg({ type: 'ok', text: 'Custom avatar uploaded and saved to your account!' })
@@ -170,11 +257,7 @@ export default function Profile() {
     }
   }
 
-  const username = profile?.username || authDisplayName || profile?.display_name || 'Player'
-  const email = profile?.email || 'player@ametheus.gg'
-  const balanceInr = profile?.inr_balance_paise ? profile.inr_balance_paise / 100 : 0
-  const rawAvatar = profile?.avatar_url || authAvatarUrl
-  const avatarDisplay = rawAvatar ? resolveMediaUrl(rawAvatar) : img(AVATARS[0], 800)
+  const avatarDisplay = (equippedAvatarUrl || rawAvatar) ? resolveMediaUrl(equippedAvatarUrl || rawAvatar) : img(AVATARS[0], 800)
 
   // Filter registrations by participation lifecycle
   const filteredFeed = useMemo(() => {
@@ -410,7 +493,7 @@ export default function Profile() {
             {/* PAST TOURNAMENTS (Career Participation & Results) */}
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
                   Past Tournaments
                 </h3>
                 {pastTournaments.length > 0 && (
@@ -423,7 +506,7 @@ export default function Profile() {
               <div className="mt-4 space-y-3">
                 {pastTournaments.length === 0 ? (
                   <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                    <h4 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                    <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
                       No Concluded Tournaments
                     </h4>
                   </div>
@@ -481,7 +564,7 @@ export default function Profile() {
             {/* MY TEAMS */}
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
                   My Teams
                 </h3>
                 <div className="flex items-center gap-3">
@@ -503,16 +586,16 @@ export default function Profile() {
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {teams.length === 0 ? (
-                  <div className="col-span-2 border border-white/10 bg-surface/30 p-8 text-center flex items-center justify-center gap-4">
+                  <div className="col-span-2 border border-white/10 bg-surface/30 p-8 text-center flex flex-wrap items-center justify-center gap-4">
                     <Link
                       to="/teams/create"
-                      className="border border-cyan bg-cyan/10 px-4 py-2 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
+                      className="border border-cyan bg-cyan/15 px-6 py-2.5 font-display text-xs font-black uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-all shadow-[0_0_15px_rgba(62,242,255,0.2)] cursor-pointer"
                     >
                       Create Team
                     </Link>
                     <Link
                       to="/teams/join"
-                      className="border border-white/20 bg-surface px-4 py-2 font-mono text-xs font-bold uppercase text-white hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+                      className="border border-white/20 bg-surface hover:border-cyan hover:text-cyan hover:bg-cyan/10 px-6 py-2.5 font-display text-xs font-black uppercase tracking-wider text-white transition-all cursor-pointer"
                     >
                       Join One
                     </Link>
@@ -543,7 +626,7 @@ export default function Profile() {
           {/* RIGHT: Intelligent Authoritative Tournament Feed */}
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+              <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
                 Tournament Feed
               </h3>
               <div className="flex gap-1">
@@ -586,7 +669,7 @@ export default function Profile() {
                 </div>
               ) : filteredFeed.length === 0 ? (
                 <div className="border border-white/10 bg-surface/30 p-10 text-center">
-                  <h4 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                  <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
                     No Tournament Entries
                   </h4>
                 </div>
@@ -678,8 +761,10 @@ export default function Profile() {
         <div className="mt-16">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Hud className="text-cyan">◇ My Open Tickets</Hud>
-              <span className="border border-white/20 bg-surface/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink">
+              <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
+                My Open Tickets
+              </h3>
+              <span className="border border-cyan/40 bg-cyan/10 px-2.5 py-0.5 font-mono text-xs uppercase font-bold tracking-wider text-cyan">
                 {openTickets.length} Active
               </span>
             </div>
@@ -694,16 +779,16 @@ export default function Profile() {
           <div className="mt-4">
             {openTickets.length === 0 ? (
               <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                <p className="font-mono text-xs text-dim uppercase tracking-wider">
-                  No open support tickets
-                </p>
-                <p className="mt-1 text-sm text-dim">
+                <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
+                  No Open Support Tickets
+                </h4>
+                <p className="mt-2 text-sm text-dim">
                   All payment reconciliations, bracket disputes, and account queries are resolved.
                 </p>
                 <div className="mt-4">
                   <Link
                     to="/support"
-                    className="inline-block border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
+                    className="inline-block border border-cyan/40 bg-cyan/10 px-5 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
                   >
                     Open New Support Ticket
                   </Link>
@@ -783,7 +868,7 @@ export default function Profile() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <Hud className="text-cyan">◇ Authoritative Rating History</Hud>
-              <h3 className="mt-1 font-display text-xl font-black uppercase text-white tracking-wide">
+              <h3 className="mt-1 font-display text-2xl font-black uppercase text-white tracking-wide">
                 Competitive Elo & Points Record
               </h3>
             </div>
@@ -820,10 +905,10 @@ export default function Profile() {
               </div>
             ) : ratingHistory.length === 0 ? (
               <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                <p className="font-mono text-xs text-dim uppercase tracking-wider">
+                <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
                   No Rating Adjustments Recorded Yet
-                </p>
-                <p className="mt-1 text-sm text-dim">
+                </h4>
+                <p className="mt-2 text-sm text-dim">
                   Contenders start at an initial authoritative rating of 500 per competitive title.
                   Points are awarded or penalized based on tournament bracket outcomes and MVP performances.
                 </p>
@@ -911,10 +996,12 @@ export default function Profile() {
         {/* BOTTOM: Actual Match History */}
         <div className="mt-16">
           <div className="flex items-center justify-between">
-            <Hud className="text-cyan">◇ Match Arena History</Hud>
+            <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
+              Match Arena History
+            </h3>
             <Link
               to="/my/matches"
-              className="font-mono text-xs text-cyan hover:underline uppercase tracking-wider"
+              className="font-mono text-xs font-bold text-cyan hover:underline uppercase tracking-wider"
             >
               View Full Match Log →
             </Link>
@@ -940,10 +1027,10 @@ export default function Profile() {
               </div>
             ) : completedMatches.length === 0 ? (
               <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                <p className="font-mono text-xs text-dim uppercase tracking-wider">
-                  No completed match scores recorded yet.
-                </p>
-                <p className="mt-1 text-sm text-dim">
+                <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
+                  No Completed Match Scores Recorded Yet
+                </h4>
+                <p className="mt-2 text-sm text-dim">
                   Match arbitration scores appear here once official tournament matches conclude.
                 </p>
               </div>
@@ -1012,7 +1099,24 @@ export default function Profile() {
               />
             </div>
             <div className="flex-1 text-center sm:text-left space-y-2">
-              <Hud className="text-cyan">Current Equipped Avatar</Hud>
+              <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                <Hud className="text-cyan">Current Equipped Avatar</Hud>
+                {profile?.avatar_source === 'UPLOADED' && (
+                  <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                    ✓ Equipped (Custom)
+                  </span>
+                )}
+                {profile?.avatar_source === 'GOOGLE' && (
+                  <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                    ✓ Equipped (Google)
+                  </span>
+                )}
+                {profile?.avatar_source === 'CREST' && (
+                  <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                    ✓ Equipped (Crest)
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-dim">
                 Persisted to your account and visible on leaderboards, match lobbies, reviews, and team rosters.
               </p>
@@ -1031,15 +1135,10 @@ export default function Profile() {
 
           {/* Voluntary Google Profile Picture Option */}
           {googleAvatarUrl && (() => {
-            const normGoogle = (googleAvatarUrl || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
-            const normCurrent = (rawAvatar || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
             const isGoogleSelected = Boolean(
-              googleAvatarUrl && (
-                profile?.avatar_source === 'GOOGLE' ||
-                normGoogle === normCurrent ||
-                rawAvatar === googleAvatarUrl
-              )
+              profile?.avatar_source === 'GOOGLE' && !profile?.equipped_crest_id
             )
+            const isEquippingGoogle = equippingId === 'google'
 
             return (
               <div className="border border-white/10 bg-surface/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1055,7 +1154,9 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <span className="font-display font-black uppercase text-sm text-ink">Google Profile Picture</span>
                       {isGoogleSelected && (
-                        <span className="text-[10px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
+                        <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                          ✓ Equipped
+                        </span>
                       )}
                     </div>
                     <p className="text-[11px] text-dim">
@@ -1066,14 +1167,16 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={handleEquipGooglePhoto}
-                  disabled={isGoogleSelected}
+                  disabled={isGoogleSelected || isEquippingGoogle || !!equippingId}
                   className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
                     isGoogleSelected
-                      ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
+                      ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default font-bold'
+                      : isEquippingGoogle
+                      ? 'border-cyan/40 bg-cyan/10 text-cyan animate-pulse'
                       : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
                   }`}
                 >
-                  {isGoogleSelected ? 'Equipped' : 'Equip Google Photo'}
+                  {isGoogleSelected ? '✓ Equipped' : isEquippingGoogle ? 'Equipping...' : 'Equip Google Photo'}
                 </button>
               </div>
             )
@@ -1093,30 +1196,20 @@ export default function Profile() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                 {availableCrests.map((c) => {
-                  const normCurrent = (rawAvatar || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
-                  const normCrest = (c.image_url || '').toLowerCase().trim().replace(/^https?:\/\/[^/]+/, '')
-                  const resolvedCurrent = resolveMediaUrl(rawAvatar).toLowerCase().trim()
-                  const resolvedCrest = resolveMediaUrl(c.image_url).toLowerCase().trim()
-
-                  const isSelected = Boolean(
-                    normCrest && (
-                      normCurrent === normCrest ||
-                      resolvedCurrent === resolvedCrest ||
-                      (normCurrent && normCurrent.endsWith(normCrest)) ||
-                      (normCrest && normCrest.endsWith(normCurrent)) ||
-                      (c.image_url && rawAvatar?.includes(c.image_url)) ||
-                      (c.id && (profile as any)?.equipped_crest_id === c.id)
-                    )
-                  )
+                  const isSelected = isAvatarEquipped(c.image_url, c.id)
+                  const isEquippingThis = equippingId === c.id
 
                   return (
                     <button
                       key={c.id}
                       type="button"
+                      disabled={isSelected || isEquippingThis || !!equippingId}
                       onClick={() => handleSelectCrest(c)}
-                      className={`text-left p-3 border transition-all flex items-center gap-3.5 cursor-pointer ${
+                      className={`group text-left p-3 border transition-all flex items-center gap-3.5 cursor-pointer ${
                         isSelected
                           ? 'border-cyan bg-cyan/15 ring-1 ring-cyan shadow-[0_0_12px_rgba(62,242,255,0.2)]'
+                          : isEquippingThis
+                          ? 'border-cyan/50 bg-cyan/10'
                           : 'border-white/10 bg-surface/50 hover:border-white/30 hover:bg-surface'
                       }`}
                     >
@@ -1131,12 +1224,20 @@ export default function Profile() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <p className="font-display font-black uppercase text-sm text-ink truncate">
+                          <p className="font-display font-black uppercase text-sm text-ink truncate group-hover:text-cyan transition-colors">
                             {c.name}
                           </p>
-                          {isSelected && (
-                            <span className="text-[9px] font-bold text-cyan uppercase tracking-wider shrink-0 bg-cyan/20 border border-cyan/40 px-1.5 py-0.5 rounded-xs">
+                          {isSelected ? (
+                            <span className="text-[10px] font-bold text-cyan uppercase tracking-wider shrink-0 bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
                               ✓ Equipped
+                            </span>
+                          ) : isEquippingThis ? (
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-cyan border border-cyan/40 px-2 py-0.5 rounded-[2px] bg-cyan/10 animate-pulse">
+                              Equipping...
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-dim group-hover:text-cyan border border-white/10 px-2 py-0.5 rounded-[2px] bg-white/5">
+                              Equip
                             </span>
                           )}
                         </div>

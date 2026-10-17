@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Container, Hud, Badge, Crest, EmptyState } from '../components/ui'
+import { Container, Hud, Badge, Crest } from '../components/ui'
 import { Link } from 'react-router'
 import { gameBy, tourBy, type MStatus } from '../lib/data'
 import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
@@ -82,7 +82,7 @@ export default function MyMatches() {
                 </div>
                 {list.length === 0 ? (
                   <div className="border border-white/10 bg-surface/30 p-10 text-center">
-                    <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white">
+                    <h3 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
                       {s === 'live' ? 'No Live Match' : s === 'upcoming' ? 'No Upcoming Match' : 'No Completed Match'}
                     </h3>
                   </div>

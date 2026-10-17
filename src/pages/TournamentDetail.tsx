@@ -22,11 +22,12 @@ import {
 } from '../services/tournaments'
 import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games'
 import { getMyTeams, Team } from '../services/teams'
+import { uploadMediaFile } from '../services/admin'
 import { useAuthContext } from '../context/AuthContext'
 import { gameBy, img, inr, MATCHES, TOUR_EXTRA, teamNames, type Match, type Stage } from '../lib/data'
 import { gsap, isMobile, reducedMotion } from '../lib/motion'
 
-const NAV = ['Overview', 'Rules', 'Teams', 'Matches', 'Standings', 'Schedule', 'Live', 'Results'] as const
+const NAV = ['Overview', 'Prizes', 'Rules', 'Teams', 'Bracket', 'Standings', 'Schedule'] as const
 type NavId = (typeof NAV)[number]
 const anchor = (n: string) => `t-${n.toLowerCase()}`
 
@@ -241,6 +242,7 @@ export default function TournamentDetail() {
   const paymentStatus = regStatus?.registration?.payment_status || regStatus?.payment_status
   const isConfirmedParticipant = Boolean(regStatus?.is_registered && (paymentStatus === 'PAID' || paymentStatus === 'FREE'))
   const isPendingParticipant = Boolean(regStatus?.is_registered && ['PENDING', 'PENDING_VERIFICATION'].includes(paymentStatus || ''))
+  const isRejectedParticipant = Boolean(regStatus?.is_registered && paymentStatus === 'REJECTED')
 
   // Resolve visual metadata
   const gameSlug = tourData?.gameId || tourData?.gameName || ''
@@ -255,6 +257,33 @@ export default function TournamentDetail() {
   const title = tourData ? tourData.title : 'Tournament'
   const tourStatus = tourData ? tourData.status.toLowerCase() : 'open'
   const isRegOpen = tourStatus === 'open' || tourStatus === 'registration_open'
+
+  // Authoritative check: Registration is closed when capacity is reached, deadline passes, or admin closed it
+  const isRegistrationClosed = useMemo(() => {
+    if (!tourData) return false
+    const status = (tourData.status || '').toLowerCase()
+    if (['registration_closed', 'closed', 'ongoing', 'live', 'completed'].includes(status)) {
+      return true
+    }
+    if (tourData.availableSlots !== undefined && tourData.availableSlots <= 0) {
+      return true
+    }
+    if (tourData.registrationDeadline) {
+      try {
+        const deadline = new Date(tourData.registrationDeadline)
+        if (!isNaN(deadline.getTime()) && Date.now() >= deadline.getTime()) {
+          return true
+        }
+      } catch {}
+    }
+    return !isRegOpen
+  }, [tourData, isRegOpen])
+
+  useEffect(() => {
+    if (isConfirmedParticipant && isRegistrationClosed && !communityInfo && id) {
+      getTournamentCommunityLink(id).then(setCommunityInfo).catch(() => {})
+    }
+  }, [isConfirmedParticipant, isRegistrationClosed, communityInfo, id])
 
   // Registered rosters
   const rosterList = tourData?.registeredRosters || []
@@ -311,7 +340,7 @@ export default function TournamentDetail() {
   return (
     <div className="bg-void text-ink pb-36" style={{ ['--acc' as string]: accent }}>
       {/* Hero */}
-      <section className="relative isolate flex min-h-[520px] md:min-h-[600px] max-h-[820px] items-end overflow-hidden bg-void">
+      <section id={anchor('Overview')} className="relative isolate flex min-h-[520px] md:min-h-[600px] max-h-[820px] items-end overflow-hidden bg-void">
         <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 70% 20%, ${accent}30, transparent 60%)` }} />
         <div className="absolute inset-0">
           <DynamicImage
@@ -356,6 +385,11 @@ export default function TournamentDetail() {
               <span className="inline-flex items-center gap-1.5 border border-warn/40 bg-warn/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.22em] text-warn">
                 <span className="size-1.5 rounded-full bg-warn" />
                 Seat Reserved · Pending Verification
+              </span>
+            ) : isRejectedParticipant ? (
+              <span className="inline-flex items-center gap-1.5 border border-live/40 bg-live/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.22em] text-live">
+                <span className="size-1.5 rounded-full bg-live" />
+                Payment Rejected · Re-registration Required
               </span>
             ) : isRegistered ? (
               <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-ok">✓ You're registered</span>
@@ -416,6 +450,10 @@ export default function TournamentDetail() {
               <Cta onClick={() => document.getElementById('participant-hub')?.scrollIntoView({ behavior: 'smooth' })}>
                 View Reserved Seat
               </Cta>
+            ) : isRejectedParticipant ? (
+              <Cta onClick={() => setRegModalOpen(true)}>
+                Re-Register With Valid Proof
+              </Cta>
             ) : isRegOpen ? (
               <Cta onClick={() => setRegModalOpen(true)}>
                 Register Now
@@ -434,7 +472,7 @@ export default function TournamentDetail() {
             <Cta ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
               View Rules
             </Cta>
-            {isRegOpen && !isConfirmedParticipant && !isPendingParticipant && (
+            {isRegOpen && !isConfirmedParticipant && !isPendingParticipant && !isRejectedParticipant && (
               <Hud className="ml-2">
                 {tourData?.availableSlots !== undefined ? tourData.availableSlots : Math.max(0, maxTeams - registeredCount)} slots remaining
               </Hud>
@@ -442,6 +480,29 @@ export default function TournamentDetail() {
           </div>
         </Container>
       </section>
+
+      {/* Sticky Subnav */}
+      <div className="sticky top-16 z-30 border-y border-white/10 bg-void/90 backdrop-blur-md">
+        <Container>
+          <div className="flex items-center gap-2 overflow-x-auto py-3 no-scrollbar text-xs font-mono uppercase tracking-wider">
+            {NAV.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  const target = document.getElementById(anchor(n))
+                  if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' })
+                  }
+                }}
+                className="px-3.5 py-1.5 text-dim hover:text-cyan hover:bg-white/5 transition-colors whitespace-nowrap cursor-pointer rounded-sm"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </Container>
+      </div>
 
       {/* Confirmed Participant Hub */}
       {isConfirmedParticipant && (
@@ -482,47 +543,147 @@ export default function TournamentDetail() {
               </div>
             )}
 
-            {/* Join Official WhatsApp Group — Top Priority Action */}
-            <div className="mb-8 border-2 border-emerald-500/40 bg-emerald-950/25 p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="grid size-12 shrink-0 place-items-center rounded bg-emerald-500 font-display text-xl font-black text-void">
-                    WA
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="font-display text-2xl font-black uppercase text-ink">
-                        Official Tournament WhatsApp Group
-                      </h3>
-                      <span className="border border-emerald-500/50 bg-emerald-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-400">
-                        Confirmed Participants Only
-                      </span>
+            {/* Official WhatsApp Group Card — Visible Only After Registration Closes */}
+            {isRegistrationClosed ? (
+              <div className="mb-8 border-2 border-emerald-500/50 bg-emerald-950/30 p-6 md:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="grid size-12 shrink-0 place-items-center rounded bg-emerald-500 font-display text-xl font-black text-void">
+                      WA
                     </div>
-                    <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
-                      {communityInfo?.instructions ||
-                        'Custom Lobby Room ID, Password, Bracket calls, Coin toss, and real-time referee communications will be broadcasted exclusively in this channel.'}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="font-display text-2xl font-black uppercase text-ink">
+                          Official Tournament WhatsApp Group
+                        </h3>
+                        <span className="border border-emerald-500/50 bg-emerald-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-400">
+                          Registration Closed • Channel Unlocked
+                        </span>
+                      </div>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
+                        {communityInfo?.instructions ||
+                          'Custom Lobby Room ID, Password, Bracket calls, Coin toss, and real-time referee communications are coordinated exclusively in this channel.'}
+                      </p>
+                      <p className="mt-2 font-mono text-xs text-emerald-400/90">
+                        Registration is officially closed. All squad captains and players must join the WhatsApp channel now for match coordination.
+                      </p>
+                    </div>
+                  </div>
+                  {communityInfo?.whatsapp_group_url || communityInfo?.community_link ? (
+                    <a
+                      href={communityInfo.whatsapp_group_url || communityInfo.community_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center justify-center gap-3 bg-emerald-500 px-8 py-3.5 font-display text-base font-black uppercase tracking-wider text-void shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 active:scale-95 cursor-pointer"
+                    >
+                      <span>Join WhatsApp Group</span>
+                      <span>→</span>
+                    </a>
+                  ) : (
+                    <div className="border border-white/10 bg-void/50 px-4 py-2 font-mono text-xs text-dim">
+                      Connecting to group channel...
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-8 border border-amber-500/40 bg-amber-950/20 p-6 md:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="grid size-12 shrink-0 place-items-center rounded bg-amber-500/20 border border-amber-500/40 font-display text-xl font-black text-amber-400">
+                      🔒
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="font-display text-2xl font-black uppercase text-ink">
+                          Official Tournament WhatsApp Group
+                        </h3>
+                        <span className="border border-amber-500/50 bg-amber-500/20 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-400">
+                          Locked While Registration Is Open
+                        </span>
+                      </div>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-dim">
+                        Tournament registration is currently open. To preserve bracket integrity and prevent premature room access, the official WhatsApp group link will unlock automatically for confirmed participants once registration officially closes.
+                      </p>
+                      <p className="mt-2 font-mono text-xs text-amber-400/90">
+                        {tourData?.registrationDeadline
+                          ? `Scheduled Registration Close: ${new Date(tourData.registrationDeadline).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST (or when slots fill).`
+                          : 'Unlocks automatically when all tournament slots fill or registration is marked closed.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-center sm:items-end gap-1.5">
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 border border-amber-500/40 bg-amber-500/10 px-6 py-3 font-mono text-xs uppercase tracking-wider text-amber-400/80 select-none"
+                    >
+                      <span>🔒 Locked Until Registration Closes</span>
+                    </button>
+                    <span className="font-mono text-[10px] text-dim">
+                      {tourData?.availableSlots !== undefined && tourData.availableSlots > 0
+                        ? `${tourData.availableSlots} slot${tourData.availableSlots === 1 ? '' : 's'} remaining open`
+                        : 'Registration in progress'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Match Lobby Credentials (Gated for Confirmed Participants) */}
+            <div className="mb-8 border border-cyan/30 bg-surface p-6 md:p-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                  <Hud className="text-cyan">Match Lobby Credentials</Hud>
+                </div>
+                <span className="font-mono text-[10px] uppercase text-cyan border border-cyan/40 bg-cyan/10 px-2 py-0.5">
+                  Exclusive Participant Access
+                </span>
+              </div>
+              
+              {((tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id) ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                  <div className="border border-white/10 bg-void/60 p-4">
+                    <span className="font-mono text-[10px] text-dim uppercase">Room ID</span>
+                    <p className="mt-1 font-mono text-lg font-bold text-cyan select-all">
+                      {(tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id}
                     </p>
-                    <p className="mt-2 font-mono text-xs text-emerald-400/90">
-                      Important: Ensure all squad members or your team captain have joined before roster lock.
+                  </div>
+                  <div className="border border-white/10 bg-void/60 p-4">
+                    <span className="font-mono text-[10px] text-dim uppercase">Room Password</span>
+                    <p className="mt-1 font-mono text-lg font-bold text-cyan select-all">
+                      {(tourData as any)?.customRoomPassword || (tourData as any)?.custom_room_password || (communityInfo as any)?.room_password || 'Shared in WhatsApp'}
+                    </p>
+                  </div>
+                  <div className="border border-white/10 bg-void/60 p-4">
+                    <span className="font-mono text-[10px] text-dim uppercase">Server / Region</span>
+                    <p className="mt-1 font-display text-lg font-bold uppercase text-ink">
+                      {tourData?.serverRegion || 'South Asia'}
+                    </p>
+                  </div>
+                  <div className="border border-white/10 bg-void/60 p-4">
+                    <span className="font-mono text-[10px] text-dim uppercase">Reporting Time</span>
+                    <p className="mt-1 font-display text-lg font-bold uppercase text-ok">
+                      15 Min Before Start
                     </p>
                   </div>
                 </div>
-                {communityInfo?.whatsapp_group_url ? (
-                  <a
-                    href={communityInfo.whatsapp_group_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center justify-center gap-3 bg-emerald-500 px-8 py-3.5 font-display text-base font-black uppercase tracking-wider text-void shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 active:scale-95"
-                  >
-                    <span>Join WhatsApp Group</span>
-                    <span>→</span>
-                  </a>
-                ) : (
-                  <div className="border border-white/10 bg-void/50 px-4 py-2 font-mono text-xs text-dim">
-                    Link will activate prior to match day
+              ) : (
+                <div className="mt-4 border border-dashed border-white/15 bg-void/40 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="font-display text-lg font-bold uppercase text-ink">
+                      Credentials Scheduled for Match Day
+                    </p>
+                    <p className="mt-1 text-xs text-dim">
+                      Custom Room ID and Password will appear here and in the official WhatsApp group exactly 15 minutes before the match start time.
+                    </p>
                   </div>
-                )}
-              </div>
+                  <span className="border border-white/20 bg-white/5 px-3 py-1 font-mono text-[11px] text-dim uppercase whitespace-nowrap">
+                    Lobby Ready 15m Prior
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 3 Core Cards Grid */}
@@ -740,7 +901,7 @@ export default function TournamentDetail() {
           <Container>
             <div className="border-2 border-warn/40 bg-surface p-6 md:p-8">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-warn animate-ping" />
                     <Hud className="text-warn">Seat Reserved — Verification Pending</Hud>
@@ -757,8 +918,33 @@ export default function TournamentDetail() {
                     <span>Concurrency Status: <strong className="text-ok">Slot Protected</strong></span>
                     <span>•</span>
                     <span>Fee: <strong className="text-ink">{entryFee ? inr(entryFee) : 'FREE'}</strong></span>
+                    {regStatus?.position && (
+                      <>
+                        <span>•</span>
+                        <span>Reserved Position: <strong className="text-cyan font-bold">#{regStatus.position}</strong></span>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {regStatus?.registration?.screenshot_url && (
+                  <div className="shrink-0 border border-white/10 bg-void/50 p-3 text-center">
+                    <p className="font-mono text-[10px] uppercase text-dim mb-1.5">Submitted Proof</p>
+                    <a
+                      href={resolveMediaUrl(regStatus.registration.screenshot_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden border border-white/20 hover:border-cyan transition-colors"
+                    >
+                      <img
+                        src={resolveMediaUrl(regStatus.registration.screenshot_url)}
+                        alt="Submitted Payment Proof"
+                        className="size-24 object-contain bg-black/40"
+                      />
+                    </a>
+                  </div>
+                )}
+
                 <div className="border border-warn/30 bg-warn/10 p-4 text-center shrink-0">
                   <p className="font-mono text-xs uppercase text-warn font-bold">Awaiting Admin Approval</p>
                   <p className="mt-1 text-[11px] text-dim max-w-[200px]">
@@ -771,8 +957,128 @@ export default function TournamentDetail() {
         </section>
       )}
 
+      {/* Rejected Registration Notice */}
+      {isRejectedParticipant && (
+        <section id="participant-hub" className="scroll-mt-24 border-b border-live/30 bg-live/5 py-12">
+          <Container>
+            <div className="border-2 border-live/40 bg-surface p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-live" />
+                    <Hud className="text-live">Registration Payment Rejected</Hud>
+                  </div>
+                  <h3 className="mt-2 font-display text-3xl font-black uppercase text-ink">
+                    Payment Verification Failed
+                  </h3>
+                  <p className="mt-2 text-sm text-dim max-w-2xl leading-relaxed">
+                    Your previous payment record could not be verified by tournament admins.
+                    {regStatus?.rejection_reason && (
+                      <span className="block mt-2 font-mono text-xs text-live bg-live/10 border border-live/30 p-2.5">
+                        Admin Note: {regStatus.rejection_reason}
+                      </span>
+                    )}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-4 text-xs font-mono text-dim">
+                    <span>Squad: <strong className="text-ink">{regStatus?.team?.name || 'Your Team'}</strong></span>
+                    <span>•</span>
+                    <span>Previous UTR: <strong className="text-cyan font-mono">{regStatus?.registration?.utr || 'N/A'}</strong></span>
+                    <span>•</span>
+                    <span>Status: <strong className="text-live uppercase font-bold">REJECTED</strong></span>
+                  </div>
+                </div>
+                <div className="shrink-0 flex flex-col sm:flex-row gap-3">
+                  <Cta small onClick={() => setRegModalOpen(true)}>
+                    Re-Register With Valid Proof
+                  </Cta>
+                  <Link
+                    to="/support"
+                    className="inline-flex items-center justify-center border border-white/20 bg-void/50 px-4 py-2 font-mono text-xs text-dim hover:text-ink hover:border-white/40 transition-colors"
+                  >
+                    Contact Support
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* Prize Pool Breakdown */}
+      <Block
+        id="Prizes"
+        idx="01"
+        kicker="Prize Distribution"
+        title="Prizes & Rewards"
+        aside={
+          <div className="text-right">
+            <Hud>Total Guaranteed Purse</Hud>
+            <p className="font-display text-4xl md:text-5xl font-black text-cyan tabular-nums">
+              {inr(prizePool)}
+            </p>
+          </div>
+        }
+      >
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* 1st Place */}
+          <div className="relative overflow-hidden border border-amber-400/40 bg-gradient-to-b from-amber-400/10 via-surface to-surface p-6">
+            <div className="flex items-center justify-between">
+              <span className="border border-amber-400/50 bg-amber-400/20 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                1st Place · Champion
+              </span>
+              <span className="font-display text-2xl">🏆</span>
+            </div>
+            <p className="mt-6 font-display text-4xl md:text-5xl font-black text-ink tabular-nums">
+              {inr(Math.round(prizePool * 0.5))}
+            </p>
+            <p className="mt-2 font-mono text-xs text-dim">
+              50% of total prize pool + Verified Champion Badge & Platform Trophy
+            </p>
+          </div>
+
+          {/* 2nd Place */}
+          <div className="relative overflow-hidden border border-slate-300/40 bg-gradient-to-b from-slate-300/10 via-surface to-surface p-6">
+            <div className="flex items-center justify-between">
+              <span className="border border-slate-300/50 bg-slate-300/20 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-slate-200">
+                2nd Place · Runner Up
+              </span>
+              <span className="font-display text-2xl">🥈</span>
+            </div>
+            <p className="mt-6 font-display text-4xl md:text-5xl font-black text-ink tabular-nums">
+              {inr(Math.round(prizePool * 0.3))}
+            </p>
+            <p className="mt-2 font-mono text-xs text-dim">
+              30% of total prize pool + Runner-up Podium recognition
+            </p>
+          </div>
+
+          {/* 3rd Place */}
+          <div className="relative overflow-hidden border border-amber-700/40 bg-gradient-to-b from-amber-700/10 via-surface to-surface p-6">
+            <div className="flex items-center justify-between">
+              <span className="border border-amber-700/50 bg-amber-700/20 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-amber-500">
+                3rd Place · 2nd Runner Up
+              </span>
+              <span className="font-display text-2xl">🥉</span>
+            </div>
+            <p className="mt-6 font-display text-4xl md:text-5xl font-black text-ink tabular-nums">
+              {inr(Math.round(prizePool * 0.2))}
+            </p>
+            <p className="mt-2 font-mono text-xs text-dim">
+              20% of total prize pool + Semifinalist Podium recognition
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 border border-white/10 bg-void/50 p-4 font-mono text-xs text-dim flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <p>
+            Prize settlements are audited and disbursed directly to the winning captain's UPI VPA within 24 hours of tournament conclusion.
+          </p>
+          <span className="text-ok font-bold uppercase shrink-0">100% Guaranteed Payout</span>
+        </div>
+      </Block>
+
       {/* Rules */}
-      <Block id="Rules" idx="01" kicker="Rulebook" title="The Rules" tone="graphite">
+      <Block id="Rules" idx="02" kicker="Rulebook" title="The Rules" tone="graphite">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {renderedRules.map((cat) => (
             <div key={cat.cat} className="border border-white/10 bg-void p-6 flex flex-col justify-between">
@@ -795,7 +1101,7 @@ export default function TournamentDetail() {
       {/* Teams Field */}
       <Block
         id="Teams"
-        idx="02"
+        idx="03"
         kicker="Registered Field"
         title="The Teams"
         aside={
@@ -827,8 +1133,110 @@ export default function TournamentDetail() {
         )}
       </Block>
 
+      {/* Bracket & Pairings */}
+      <Block id="Bracket" idx="04" kicker="Bracket & Pairings" title="The Bracket" tone="graphite">
+        {matchesData.length > 0 ? (
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {matchesData.map((m, idx) => (
+                <div key={m.id || idx} className="border border-white/10 bg-void p-5 space-y-3">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span className="text-cyan font-bold">{m.round_name || `Match 0${idx + 1}`}</span>
+                    <span className="text-dim uppercase">{m.format || 'BO1'}</span>
+                  </div>
+                  <div className="space-y-2 border-y border-white/10 py-3 font-display">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black uppercase text-ink">{m.team_a_name || 'Team 1'}</span>
+                      <span className="text-sm font-bold text-cyan">{m.team_a_score ?? '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-black uppercase text-ink">{m.team_b_name || 'Team 2'}</span>
+                      <span className="text-sm font-bold text-cyan">{m.team_b_score ?? '-'}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-mono text-dim">
+                    <span>{m.scheduled_time || 'TBD'}</span>
+                    <span className={`uppercase font-bold ${m.status === 'COMPLETED' ? 'text-ok' : m.status === 'LIVE' ? 'text-live' : 'text-dim'}`}>
+                      {m.status || 'SCHEDULED'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="border border-dashed border-white/15 bg-void p-8 md:p-12 text-center">
+            <div className="mx-auto max-w-xl space-y-4">
+              <span className="grid size-14 mx-auto place-items-center border border-cyan/40 bg-cyan/10 font-display text-2xl text-cyan">
+                ⚔️
+              </span>
+              <h3 className="font-display text-3xl font-black uppercase text-ink">
+                Automated Bracket Seeding
+              </h3>
+              <p className="text-sm text-dim leading-relaxed">
+                Bracket trees and custom match pairings generate automatically upon tournament registration close. Competing squads will be seeded into single-elimination brackets based on authoritative player ratings and registration order.
+              </p>
+              <div className="pt-2 flex flex-wrap justify-center gap-3 font-mono text-xs text-dim">
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || 'Single Elimination'}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Series: BO1 Qualifiers · BO3 Finals</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Slots: {maxTeams} Squads</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Block>
+
+      {/* Standings & Results */}
+      <Block id="Standings" idx="05" kicker="Leaderboard" title="Standings">
+        {tourStatus === 'completed' && tourData?.standings && tourData.standings.length > 0 ? (
+          <div className="border border-white/10 bg-surface overflow-x-auto">
+            <table className="w-full text-left font-mono text-xs">
+              <thead className="border-b border-white/10 bg-void/50 uppercase text-dim">
+                <tr>
+                  <th className="p-4">Rank</th>
+                  <th className="p-4">Team</th>
+                  <th className="p-4">Matches</th>
+                  <th className="p-4">Wins</th>
+                  <th className="p-4">Eliminations</th>
+                  <th className="p-4 text-right">Prize Awarded</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {tourData.standings.map((st: any, idx: number) => (
+                  <tr key={st.team_id || idx} className="hover:bg-white/5">
+                    <td className="p-4 font-bold text-cyan">#{idx + 1}</td>
+                    <td className="p-4 font-display font-black uppercase text-ink">{st.team_name}</td>
+                    <td className="p-4 text-dim">{st.played ?? '-'}</td>
+                    <td className="p-4 text-ok font-bold">{st.won ?? '-'}</td>
+                    <td className="p-4 text-ink font-bold">{st.eliminations ?? '-'}</td>
+                    <td className="p-4 text-right font-bold text-ok">{st.prize ? inr(st.prize) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="border border-dashed border-white/15 bg-graphite/40 p-8 md:p-12 text-center">
+            <div className="mx-auto max-w-xl space-y-4">
+              <span className="grid size-14 mx-auto place-items-center border border-white/20 bg-white/5 font-display text-2xl text-dim">
+                📊
+              </span>
+              <h3 className="font-display text-3xl font-black uppercase text-ink">
+                Standings Awaiting Match Results
+              </h3>
+              <p className="text-sm text-dim leading-relaxed">
+                Leaderboards, elimination tallies, and prize awards will update live as match scores are reported and verified by the referee team on match day.
+              </p>
+              <div className="pt-2 font-mono text-xs text-cyan">
+                {registeredCount} of {maxTeams} squads confirmed on the board
+              </div>
+            </div>
+          </div>
+        )}
+      </Block>
+
       {/* Schedule */}
-      <Block id="Schedule" idx="03" kicker="Timeline" title="Road to Final" tone="graphite">
+      <Block id="Schedule" idx="06" kicker="Timeline" title="Road to Final" tone="graphite">
         <ol className="grid gap-6 md:grid-cols-4">
           {stages.map((s, idx) => (
             <li key={s.name} className="border-t border-cyan/40 pt-4">
@@ -880,6 +1288,41 @@ function RegistrationModal({
   const [upiData, setUpiData] = useState<DirectUpiInitResponse | null>(null)
   const [utr, setUtr] = useState('')
   const [utrSubmitted, setUtrSubmitted] = useState(false)
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [screenshotUrl, setScreenshotUrl] = useState<string>('')
+  const [screenshotUploading, setScreenshotUploading] = useState(false)
+  const [screenshotError, setScreenshotError] = useState<string>('')
+  const [copiedUpi, setCopiedUpi] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const copyUpiId = () => {
+    if (upiData?.upi_id) {
+      navigator.clipboard.writeText(upiData.upi_id)
+      setCopiedUpi(true)
+      setTimeout(() => setCopiedUpi(false), 2000)
+    }
+  }
+
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScreenshotFile(file)
+    setScreenshotError('')
+    setScreenshotUploading(true)
+    try {
+      const resp = await uploadMediaFile(file)
+      const url = resp?.url
+      if (url) {
+        setScreenshotUrl(url)
+      } else {
+        throw new Error('No media URL returned from server')
+      }
+    } catch (err: any) {
+      setScreenshotError(err.message || 'Failed to upload screenshot proof')
+    } finally {
+      setScreenshotUploading(false)
+    }
+  }
 
   const isSolo =
     (tournament?.format || '').toLowerCase().includes('solo') ||
@@ -944,6 +1387,7 @@ function RegistrationModal({
         payment_id: upiData.payment_id,
         utr: utr.trim(),
         sender_name: profile?.display_name || profile?.username,
+        screenshot_url: screenshotUrl || undefined,
       })
       setUtrSubmitted(true)
       setStep(2)
@@ -1089,39 +1533,129 @@ function RegistrationModal({
             <div className="text-center">
               <Hud className="text-cyan">Scan & Pay via any UPI App</Hud>
               <div className="mt-4 flex justify-center">
-                <div className="p-3 bg-white rounded">
+                <div className="p-3 bg-white rounded shadow-lg">
                   <QRCodeSVG value={upiData.qr_code_data} size={180} />
                 </div>
               </div>
-              <p className="mt-3 font-display text-2xl font-black text-ink">{inr(upiData.amount_inr)}</p>
-              <p className="mt-1 font-mono text-xs text-dim select-all">UPI ID: {upiData.upi_id}</p>
-            </div>
-
-            <div>
-              <Hud>Enter 12-Digit UTR / Transaction Ref</Hud>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 428198841029"
-                value={utr}
-                onChange={(e) => setUtr(e.target.value)}
-                className="mt-2 w-full border border-white/20 bg-surface px-4 py-3 font-mono text-sm tracking-wider text-cyan outline-none focus:border-cyan"
-              />
-              <p className="mt-1 text-[11px] text-dim">
-                Found in your GPay / PhonePe / Paytm payment receipt under "UPI Ref No" or "UTR".
+              <p className="mt-3 font-display text-3xl font-black text-ink">{inr(upiData.amount_inr)}</p>
+              {upiData.payee_name && (
+                <p className="font-mono text-xs text-dim">Payee: <strong className="text-ink">{upiData.payee_name}</strong></p>
+              )}
+              
+              {/* Copyable UPI ID */}
+              <div className="mt-2 inline-flex items-center gap-2 rounded border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs">
+                <span className="text-dim">UPI ID:</span>
+                <span className="text-cyan font-bold select-all">{upiData.upi_id}</span>
+                <button
+                  type="button"
+                  onClick={copyUpiId}
+                  className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] uppercase text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
+                >
+                  {copiedUpi ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-dim">
+                Pay the exact amount from Google Pay, PhonePe, Paytm, or BHIM.
               </p>
             </div>
 
+            <div>
+              <Hud>12-Digit UTR / Transaction Reference</Hud>
+              <input
+                type="text"
+                required
+                maxLength={24}
+                placeholder="e.g. 428198841029"
+                value={utr}
+                onChange={(e) => setUtr(e.target.value.replace(/\s+/g, ''))}
+                className="mt-2 w-full border border-white/20 bg-surface px-4 py-3 font-mono text-base tracking-widest text-cyan outline-none focus:border-cyan"
+              />
+              <p className="mt-1 text-[11px] text-dim">
+                Found in your payment app under "UPI Ref No" or "UTR".
+              </p>
+            </div>
+
+            {/* Payment Screenshot Proof Upload */}
+            <div className="border border-white/10 bg-surface p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <Hud className="text-cyan">Payment Screenshot Proof</Hud>
+                <span className="font-mono text-[10px] text-dim uppercase">Recommended</span>
+              </div>
+              <p className="text-xs text-dim">
+                Attach a screenshot showing successful transfer and UTR for expedited admin approval.
+              </p>
+
+              {screenshotUrl ? (
+                <div className="flex items-center justify-between border border-ok/30 bg-ok/5 p-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={resolveMediaUrl(screenshotUrl)}
+                      alt="Proof preview"
+                      className="size-14 object-cover rounded border border-white/20"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-ok block">✓ Screenshot Attached</span>
+                      <span className="font-mono text-[10px] text-dim">{screenshotFile?.name || 'receipt.jpg'}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScreenshotUrl('')
+                      setScreenshotFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className="border border-white/20 px-2 py-1 font-mono text-[10px] uppercase text-dim hover:text-live hover:border-live transition-colors cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleScreenshotChange}
+                    className="hidden"
+                    id="payment-screenshot-input"
+                  />
+                  <label
+                    htmlFor="payment-screenshot-input"
+                    className="flex flex-col items-center justify-center border-2 border-dashed border-white/15 hover:border-cyan/50 p-4 text-center cursor-pointer transition-colors bg-void/50"
+                  >
+                    {screenshotUploading ? (
+                      <span className="font-mono text-xs text-cyan animate-pulse">Uploading screenshot...</span>
+                    ) : (
+                      <>
+                        <span className="text-xl">📸</span>
+                        <span className="mt-1 font-mono text-xs uppercase text-ink">Upload Payment Screenshot</span>
+                        <span className="mt-0.5 text-[10px] text-dim">PNG, JPG or WebP up to 5MB</span>
+                      </>
+                    )}
+                  </label>
+                  {screenshotError && (
+                    <p className="mt-1 text-xs text-live font-mono">{screenshotError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="pt-4 flex justify-between items-center border-t border-white/10">
-              <button type="button" onClick={() => setStep(0)} className="text-xs text-dim hover:text-ink">
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                disabled={loading}
+                className="text-xs text-dim hover:text-ink cursor-pointer"
+              >
                 ← Back
               </button>
               <button
                 type="submit"
-                disabled={loading || !utr.trim()}
-                className="px-6 py-2 bg-ink text-void font-bold text-xs uppercase hover:bg-cyan transition-colors disabled:opacity-40"
+                disabled={loading || !utr.trim() || utr.trim().length < 6 || screenshotUploading}
+                className="px-6 py-2.5 bg-ink text-void font-bold text-xs uppercase hover:bg-cyan transition-colors disabled:opacity-40 cursor-pointer"
               >
-                {loading ? 'Submitting...' : 'Submit UTR'}
+                {loading ? 'Submitting...' : 'Submit Payment & Confirm'}
               </button>
             </div>
           </form>

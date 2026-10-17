@@ -62,6 +62,7 @@ export default function Settings() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [avatarUploadError, setAvatarUploadError] = useState('')
   const [availableCrests, setAvailableCrests] = useState<Crest[]>([])
+  const [equippingId, setEquippingId] = useState<string | null>(null)
 
   // 2. Preferences States
   const DEFAULT_NOTIFICATIONS: Record<string, boolean> = {
@@ -237,6 +238,42 @@ export default function Settings() {
 
   // ---------------- Handlers ----------------
 
+  const normalizeAvatarPath = (url?: string | null) => {
+    if (!url) return ''
+    let clean = url.trim().replace(/^https?:\/\/[^/]+/, '')
+    try {
+      clean = decodeURIComponent(clean)
+    } catch {}
+    return clean.toLowerCase().replace(/\s+/g, ' ').trim()
+  }
+
+  const isAvatarEquipped = (crestUrl?: string | null, crestId?: string) => {
+    if (!crestUrl && !crestId) return false
+    // 1. Exact ID match from user document
+    if (crestId && profile?.equipped_crest_id === crestId) return true
+    if (profile?.equipped_crest_id && crestId && profile.equipped_crest_id !== crestId) {
+      return false
+    }
+
+    // 2. If user equipped GOOGLE or UPLOADED, crests are never equipped
+    if (profile?.avatar_source && profile.avatar_source !== 'CREST') {
+      return false
+    }
+
+    // 3. Normalized URL comparison
+    const active = avatarUrl || profile?.avatar_url || ''
+    if (!active) return false
+    const normActive = normalizeAvatarPath(active)
+    const normTarget = normalizeAvatarPath(crestUrl)
+    if (normTarget && normActive === normTarget) return true
+    const resolvedActive = normalizeAvatarPath(resolveMediaUrl(active))
+    const resolvedTarget = normalizeAvatarPath(resolveMediaUrl(crestUrl || ''))
+    if (resolvedTarget && resolvedActive === resolvedTarget) return true
+    if (normTarget && normActive.endsWith(normTarget)) return true
+    if (normTarget && crestUrl && active.includes(crestUrl)) return true
+    return false
+  }
+
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -245,10 +282,23 @@ export default function Settings() {
     try {
       const res = await uploadMediaFile(file)
       if (res && res.url) {
+        const updatedUser = await updateUserProfile({
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
+        })
         setAvatarUrl(res.url)
-        // Automatically persist custom avatar upload to database
-        const updatedUser = await updateUserProfile({ avatar_url: res.url, avatar_source: 'UPLOADED' })
-        updateLocalProfile?.(updatedUser)
+        const merged = updatedUser || {
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
+        }
+        updateLocalProfile?.({
+          ...merged,
+          avatar_url: res.url,
+          avatar_source: 'UPLOADED',
+          equipped_crest_id: null,
+        })
         await refreshProfile()
         window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
         setSaveMessage('Profile picture uploaded and saved successfully.')
@@ -263,11 +313,26 @@ export default function Settings() {
   }
 
   const handleEquipGooglePhoto = async () => {
-    if (!googleAvatarUrl) return
-    setAvatarUrl(googleAvatarUrl)
+    if (!googleAvatarUrl || equippingId) return
+    setEquippingId('google')
     try {
-      const updatedUser = await updateUserProfile({ avatar_url: googleAvatarUrl, avatar_source: 'GOOGLE' })
-      updateLocalProfile?.(updatedUser)
+      const updatedUser = await updateUserProfile({
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
+      })
+      setAvatarUrl(googleAvatarUrl)
+      const merged = updatedUser || {
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
+      }
+      updateLocalProfile?.({
+        ...merged,
+        avatar_url: googleAvatarUrl,
+        avatar_source: 'GOOGLE',
+        equipped_crest_id: null,
+      })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaveMessage('Google profile picture equipped and persisted.')
@@ -275,14 +340,32 @@ export default function Settings() {
       setTimeout(() => setSaveMessage(''), 4000)
     } catch (err: any) {
       setSaveMessage(err.message || 'Failed to equip Google profile photo.')
+    } finally {
+      setEquippingId(null)
     }
   }
 
   const handleSelectCrest = async (crest: Crest) => {
-    setAvatarUrl(crest.image_url)
+    if (equippingId) return
+    setEquippingId(crest.id)
     try {
-      const updatedUser = await updateUserProfile({ avatar_url: crest.image_url, avatar_source: 'CREST' })
-      updateLocalProfile?.(updatedUser)
+      const updatedUser = await updateUserProfile({
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
+      })
+      setAvatarUrl(crest.image_url)
+      const merged = updatedUser || {
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
+      }
+      updateLocalProfile?.({
+        ...merged,
+        avatar_url: crest.image_url,
+        avatar_source: 'CREST',
+        equipped_crest_id: crest.id,
+      })
       await refreshProfile()
       window.dispatchEvent(new CustomEvent('ametheus:profile_updated'))
       setSaveMessage(`Player crest "${crest.name}" equipped and persisted.`)
@@ -290,6 +373,8 @@ export default function Settings() {
       setTimeout(() => setSaveMessage(''), 4000)
     } catch (err: any) {
       setSaveMessage(err.message || 'Failed to equip crest.')
+    } finally {
+      setEquippingId(null)
     }
   }
 
@@ -661,7 +746,24 @@ export default function Settings() {
                   </div>
                   <div className="flex-1 space-y-4">
                     <div>
-                      <Hud className="text-cyan">Profile Avatar & Player Crest</Hud>
+                      <div className="flex items-center gap-2">
+                        <Hud className="text-cyan">Profile Avatar & Player Crest</Hud>
+                        {profile?.avatar_source === 'UPLOADED' && (
+                          <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                            ✓ Equipped (Custom)
+                          </span>
+                        )}
+                        {profile?.avatar_source === 'GOOGLE' && (
+                          <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                            ✓ Equipped (Google)
+                          </span>
+                        )}
+                        {profile?.avatar_source === 'CREST' && (
+                          <span className="text-[10px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
+                            ✓ Equipped (Crest)
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1 text-xs text-dim">
                         Upload your official competitive esports avatar or select from sanctioned operator crests. Changes persist directly to your account.
                       </p>
@@ -684,42 +786,53 @@ export default function Settings() {
                     </div>
 
                     {/* Voluntary Google Profile Picture Option */}
-                    {googleAvatarUrl && (
-                      <div className="border border-white/10 bg-surface/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="size-12 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
-                            <img
-                              src={googleAvatarUrl}
-                              alt="Google Profile"
-                              className="size-full aspect-square object-cover object-center"
-                            />
+                    {googleAvatarUrl && (() => {
+                      const isGoogleSelected = Boolean(
+                        profile?.avatar_source === 'GOOGLE' && !profile?.equipped_crest_id
+                      )
+                      const isEquippingGoogle = equippingId === 'google'
+
+                      return (
+                        <div className="border border-white/10 bg-surface/50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="size-12 shrink-0 aspect-square rounded-[2px] border border-white/20 bg-void overflow-hidden">
+                              <img
+                                src={googleAvatarUrl}
+                                alt="Google Profile"
+                                className="size-full aspect-square object-cover object-center"
+                              />
+                            </div>
+                            <div>
+                              <p className="font-display font-black uppercase text-xs text-ink flex items-center gap-2">
+                                Google Profile Picture
+                                {isGoogleSelected && (
+                                  <span className="text-[9px] font-bold text-cyan uppercase tracking-wider bg-cyan/20 border border-cyan/40 px-1.5 py-0.5 rounded-[2px]">
+                                    ✓ Equipped
+                                  </span>
+                                )}
+                              </p>
+                              <p className="font-sans text-[11px] text-dim mt-0.5">
+                                Voluntarily use your Google / Gmail account picture as your public esports avatar.
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-display font-black uppercase text-xs text-ink flex items-center gap-2">
-                              Google Profile Picture
-                              {(profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl) && (
-                                <span className="text-[9px] font-bold text-cyan uppercase tracking-wider">✓ Equipped</span>
-                              )}
-                            </p>
-                            <p className="font-sans text-[11px] text-dim mt-0.5">
-                              Voluntarily use your Google / Gmail account picture as your public esports avatar.
-                            </p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={handleEquipGooglePhoto}
+                            disabled={isGoogleSelected || isEquippingGoogle || !!equippingId}
+                            className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
+                              isGoogleSelected
+                                ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default font-bold'
+                                : isEquippingGoogle
+                                ? 'border-cyan/40 bg-cyan/10 text-cyan animate-pulse'
+                                : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
+                            }`}
+                          >
+                            {isGoogleSelected ? '✓ Equipped' : isEquippingGoogle ? 'Equipping...' : 'Equip Google Photo'}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleEquipGooglePhoto}
-                          disabled={profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl}
-                          className={`px-4 py-2 font-mono text-xs uppercase cursor-pointer border transition-colors shrink-0 ${
-                            (profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl)
-                              ? 'border-cyan/40 bg-cyan/15 text-cyan cursor-default'
-                              : 'border-white/20 hover:border-cyan text-ink hover:text-cyan bg-white/5'
-                          }`}
-                        >
-                          {(profile?.avatar_source === 'GOOGLE' || avatarUrl === googleAvatarUrl) ? 'Equipped' : 'Equip Google Photo'}
-                        </button>
-                      </div>
-                    )}
+                      )
+                    })()}
 
                     {/* Sanctioned Crests Grid */}
                     <div className="pt-2 border-t border-white/10">
@@ -729,16 +842,20 @@ export default function Settings() {
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {availableCrests.map((c) => {
-                            const isSelected = avatarUrl === c.image_url
+                            const isSelected = isAvatarEquipped(c.image_url, c.id)
+                            const isEquippingThis = equippingId === c.id
 
                             return (
                               <button
                                 key={c.id}
                                 type="button"
+                                disabled={isSelected || isEquippingThis || !!equippingId}
                                 onClick={() => handleSelectCrest(c)}
-                                className={`text-left p-3 border transition-all flex items-center gap-3 cursor-pointer ${
+                                className={`group text-left p-3 border transition-all flex items-center gap-3 cursor-pointer ${
                                   isSelected
                                     ? 'border-cyan bg-cyan/15 ring-1 ring-cyan shadow-[0_0_10px_rgba(62,242,255,0.25)]'
+                                    : isEquippingThis
+                                    ? 'border-cyan/50 bg-cyan/10'
                                     : 'border-white/10 bg-surface/50 hover:border-white/30 hover:bg-surface'
                                 }`}
                               >
@@ -753,12 +870,20 @@ export default function Settings() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center justify-between gap-1">
-                                    <p className="font-display font-black uppercase text-xs text-ink truncate">
+                                    <p className="font-display font-black uppercase text-xs text-ink truncate group-hover:text-cyan transition-colors">
                                       {c.name}
                                     </p>
-                                    {isSelected && (
-                                      <span className="text-[9px] font-bold text-cyan uppercase shrink-0">
+                                    {isSelected ? (
+                                      <span className="text-[10px] font-bold text-cyan uppercase tracking-wider shrink-0 bg-cyan/20 border border-cyan/40 px-2 py-0.5 rounded-[2px]">
                                         ✓ Equipped
+                                      </span>
+                                    ) : isEquippingThis ? (
+                                      <span className="text-[10px] font-mono uppercase tracking-wider text-cyan border border-cyan/40 px-2 py-0.5 rounded-[2px] bg-cyan/10 animate-pulse">
+                                        Equipping...
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-mono uppercase tracking-wider text-dim group-hover:text-cyan border border-white/10 px-2 py-0.5 rounded-[2px] bg-white/5">
+                                        Equip
                                       </span>
                                     )}
                                   </div>

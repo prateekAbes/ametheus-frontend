@@ -54,6 +54,8 @@ export interface PendingPayment {
   user_username?: string
   user_email?: string
   tournament_id?: string
+  tournament_title?: string
+  team_name?: string
   amount_inr: number
   amount_paise?: number
   utr: string
@@ -271,6 +273,38 @@ export async function unarchivePayment(paymentId: string): Promise<any> {
   })
 }
 
+export interface RegistrationRevenueAnalytics {
+  time_range: string
+  confirmed_registrations: number
+  reserved_seats: number
+  rejected_registrations: number
+  approved_tournament_revenue_inr: number
+  pending_verification_volume_inr: number
+  wallet_topup_volume_inr: number
+  tournaments: Array<{
+    id: string
+    title: string
+    confirmed_teams: number
+    max_teams: number
+    available_slots: number
+    entry_fee_inr: number
+    approved_revenue_inr: number
+  }>
+}
+
+export async function getRegistrationRevenueAnalytics(params?: {
+  time_range?: string
+  start_date?: string
+  end_date?: string
+}): Promise<RegistrationRevenueAnalytics> {
+  const q = new URLSearchParams()
+  if (params?.time_range) q.set('time_range', params.time_range)
+  if (params?.start_date) q.set('start_date', params.start_date)
+  if (params?.end_date) q.set('end_date', params.end_date)
+  const qs = q.toString() ? `?${q.toString()}` : ''
+  return apiClient<RegistrationRevenueAnalytics>(`/admin/registration-revenue-analytics${qs}`)
+}
+
 // UPI Accounts
 export async function getAdminUpiAccounts(): Promise<UpiAccount[]> {
   return apiClient<UpiAccount[]>('/admin/upi-accounts')
@@ -285,6 +319,22 @@ export async function createUpiAccount(payload: {
 }): Promise<UpiAccount> {
   return apiClient<UpiAccount>('/admin/upi-accounts', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateUpiAccount(
+  id: string,
+  payload: {
+    upi_id?: string
+    payee_name?: string
+    display_name?: string
+    qr_url?: string
+    status?: string
+  }
+): Promise<UpiAccount> {
+  return apiClient<UpiAccount>(`/admin/upi-accounts/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }
