@@ -121,6 +121,16 @@ export default function GameDetail() {
   const bannerZoom = bannerCfg?.zoom
   const bannerFit = bannerCfg?.fit_mode || 'ambient'
 
+  const supportedModesList: string[] = (
+    gameData?.supportedGameModes ||
+    (gameData as any)?.supported_game_modes ||
+    []
+  ).map((m: string) => m.toUpperCase().trim())
+
+  const modesDisplay = supportedModesList.length > 0
+    ? supportedModesList.map((m: string) => m.charAt(0) + m.slice(1).toLowerCase()).join(', ')
+    : (gameData?.isTeamGame === false ? 'Solo' : 'Squad')
+
   const minSize = gameData?.minTeamSize || 4
   const maxSize = gameData?.maxTeamSize || fallback.size
   const antiCheat = gameData?.antiCheat || 'Server-Side Platform Guard'
@@ -232,7 +242,7 @@ export default function GameDetail() {
             <Cta onClick={() => document.getElementById('active-tournaments')?.scrollIntoView({ behavior: 'smooth' })}>
               View Brackets
             </Cta>
-            <Stat k="Squad size" v={`${minSize}–${maxSize}P`} accent={accent} />
+            <Stat k="Supported Modes" v={modesDisplay} accent={accent} />
             <Stat k="Platform" v={cleanPlatform} />
             <Stat k="Total Circuit Prize" v={inr(totalPrizePool)} accent="#f59e0b" />
           </div>
@@ -465,7 +475,7 @@ export default function GameDetail() {
             {[
               ['Genre', genre],
               ['Platform', cleanPlatform],
-              ['Squad Format', `${maxSize} Player Team (${minSize}-${maxSize})`],
+              ['Supported Game Modes', modesDisplay],
               ['Region', 'India (Mumbai Dedicated)'],
               ['Server Protocol', 'Custom Room / Dedicated Arbitrated'],
               ['Anti-Cheat Protocol', antiCheat],

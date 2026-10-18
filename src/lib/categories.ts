@@ -110,6 +110,8 @@ export function groupGamesByCategory(
             platform: cg.platform,
             tag: cg.short,
             isTeamGame: true,
+            supportedGameModes: ['SOLO', 'DUO', 'SQUAD'],
+            supported_game_modes: ['SOLO', 'DUO', 'SQUAD'],
             minTeamSize: 1,
             maxTeamSize: 5,
             maxSubstitutes: 1,

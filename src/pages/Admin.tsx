@@ -384,15 +384,15 @@ export default function Admin() {
     title: string
     game_id: string
     format: string
+    participation_mode: string
     series_format?: string
     status: 'REGISTRATION_OPEN' | 'UPCOMING' | 'DRAFT'
     prize_pool_inr: number
     entry_fee_inr: number
     max_teams: number
-    min_team_size: number
-    max_team_size: number
+    start_date?: string
+    start_time?: string
     starts_at_local: string
-    roster_lock_local: string
     banner_url: string
     banner_tablet_url: string
     banner_mobile_url: string
@@ -403,28 +403,32 @@ export default function Admin() {
     description: string
   }
 
-  const getInitialNewTourState = (): NewTournamentFormState => ({
-    title: '',
-    game_id: 'valorant',
-    format: 'Knockout',
-    series_format: 'BO1',
-    status: 'REGISTRATION_OPEN',
-    prize_pool_inr: 25000,
-    entry_fee_inr: 100,
-    max_teams: 16,
-    min_team_size: 5,
-    max_team_size: 5,
-    starts_at_local: getDefaultStartLocal(),
-    roster_lock_local: getDefaultLockLocal(),
-    banner_url: '',
-    banner_tablet_url: '',
-    banner_mobile_url: '',
-    logo_url: '',
-    whatsapp_group_url: '',
-    discord_url: '',
-    community_link: '',
-    description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
-  })
+  const getInitialNewTourState = (): NewTournamentFormState => {
+    const defaultStart = getDefaultStartLocal()
+    const [d, t] = defaultStart.includes('T') ? defaultStart.split('T') : ['', '18:00']
+    return {
+      title: '',
+      game_id: 'valorant',
+      format: 'Knockout',
+      participation_mode: 'SQUAD',
+      series_format: 'BO1',
+      status: 'REGISTRATION_OPEN',
+      prize_pool_inr: 25000,
+      entry_fee_inr: 100,
+      max_teams: 16,
+      start_date: d,
+      start_time: t ? t.slice(0, 5) : '18:00',
+      starts_at_local: defaultStart,
+      banner_url: '',
+      banner_tablet_url: '',
+      banner_mobile_url: '',
+      logo_url: '',
+      whatsapp_group_url: '',
+      discord_url: '',
+      community_link: '',
+      description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+    }
+  }
 
   // TOURNAMENTS Interactive States
   const [tournamentFilter, setTournamentFilter] = useState('ALL')
@@ -440,9 +444,6 @@ export default function Admin() {
         const parsed = JSON.parse(saved)
         if (parsed.start_date && !parsed.starts_at_local) {
           parsed.starts_at_local = parsed.start_date
-        }
-        if (!parsed.roster_lock_local && parsed.starts_at_local) {
-          parsed.roster_lock_local = getDefaultLockLocal(parsed.starts_at_local)
         }
         return { ...defaults, ...parsed }
       }
@@ -477,8 +478,7 @@ export default function Admin() {
       platform: 'PC',
       tag: 'TACTICAL',
       is_team_game: true,
-      min_team_size: 5,
-      max_team_size: 5,
+      supported_game_modes: ['SQUAD'] as string[],
       max_substitutes: 2,
       entry_fee_inr: 0,
       prize_pool_inr: 50000,
@@ -1513,32 +1513,27 @@ export default function Admin() {
 
   const handleSelectGameForNewTour = (gameSlugOrId: string) => {
     const g = games.find((item) => item.slug === gameSlugOrId || item.id === gameSlugOrId)
-    const nextMin = g?.min_team_size ?? 5
-    const nextMax = g?.max_team_size ?? 5
+    const gModes = g
+      ? ((g as any).supported_game_modes || (g as any).supportedGameModes || (g.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+      : ['SOLO', 'DUO', 'SQUAD']
+    const currentMode = (newTour.participation_mode || 'SQUAD').toUpperCase().trim()
+    const nextMode = gModes.includes(currentMode) ? currentMode : (gModes[0] || 'SQUAD')
+
     setNewTour((prev) => ({
       ...prev,
       game_id: gameSlugOrId,
-      min_team_size: nextMin,
-      max_team_size: nextMax,
+      participation_mode: nextMode,
     }))
   }
 
   const handleStartDateChange = (val: string) => {
-    setNewTour((prev) => {
-      const prevStart = new Date(prev.starts_at_local).getTime()
-      const prevLock = new Date(prev.roster_lock_local).getTime()
-      const nextStart = new Date(val).getTime()
-
-      let nextLock = prev.roster_lock_local
-      if (isNaN(prevLock) || prevLock > nextStart || (prevStart && prevStart - prevLock === 2 * 3600000)) {
-        nextLock = getDefaultLockLocal(val)
-      }
-      return {
-        ...prev,
-        starts_at_local: val,
-        roster_lock_local: nextLock,
-      }
-    })
+    const [d, t] = val.includes('T') ? val.split('T') : [val, '18:00']
+    setNewTour((prev) => ({
+      ...prev,
+      start_date: d,
+      start_time: t ? t.slice(0, 5) : '18:00',
+      starts_at_local: val,
+    }))
   }
 
   const handleCreateTourSubmit = async (e: React.FormEvent) => {
@@ -1557,48 +1552,37 @@ export default function Admin() {
     }
     const format = newTour.format?.trim()
     if (!format) {
-      setCreateTourError('Match format is required (e.g. Single Elimination · BO3).')
+      setCreateTourError('Match format is required (e.g. Knockout, Round Robin, Battle Royale).')
       return
     }
+
+    // Validate selected game & participation mode
+    const g = games.find((item) => item.slug === newTour.game_id || item.id === newTour.game_id)
+    const gModes = g
+      ? ((g as any).supported_game_modes || (g as any).supportedGameModes || (g.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+      : ['SOLO', 'DUO', 'SQUAD']
+    const partMode = (newTour.participation_mode || gModes[0] || 'SQUAD').toUpperCase().trim()
+
+    if (!gModes.includes(partMode)) {
+      setCreateTourError(`Participation mode ${partMode} is not supported by ${g?.name || 'this game'}. Supported modes: ${gModes.join(', ')}`)
+      return
+    }
+
     if (!newTour.starts_at_local) {
       setCreateTourError('Tournament Start Date & Time is required.')
       return
     }
-    if (!newTour.roster_lock_local) {
-      setCreateTourError('Roster Lock Date & Time is required.')
-      return
-    }
 
     const startDate = new Date(newTour.starts_at_local)
-    const lockDate = new Date(newTour.roster_lock_local)
-
     if (isNaN(startDate.getTime())) {
       setCreateTourError('Tournament Start Date & Time is invalid. Please select a valid date and time.')
       return
     }
-    if (isNaN(lockDate.getTime())) {
-      setCreateTourError('Roster Lock Date & Time is invalid. Please select a valid date and time.')
-      return
-    }
-    if (lockDate.getTime() > startDate.getTime()) {
-      setCreateTourError('Roster lock deadline must be at or before tournament start time.')
-      return
-    }
 
     const maxTeams = Number(newTour.max_teams)
+    const capName = partMode === 'SOLO' ? 'Max Players' : 'Max Teams'
     if (isNaN(maxTeams) || maxTeams < 2) {
-      setCreateTourError('Maximum teams must be at least 2.')
-      return
-    }
-
-    const minTeamSize = Number(newTour.min_team_size)
-    const maxTeamSize = Number(newTour.max_team_size)
-    if (isNaN(minTeamSize) || minTeamSize < 1) {
-      setCreateTourError('Minimum team size must be at least 1 player.')
-      return
-    }
-    if (isNaN(maxTeamSize) || maxTeamSize < minTeamSize) {
-      setCreateTourError('Maximum team size cannot be less than minimum team size.')
+      setCreateTourError(`${capName} must be at least 2.`)
       return
     }
 
@@ -1636,15 +1620,15 @@ export default function Admin() {
         title,
         game_id: newTour.game_id,
         format,
+        participation_mode: partMode,
         series_format: newTour.series_format || 'BO1',
         status: newTour.status || 'REGISTRATION_OPEN',
         prize_pool_inr: prizePool,
         entry_fee_inr: entryFee,
         max_teams: maxTeams,
-        min_team_size: minTeamSize,
-        max_team_size: maxTeamSize,
         starts_at: startDate.toISOString(),
-        roster_lock_time: lockDate.toISOString(),
+        start_date: newTour.start_date || (newTour.starts_at_local ? newTour.starts_at_local.split('T')[0] : undefined),
+        start_time: newTour.start_time || (newTour.starts_at_local && newTour.starts_at_local.includes('T') ? newTour.starts_at_local.split('T')[1].slice(0, 5) : undefined),
         banner_url: newTour.banner_url || undefined,
         banner_tablet_url: newTour.banner_tablet_url || undefined,
         banner_mobile_url: newTour.banner_mobile_url || undefined,
@@ -1692,6 +1676,7 @@ export default function Admin() {
         title,
         game_id: editingTour.game_id,
         format: editingTour.format,
+        participation_mode: (editingTour as any).participation_mode || undefined,
         series_format: (editingTour as any).series_format || 'BO1',
         status: editingTour.status,
         registration_status: regStatus,
@@ -1699,7 +1684,6 @@ export default function Admin() {
         entry_fee_inr: Number(editingTour.entry_fee_inr),
         max_teams: Number(editingTour.max_teams),
         starts_at: editingTour.starts_at,
-        roster_lock_time: editingTour.roster_lock_time,
         banner_url: editingTour.banner_url,
         hero_banner_url: editingTour.hero_banner_url,
         banner_tablet_url: editingTour.banner_tablet_url,
@@ -1723,14 +1707,17 @@ export default function Admin() {
   // Games Action Handlers
   const handleCreateGameSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!newGame.supported_game_modes || newGame.supported_game_modes.length === 0) {
+      alert('Please select at least one supported game mode (Solo, Duo, Squad).')
+      return
+    }
     try {
       await createGame({
         ...newGame,
         poster_url: newGame.poster_url || undefined,
         genre_id: newGame.genre_id || undefined,
         genre_name: newGame.genre_name || undefined,
-        min_team_size: Number(newGame.min_team_size),
-        max_team_size: Number(newGame.max_team_size),
+        supported_game_modes: newGame.supported_game_modes,
         max_substitutes: Number(newGame.max_substitutes),
         entry_fee_inr: Number(newGame.entry_fee_inr),
         prize_pool_inr: Number(newGame.prize_pool_inr),
@@ -1745,8 +1732,7 @@ export default function Admin() {
         platform: 'PC',
         tag: 'TACTICAL',
         is_team_game: true,
-        min_team_size: 5,
-        max_team_size: 5,
+        supported_game_modes: ['SQUAD'],
         max_substitutes: 2,
         entry_fee_inr: 0,
         prize_pool_inr: 50000,
@@ -1774,6 +1760,11 @@ export default function Admin() {
   const handleUpdateGameSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingGame) return
+    const currentModes = (editingGame.supported_game_modes || (editingGame as any).supportedGameModes || []).map((m: string) => m.toUpperCase().trim())
+    if (currentModes.length === 0) {
+      alert('Please select at least one supported game mode (Solo, Duo, Squad).')
+      return
+    }
     try {
       await updateGame(editingGame.id || editingGame.slug, {
         name: editingGame.name,
@@ -1783,8 +1774,7 @@ export default function Admin() {
         platform: editingGame.platform,
         tag: editingGame.tag,
         is_team_game: editingGame.is_team_game,
-        min_team_size: Number(editingGame.min_team_size),
-        max_team_size: Number(editingGame.max_team_size),
+        supported_game_modes: currentModes,
         entry_fee_inr: Number(editingGame.entry_fee_inr || 0),
         prize_pool_inr: Number(editingGame.prize_pool_inr || 0),
         poster_url: editingGame.poster_url,
@@ -2195,7 +2185,13 @@ export default function Admin() {
                             Rosters ({norm.registeredTeams})
                           </button>
                           <button
-                            onClick={() => setEditingTour(t)}
+                            onClick={() => {
+                              const pMode = ((t as any).participation_mode || (t as any).participationMode || (norm.isSolo ? 'SOLO' : 'SQUAD')).toUpperCase().trim()
+                              setEditingTour({
+                                ...t,
+                                participation_mode: pMode,
+                              } as any)
+                            }}
                             className="border border-white/20 bg-surface px-2.5 py-1.5 font-mono text-[10px] uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
                           >
                             Edit
@@ -2654,14 +2650,24 @@ export default function Admin() {
                     <h3 className="mt-2 font-display text-2xl font-black uppercase">{g.name}</h3>
                     <p className="font-mono text-xs text-dim">Slug: {g.slug}</p>
                     <p className="font-mono text-xs text-dim">Platform: {g.platform || 'PC'}</p>
-                    <p className="font-mono text-xs text-dim">Team Size: {g.min_team_size || 1} - {g.max_team_size || 5} Players</p>
+                    <p className="font-mono text-xs text-dim">Modes: {(((g as any).supported_game_modes || (g as any).supportedGameModes || (g.is_team_game === false ? ['SOLO'] : ['SQUAD'])) as string[]).map((m: string) => m.charAt(0) + m.slice(1).toLowerCase()).join(', ')}</p>
                     <p className="font-mono text-xs text-dim">Server: {g.server_region || 'India'}</p>
                     <p className="font-mono text-xs text-dim">Anti-Cheat: {g.anti_cheat || 'Verified'}</p>
                   </div>
 
                   <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-3">
                     <button
-                      onClick={() => setEditingGame(g)}
+                      onClick={() => {
+                        const gModes = (g as any).supported_game_modes || (g as any).supportedGameModes || []
+                        const initialModes = Array.isArray(gModes) && gModes.length > 0
+                          ? gModes.map((m: string) => m.toUpperCase().trim())
+                          : (g.is_team_game === false ? ['SOLO'] : ['SQUAD'])
+                        setEditingGame({
+                          ...g,
+                          supported_game_modes: initialModes,
+                          supportedGameModes: initialModes,
+                        } as any)
+                      }}
                       className="border border-white/20 bg-surface px-3 py-1 font-mono text-xs uppercase text-ink hover:border-cyan hover:text-cyan"
                     >
                       Edit
@@ -6334,250 +6340,261 @@ export default function Admin() {
 
               <form onSubmit={handleCreateTourSubmit} className="flex flex-col min-h-0 flex-1">
                 <div className="overflow-y-auto p-6 space-y-5 font-mono text-xs flex-1 pr-4">
-                  {/* SECTION A: COMPETITION IDENTITY */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
-                      <span className="text-cyan font-bold">01 //</span>
-                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Competition Identity</span>
-                    </div>
-                    <div>
-                      <label className="text-dim">Tournament Title <span className="text-cyan">*</span></label>
-                      <input
-                        required
-                        placeholder="e.g. Ascent Championship Series 2026"
-                        value={newTour.title}
-                        onChange={(e) => { setNewTour({ ...newTour, title: e.target.value }); if (createTourError) setCreateTourError(null); }}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-dim">Sanctioned Game <span className="text-cyan">*</span></label>
-                        <select
-                          value={newTour.game_id}
-                          onChange={(e) => handleSelectGameForNewTour(e.target.value)}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                        >
-                          {games.map((g) => (
-                            <option key={g.id || g.slug} value={g.slug || g.id}>{g.name}</option>
-                          ))}
-                          {games.length === 0 && (
-                            <>
-                              <option value="valorant">VALORANT</option>
-                              <option value="bgmi">BGMI</option>
-                              <option value="free-fire">Free Fire</option>
-                              <option value="codm">COD Mobile</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-dim">Competition Format <span className="text-cyan">*</span></label>
-                        <select
-                          required
-                          value={newTour.format}
-                          onChange={(e) => setNewTour({ ...newTour, format: e.target.value })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                        >
-                          <option value="Knockout">Knockout</option>
-                          <option value="Round Robin">Round Robin</option>
-                          <option value="Battle Royale">Battle Royale</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-dim">Series Format <span className="text-cyan">*</span></label>
-                        <select
-                          required
-                          value={newTour.series_format || 'BO1'}
-                          onChange={(e) => setNewTour({ ...newTour, series_format: e.target.value })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                        >
-                          <option value="BO1">Best of 1 (BO1)</option>
-                          <option value="BO3">Best of 3 (BO3)</option>
-                        </select>
-                      </div>
-                    </div>
+                  {(() => {
+                    const activeGameObj = games.find((g) => (g.slug || g.id) === newTour.game_id || g.id === newTour.game_id)
+                    const activeGameModes: string[] = activeGameObj
+                      ? ((activeGameObj as any).supported_game_modes || (activeGameObj as any).supportedGameModes || (activeGameObj.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+                      : ['SOLO', 'DUO', 'SQUAD']
+                    const currentPartMode = (newTour.participation_mode || activeGameModes[0] || 'SQUAD').toUpperCase().trim()
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-dim">Initial Publication Status <span className="text-cyan">*</span></label>
-                        <span className="text-[10px] text-cyan uppercase font-bold tracking-wider">Visibility & Enrollment</span>
-                      </div>
-                      <select
-                        value={newTour.status}
-                        onChange={(e) => setNewTour({ ...newTour, status: e.target.value as any })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      >
-                        <option value="REGISTRATION_OPEN">Registration Open (Publicly Visible & Open for Squad Entries)</option>
-                        <option value="UPCOMING">Upcoming (Publicly Visible Announcement - Registrations Pending)</option>
-                        <option value="DRAFT">Draft (Admin Only - Staged & Hidden from Public)</option>
-                      </select>
-                      <p className="mt-1 text-[10px] text-dim font-mono">
-                        {newTour.status === 'REGISTRATION_OPEN' && 'Tournament will be immediately visible on public listings and open for player and team registrations.'}
-                        {newTour.status === 'UPCOMING' && 'Tournament will be visible as an upcoming event on public listings.'}
-                        {newTour.status === 'DRAFT' && 'Tournament will be saved as a draft. Only admins can view and publish it.'}
-                      </p>
-                    </div>
-                  </div>
+                    return (
+                      <>
+                        {/* 1. Tournament Title */}
+                        <div>
+                          <label className="text-dim">Tournament Title <span className="text-cyan">*</span></label>
+                          <input
+                            required
+                            placeholder="e.g. Ascent Championship Series 2026"
+                            value={newTour.title}
+                            onChange={(e) => { setNewTour({ ...newTour, title: e.target.value }); if (createTourError) setCreateTourError(null); }}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          />
+                        </div>
 
-                  {/* SECTION B: TOURNAMENT SCHEDULE */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
-                      <span className="text-cyan font-bold">02 //</span>
-                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Tournament Schedule</span>
-                    </div>
+                        {/* 2. Selected Game */}
+                        <div>
+                          <label className="text-dim">Sanctioned Game <span className="text-cyan">*</span></label>
+                          <select
+                            value={newTour.game_id}
+                            onChange={(e) => handleSelectGameForNewTour(e.target.value)}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          >
+                            {games.map((g) => (
+                              <option key={g.id || g.slug} value={g.slug || g.id}>{g.name}</option>
+                            ))}
+                            {games.length === 0 && (
+                              <>
+                                <option value="valorant">VALORANT</option>
+                                <option value="bgmi">BGMI</option>
+                                <option value="free-fire">Free Fire</option>
+                                <option value="codm">COD Mobile</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
 
-                    {/* Start Date & Time */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-dim">Tournament Start Date & Time (UTC/Local) <span className="text-cyan">*</span></label>
-                      </div>
-                      <input
-                        required
-                        type="datetime-local"
-                        value={newTour.starts_at_local}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                      <p className="mt-1 text-[10px] text-dim font-mono">
-                        Target scheduled start time for Round 1 of the tournament.
-                      </p>
-                    </div>
+                        {/* 3 & 4. Competition Format & Participation Mode */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* 3. Competition Format */}
+                          <div>
+                            <label className="text-dim">Competition Format <span className="text-cyan">*</span></label>
+                            <select
+                              required
+                              value={newTour.format}
+                              onChange={(e) => setNewTour({ ...newTour, format: e.target.value })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              <option value="Knockout">Knockout</option>
+                              <option value="Round Robin">Round Robin</option>
+                              <option value="Battle Royale">Battle Royale</option>
+                            </select>
+                          </div>
 
-                    {/* Roster Lock Date & Time - DIRECTLY BENEATH */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="text-dim">Roster Lock Date & Time (UTC/Local) <span className="text-cyan">*</span></label>
-                        <span className="text-[10px] text-cyan uppercase font-bold tracking-wider">Registration Cutoff</span>
-                      </div>
-                      <input
-                        required
-                        type="datetime-local"
-                        value={newTour.roster_lock_local}
-                        onChange={(e) => setNewTour({ ...newTour, roster_lock_local: e.target.value })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                      <p className="mt-1 text-[10px] text-dim font-mono">
-                        Roster lock cutoff deadline. Squad registration and lineup changes lock permanently at this cutoff (must be at or before tournament start).
-                      </p>
-                    </div>
-                  </div>
+                          {/* 4. Participation Mode (Dynamically filtered by selected game's supported modes) */}
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-dim">Participation Mode <span className="text-cyan">*</span></label>
+                              <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
+                            </div>
+                            <select
+                              required
+                              value={currentPartMode}
+                              onChange={(e) => setNewTour({ ...newTour, participation_mode: e.target.value })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              {activeGameModes.map((mode) => (
+                                <option key={mode} value={mode}>
+                                  {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
 
-                  {/* SECTION C: TEAM & PLAYER STRUCTURE */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
-                      <span className="text-cyan font-bold">03 //</span>
-                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Roster & Team Structure</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-dim">Max Teams</label>
-                        <input
-                          required
-                          type="number"
-                          min="2"
-                          max="128"
-                          value={newTour.max_teams}
-                          onChange={(e) => setNewTour({ ...newTour, max_teams: Number(e.target.value) })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-dim">Min Team Size</label>
-                        <input
-                          required
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={newTour.min_team_size}
-                          onChange={(e) => setNewTour({ ...newTour, min_team_size: Number(e.target.value) })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-dim">Max Team Size</label>
-                        <input
-                          required
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={newTour.max_team_size}
-                          onChange={(e) => setNewTour({ ...newTour, max_team_size: Number(e.target.value) })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                        {/* 5 & 6. Dynamic Capacity & Series Format */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* 5. Dynamic Capacity */}
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-dim">
+                                {currentPartMode === 'SOLO' ? 'Max Players' : 'Max Teams'} <span className="text-cyan">*</span>
+                              </label>
+                              <span className="text-[10px] text-dim font-mono">
+                                {currentPartMode === 'SOLO' ? 'Individual Competitors' : currentPartMode === 'DUO' ? '2-Player Teams' : '4-Player Squads'}
+                              </span>
+                            </div>
+                            <input
+                              required
+                              type="number"
+                              min="2"
+                              max="256"
+                              placeholder={currentPartMode === 'SOLO' ? 'e.g. 100 players' : currentPartMode === 'DUO' ? 'e.g. 25 teams' : 'e.g. 16 teams'}
+                              value={newTour.max_teams}
+                              onChange={(e) => setNewTour({ ...newTour, max_teams: Number(e.target.value) })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                          </div>
 
-                  {/* SECTION D: FINANCIAL STRUCTURE */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
-                      <span className="text-cyan font-bold">04 //</span>
-                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Financial Structure</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-dim">Prize Pool (₹)</label>
-                        <input
-                          required
-                          type="number"
-                          min="0"
-                          value={newTour.prize_pool_inr}
-                          onChange={(e) => setNewTour({ ...newTour, prize_pool_inr: Number(e.target.value) })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-dim">Entry Fee per Squad (₹)</label>
-                        <input
-                          required
-                          type="number"
-                          min="0"
-                          value={newTour.entry_fee_inr}
-                          onChange={(e) => setNewTour({ ...newTour, entry_fee_inr: Number(e.target.value) })}
-                          className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                        />
-                        <p className="mt-1 text-[10px] text-dim font-mono">Set to 0 for Free-to-enter tournaments.</p>
-                      </div>
-                    </div>
-                  </div>
+                          {/* 6. Series Format */}
+                          <div>
+                            <label className="text-dim">Series Format <span className="text-cyan">*</span></label>
+                            <select
+                              required
+                              value={newTour.series_format || 'BO1'}
+                              onChange={(e) => setNewTour({ ...newTour, series_format: e.target.value })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              <option value="BO1">Best of 1 (BO1)</option>
+                              <option value="BO3">Best of 3 (BO3)</option>
+                            </select>
+                          </div>
+                        </div>
 
-                  {/* SECTION E: COMMUNITY & OVERVIEW */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-white/10 pb-1.5">
-                      <span className="text-cyan font-bold">05 //</span>
-                      <span className="text-ink font-bold uppercase tracking-wider text-[11px]">Communications & Information</span>
-                    </div>
-                    <div>
-                      <label className="text-dim">Official WhatsApp Group Link</label>
-                      <input
-                        placeholder="https://chat.whatsapp.com/... (optional)"
-                        value={newTour.whatsapp_group_url || ''}
-                        onChange={(e) => setNewTour({ ...newTour, whatsapp_group_url: e.target.value })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                      <p className="mt-1 text-[10px] text-dim font-mono">Enrolled squad captains receive this link upon registration confirmation.</p>
-                    </div>
-                    <div>
-                      <label className="text-dim">Community Discord / Channel Link</label>
-                      <input
-                        placeholder="https://discord.gg/... (optional)"
-                        value={newTour.community_link || ''}
-                        onChange={(e) => setNewTour({ ...newTour, community_link: e.target.value })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                      <p className="mt-1 text-[10px] text-dim font-mono">Public discord server or communication hub for general announcements.</p>
-                    </div>
-                    <div>
-                      <label className="text-dim">Description</label>
-                      <textarea
-                        rows={3}
-                        value={newTour.description}
-                        onChange={(e) => setNewTour({ ...newTour, description: e.target.value })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                    </div>
-                  </div>
+                        {/* 7 & 8. Prize Pool & Entry Fee */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* 7. Prize Pool */}
+                          <div>
+                            <label className="text-dim">Prize Pool (₹) <span className="text-cyan">*</span></label>
+                            <input
+                              required
+                              type="number"
+                              min="0"
+                              value={newTour.prize_pool_inr}
+                              onChange={(e) => setNewTour({ ...newTour, prize_pool_inr: Number(e.target.value) })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                          </div>
+
+                          {/* 8. Entry Fee */}
+                          <div>
+                            <label className="text-dim">
+                              Entry Fee {currentPartMode === 'SOLO' ? 'per Player' : 'per Squad'} (₹) <span className="text-cyan">*</span>
+                            </label>
+                            <input
+                              required
+                              type="number"
+                              min="0"
+                              value={newTour.entry_fee_inr}
+                              onChange={(e) => setNewTour({ ...newTour, entry_fee_inr: Number(e.target.value) })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                            <p className="mt-1 text-[10px] text-dim font-mono">Set to 0 for Free-to-enter tournaments.</p>
+                          </div>
+                        </div>
+
+                        {/* 9 & 10. Start Date & Start Time */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* 9. Start Date */}
+                          <div>
+                            <label className="text-dim">Start Date <span className="text-cyan">*</span></label>
+                            <input
+                              required
+                              type="date"
+                              value={newTour.start_date || (newTour.starts_at_local ? newTour.starts_at_local.split('T')[0] : '')}
+                              onChange={(e) => {
+                                const d = e.target.value
+                                const t = newTour.start_time || '18:00'
+                                setNewTour({
+                                  ...newTour,
+                                  start_date: d,
+                                  start_time: t,
+                                  starts_at_local: d && t ? `${d}T${t}` : newTour.starts_at_local,
+                                })
+                              }}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                          </div>
+
+                          {/* 10. Start Time */}
+                          <div>
+                            <label className="text-dim">Start Time <span className="text-cyan">*</span></label>
+                            <input
+                              required
+                              type="time"
+                              value={newTour.start_time || (newTour.starts_at_local && newTour.starts_at_local.includes('T') ? newTour.starts_at_local.split('T')[1].slice(0, 5) : '18:00')}
+                              onChange={(e) => {
+                                const t = e.target.value
+                                const d = newTour.start_date || (newTour.starts_at_local ? newTour.starts_at_local.split('T')[0] : '')
+                                setNewTour({
+                                  ...newTour,
+                                  start_time: t,
+                                  starts_at_local: d && t ? `${d}T${t}` : newTour.starts_at_local,
+                                })
+                              }}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 11. Official WhatsApp Group Link */}
+                        <div>
+                          <label className="text-dim">Official WhatsApp Group Link</label>
+                          <input
+                            placeholder="https://chat.whatsapp.com/... (optional)"
+                            value={newTour.whatsapp_group_url || ''}
+                            onChange={(e) => setNewTour({ ...newTour, whatsapp_group_url: e.target.value })}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          />
+                          <p className="mt-1 text-[10px] text-dim font-mono">Enrolled participants receive this link upon registration confirmation.</p>
+                        </div>
+
+                        {/* 12. Official Community Link */}
+                        <div>
+                          <label className="text-dim">Official Community Link (Discord / Channel)</label>
+                          <input
+                            placeholder="https://discord.gg/... (optional)"
+                            value={newTour.community_link || ''}
+                            onChange={(e) => setNewTour({ ...newTour, community_link: e.target.value })}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          />
+                          <p className="mt-1 text-[10px] text-dim font-mono">Public discord server or communication hub for general announcements.</p>
+                        </div>
+
+                        {/* 13. Description */}
+                        <div>
+                          <label className="text-dim">Description</label>
+                          <textarea
+                            rows={3}
+                            value={newTour.description}
+                            onChange={(e) => setNewTour({ ...newTour, description: e.target.value })}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          />
+                        </div>
+
+                        {/* 14. Status / Tournament State Controls */}
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="text-dim">Tournament Status <span className="text-cyan">*</span></label>
+                            <span className="text-[10px] text-cyan uppercase font-bold tracking-wider">Visibility & Enrollment</span>
+                          </div>
+                          <select
+                            value={newTour.status}
+                            onChange={(e) => setNewTour({ ...newTour, status: e.target.value as any })}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          >
+                            <option value="REGISTRATION_OPEN">Registration Open (Publicly Visible & Open for Entries)</option>
+                            <option value="UPCOMING">Upcoming (Publicly Visible Announcement - Registrations Pending)</option>
+                            <option value="DRAFT">Draft (Admin Only - Staged & Hidden from Public)</option>
+                          </select>
+                          <p className="mt-1 text-[10px] text-dim font-mono">
+                            {newTour.status === 'REGISTRATION_OPEN' && 'Tournament will be immediately visible on public listings and open for player and team registrations.'}
+                            {newTour.status === 'UPCOMING' && 'Tournament will be visible as an upcoming event on public listings.'}
+                            {newTour.status === 'DRAFT' && 'Tournament will be saved as a draft. Only admins can view and publish it.'}
+                          </p>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
 
                 <div className="pt-3 flex justify-end items-center gap-3 border-t border-white/10 p-4 shrink-0 bg-graphite">
@@ -6672,37 +6689,86 @@ export default function Admin() {
                     <label className="text-dim">Title</label>
                     <input required value={editingTour.title} onChange={(e) => setEditingTour({ ...editingTour, title: e.target.value })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-dim">Competition Format</label>
-                      <select
-                        required
-                        value={editingTour.format}
-                        onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                      >
-                        <option value="Knockout">Knockout</option>
-                        <option value="Round Robin">Round Robin</option>
-                        <option value="Battle Royale">Battle Royale</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-dim">Series Format</label>
-                      <select
-                        required
-                        value={(editingTour as any).series_format || 'BO1'}
-                        onChange={(e) => setEditingTour({ ...editingTour, series_format: e.target.value } as any)}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                      >
-                        <option value="BO1">Best of 1 (BO1)</option>
-                        <option value="BO3">Best of 3 (BO3)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-dim">Max Teams</label>
-                      <input required type="number" min="2" value={editingTour.max_teams} onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs" />
-                    </div>
-                  </div>
+                  {(() => {
+                    const matchingGame = games.find((g) => (g.slug || g.id) === editingTour.game_id || g.id === editingTour.game_id)
+                    const supportedModes: string[] = matchingGame
+                      ? ((matchingGame as any).supported_game_modes || (matchingGame as any).supportedGameModes || (matchingGame.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+                      : ['SOLO', 'DUO', 'SQUAD']
+                    const currentPartMode = ((editingTour as any).participation_mode || supportedModes[0] || 'SQUAD').toUpperCase().trim()
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-dim">Competition Format</label>
+                            <select
+                              required
+                              value={editingTour.format}
+                              onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              <option value="Knockout">Knockout</option>
+                              <option value="Round Robin">Round Robin</option>
+                              <option value="Battle Royale">Battle Royale</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-dim">Participation Mode</label>
+                              <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
+                            </div>
+                            <select
+                              required
+                              value={currentPartMode}
+                              onChange={(e) => setEditingTour({ ...editingTour, participation_mode: e.target.value } as any)}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              {supportedModes.map((mode) => (
+                                <option key={mode} value={mode}>
+                                  {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-dim">
+                                {currentPartMode === 'SOLO' ? 'Max Players' : 'Max Teams'}
+                              </label>
+                              <span className="text-[10px] text-dim font-mono">
+                                {currentPartMode === 'SOLO' ? 'Individual Competitors' : currentPartMode === 'DUO' ? '2-Player Teams' : '4-Player Squads'}
+                              </span>
+                            </div>
+                            <input
+                              required
+                              type="number"
+                              min="2"
+                              max="256"
+                              placeholder={currentPartMode === 'SOLO' ? 'e.g. 100 players' : currentPartMode === 'DUO' ? 'e.g. 25 teams' : 'e.g. 16 teams'}
+                              value={editingTour.max_teams}
+                              onChange={(e) => setEditingTour({ ...editingTour, max_teams: Number(e.target.value) })}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-dim">Series Format</label>
+                            <select
+                              required
+                              value={(editingTour as any).series_format || 'BO1'}
+                              onChange={(e) => setEditingTour({ ...editingTour, series_format: e.target.value } as any)}
+                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            >
+                              <option value="BO1">Best of 1 (BO1)</option>
+                              <option value="BO3">Best of 3 (BO3)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    )
+                  })()}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-dim">Prize Pool (₹)</label>
@@ -6713,37 +6779,20 @@ export default function Admin() {
                       <input required type="number" min="0" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-dim">Start Date & Time (UTC/Local)</label>
-                      <input
-                        type="datetime-local"
-                        value={isoToLocalDatetimeInputString(editingTour.starts_at || editingTour.start_date)}
-                        onChange={(e) => {
-                          const d = new Date(e.target.value)
-                          setEditingTour({
-                            ...editingTour,
-                            starts_at: isNaN(d.getTime()) ? undefined : d.toISOString(),
-                          })
-                        }}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-dim">Roster Lock Date & Time (UTC/Local)</label>
-                      <input
-                        type="datetime-local"
-                        value={isoToLocalDatetimeInputString(editingTour.roster_lock_time)}
-                        onChange={(e) => {
-                          const d = new Date(e.target.value)
-                          setEditingTour({
-                            ...editingTour,
-                            roster_lock_time: isNaN(d.getTime()) ? undefined : d.toISOString(),
-                          })
-                        }}
-                        className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-dim">Start Date & Time (UTC/Local)</label>
+                    <input
+                      type="datetime-local"
+                      value={isoToLocalDatetimeInputString(editingTour.starts_at || editingTour.start_date)}
+                      onChange={(e) => {
+                        const d = new Date(e.target.value)
+                        setEditingTour({
+                          ...editingTour,
+                          starts_at: isNaN(d.getTime()) ? undefined : d.toISOString(),
+                        })
+                      }}
+                      className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan"
+                    />
                   </div>
                   <div>
                     <label className="text-dim">Official WhatsApp Group Link</label>
@@ -6930,19 +6979,54 @@ export default function Admin() {
                     <input required placeholder="e.g. BATTLE ROYALE" value={newGame.tag} onChange={(e) => setNewGame({ ...newGame, tag: e.target.value.toUpperCase() })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-dim">Min Squad Size</label>
-                    <input required type="number" min="1" max="10" value={newGame.min_team_size} onChange={(e) => setNewGame({ ...newGame, min_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-dim font-bold uppercase">Supported Game Modes <span className="text-cyan">*</span></label>
+                    <span className="text-[10px] text-cyan font-mono">Select all applicable modes</span>
                   </div>
-                  <div>
-                    <label className="text-dim">Max Squad Size</label>
-                    <input required type="number" min="1" max="10" value={newGame.max_team_size} onChange={(e) => setNewGame({ ...newGame, max_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      { key: 'SOLO', label: 'Solo', desc: '1v1 Individual' },
+                      { key: 'DUO', label: 'Duo', desc: '2 Players' },
+                      { key: 'SQUAD', label: 'Squad', desc: '4 Players' },
+                    ].map((m) => {
+                      const isSelected = (newGame.supported_game_modes || []).includes(m.key)
+                      return (
+                        <label
+                          key={m.key}
+                          className={`flex items-start gap-2.5 p-2.5 border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'border-cyan bg-cyan/10 text-ink'
+                              : 'border-white/15 bg-surface text-dim hover:border-white/30'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 accent-cyan"
+                            checked={isSelected}
+                            onChange={() => {
+                              const current = newGame.supported_game_modes || []
+                              const updated = isSelected
+                                ? current.filter((x: string) => x !== m.key)
+                                : [...current, m.key]
+                              setNewGame({ ...newGame, supported_game_modes: updated })
+                            }}
+                          />
+                          <div>
+                            <span className="font-bold text-ink block">{m.label}</span>
+                            <span className="text-[10px] text-dim block">{m.desc}</span>
+                          </div>
+                        </label>
+                      )
+                    })}
                   </div>
-                  <div>
-                    <label className="text-dim">Substitutes</label>
-                    <input required type="number" min="0" max="5" value={newGame.max_substitutes} onChange={(e) => setNewGame({ ...newGame, max_substitutes: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
-                  </div>
+                  {(newGame.supported_game_modes || []).length === 0 && (
+                    <p className="mt-1 text-[10px] text-red-400 font-mono">Select at least one supported game mode.</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-dim">Max Substitutes</label>
+                  <input type="number" min="0" max="5" value={newGame.max_substitutes} onChange={(e) => setNewGame({ ...newGame, max_substitutes: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
                 </div>
                 <div>
                   <label className="text-dim">Server Region</label>
@@ -7029,15 +7113,50 @@ export default function Admin() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-dim">Min Squad Size</label>
-                    <input required type="number" value={editingGame.min_team_size} onChange={(e) => setEditingGame({ ...editingGame, min_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-dim font-bold uppercase">Supported Game Modes <span className="text-cyan">*</span></label>
+                    <span className="text-[10px] text-cyan font-mono">Select all applicable modes</span>
                   </div>
-                  <div>
-                    <label className="text-dim">Max Squad Size</label>
-                    <input required type="number" value={editingGame.max_team_size} onChange={(e) => setEditingGame({ ...editingGame, max_team_size: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none" />
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      { key: 'SOLO', label: 'Solo', desc: '1v1 Individual' },
+                      { key: 'DUO', label: 'Duo', desc: '2 Players' },
+                      { key: 'SQUAD', label: 'Squad', desc: '4 Players' },
+                    ].map((m) => {
+                      const currentModes = (editingGame.supported_game_modes || (editingGame as any).supportedGameModes || []).map((x: string) => x.toUpperCase().trim())
+                      const isSelected = currentModes.includes(m.key)
+                      return (
+                        <label
+                          key={m.key}
+                          className={`flex items-start gap-2.5 p-2.5 border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'border-cyan bg-cyan/10 text-ink'
+                              : 'border-white/15 bg-surface text-dim hover:border-white/30'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 accent-cyan"
+                            checked={isSelected}
+                            onChange={() => {
+                              const updated = isSelected
+                                ? currentModes.filter((x: string) => x !== m.key)
+                                : [...currentModes, m.key]
+                              setEditingGame({ ...editingGame, supported_game_modes: updated })
+                            }}
+                          />
+                          <div>
+                            <span className="font-bold text-ink block">{m.label}</span>
+                            <span className="text-[10px] text-dim block">{m.desc}</span>
+                          </div>
+                        </label>
+                      )
+                    })}
                   </div>
+                  {(editingGame.supported_game_modes || []).length === 0 && (
+                    <p className="mt-1 text-[10px] text-red-400 font-mono">Select at least one supported game mode.</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-dim">Server Region</label>

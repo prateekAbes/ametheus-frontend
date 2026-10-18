@@ -8,8 +8,9 @@ export interface Game {
   platform: string
   tag: string
   is_team_game: boolean
-  min_team_size: number
-  max_team_size: number
+  supported_game_modes?: string[]
+  min_team_size?: number
+  max_team_size?: number
   max_substitutes?: number
   entry_fee_inr?: number
   prize_pool_inr?: number
@@ -45,8 +46,10 @@ export interface NormalizedGame {
   platform: string
   tag: string
   isTeamGame: boolean
-  minTeamSize: number
-  maxTeamSize: number
+  supported_game_modes?: string[]
+  supportedGameModes: string[]
+  minTeamSize?: number
+  maxTeamSize?: number
   maxSubstitutes: number
   entryFeeInr: number
   prizePoolInr: number
@@ -88,6 +91,11 @@ export function normalizeGame(game: Game): NormalizedGame {
   const logoUrl = game.logo_url || (game as any).logoUrl || ''
   const mediaConfig = game.media_config || (game as any).mediaConfig || {}
 
+  const rawModes = game.supported_game_modes || (game as any).supportedGameModes || []
+  const supportedGameModes = Array.isArray(rawModes) && rawModes.length > 0
+    ? rawModes.map(m => String(m).toUpperCase().trim())
+    : (game.is_team_game === false ? ['SOLO'] : ['SQUAD'])
+
   return {
     id: game.id || (game as any)._id,
     slug: game.slug,
@@ -98,8 +106,10 @@ export function normalizeGame(game: Game): NormalizedGame {
     platform: game.platform,
     tag: game.tag,
     isTeamGame: game.is_team_game,
-    minTeamSize: game.min_team_size,
-    maxTeamSize: game.max_team_size,
+    supported_game_modes: supportedGameModes,
+    supportedGameModes,
+    minTeamSize: game.min_team_size ?? (supportedGameModes.includes('SOLO') && supportedGameModes.length === 1 ? 1 : 1),
+    maxTeamSize: game.max_team_size ?? (supportedGameModes.includes('SOLO') && supportedGameModes.length === 1 ? 1 : 5),
     maxSubstitutes: game.max_substitutes || 0,
     entryFeeInr: game.entry_fee_inr || 0,
     prizePoolInr: game.prize_pool_inr || 0,

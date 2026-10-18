@@ -91,9 +91,10 @@ export default function Organizer() {
   const [formData, setFormData] = useState({
     title: '',
     game_id: '',
+    participation_mode: 'SQUAD',
     is_solo: false,
-    min_team_size: 5,
-    max_team_size: 5,
+    min_team_size: 4,
+    max_team_size: 4,
     format: 'Knockout',
     tournament_type: 'Knockout',
     match_format: 'Best of 1',
@@ -103,8 +104,9 @@ export default function Organizer() {
     prize_pool_inr: 10000,
     entry_fee_inr: 0,
     max_teams: 16,
+    start_date: '',
+    start_time: '18:00',
     starts_at: '',
-    roster_lock_time: '',
     rank_requirement: 'Open to All Ranks',
     description: 'Sanctioned competitive esports tournament. Anti-cheat verification mandatory.',
     rules: '1. Standard competitive rules apply.\n2. Roster check-in required 15 mins prior to match start.\n3. Toxic conduct or cheating results in immediate disqualification.',
@@ -188,25 +190,40 @@ export default function Organizer() {
 
   const handleGameChange = (gameVal: string) => {
     const sel = games.find((g) => g.id === gameVal || g.slug === gameVal)
-    const isSolo = sel?.max_team_size === 1 || sel?.tag?.toLowerCase().includes('1v1')
+    const modes: string[] = sel
+      ? ((sel as any).supported_game_modes || (sel as any).supportedGameModes || (sel.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+      : ['SOLO', 'DUO', 'SQUAD']
+    const nextMode = modes.includes((formData.participation_mode || '').toUpperCase())
+      ? (formData.participation_mode || '').toUpperCase()
+      : modes[0] || 'SQUAD'
+    const isSolo = nextMode === 'SOLO'
+    const teamSize = nextMode === 'SOLO' ? 1 : (nextMode === 'DUO' ? 2 : 4)
+
     setFormData((prev) => ({
       ...prev,
       game_id: gameVal,
-      is_solo: !!isSolo,
-      min_team_size: isSolo ? 1 : (sel?.min_team_size || 5),
-      max_team_size: isSolo ? 1 : (sel?.max_team_size || 5),
+      participation_mode: nextMode,
+      is_solo: isSolo,
+      min_team_size: teamSize,
+      max_team_size: teamSize,
       format: 'Knockout',
     }))
   }
 
   const openCreateModal = () => {
     setEditingTournament(null)
+    const initGame = games[0]
+    const modes: string[] = initGame
+      ? ((initGame as any).supported_game_modes || (initGame as any).supportedGameModes || (initGame.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+      : ['SOLO', 'DUO', 'SQUAD']
+    const defaultMode = modes[0] || 'SQUAD'
     setFormData({
       title: '',
-      game_id: games[0]?.slug || games[0]?.id || '',
-      is_solo: false,
-      min_team_size: 5,
-      max_team_size: 5,
+      game_id: initGame?.slug || initGame?.id || '',
+      participation_mode: defaultMode,
+      is_solo: defaultMode === 'SOLO',
+      min_team_size: defaultMode === 'SOLO' ? 1 : (defaultMode === 'DUO' ? 2 : 4),
+      max_team_size: defaultMode === 'SOLO' ? 1 : (defaultMode === 'DUO' ? 2 : 4),
       format: 'Knockout',
       tournament_type: 'Knockout',
       match_format: 'Best of 1',
@@ -216,8 +233,9 @@ export default function Organizer() {
       prize_pool_inr: 10000,
       entry_fee_inr: 0,
       max_teams: 16,
+      start_date: '',
+      start_time: '18:00',
       starts_at: '',
-      roster_lock_time: '',
       rank_requirement: 'Open to All Ranks',
       description: 'Sanctioned competitive esports tournament. Anti-cheat verification mandatory.',
       rules: '1. Standard competitive rules apply.\n2. Roster check-in required 15 mins prior to match start.\n3. Toxic conduct or cheating results in immediate disqualification.',
@@ -227,23 +245,28 @@ export default function Organizer() {
 
   const openEditModal = (t: any) => {
     setEditingTournament(t)
+    const pMode = ((t as any).participation_mode || (t as any).participationMode || (t.is_solo ? 'SOLO' : 'SQUAD')).toUpperCase().trim()
+    const startDateVal = t.starts_at ? t.starts_at.split('T')[0] : ''
+    const startTimeVal = t.starts_at && t.starts_at.includes('T') ? t.starts_at.split('T')[1].slice(0, 5) : '18:00'
     setFormData({
       title: t.title || '',
       game_id: t.game_id || t.gameId || games[0]?.slug || '',
-      is_solo: !!(t.is_solo || t.isSolo),
-      min_team_size: t.min_team_size || t.minTeamSize || 5,
-      max_team_size: t.max_team_size || t.maxTeamSize || 5,
+      participation_mode: pMode,
+      is_solo: pMode === 'SOLO',
+      min_team_size: pMode === 'SOLO' ? 1 : (pMode === 'DUO' ? 2 : 4),
+      max_team_size: pMode === 'SOLO' ? 1 : (pMode === 'DUO' ? 2 : 4),
       format: t.format || 'Knockout',
       tournament_type: t.tournament_type || t.format || 'Knockout',
       match_format: t.match_format || 'Best of 1',
       whatsapp_group_url: t.whatsapp_group_url || '',
-      discord_url: t.discord_url || '',
+      discord_url: t.discord_url || (t as any).community_link || '',
       server_region: t.server_region || 'AWS Mumbai (ap-south-1)',
       prize_pool_inr: t.prize_pool_inr ?? t.prizePoolInr ?? 10000,
       entry_fee_inr: t.entry_fee_inr ?? t.entryFeeInr ?? 0,
       max_teams: t.max_teams || t.maxTeams || 16,
+      start_date: startDateVal,
+      start_time: startTimeVal,
       starts_at: t.starts_at || '',
-      roster_lock_time: t.roster_lock_time || '',
       rank_requirement: t.rank_requirement || 'Open to All Ranks',
       description: t.description || '',
       rules: Array.isArray(t.rules) ? t.rules.join('\n') : (t.rules || ''),
@@ -256,35 +279,47 @@ export default function Organizer() {
     setCreating(true)
     try {
       const rulesArr = formData.rules.split('\n').map((r) => r.trim()).filter(Boolean)
-      const startIso = formData.starts_at || new Date(Date.now() + 86400000 * 3).toISOString()
-      const lockIso = formData.roster_lock_time || new Date(Date.now() + 86400000 * 2).toISOString()
+      let startIso: string
+      if (formData.start_date) {
+        startIso = new Date(`${formData.start_date}T${formData.start_time || '18:00'}:00`).toISOString()
+      } else if (formData.starts_at) {
+        startIso = new Date(formData.starts_at).toISOString()
+      } else {
+        startIso = new Date(Date.now() + 86400000 * 3).toISOString()
+      }
 
       const rawFmt = (formData.tournament_type || formData.format || '').toLowerCase();
       const isBr = rawFmt.includes('battle royale') || rawFmt.includes('battle_royale');
       const isRr = rawFmt.includes('round robin') || rawFmt.includes('round_robin');
       const match_structure = isBr ? 'BATTLE_ROYALE' : isRr ? 'ROUND_ROBIN' : 'KNOCKOUT';
-      const registration_type = formData.is_solo ? 'SOLO' : 'TEAM';
+      const pMode = (formData.participation_mode || (formData.is_solo ? 'SOLO' : 'SQUAD')).toUpperCase().trim()
+      const is_solo = pMode === 'SOLO'
+      const registration_type = is_solo ? 'SOLO' : 'TEAM';
+      const team_size = pMode === 'SOLO' ? 1 : (pMode === 'DUO' ? 2 : 4);
 
       const payload = {
         title: formData.title,
         game_id: formData.game_id,
-        is_solo: formData.is_solo,
+        participation_mode: pMode,
+        is_solo: is_solo,
         registration_type: registration_type,
         match_structure: match_structure,
         prize_pool_inr: Number(formData.prize_pool_inr),
         entry_fee_inr: Number(formData.entry_fee_inr),
+        start_date: formData.start_date || undefined,
+        start_time: formData.start_time || undefined,
         starts_at: startIso,
-        roster_lock_time: lockIso,
         server_region: formData.server_region,
         max_teams: Number(formData.max_teams),
-        min_team_size: Number(formData.min_team_size),
-        max_team_size: Number(formData.max_team_size),
+        min_team_size: team_size,
+        max_team_size: team_size,
         rank_requirement: formData.rank_requirement,
         format: formData.format,
         tournament_type: formData.tournament_type || formData.format,
         match_format: formData.match_format,
         whatsapp_group_url: formData.whatsapp_group_url || undefined,
         discord_url: formData.discord_url || undefined,
+        community_link: formData.discord_url || undefined,
         description: formData.description,
         rules: rulesArr,
       }
@@ -1575,217 +1610,280 @@ export default function Organizer() {
             </div>
 
             <form onSubmit={handleSaveTournament} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Hud>Game / Discipline</Hud>
-                  <select
-                    value={formData.game_id}
-                    onChange={(e) => handleGameChange(e.target.value)}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                    required
-                  >
-                    {games.map((g) => (
-                      <option key={g.id || g.slug} value={g.slug || g.id}>
-                        {g.name} ({g.tag || 'ESPORTS'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {(() => {
+                const activeGameObj = games.find((g) => (g.slug || g.id) === formData.game_id || g.id === formData.game_id)
+                const activeGameModes: string[] = activeGameObj
+                  ? ((activeGameObj as any).supported_game_modes || (activeGameObj as any).supportedGameModes || (activeGameObj.is_team_game === false ? ['SOLO'] : ['SQUAD'])).map((m: string) => m.toUpperCase().trim())
+                  : ['SOLO', 'DUO', 'SQUAD']
+                const currentPartMode = (formData.participation_mode || activeGameModes[0] || 'SQUAD').toUpperCase().trim()
 
-                <div>
-                  <Hud>Tournament Title</Hud>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. MONSOON INVITATIONAL 2026"
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  />
-                </div>
-              </div>
+                return (
+                  <>
+                    {/* 1 & 2. Sanctioned Game & Tournament Title */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 1. Selected Game / Discipline */}
+                      <div>
+                        <Hud>1. Sanctioned Game <span className="text-cyan">*</span></Hud>
+                        <select
+                          value={formData.game_id}
+                          onChange={(e) => handleGameChange(e.target.value)}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                          required
+                        >
+                          {games.map((g) => (
+                            <option key={g.id || g.slug} value={g.slug || g.id}>
+                              {g.name} ({g.tag || 'ESPORTS'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-              {/* Format selection */}
-              <div className="border border-white/10 bg-surface/50 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs uppercase text-cyan font-bold">Roster & Competition Format</span>
-                  <span className="font-mono text-[10px] px-2 py-0.5 border border-cyan/40 bg-cyan/10 text-cyan">
-                    {formData.is_solo ? 'SOLO (1v1)' : `TEAM (${formData.min_team_size}v${formData.max_team_size})`}
-                  </span>
-                </div>
+                      {/* 2. Tournament Title */}
+                      <div>
+                        <Hud>2. Tournament Title <span className="text-cyan">*</span></Hud>
+                        <input
+                          type="text"
+                          required
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          placeholder="e.g. MONSOON INVITATIONAL 2026"
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                        />
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        is_solo: true,
-                        min_team_size: 1,
-                        max_team_size: 1,
-                        format: '1v1 Solo Championship',
-                      }))
-                    }
-                    className={`border p-3 text-left font-mono text-xs uppercase transition-colors ${
-                      formData.is_solo ? 'border-cyan bg-cyan/10 text-cyan' : 'border-white/10 text-dim hover:border-white/30'
-                    }`}
-                  >
-                    1v1 Solo Contender
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData((p) => ({
-                        ...p,
-                        is_solo: false,
-                        min_team_size: 5,
-                        max_team_size: 5,
-                        format: 'Single Elimination Bracket',
-                      }))
-                    }
-                    className={`border p-3 text-left font-mono text-xs uppercase transition-colors ${
-                      !formData.is_solo ? 'border-cyan bg-cyan/10 text-cyan' : 'border-white/10 text-dim hover:border-white/30'
-                    }`}
-                  >
-                    Team Roster (5v5 Squad)
-                  </button>
-                </div>
-              </div>
+                    {/* 3 & 4. Competition Format & Participation Mode */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 3. Competition Format */}
+                      <div>
+                        <Hud>3. Competition Format <span className="text-cyan">*</span></Hud>
+                        <select
+                          required
+                          value={formData.format}
+                          onChange={(e) => setFormData({ ...formData, format: e.target.value, tournament_type: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                        >
+                          <option value="Knockout">Knockout</option>
+                          <option value="Round Robin">Round Robin</option>
+                          <option value="Battle Royale">Battle Royale</option>
+                        </select>
+                      </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Hud>Prize Pool (₹)</Hud>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.prize_pool_inr}
-                    onChange={(e) => setFormData({ ...formData, prize_pool_inr: Number(e.target.value) })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <Hud>Entry Fee (₹)</Hud>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.entry_fee_inr}
-                    onChange={(e) => setFormData({ ...formData, entry_fee_inr: Number(e.target.value) })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <Hud>Max Teams</Hud>
-                  <input
-                    type="number"
-                    min="2"
-                    max="256"
-                    value={formData.max_teams}
-                    onChange={(e) => setFormData({ ...formData, max_teams: Number(e.target.value) })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-              </div>
+                      {/* 4. Participation Mode (Game Dependent) */}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <Hud>4. Participation Mode <span className="text-cyan">*</span></Hud>
+                          <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
+                        </div>
+                        <select
+                          required
+                          value={currentPartMode}
+                          onChange={(e) => {
+                            const newMode = e.target.value
+                            const isSolo = newMode === 'SOLO'
+                            const teamSize = newMode === 'SOLO' ? 1 : (newMode === 'DUO' ? 2 : 4)
+                            setFormData({
+                              ...formData,
+                              participation_mode: newMode,
+                              is_solo: isSolo,
+                              min_team_size: teamSize,
+                              max_team_size: teamSize,
+                            })
+                          }}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                        >
+                          {activeGameModes.map((mode) => (
+                            <option key={mode} value={mode}>
+                              {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Hud>Tournament Format</Hud>
-                  <select
-                    value={formData.format}
-                    onChange={(e) => setFormData({ ...formData, format: e.target.value, tournament_type: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  >
-                    <option value="Knockout">Knockout</option>
-                    <option value="Round Robin">Round Robin</option>
-                    <option value="Battle Royale">Battle Royale</option>
-                  </select>
-                </div>
-                <div>
-                  <Hud>Series Format</Hud>
-                  <select
-                    value={formData.match_format}
-                    onChange={(e) => setFormData({ ...formData, match_format: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  >
-                    <option value="Best of 1">Best of 1 (BO1)</option>
-                    <option value="Best of 3">Best of 3 (BO3)</option>
-                  </select>
-                </div>
-              </div>
+                    {/* 5 & 6. Dynamic Capacity & Series Format */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 5. Dynamic Capacity */}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <Hud>
+                            5. {currentPartMode === 'SOLO' ? 'Max Players' : 'Max Teams'} <span className="text-cyan">*</span>
+                          </Hud>
+                          <span className="text-[10px] text-dim font-mono">
+                            {currentPartMode === 'SOLO' ? 'Individual Competitors' : currentPartMode === 'DUO' ? '2-Player Teams' : '4-Player Squads'}
+                          </span>
+                        </div>
+                        <input
+                          type="number"
+                          required
+                          min="2"
+                          max="256"
+                          placeholder={currentPartMode === 'SOLO' ? 'e.g. 100 players' : currentPartMode === 'DUO' ? 'e.g. 25 teams' : 'e.g. 16 teams'}
+                          value={formData.max_teams}
+                          onChange={(e) => setFormData({ ...formData, max_teams: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Hud>WhatsApp Group URL</Hud>
-                  <input
-                    type="url"
-                    placeholder="https://chat.whatsapp.com/..."
-                    value={formData.whatsapp_group_url}
-                    onChange={(e) => setFormData({ ...formData, whatsapp_group_url: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <Hud>Discord Server URL</Hud>
-                  <input
-                    type="url"
-                    placeholder="https://discord.gg/..."
-                    value={formData.discord_url}
-                    onChange={(e) => setFormData({ ...formData, discord_url: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-              </div>
+                      {/* 6. Series Format */}
+                      <div>
+                        <Hud>6. Series Format <span className="text-cyan">*</span></Hud>
+                        <select
+                          required
+                          value={formData.match_format}
+                          onChange={(e) => setFormData({ ...formData, match_format: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                        >
+                          <option value="Best of 1">Best of 1 (BO1)</option>
+                          <option value="Best of 3">Best of 3 (BO3)</option>
+                        </select>
+                      </div>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Hud>Server Region</Hud>
-                  <input
-                    type="text"
-                    value={formData.server_region}
-                    onChange={(e) => setFormData({ ...formData, server_region: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <Hud>Rank Requirement</Hud>
-                  <input
-                    type="text"
-                    value={formData.rank_requirement}
-                    onChange={(e) => setFormData({ ...formData, rank_requirement: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-              </div>
+                    {/* 7 & 8. Prize Pool & Entry Fee */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 7. Prize Pool */}
+                      <div>
+                        <Hud>7. Prize Pool (₹) <span className="text-cyan">*</span></Hud>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          value={formData.prize_pool_inr}
+                          onChange={(e) => setFormData({ ...formData, prize_pool_inr: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Hud>Start Date & Time</Hud>
-                  <input
-                    type="datetime-local"
-                    value={formData.starts_at}
-                    onChange={(e) => setFormData({ ...formData, starts_at: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <Hud>Roster Lock Time</Hud>
-                  <input
-                    type="datetime-local"
-                    value={formData.roster_lock_time}
-                    onChange={(e) => setFormData({ ...formData, roster_lock_time: e.target.value })}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
-                  />
-                </div>
-              </div>
+                      {/* 8. Entry Fee */}
+                      <div>
+                        <Hud>8. Entry Fee {currentPartMode === 'SOLO' ? 'per Player' : 'per Squad'} (₹) <span className="text-cyan">*</span></Hud>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          value={formData.entry_fee_inr}
+                          onChange={(e) => setFormData({ ...formData, entry_fee_inr: Number(e.target.value) })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+                    </div>
 
-              <div>
-                <Hud>Description & Rules</Hud>
-                <textarea
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-                />
-              </div>
+                    {/* 9 & 10. Start Date & Start Time */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 9. Start Date */}
+                      <div>
+                        <Hud>9. Start Date <span className="text-cyan">*</span></Hud>
+                        <input
+                          type="date"
+                          required
+                          value={formData.start_date || (formData.starts_at ? formData.starts_at.split('T')[0] : '')}
+                          onChange={(e) => {
+                            const d = e.target.value
+                            const t = formData.start_time || '18:00'
+                            setFormData({
+                              ...formData,
+                              start_date: d,
+                              start_time: t,
+                              starts_at: d && t ? `${d}T${t}` : formData.starts_at,
+                            })
+                          }}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+
+                      {/* 10. Start Time */}
+                      <div>
+                        <Hud>10. Start Time <span className="text-cyan">*</span></Hud>
+                        <input
+                          type="time"
+                          required
+                          value={formData.start_time || (formData.starts_at && formData.starts_at.includes('T') ? formData.starts_at.split('T')[1].slice(0, 5) : '18:00')}
+                          onChange={(e) => {
+                            const t = e.target.value
+                            const d = formData.start_date || (formData.starts_at ? formData.starts_at.split('T')[0] : '')
+                            setFormData({
+                              ...formData,
+                              start_time: t,
+                              starts_at: d && t ? `${d}T${t}` : formData.starts_at,
+                            })
+                          }}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 11 & 12. WhatsApp & Community Links */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 11. WhatsApp Link */}
+                      <div>
+                        <Hud>11. Official WhatsApp Group Link</Hud>
+                        <input
+                          type="url"
+                          placeholder="https://chat.whatsapp.com/... (optional)"
+                          value={formData.whatsapp_group_url}
+                          onChange={(e) => setFormData({ ...formData, whatsapp_group_url: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+
+                      {/* 12. Community Link */}
+                      <div>
+                        <Hud>12. Official Community Link (Discord / Public)</Hud>
+                        <input
+                          type="url"
+                          placeholder="https://discord.gg/... (optional)"
+                          value={formData.discord_url}
+                          onChange={(e) => setFormData({ ...formData, discord_url: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 13. Description & Rules */}
+                    <div>
+                      <Hud>13. Description</Hud>
+                      <textarea
+                        rows={2}
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Hud>Tournament Rules & Regulations</Hud>
+                      <textarea
+                        rows={3}
+                        value={formData.rules}
+                        onChange={(e) => setFormData({ ...formData, rules: e.target.value })}
+                        className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                      />
+                    </div>
+
+                    {/* 14. Server Region & Rank Requirements */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Hud>14. Server Region</Hud>
+                        <input
+                          type="text"
+                          value={formData.server_region}
+                          onChange={(e) => setFormData({ ...formData, server_region: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Hud>Rank Requirement</Hud>
+                        <input
+                          type="text"
+                          value={formData.rank_requirement}
+                          onChange={(e) => setFormData({ ...formData, rank_requirement: e.target.value })}
+                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
 
               <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
                 <button

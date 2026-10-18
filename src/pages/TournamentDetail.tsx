@@ -54,7 +54,7 @@ const RULES: { cat: string; items: [string, string][] }[] = [
     items: [
       ['Roster size', 'Full squad plus one optional substitute.'],
       ['Captain', 'The captain registers the team and must be reachable on match day.'],
-      ['Roster lock', 'Rosters lock once check-in opens for the first match.'],
+      ['Check-in confirmation', 'Teams and players verify readiness and in-game credentials prior to kickoff.'],
     ],
   },
   {
@@ -285,6 +285,8 @@ export default function TournamentDetail() {
   )
   const isSolo = Boolean(
     (tourData?.format || '').toLowerCase().includes('solo') ||
+    (tourData as any)?.participation_mode === 'SOLO' ||
+    (tourData as any)?.participationMode === 'SOLO' ||
     (tourData as any)?.isSolo ||
     (tourData as any)?.is_solo ||
     (tourData?.minTeamSize === 1 && tourData?.maxTeamSize === 1)
@@ -554,7 +556,7 @@ export default function TournamentDetail() {
                 </p>
               </div>
               <div>
-                <Hud>Confirmed Teams</Hud>
+                <Hud>{isSolo ? 'Confirmed Players' : 'Confirmed Teams'}</Hud>
                 <p className="mt-1 font-display text-2xl font-extrabold uppercase text-cyan tabular-nums">
                   {tourData?.confirmedTeams !== undefined ? tourData.confirmedTeams : registeredCount} / {maxTeams}
                 </p>
@@ -1106,26 +1108,18 @@ export default function TournamentDetail() {
                   <p className="mt-1 text-xs text-dim">Official match commencement time.</p>
                 </div>
                 <div className="border border-white/5 bg-void/50 p-4">
-                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">02 · Roster Lock</p>
-                  <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
-                    {tourData?.rosterLockTime
-                      ? new Date(tourData.rosterLockTime).toLocaleString('en-IN', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '2 Hours Before Match'}
-                  </p>
-                  <p className="mt-1 text-xs text-dim">No roster modifications allowed after this point.</p>
-                </div>
-                <div className="border border-white/5 bg-void/50 p-4">
-                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">03 · Server & Region</p>
+                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">02 · Server & Region</p>
                   <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
                     {tourData?.serverRegion || 'India / South Asia'}
                   </p>
                   <p className="mt-1 text-xs text-dim">Authoritative match server region.</p>
+                </div>
+                <div className="border border-white/5 bg-void/50 p-4">
+                  <p className="font-mono text-xs uppercase tracking-wider text-cyan">03 · Competition Format</p>
+                  <p className="mt-2 font-display text-xl font-bold uppercase text-ink">
+                    {tourData?.format || 'Knockout'}
+                  </p>
+                  <p className="mt-1 text-xs text-dim">Official tournament competition structure.</p>
                 </div>
               </div>
 

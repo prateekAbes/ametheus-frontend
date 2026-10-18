@@ -58,7 +58,8 @@ export interface Tournament {
   discord_url?: string
   community_link?: string
   starts_at?: string
-  roster_lock_time?: string
+  participation_mode?: string
+  capacity_label?: string
   server_region?: string
   media_config?: Record<string, any>
 }
@@ -73,6 +74,10 @@ export interface NormalizedTournament {
   format: string
   status: string
   maxTeams: number
+  capacityLabel?: string
+  capacity_label?: string
+  participationMode?: string
+  participation_mode?: string
   registeredTeams: number
   confirmedTeams: number
   reservedTeams: number
@@ -83,7 +88,6 @@ export interface NormalizedTournament {
   endDate?: string
   registrationDeadline?: string
   startsAt?: string
-  rosterLockTime?: string
   serverRegion?: string
   announcementText?: string
   whatsappGroupUrl?: string
@@ -234,6 +238,10 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     format: t.format || (t as any).tournament_type || (t as any).match_format || 'Knockout',
     status: t.status,
     maxTeams,
+    capacityLabel: (t as any).capacity_label || (t as any).capacityLabel || (isSolo ? 'Max Players' : 'Max Teams'),
+    capacity_label: (t as any).capacity_label || (t as any).capacityLabel || (isSolo ? 'Max Players' : 'Max Teams'),
+    participationMode: ((t as any).participation_mode || (t as any).participationMode || (isSolo ? 'SOLO' : isDuo ? 'DUO' : 'SQUAD')).toUpperCase().trim(),
+    participation_mode: ((t as any).participation_mode || (t as any).participationMode || (isSolo ? 'SOLO' : isDuo ? 'DUO' : 'SQUAD')).toUpperCase().trim(),
     registeredTeams: regCount,
     confirmedTeams,
     reservedTeams,
@@ -244,7 +252,6 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     endDate: t.end_date,
     registrationDeadline: t.registration_deadline,
     startsAt: t.starts_at || (t as any).startsAt || t.start_date,
-    rosterLockTime: t.roster_lock_time || (t as any).rosterLockTime,
     serverRegion: t.server_region || (t as any).serverRegion || 'AWS Mumbai (ap-south-1)',
     announcementText: (t as any).announcement_text || (t as any).announcementText,
     whatsappGroupUrl: t.whatsapp_group_url || (t as any).whatsappGroupUrl,
