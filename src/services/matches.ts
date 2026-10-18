@@ -385,6 +385,8 @@ export interface AdminMatchUpdatePayload {
   score_a?: number
   score_b?: number
   winner_team_id?: string
+  room_id?: string
+  room_password?: string
   lobby_code?: string
   lobby_password?: string
   server_region?: string
@@ -728,9 +730,22 @@ export interface QualifiedContender {
 
 export async function getQualifiedContendersAdmin(
   tournamentId: string,
-  sourceRound?: string
-): Promise<{ status: string; tournament_id: string; total_qualified: number; contenders: QualifiedContender[] }> {
-  const query = sourceRound ? `?source_round=${encodeURIComponent(sourceRound)}` : ''
+  sourceRound?: string,
+  roundNumber?: number
+): Promise<{
+  status: string
+  tournament_id: string
+  total_qualified: number
+  contenders: QualifiedContender[]
+  pending_matches?: number
+  has_pending_matches?: boolean
+  eliminated_contenders?: string[]
+  round_number?: number
+}> {
+  const params = new URLSearchParams()
+  if (sourceRound) params.append('source_round', sourceRound)
+  if (roundNumber !== undefined) params.append('round_number', String(roundNumber))
+  const query = params.toString() ? `?${params.toString()}` : ''
   return apiClient(`/admin/tournaments/${tournamentId}/qualified-contenders${query}`)
 }
 

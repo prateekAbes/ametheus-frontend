@@ -483,8 +483,8 @@ export default function Organizer() {
 
   const openLobbyModal = (m: ApiMatch) => {
     setSelectedLobbyMatch(m)
-    setLobbyCode(m.room_id || m.lobby_code || '')
-    setLobbyPassword(m.room_password || m.lobby_password || '')
+    setLobbyCode(m.room_id || '')
+    setLobbyPassword(m.room_password || '')
     setServerRegion(m.server_region || 'AWS Mumbai (ap-south-1)')
     setCustomInstructions(m.custom_instructions || m.match_message || '')
     setStreamUrl(m.youtube_live_url || m.live_link || '')
@@ -498,8 +498,6 @@ export default function Organizer() {
       await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
         room_id: lobbyCode.trim(),
         room_password: lobbyPassword.trim(),
-        lobby_code: lobbyCode.trim(),
-        lobby_password: lobbyPassword.trim(),
         server_region: serverRegion.trim(),
         custom_instructions: customInstructions.trim(),
       })
@@ -537,8 +535,6 @@ export default function Organizer() {
       await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
         room_id: lobbyCode.trim(),
         room_password: lobbyPassword.trim(),
-        lobby_code: lobbyCode.trim(),
-        lobby_password: lobbyPassword.trim(),
         server_region: serverRegion.trim(),
         custom_instructions: customInstructions.trim(),
       })
@@ -935,7 +931,7 @@ export default function Organizer() {
                     ) : (
                       <div className="grid gap-4 md:grid-cols-2">
                         {cockpitMatches.map((m) => {
-                          const hasCreds = !!(m.room_id || m.lobby_code)
+                          const hasCreds = !!m.room_id
                           const isReleased = !!m.credentials_released
                           const isBR = (managingTournament.format || '').toLowerCase().includes('battle') || (managingTournament.tournament_type || '').toLowerCase().includes('battle')
                           const isSolo = !!(managingTournament.is_solo)
@@ -1004,11 +1000,11 @@ export default function Organizer() {
                                 <div className="bg-surface/60 border border-white/10 p-2.5 font-mono text-[11px] grid grid-cols-2 gap-2">
                                   <div>
                                     <span className="text-dim block text-[10px]">ROOM ID:</span>
-                                    <span className="text-ink font-bold">{m.room_id || m.lobby_code}</span>
+                                    <span className="text-ink font-bold">{m.room_id}</span>
                                   </div>
                                   <div>
-                                    <span className="text-dim block text-[10px]">PASSWORD:</span>
-                                    <span className="text-ink font-bold">{m.room_password || m.lobby_password}</span>
+                                    <span className="text-dim block text-[10px]">ROOM PASSWORD:</span>
+                                    <span className="text-ink font-bold">{m.room_password}</span>
                                   </div>
                                 </div>
                               )}
@@ -1986,7 +1982,7 @@ export default function Organizer() {
                     <span className="w-2 h-2 rounded-full bg-ok animate-pulse" />
                     ✓ RELEASED TO PARTICIPANTS
                   </span>
-                ) : (selectedLobbyMatch.room_id || selectedLobbyMatch.lobby_code) ? (
+                ) : selectedLobbyMatch.room_id ? (
                   <span className="text-warn font-bold flex items-center gap-1.5">
                     🔒 DRAFT SAVED (PRIVATE TO ORGANIZER)
                   </span>
@@ -2000,7 +1996,7 @@ export default function Organizer() {
               <form onSubmit={handleSaveLobbyCredentials} className="space-y-4 font-mono text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Hud>Room ID / Lobby Code</Hud>
+                    <Hud>Room ID</Hud>
                     <input
                       type="text"
                       value={lobbyCode}

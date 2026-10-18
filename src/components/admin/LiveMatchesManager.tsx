@@ -98,8 +98,8 @@ interface FormationMatch {
   scheduled_date?: string
   scheduled_time?: string
   youtube_live_url?: string
-  lobby_code?: string
-  lobby_password?: string
+  room_id?: string
+  room_password?: string
   server_region?: string
   score_a?: number
   score_b?: number
@@ -148,6 +148,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const [formationRounds, setFormationRounds] = useState<FormationRound[]>([])
   const [formationMatches, setFormationMatches] = useState<FormationMatch[]>([])
   const [formationRosters, setFormationRosters] = useState<RegisteredRosterTeam[]>([])
+  const [roundQualifiedRoster, setRoundQualifiedRoster] = useState<RegisteredRosterTeam[] | null>(null)
+  const [roundPendingMatches, setRoundPendingMatches] = useState<number>(0)
+  const [isLoadingQualified, setIsLoadingQualified] = useState<boolean>(false)
   const [formationStreamUrl, setFormationStreamUrl] = useState('')
   const [savingFormationStream, setSavingFormationStream] = useState(false)
   const [formationSquadSearch, setFormationSquadSearch] = useState('')
@@ -244,8 +247,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                 scheduled_date: m.scheduled_date,
                 scheduled_time: m.scheduled_time,
                 youtube_live_url: m.youtube_live_url || m.live_link,
-                lobby_code: m.lobby_code,
-                lobby_password: m.lobby_password,
+                room_id: m.room_id,
+                room_password: m.room_password,
                 server_region: m.server_region,
                 score_a: m.team_a?.score ?? m.score_a ?? 0,
                 score_b: m.team_b?.score ?? m.score_b ?? 0,
@@ -340,8 +343,41 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     const roundObj = formationRounds.find((r) => r.round_name === roundName)
     const matchesInRound = formationMatches.filter((m) => m.round_name === roundName)
     const defaultFormat = (roundObj?.format as any) || (currentFormationTourn?.format as any) || 'Knockout'
+    const rNum = roundObj?.round_number || 1
 
     setFormationMatchRound(roundName)
+    setRoundQualifiedRoster(null)
+    setRoundPendingMatches(0)
+
+    if (rNum > 1 && formationTournId) {
+      setIsLoadingQualified(true)
+      getQualifiedContendersAdmin(formationTournId, undefined, rNum)
+        .then((res) => {
+          if (res && Array.isArray(res.contenders)) {
+            const mappedContenders: RegisteredRosterTeam[] = res.contenders.map((c) => ({
+              team_id: c.team_id,
+              team_name: c.team_name,
+              team_tag: c.team_tag || '',
+              captain: {
+                user_id: c.team_id,
+                username: (c as any).captain_username || 'Qualified Winner',
+              },
+              members: [],
+            }))
+            setRoundQualifiedRoster(mappedContenders)
+          }
+          if (res && res.pending_matches) {
+            setRoundPendingMatches(res.pending_matches)
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to load qualified contenders for round:', err)
+        })
+        .finally(() => {
+          setIsLoadingQualified(false)
+        })
+    }
+
     setFormationMatchFormData({
       format: defaultFormat,
       series_format: 'BO1',
@@ -376,24 +412,26 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     let teamBName: string | undefined = undefined
     let teamsList: Array<{ id: string; name: string; tag?: string }> | undefined = undefined
 
+    const candidateRoster = roundQualifiedRoster !== null ? roundQualifiedRoster : formationRosters
+
     if (formationMatchFormData.format === 'Battle Royale') {
       if (formationMatchFormData.selected_team_ids.length < 2) {
         alert('Please select at least 2 contender squads for a Battle Royale match.')
         return
       }
-      teamsList = formationRosters
+      teamsList = candidateRoster
         .filter((r) => formationMatchFormData.selected_team_ids.includes(r.team_id))
         .map((r) => ({ id: r.team_id, name: r.team_name, tag: r.team_tag }))
     } else {
       if (formationMatchFormData.team_a_mode === 'ROSTER') {
-        const t = formationRosters.find((r) => r.team_id === formationMatchFormData.team_a_id)
+        const t = candidateRoster.find((r) => r.team_id === formationMatchFormData.team_a_id)
         teamAName = t?.team_name
       } else {
         teamAName = formationMatchFormData.team_a_placeholder.trim() || 'TBD (Team A)'
       }
 
       if (formationMatchFormData.team_b_mode === 'ROSTER') {
-        const t = formationRosters.find((r) => r.team_id === formationMatchFormData.team_b_id)
+        const t = candidateRoster.find((r) => r.team_id === formationMatchFormData.team_b_id)
         teamBName = t?.team_name
       } else {
         teamBName = formationMatchFormData.team_b_placeholder.trim() || 'TBD (Team B)'
@@ -565,8 +603,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     scheduled_date: '',
     youtube_live_url: '',
     server_region: 'AWS Mumbai (ap-south-1)',
-    lobby_code: '',
-    lobby_password: '',
+    room_id: '',
+    room_password: '',
   })
   const [submittingAdd, setSubmittingAdd] = useState(false)
 
@@ -597,8 +635,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     scheduled_date: '',
     next_match_slot: '',
     youtube_live_url: '',
-    lobby_code: '',
-    lobby_password: '',
+    room_id: '',
+    room_password: '',
     server_region: 'AWS Mumbai (ap-south-1)',
     score_a: 0,
     score_b: 0,
@@ -667,8 +705,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const handleOpenCredentialsModal = (m: ApiMatch) => {
     setCredentialModalMatch(m)
     setCredentialForm({
-      room_id: m.room_id || m.lobby_code || '',
-      room_password: m.room_password || m.lobby_password || '',
+      room_id: m.room_id || '',
+      room_password: m.room_password || '',
       custom_instructions: m.custom_instructions || '',
     })
   }
@@ -1089,8 +1127,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         advancement_label: addMatchData.advancement_label.trim() || undefined,
         youtube_live_url: addMatchData.youtube_live_url.trim() || undefined,
         server_region: addMatchData.server_region.trim() || undefined,
-        lobby_code: addMatchData.lobby_code.trim() || undefined,
-        lobby_password: addMatchData.lobby_password.trim() || undefined,
+        room_id: addMatchData.room_id.trim() || undefined,
+        room_password: addMatchData.room_password.trim() || undefined,
         status: 'SCHEDULED',
       }
 
@@ -1236,8 +1274,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         scheduled_date: editForm.scheduled_date || undefined,
         next_match_slot: editForm.next_match_slot || undefined,
         youtube_live_url: editForm.youtube_live_url.trim() || undefined,
-        lobby_code: editForm.lobby_code.trim() || undefined,
-        lobby_password: editForm.lobby_password.trim() || undefined,
+        room_id: editForm.room_id.trim() || undefined,
+        room_password: editForm.room_password.trim() || undefined,
         server_region: editForm.server_region.trim() || undefined,
         score_a: Number(editForm.score_a),
         score_b: Number(editForm.score_b),
@@ -2548,7 +2586,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         onClick={() => handleOpenCredentialsModal(m)}
                         className="border border-cyan bg-cyan/15 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer flex items-center gap-1"
                       >
-                        🔑 Edit Lobby
+                        🔑 Room Credentials
                       </button>
 
                       <button
@@ -2565,8 +2603,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                             scheduled_date: m.scheduled_date || '',
                             next_match_slot: m.next_match_slot || '',
                             youtube_live_url: m.youtube_live_url || m.live_link || '',
-                            lobby_code: m.lobby_code || m.room_id || '',
-                            lobby_password: m.lobby_password || m.room_password || '',
+                            room_id: m.room_id || '',
+                            room_password: m.room_password || '',
                             server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
                             score_a: m.team_a?.score ?? m.score_a ?? 0,
                             score_b: m.team_b?.score ?? m.score_b ?? 0,
@@ -2683,6 +2721,23 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               <span className="text-[10px] text-cyan font-bold uppercase">{currentFormationTourn?.title}</span>
             </div>
 
+            {/* Contender qualification notice if round > 1 */}
+            {roundPendingMatches > 0 && (
+              <div className="p-2.5 bg-warn/15 border border-warn/40 text-warn text-[11px] font-mono leading-relaxed">
+                ⚠️ <strong>Notice:</strong> {roundPendingMatches} match(es) from preceding rounds are still pending or in progress. Downstream round candidates only include certified winners from completed matches.
+              </div>
+            )}
+            {isLoadingQualified && (
+              <div className="p-2 text-dim font-mono text-xs animate-pulse">
+                Loading qualified winners from preceding round...
+              </div>
+            )}
+            {roundQualifiedRoster !== null && roundQualifiedRoster.length === 0 && !isLoadingQualified && (
+              <div className="p-2.5 bg-live/15 border border-live/40 text-live text-[11px] font-mono leading-relaxed">
+                ⚠️ No contenders have qualified from the previous round yet. Complete preceding round matches first or use Placeholders (e.g. Winner of Match 1).
+              </div>
+            )}
+
             <form onSubmit={handleSaveMatchToFormation} className="mt-4 space-y-4 font-mono text-xs">
               {/* Competition Format Selector */}
               <div className="grid grid-cols-2 gap-3">
@@ -2733,208 +2788,212 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               </div>
 
               {/* BATTLE ROYALE MULTI-TEAM CHECKBOXES */}
-              {formationMatchFormData.format === 'Battle Royale' ? (
-                <div className="border border-white/10 bg-void/60 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-ink uppercase">Select Contender Squads</span>
-                    <span className="text-[10px] text-cyan font-bold">
-                      {formationMatchFormData.selected_team_ids.length} Selected
-                    </span>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto space-y-1.5 border border-white/10 p-2 bg-surface">
-                    {formationRosters.map((tm) => {
-                      const checked = formationMatchFormData.selected_team_ids.includes(tm.team_id)
-                      return (
-                        <label
-                          key={tm.team_id}
-                          className="flex items-center gap-2 p-1 hover:bg-void/40 cursor-pointer text-[11px]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFormationMatchFormData({
-                                  ...formationMatchFormData,
-                                  selected_team_ids: [
-                                    ...formationMatchFormData.selected_team_ids,
-                                    tm.team_id,
-                                  ],
-                                })
-                              } else {
-                                setFormationMatchFormData({
-                                  ...formationMatchFormData,
-                                  selected_team_ids: formationMatchFormData.selected_team_ids.filter(
-                                    (id) => id !== tm.team_id
-                                  ),
-                                })
-                              }
-                            }}
-                            className="accent-cyan"
-                          />
-                          <span className="text-ink font-bold">
-                            {tm.team_name} [{tm.team_tag}]
-                          </span>
-                          <span className="text-dim text-[10px]">
-                            (Capt: @{tm.captain?.username || tm.captain_username || 'TBD'})
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : (
-                /* 2-TEAM PAIRING (Team A vs Team B) */
-                <div className="space-y-3">
-                  {/* Team A */}
-                  <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+              {(() => {
+                const activeCandidateRoster = roundQualifiedRoster !== null ? roundQualifiedRoster : formationRosters
+
+                return formationMatchFormData.format === 'Battle Royale' ? (
+                  <div className="border border-white/10 bg-void/60 p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-ink uppercase">Team A</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormationMatchFormData({
-                              ...formationMatchFormData,
-                              team_a_mode: 'ROSTER',
-                            })
-                          }
-                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
-                            formationMatchFormData.team_a_mode === 'ROSTER'
-                              ? 'border border-cyan bg-cyan text-void font-bold'
-                              : 'text-dim hover:text-ink'
-                          }`}
-                        >
-                          Registered Squad
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormationMatchFormData({
-                              ...formationMatchFormData,
-                              team_a_mode: 'PLACEHOLDER',
-                            })
-                          }
-                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
-                            formationMatchFormData.team_a_mode === 'PLACEHOLDER'
-                              ? 'border border-cyan bg-cyan text-void font-bold'
-                              : 'text-dim hover:text-ink'
-                          }`}
-                        >
-                          Placeholder
-                        </button>
+                      <span className="font-bold text-ink uppercase">Select Contender Squads</span>
+                      <span className="text-[10px] text-cyan font-bold">
+                        {formationMatchFormData.selected_team_ids.length} Selected
+                      </span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 border border-white/10 p-2 bg-surface">
+                      {activeCandidateRoster.map((tm) => {
+                        const checked = formationMatchFormData.selected_team_ids.includes(tm.team_id)
+                        return (
+                          <label
+                            key={tm.team_id}
+                            className="flex items-center gap-2 p-1 hover:bg-void/40 cursor-pointer text-[11px]"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormationMatchFormData({
+                                    ...formationMatchFormData,
+                                    selected_team_ids: [
+                                      ...formationMatchFormData.selected_team_ids,
+                                      tm.team_id,
+                                    ],
+                                  })
+                                } else {
+                                  setFormationMatchFormData({
+                                    ...formationMatchFormData,
+                                    selected_team_ids: formationMatchFormData.selected_team_ids.filter(
+                                      (id) => id !== tm.team_id
+                                    ),
+                                  })
+                                }
+                              }}
+                              className="accent-cyan"
+                            />
+                            <span className="text-ink font-bold">
+                              {tm.team_name} [{tm.team_tag}]
+                            </span>
+                            <span className="text-dim text-[10px]">
+                              (Capt: @{tm.captain?.username || tm.captain_username || 'TBD'})
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* 2-TEAM PAIRING (Team A vs Team B) */
+                  <div className="space-y-3">
+                    {/* Team A */}
+                    <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-ink uppercase">Team A</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormationMatchFormData({
+                                ...formationMatchFormData,
+                                team_a_mode: 'ROSTER',
+                              })
+                            }
+                            className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                              formationMatchFormData.team_a_mode === 'ROSTER'
+                                ? 'border border-cyan bg-cyan text-void font-bold'
+                                : 'text-dim hover:text-ink'
+                            }`}
+                          >
+                            Registered Squad
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormationMatchFormData({
+                                ...formationMatchFormData,
+                                team_a_mode: 'PLACEHOLDER',
+                              })
+                            }
+                            className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                              formationMatchFormData.team_a_mode === 'PLACEHOLDER'
+                                ? 'border border-cyan bg-cyan text-void font-bold'
+                                : 'text-dim hover:text-ink'
+                            }`}
+                          >
+                            Placeholder
+                          </button>
+                        </div>
                       </div>
+
+                      {formationMatchFormData.team_a_mode === 'ROSTER' ? (
+                        <select
+                          value={formationMatchFormData.team_a_id}
+                          onChange={(e) =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_a_id: e.target.value,
+                            })
+                          }
+                          className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                        >
+                          <option value="">Select Registered Squad...</option>
+                          {activeCandidateRoster.map((r) => (
+                            <option key={r.team_id} value={r.team_id}>
+                              {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="e.g. Winner of Match 1 or Alpha Squad"
+                          value={formationMatchFormData.team_a_placeholder}
+                          onChange={(e) =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_a_placeholder: e.target.value,
+                            })
+                          }
+                          className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                        />
+                      )}
                     </div>
 
-                    {formationMatchFormData.team_a_mode === 'ROSTER' ? (
-                      <select
-                        value={formationMatchFormData.team_a_id}
-                        onChange={(e) =>
-                          setFormationMatchFormData({
-                            ...formationMatchFormData,
-                            team_a_id: e.target.value,
-                          })
-                        }
-                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                      >
-                        <option value="">Select Registered Squad...</option>
-                        {formationRosters.map((r) => (
-                          <option key={r.team_id} value={r.team_id}>
-                            {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="e.g. Winner of Match 1 or Alpha Squad"
-                        value={formationMatchFormData.team_a_placeholder}
-                        onChange={(e) =>
-                          setFormationMatchFormData({
-                            ...formationMatchFormData,
-                            team_a_placeholder: e.target.value,
-                          })
-                        }
-                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                      />
-                    )}
-                  </div>
-
-                  {/* Team B */}
-                  <div className="border border-white/10 bg-void/50 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-ink uppercase">Team B</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormationMatchFormData({
-                              ...formationMatchFormData,
-                              team_b_mode: 'ROSTER',
-                            })
-                          }
-                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
-                            formationMatchFormData.team_b_mode === 'ROSTER'
-                              ? 'border border-cyan bg-cyan text-void font-bold'
-                              : 'text-dim hover:text-ink'
-                          }`}
-                        >
-                          Registered Squad
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormationMatchFormData({
-                              ...formationMatchFormData,
-                              team_b_mode: 'PLACEHOLDER',
-                            })
-                          }
-                          className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
-                            formationMatchFormData.team_b_mode === 'PLACEHOLDER'
-                              ? 'border border-cyan bg-cyan text-void font-bold'
-                              : 'text-dim hover:text-ink'
-                          }`}
-                        >
-                          Placeholder
-                        </button>
+                    {/* Team B */}
+                    <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-ink uppercase">Team B</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormationMatchFormData({
+                                ...formationMatchFormData,
+                                team_b_mode: 'ROSTER',
+                              })
+                            }
+                            className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                              formationMatchFormData.team_b_mode === 'ROSTER'
+                                ? 'border border-cyan bg-cyan text-void font-bold'
+                                : 'text-dim hover:text-ink'
+                            }`}
+                          >
+                            Registered Squad
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormationMatchFormData({
+                                ...formationMatchFormData,
+                                team_b_mode: 'PLACEHOLDER',
+                              })
+                            }
+                            className={`px-2 py-0.5 text-[10px] uppercase cursor-pointer ${
+                              formationMatchFormData.team_b_mode === 'PLACEHOLDER'
+                                ? 'border border-cyan bg-cyan text-void font-bold'
+                                : 'text-dim hover:text-ink'
+                            }`}
+                          >
+                            Placeholder
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {formationMatchFormData.team_b_mode === 'ROSTER' ? (
-                      <select
-                        value={formationMatchFormData.team_b_id}
-                        onChange={(e) =>
-                          setFormationMatchFormData({
-                            ...formationMatchFormData,
-                            team_b_id: e.target.value,
-                          })
-                        }
-                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                      >
-                        <option value="">Select Registered Squad...</option>
-                        {formationRosters.map((r) => (
-                          <option key={r.team_id} value={r.team_id}>
-                            {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="e.g. Winner of Match 2 or Beta Squad"
-                        value={formationMatchFormData.team_b_placeholder}
-                        onChange={(e) =>
-                          setFormationMatchFormData({
-                            ...formationMatchFormData,
-                            team_b_placeholder: e.target.value,
-                          })
-                        }
-                        className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
-                      />
-                    )}
+                      {formationMatchFormData.team_b_mode === 'ROSTER' ? (
+                        <select
+                          value={formationMatchFormData.team_b_id}
+                          onChange={(e) =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_b_id: e.target.value,
+                            })
+                          }
+                          className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                        >
+                          <option value="">Select Registered Squad...</option>
+                          {activeCandidateRoster.map((r) => (
+                            <option key={r.team_id} value={r.team_id}>
+                              {r.team_name} [{r.team_tag}] (Capt: @{r.captain?.username || r.captain_username || 'TBD'})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="e.g. Winner of Match 2 or Beta Squad"
+                          value={formationMatchFormData.team_b_placeholder}
+                          onChange={(e) =>
+                            setFormationMatchFormData({
+                              ...formationMatchFormData,
+                              team_b_placeholder: e.target.value,
+                            })
+                          }
+                          className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Match Order & Schedule */}
               <div className="grid grid-cols-2 gap-3">
@@ -3300,7 +3359,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
             <div className="relative w-full max-w-lg border border-white/20 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
               <Brackets color="border-cyan/50" />
               <h3 className="font-display text-2xl font-black uppercase text-ink">
-                Edit Match &amp; Lobby Credentials
+                Edit Match Settings
               </h3>
               <p className="text-xs text-dim mt-1 font-mono">
                 {editMatch.tournament_title || 'Tournament'} · {editMatch.stage || 'Round'}
@@ -3393,22 +3452,22 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-dim uppercase mb-1">Lobby Room Code</label>
+                    <label className="block text-dim uppercase mb-1">Room ID</label>
                     <input
                       type="text"
                       placeholder="e.g. AMT-ROOM-01"
-                      value={editForm.lobby_code}
-                      onChange={(e) => setEditForm({ ...editForm, lobby_code: e.target.value })}
+                      value={editForm.room_id}
+                      onChange={(e) => setEditForm({ ...editForm, room_id: e.target.value })}
                       className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-cyan"
                     />
                   </div>
                   <div>
-                    <label className="block text-dim uppercase mb-1">Lobby Password</label>
+                    <label className="block text-dim uppercase mb-1">Room Password</label>
                     <input
                       type="text"
                       placeholder="e.g. PASS99"
-                      value={editForm.lobby_password}
-                      onChange={(e) => setEditForm({ ...editForm, lobby_password: e.target.value })}
+                      value={editForm.room_password}
+                      onChange={(e) => setEditForm({ ...editForm, room_password: e.target.value })}
                       className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold text-warn"
                     />
                   </div>
@@ -3439,6 +3498,39 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                       className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                     />
                   </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/10">
+                  <label className="block text-dim uppercase mb-1">Declared Match Winner</label>
+                  <select
+                    value={editForm.winner_team_id}
+                    onChange={(e) => setEditForm({ ...editForm, winner_team_id: e.target.value })}
+                    className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan font-bold"
+                  >
+                    <option value="">-- No Declared Winner (Pending / Unsettled) --</option>
+                    {(editMatch.team_a_id || editMatch.team_a?.id) && (
+                      <option value={editMatch.team_a_id || editMatch.team_a?.id}>
+                        {editMatch.team_a?.name || editMatch.team_a_name || 'Team A'}
+                      </option>
+                    )}
+                    {(editMatch.team_b_id || editMatch.team_b?.id) && (
+                      <option value={editMatch.team_b_id || editMatch.team_b?.id}>
+                        {editMatch.team_b?.name || editMatch.team_b_name || 'Team B'}
+                      </option>
+                    )}
+                    {Array.isArray(editMatch.teams) &&
+                      editMatch.teams.map((tm: any, idx: number) => {
+                        const tId = tm.id || tm._id
+                        if (tId && tId !== editMatch.team_a_id && tId !== editMatch.team_b_id) {
+                          return (
+                            <option key={tId || idx} value={tId}>
+                              {tm.name || `Participant ${idx + 1}`}
+                            </option>
+                          )
+                        }
+                        return null
+                      })}
+                  </select>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">

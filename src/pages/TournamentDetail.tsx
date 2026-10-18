@@ -238,6 +238,27 @@ export default function TournamentDetail() {
   useEffect(() => {
     fetchTour()
     fetchStatus(id)
+
+    // Polling interval every 10 seconds for live match updates and credentials
+    const interval = setInterval(() => {
+      fetchTour()
+      if (isSignedIn) {
+        fetchStatus(id)
+      }
+    }, 10000)
+
+    const handleFocus = () => {
+      fetchTour()
+      if (isSignedIn) {
+        fetchStatus(id)
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [id, isSignedIn])
 
   const paymentStatus = regStatus?.registration?.payment_status || regStatus?.payment_status
@@ -310,43 +331,56 @@ export default function TournamentDetail() {
   const userMatch = useMemo(() => {
     if (!matchesData || matchesData.length === 0) return null
     // Find all matches where user or team participates
+    const uTeamStr = userTeamId ? String(userTeamId) : ''
+    const uPlayerStr = userPlayerId ? String(userPlayerId) : ''
+
     const userMatches = matchesData.filter((m: any) => {
-      if (userTeamId) {
-        if (m.team_a?.id === userTeamId || m.team_b?.id === userTeamId || m.team_a_id === userTeamId || m.team_b_id === userTeamId) return true
-        if (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id) === userTeamId)) return true
+      if (uTeamStr) {
+        if (String(m.team_a?.id || '') === uTeamStr || String(m.team_b?.id || '') === uTeamStr || String(m.team_a_id || '') === uTeamStr || String(m.team_b_id || '') === uTeamStr) return true
+        if (Array.isArray(m.teams) && m.teams.some((t: any) => String(t?.id || t?._id || '') === uTeamStr)) return true
+        if (Array.isArray(m.team_ids) && m.team_ids.some((tid: any) => String(tid) === uTeamStr)) return true
       }
-      if (userPlayerId) {
-        if (m.team_a?.id === userPlayerId || m.team_b?.id === userPlayerId || m.team_a_id === userPlayerId || m.team_b_id === userPlayerId) return true
-        if (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id || t?.user_id) === userPlayerId)) return true
+      if (uPlayerStr) {
+        if (String(m.team_a?.id || '') === uPlayerStr || String(m.team_b?.id || '') === uPlayerStr || String(m.team_a_id || '') === uPlayerStr || String(m.team_b_id || '') === uPlayerStr) return true
+        if (Array.isArray(m.teams) && m.teams.some((t: any) => String(t?.id || t?._id || t?.user_id || '') === uPlayerStr)) return true
+        if (Array.isArray(m.team_ids) && m.team_ids.some((tid: any) => String(tid) === uPlayerStr)) return true
+        if (Array.isArray(m.registered_participant_ids) && m.registered_participant_ids.some((pid: any) => String(pid) === uPlayerStr)) return true
       }
       return false
     })
 
-    if (userMatches.length === 0) return null
+    // If no direct participant match was resolved by ID, but user is confirmed participant in a single-lobby tournament
+    let matchPool = userMatches
+    if (matchPool.length === 0 && isConfirmedParticipant && matchesData.length === 1) {
+      matchPool = matchesData
+    }
+
+    if (matchPool.length === 0) return null
 
     // Prioritize active/current match: LIVE first, then SCHEDULED/UPCOMING (highest round), then ENDED, then COMPLETED
-    const liveMatch = userMatches.find((m: any) => (m.status || '').toUpperCase() === 'LIVE')
+    const liveMatch = matchPool.find((m: any) => (m.status || '').toUpperCase() === 'LIVE')
     if (liveMatch) return liveMatch
 
-    const scheduledMatches = userMatches
+    const scheduledMatches = matchPool
       .filter((m: any) => ['SCHEDULED', 'DRAFT', 'CHECK_IN_OPEN', 'UPCOMING'].includes((m.status || '').toUpperCase()))
       .sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))
     if (scheduledMatches.length > 0) return scheduledMatches[0]
 
-    const endedMatches = userMatches
+    const endedMatches = matchPool
       .filter((m: any) => ['ENDED', 'RESULTS_SAVED', 'RESULTS_PENDING'].includes((m.status || '').toUpperCase()))
       .sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))
     if (endedMatches.length > 0) return endedMatches[0]
 
-    return [...userMatches].sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))[0]
-  }, [matchesData, userTeamId, userPlayerId])
+    return [...matchPool].sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))[0]
+  }, [matchesData, userTeamId, userPlayerId, isConfirmedParticipant])
 
   // Strict Round-Specific Credential Isolation: Credentials belong to user's active match only
   const activeCreds = useMemo(() => {
     if (userMatch) {
-      if (userMatch.credentials_released) {
-        const rId = userMatch.room_id || userMatch.lobby_code
-        const rPass = userMatch.room_password || userMatch.lobby_password
+      const isLive = (userMatch.status || '').toUpperCase() === 'LIVE'
+      if (userMatch.credentials_released || isLive) {
+        const rId = userMatch.room_id
+        const rPass = userMatch.room_password
         if (rId && rId !== 'TBD') {
           return {
             roomId: rId,
@@ -707,14 +741,14 @@ export default function TournamentDetail() {
 
 
 
-            {/* Match Lobby Credentials — Primary Focal Point for Confirmed Participants */}
+            {/* Match Room Credentials — Primary Focal Point for Confirmed Participants */}
             {activeCreds ? (
               <div className="mb-8 border border-cyan/40 bg-void/80 p-6 md:p-8 backdrop-blur-md relative overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                   <div className="flex items-center gap-2.5">
                     <span className="size-2 rounded-full bg-cyan animate-pulse" />
                     <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan">
-                      Match Lobby Credentials
+                      Official Room Credentials
                     </span>
                   </div>
                   <span className="border border-ok/40 bg-ok/10 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-ok tracking-wider">
@@ -793,7 +827,7 @@ export default function TournamentDetail() {
                       </div>
                     </div>
                     <span className="mt-4 font-mono text-[11px] text-ok/80 block">
-                      Join Lobby Before Kickoff
+                      Join Room Before Kickoff
                     </span>
                   </div>
                 </div>
@@ -830,7 +864,7 @@ export default function TournamentDetail() {
                       to={`/matches/${userMatch.id || userMatch._id}`}
                       className="inline-flex items-center gap-1.5 border border-cyan/40 bg-cyan/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
                     >
-                      <span>Open Match Lobby</span>
+                      <span>Open Match Details</span>
                       <span>→</span>
                     </Link>
                   </div>
@@ -841,7 +875,7 @@ export default function TournamentDetail() {
                 <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-dim">
                     <span className="size-2 rounded-full bg-dim" />
-                    <span>Match Lobby Credentials</span>
+                    <span>Official Room Credentials</span>
                   </div>
                   <span className="border border-white/15 bg-white/5 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-dim tracking-wider">
                     Awaiting Arbiter Release
@@ -853,7 +887,7 @@ export default function TournamentDetail() {
                       Credentials Scheduled for Match Day
                     </p>
                     <p className="mt-1 text-sm text-dim leading-relaxed">
-                      Custom Room ID and Password will unlock directly in your Competitor Hub once released by arbiters prior to match kickoff.
+                      Custom Room ID and Password will unlock directly in your Competitor Hub and here once released by arbiters prior to match kickoff.
                     </p>
                   </div>
                   <div className="shrink-0 border border-white/10 bg-surface/60 px-3.5 py-2 font-mono text-xs text-dim">

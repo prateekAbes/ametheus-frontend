@@ -27,8 +27,8 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
 
   useEffect(() => {
     if (match) {
-      setRoomId(match.room_id || match.lobby_code || '')
-      setRoomPassword(match.room_password || match.lobby_password || '')
+      setRoomId(match.room_id || '')
+      setRoomPassword(match.room_password || '')
       setCustomInstructions(match.custom_instructions || '')
       setShowPassword(false)
       setErrorMsg(null)
@@ -49,7 +49,7 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
       })
       onClose()
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to save lobby credentials.')
+      setErrorMsg(err?.message || 'Failed to save room credentials.')
     } finally {
       setIsSubmitting(false)
     }
@@ -71,7 +71,7 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
           <div className="border-b border-white/10 pb-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono uppercase tracking-widest text-cyan font-bold">
-                {tournamentTitle || 'Tournament'} • Lobby Setup
+                {tournamentTitle || 'Tournament'} • Room Setup
               </span>
               <span
                 className={`text-[10px] font-mono uppercase font-bold px-2 py-0.5 border ${
@@ -84,7 +84,7 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
               </span>
             </div>
             <h3 className="font-display text-2xl font-black uppercase text-ink mt-1">
-              🔑 Edit Lobby Credentials
+              🔑 Edit Room Credentials
             </h3>
             <p className="text-xs text-dim mt-1 font-mono">
               Match #{match.match_number || 1} • {match.round_name || match.stage || 'Round 1'}
@@ -93,7 +93,7 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
 
           {/* Explanation note */}
           <div className="mt-3 p-2.5 bg-void/60 border border-white/5 text-[11px] font-mono text-dim leading-relaxed">
-            <strong className="text-ink">Confidentiality Protocol:</strong> Saving credentials here stores them safely in the backend. Registered participants will only see Room ID and Password once you explicitly release credentials.
+            <strong className="text-ink">Confidentiality Protocol:</strong> Saving credentials here stores them safely in the backend. Registered participants will only see Room ID and Room Password once you explicitly release credentials or the match goes LIVE.
           </div>
 
           {errorMsg && (
@@ -107,11 +107,11 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
             {/* Room ID */}
             <div>
               <label className="block text-dim uppercase mb-1 font-bold">
-                Room ID / Custom Lobby Code
+                Room ID
               </label>
               <input
                 type="text"
-                placeholder="e.g. AMT-BR-ROOM-01"
+                placeholder="e.g. AMT-ROOM-01"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
                 className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan font-mono text-sm font-bold text-cyan placeholder:text-dim/40"
@@ -121,7 +121,7 @@ export const EditLobbyCredentialsModal: React.FC<EditLobbyCredentialsModalProps>
             {/* Room Password with Toggleable Visibility */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-dim uppercase font-bold">Room Password / PIN</label>
+                <label className="text-dim uppercase font-bold">Room Password</label>
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}

@@ -147,6 +147,21 @@ export default function MatchDetail() {
 
   useEffect(() => {
     loadData()
+
+    // 10-second polling and window focus refresh for live match updates and credentials
+    const interval = setInterval(() => {
+      loadData()
+    }, 10000)
+
+    const handleFocus = () => {
+      loadData()
+    }
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [loadData])
 
   // Normalizations — CHECK_IN_OPEN is treated the same as SCHEDULED (check-in system removed)
@@ -214,10 +229,10 @@ export default function MatchDetail() {
     : null
 
   // Credentials
-  const roomId = (match as any)?.custom_room_id || match?.room_id || (match as any)?.lobby_code || (match as any)?.lobbyCode
-  const roomPassword = (match as any)?.custom_room_password || match?.room_password || (match as any)?.lobby_password || (match as any)?.lobbyPassword
+  const roomId = (match as any)?.custom_room_id || match?.room_id
+  const roomPassword = (match as any)?.custom_room_password || match?.room_password
   const instructions = match?.custom_instructions || (match as any)?.instructions
-  const credentialsReleased = Boolean(match?.credentials_released || (match as any)?.is_creds_released || roomId)
+  const credentialsReleased = Boolean(match?.credentials_released || (match as any)?.is_creds_released || isLive || Boolean(roomId && isLive))
 
   // Distinct tournament rounds for interactive segmented navigation
   const progressionRounds = match?.tournament_progression || []
@@ -561,6 +576,143 @@ export default function MatchDetail() {
               <Hud className="text-cyan">Scheduled Match Countdown</Hud>
               <div className="mt-6">
                 <Countdown targetIso={match.scheduled_at} />
+              </div>
+            </Panel>
+          )}
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 4B. OFFICIAL ROOM CREDENTIALS CARD */}
+        {/* ========================================================================= */}
+        <section aria-label="Official Room Credentials" className="my-6">
+          {credentialsReleased && roomId ? (
+            <Panel className="p-6 md:p-8 border-cyan/40 bg-surface/90 relative overflow-hidden">
+              <Brackets color="border-cyan/50" />
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan">
+                    Official Room Credentials
+                  </span>
+                </div>
+                <span className="border border-ok/40 bg-ok/10 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-ok tracking-wider">
+                  ● Released &amp; Active
+                </span>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Room ID Card */}
+                <div className="border border-cyan/40 bg-void/60 p-5 flex flex-col justify-between">
+                  <div>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                      Room ID
+                    </span>
+                    <div className="mt-2 font-mono text-2xl sm:text-3xl font-extrabold tracking-wide text-cyan select-all break-all">
+                      {roomId}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(roomId, 'room_id')}
+                    className="mt-4 inline-flex items-center justify-center gap-1.5 border border-cyan/40 bg-cyan/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer active:scale-95"
+                  >
+                    <span>{copiedField === 'room_id' ? '✓ Copied' : '📋 Copy Room ID'}</span>
+                  </button>
+                </div>
+
+                {/* Room Password Card */}
+                <div className="border border-amber-500/40 bg-void/60 p-5 flex flex-col justify-between">
+                  <div>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                      Room Password
+                    </span>
+                    <div className="mt-2 font-mono text-2xl sm:text-3xl font-extrabold tracking-wide text-amber-400 select-all break-all">
+                      {roomPassword || 'None'}
+                    </div>
+                  </div>
+                  {roomPassword && roomPassword !== 'None' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(roomPassword, 'room_password')}
+                      className="mt-4 inline-flex items-center justify-center gap-1.5 border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-amber-400 hover:bg-amber-400 hover:text-void transition-all cursor-pointer active:scale-95"
+                    >
+                      <span>{copiedField === 'room_password' ? '✓ Copied' : '📋 Copy Password'}</span>
+                    </button>
+                  ) : (
+                    <span className="mt-4 font-mono text-[11px] text-dim block text-center">
+                      No Password Required
+                    </span>
+                  )}
+                </div>
+
+                {/* Server Region Card */}
+                <div className="border border-white/10 bg-void/60 p-5 flex flex-col justify-between">
+                  <div>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                      Server Region
+                    </span>
+                    <div className="mt-2 font-display text-lg sm:text-xl font-bold uppercase text-ink break-words">
+                      {match?.server_region || (t as any)?.serverRegion || 'AWS Mumbai (ap-south-1)'}
+                    </div>
+                  </div>
+                  <span className="mt-4 font-mono text-[11px] text-dim block">
+                    Authoritative Game Server
+                  </span>
+                </div>
+
+                {/* Status Notice Card */}
+                <div className="border border-white/10 bg-void/60 p-5 flex flex-col justify-between">
+                  <div>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-dim block">
+                      Access Status
+                    </span>
+                    <div className="mt-2 font-display text-lg sm:text-xl font-bold uppercase text-ok">
+                      Verified Contender
+                    </div>
+                  </div>
+                  <span className="mt-4 font-mono text-[11px] text-ok/80 block">
+                    Launch Game &amp; Join Room
+                  </span>
+                </div>
+              </div>
+
+              {/* Host Instructions */}
+              {instructions && (
+                <div className="mt-4 border-t border-white/10 pt-4 font-mono text-xs">
+                  <span className="font-bold text-cyan uppercase tracking-wider block mb-1">
+                    Arbiter Instructions:
+                  </span>
+                  <p className="text-ink text-sm leading-relaxed">
+                    {instructions}
+                  </p>
+                </div>
+              )}
+            </Panel>
+          ) : (
+            <Panel className="p-6 border-dashed border-white/20 bg-void/60">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-dim">
+                  <span className="size-2 rounded-full bg-dim" />
+                  <span>Official Room Credentials</span>
+                </div>
+                <span className="border border-white/15 bg-white/5 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase text-dim tracking-wider">
+                  {isDone ? 'Match Concluded' : 'Awaiting Arbiter Release'}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <p className="font-display text-lg font-bold uppercase text-ink">
+                    {isDone ? 'Room Credentials Expired' : 'Credentials Release Pending'}
+                  </p>
+                  <p className="mt-1 text-xs font-mono text-dim leading-relaxed">
+                    {isDone
+                      ? 'This match has been completed. Room credentials are no longer active.'
+                      : 'Room ID and Room Password will be displayed here as soon as the arbiter releases them or the match goes LIVE.'}
+                  </p>
+                </div>
+                <div className="shrink-0 border border-white/10 bg-surface/60 px-3 py-1.5 font-mono text-xs text-dim">
+                  <span>⏱ {isDone ? 'Archived' : 'Auto-refreshes when live'}</span>
+                </div>
               </div>
             </Panel>
           )}
