@@ -24,7 +24,7 @@ import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games
 import { getMyTeams, Team } from '../services/teams'
 import { uploadMediaFile } from '../services/admin'
 import { useAuthContext } from '../context/AuthContext'
-import { gameBy, img, inr, MATCHES, TOUR_EXTRA, teamNames, type Match, type Stage } from '../lib/data'
+import { gameBy, img, inr, TOUR_EXTRA, teamNames, type Match, type Stage } from '../lib/data'
 import { gsap, isMobile, reducedMotion } from '../lib/motion'
 
 const NAV = ['Overview', 'Prizes', 'Rules', 'Teams', 'Bracket', 'Standings', 'Schedule'] as const

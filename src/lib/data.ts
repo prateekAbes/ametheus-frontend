@@ -43,16 +43,10 @@ export const tourBy = (id: string) => TOURNAMENTS.find((t) => t.id === id) ?? TO
 
 export type MStatus = 'upcoming' | 'live' | 'completed'
 export type Match = { id: string; tour: string; game: string; no: number; round: string; a: string; b: string; date: string; time: string; status: MStatus; score?: [number, number]; format: string }
-export const MATCHES: Match[] = [
-  { id: 'm-1042', tour: 'ff-inferno-league', game: 'free-fire', no: 7, round: 'League Round 7', a: 'Team Alpha', b: 'Team Omega', date: 'Today', time: '19:00 IST', status: 'live', score: [1, 0], format: 'BO3' },
-  { id: 'm-1043', tour: 'val-ascent-series', game: 'valorant', no: 12, round: 'Quarterfinal', a: 'Kraken Esports', b: 'Night Wolves', date: 'Today', time: '20:30 IST', status: 'live', score: [9, 7], format: 'BO3' },
-  { id: 'm-1050', tour: 'bgmi-monsoon-cup', game: 'bgmi', no: 1, round: 'Qualifier A', a: 'Team Alpha', b: 'Vanguard 7', date: '12 Oct', time: '18:00 IST', status: 'upcoming', format: 'Map 1–3' },
-  { id: 'm-1051', tour: 'codm-frontline', game: 'codm', no: 3, round: 'Upper Bracket R1', a: 'Ghost Protocol', b: 'Iron Saints', date: '26 Oct', time: '17:00 IST', status: 'upcoming', format: 'BO5' },
-  { id: 'm-1052', tour: 'val-ascent-series', game: 'valorant', no: 13, round: 'Quarterfinal', a: 'Team Alpha', b: 'Raptor Gaming', date: '19 Oct', time: '21:00 IST', status: 'upcoming', format: 'BO3' },
-  { id: 'm-0998', tour: 'ff-campus-wars', game: 'free-fire', no: 8, round: 'Grand Final', a: 'Saffron Storm', b: 'Team Alpha', date: '21 Sep', time: '20:00 IST', status: 'completed', score: [2, 1], format: 'BO3' },
-  { id: 'm-0991', tour: 'ff-campus-wars', game: 'free-fire', no: 6, round: 'Semifinal', a: 'Team Alpha', b: 'Neon Riders', date: '20 Sep', time: '19:00 IST', status: 'completed', score: [2, 0], format: 'BO3' },
-]
-export const matchBy = (id: string) => MATCHES.find((m) => m.id === id) ?? MATCHES[0]
+/** @deprecated All match data must be queried from backend APIs via services/matches.ts */
+export const MATCHES: Match[] = []
+export const matchBy = (id: string) => MATCHES.find((m) => m.id === id) ?? null
+
 
 export const TEAMS = ['Team Alpha', 'Team Omega', 'Kraken Esports', 'Night Wolves', 'Vanguard 7', 'Ghost Protocol', 'Iron Saints', 'Raptor Gaming', 'Saffron Storm', 'Neon Riders', 'Hydra X', 'Velocity']
 

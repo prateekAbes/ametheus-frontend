@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Crest, Avatar, MatchCard, Panel, Brackets, Stat, Particles } from '../components/ui'
-import { MATCHES, TOURNAMENTS, AVATARS, gameBy } from '../lib/data'
+import { AVATARS, gameBy } from '../lib/data'
 import { getMyTeams, leaveTeam, deleteTeam, transferTeamLeadership, kickTeamMember, type Team } from '../services/teams'
+import { getMatches } from '../services/matches'
 import { useAuthContext } from '../context/AuthContext'
 
 export default function Teams() {
@@ -112,11 +113,44 @@ export default function Teams() {
     }
   }
 
-  // Upcoming matches for active team
-  const upcoming = MATCHES.filter(
-    (m) => (m.a === (activeTeam?.name || 'Team Alpha') || m.b === (activeTeam?.name || 'Team Alpha')) && m.status !== 'completed'
-  )
-  const regs = TOURNAMENTS.filter((t) => ['bgmi-monsoon-cup', 'val-ascent-series', 'ff-inferno-league'].includes(t.id))
+  const [upcomingMatchesCount, setUpcomingMatchesCount] = useState(0)
+  const [teamRegsCount, setTeamRegsCount] = useState(0)
+
+  useEffect(() => {
+    if (!activeTeam) {
+      setUpcomingMatchesCount(0)
+      setTeamRegsCount(0)
+      return
+    }
+    const teamName = activeTeam.name?.toLowerCase() || ''
+    const teamId = (activeTeam as any)._id || activeTeam.id || ''
+
+    getMatches()
+      .then((mList) => {
+        if (Array.isArray(mList)) {
+          const upCount = mList.filter((m: any) => {
+            const st = (m.status || '').toUpperCase()
+            const isUpcoming = ['SCHEDULED', 'UPCOMING', 'CHECK_IN_OPEN', 'LIVE', 'IN_PROGRESS'].includes(st)
+            if (!isUpcoming) return false
+            const aName = (m.team_a?.name || m.team_a_name || '').toLowerCase()
+            const bName = (m.team_b?.name || m.team_b_name || '').toLowerCase()
+            const aId = m.team_a?.id || m.team_a_id || ''
+            const bId = m.team_b?.id || m.team_b_id || ''
+            const teamIds = m.team_ids || []
+            return (
+              (teamName && (aName === teamName || bName === teamName)) ||
+              (teamId && (aId === teamId || bId === teamId || teamIds.includes(teamId)))
+            )
+          }).length
+          setUpcomingMatchesCount(upCount)
+        }
+      })
+      .catch(() => {
+        setUpcomingMatchesCount(0)
+      })
+
+    setTeamRegsCount((activeTeam as any).tournaments_count || (activeTeam as any).registrations_count || 0)
+  }, [activeTeam])
 
   return (
     <div className="relative min-h-screen bg-void pb-28 pt-32">
@@ -241,8 +275,8 @@ export default function Teams() {
             <div className="mt-10 grid grid-cols-2 gap-6 border-y border-white/10 py-6 md:grid-cols-4">
               <Stat k="Members" v={mainMembers.length} />
               <Stat k="Substitutes" v={subMembers.length} />
-              <Stat k="Registrations" v={regs.length} accent="#3ef2ff" />
-              <Stat k="Upcoming Matches" v={upcoming.length} />
+              <Stat k="Registrations" v={teamRegsCount} accent="#3ef2ff" />
+              <Stat k="Upcoming Matches" v={upcomingMatchesCount} />
             </div>
 
             <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_380px]">

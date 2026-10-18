@@ -174,15 +174,21 @@ export default function Matches() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('All Matches')
   const [matches, setMatches] = useState<UiMatchItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchMatchesData = useCallback(async () => {
     try {
+      setIsLoading(true)
+      setError(null)
       const data = await getMatches()
       if (Array.isArray(data)) {
         setMatches(data.map(mapApiMatchToUiMatch))
+      } else {
+        setMatches([])
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Could not fetch matches:', err)
+      setError(err?.message || 'Failed to load tournament matches. Please check your connection and try again.')
     } finally {
       setIsLoading(false)
     }
@@ -255,16 +261,45 @@ export default function Matches() {
         </div>
 
         <div className="mt-10 space-y-4">
-          {isLoading ? (
+          {error ? (
+            <div className="border border-live/30 bg-live/5 p-12 text-center flex flex-col items-center justify-center">
+              <span className="font-mono text-xs uppercase tracking-widest text-live mb-2">Error Loading Matches</span>
+              <h2 className="font-display text-2xl sm:text-3xl font-black uppercase text-ink mb-3">
+                Unable to load tournament matches
+              </h2>
+              <p className="font-mono text-xs text-dim max-w-md mb-6">{error}</p>
+              <button
+                onClick={() => fetchMatchesData()}
+                className="border border-cyan bg-cyan/10 px-5 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
+              >
+                ↻ Retry
+              </button>
+            </div>
+          ) : isLoading ? (
             <div className="border border-white/10 bg-surface/50 p-16 text-center">
               <div className="inline-block size-8 animate-spin rounded-full border-2 border-cyan border-t-transparent mb-4" />
               <Hud className="text-cyan">Loading matches...</Hud>
             </div>
           ) : filteredList.length === 0 ? (
             <div className="border border-white/10 bg-surface/40 py-16 px-6 text-center flex flex-col items-center justify-center">
-              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-wider text-ink mb-6">
-                No matches found
+              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-wider text-ink mb-3">
+                {statusFilter === 'Upcoming'
+                  ? 'No upcoming matches scheduled yet'
+                  : statusFilter === 'Live'
+                  ? 'No live matches right now'
+                  : statusFilter === 'Completed'
+                  ? 'No completed matches found'
+                  : 'No matches found'}
               </h2>
+              <p className="font-mono text-xs text-dim max-w-md mb-6">
+                {statusFilter === 'Upcoming'
+                  ? 'There are currently no upcoming tournament matches scheduled. Check back once tournament brackets are seeded.'
+                  : statusFilter === 'Live'
+                  ? 'There are currently no active tournament matches in progress.'
+                  : statusFilter === 'Completed'
+                  ? 'No completed tournament matches match the selected filter.'
+                  : 'No verified tournament matches match the selected criteria.'}
+              </p>
               <Cta to="/tournaments" small>
                 Browse Tournaments
               </Cta>
