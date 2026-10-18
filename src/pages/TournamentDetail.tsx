@@ -22,6 +22,7 @@ import {
 } from '../services/tournaments'
 import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games'
 import { getMyTeams, Team } from '../services/teams'
+import { captainCheckIn } from '../services/matches'
 import { uploadMediaFile } from '../services/admin'
 import { useAuthContext } from '../context/AuthContext'
 import { gameBy, img, inr, TOUR_EXTRA, teamNames, type Match, type Stage } from '../lib/data'
@@ -305,6 +306,7 @@ export default function TournamentDetail() {
   }
 
   const userTeamId = regStatus?.team?.id || (regStatus?.team as any)?._id || regStatus?.registration?.team_id
+  const userPlayerId = profile?.id || (profile as any)?.clerk_id || profile?.clerk_user_id || regStatus?.registration?.player_id
   const userMatch = useMemo(() => {
     if (!matchesData || matchesData.length === 0) return null
     if (userTeamId) {
@@ -317,8 +319,43 @@ export default function TournamentDetail() {
       )
       if (found) return found
     }
-    return matchesData.find((m: any) => m.credentials_released) || null
-  }, [matchesData, userTeamId])
+    if (userPlayerId) {
+      const found = matchesData.find((m: any) =>
+        m.team_a?.id === userPlayerId ||
+        m.team_b?.id === userPlayerId ||
+        m.team_a_id === userPlayerId ||
+        m.team_b_id === userPlayerId ||
+        (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id || t?.user_id) === userPlayerId))
+      )
+      if (found) return found
+    }
+    return null
+  }, [matchesData, userTeamId, userPlayerId])
+
+  const [checkingIn, setCheckingIn] = useState(false)
+  const [checkInSuccessMsg, setCheckInSuccessMsg] = useState<string | null>(null)
+
+  const isUserCheckedIn = Boolean(
+    (userMatch?.check_in_status && userPlayerId && userMatch.check_in_status[userPlayerId]) ||
+    (userMatch?.check_in_status && userTeamId && userMatch.check_in_status[userTeamId]) ||
+    (userMatch?.check_ins && Object.values(userMatch.check_ins).some((ci: any) => ci?.user_id === userPlayerId || ci?.team_id === userTeamId))
+  )
+
+  const handleHubCheckIn = async () => {
+    if (!userMatch) return
+    setCheckingIn(true)
+    setCheckInSuccessMsg(null)
+    try {
+      await captainCheckIn(userMatch.id || userMatch._id)
+      setCheckInSuccessMsg('Check-in verified! You are confirmed ready.')
+      fetchTour()
+      fetchStatus(id)
+    } catch (err: any) {
+      alert(err.message || 'Failed to check in')
+    } finally {
+      setCheckingIn(false)
+    }
+  }
 
   const activeCreds = useMemo(() => {
     if (userMatch?.credentials_released) {
@@ -675,6 +712,113 @@ export default function TournamentDetail() {
               </div>
             )}
 
+            {/* Participant Readiness & Check-in Control (Part G 5-stage readiness state machine) */}
+            <div className="mb-8 border border-white/10 bg-void/70 p-6 md:p-8 backdrop-blur-md">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className={`size-2 rounded-full ${isUserCheckedIn ? 'bg-ok animate-pulse' : 'bg-cyan animate-pulse'}`} />
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink">
+                    Participant Readiness &amp; Check-In
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] text-dim uppercase">
+                    Stage {userMatch?.status === 'LIVE' ? '5/5: Live' : (activeCreds && isUserCheckedIn) ? '4/5: Credentials Released' : isUserCheckedIn ? '3/5: Checked In' : (userMatch?.status === 'CHECK_IN_OPEN' || tourData?.status === 'IN_PROGRESS') ? '2/5: Check-In Open' : '1/5: Confirmed'}
+                  </span>
+                  <span className={`px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider border ${
+                    isUserCheckedIn ? 'border-ok/40 bg-ok/10 text-ok' : 'border-cyan/40 bg-cyan/10 text-cyan'
+                  }`}>
+                    {isUserCheckedIn ? '✓ Platform Verified' : 'Action Required'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 5-Stage Stepper Visualization */}
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
+                <div className="border border-ok/40 bg-ok/5 p-2.5">
+                  <span className="text-ok font-bold block">01 · Enrolled</span>
+                  <span className="text-dim text-[10px]">Slot Confirmed</span>
+                </div>
+                <div className={`border p-2.5 ${
+                  (userMatch?.status === 'CHECK_IN_OPEN' || tourData?.status === 'IN_PROGRESS' || isUserCheckedIn)
+                    ? 'border-ok/40 bg-ok/5 text-ok'
+                    : 'border-white/10 bg-surface/40 text-dim'
+                }`}>
+                  <span className="font-bold block">02 · Check-In</span>
+                  <span className="text-[10px]">{isUserCheckedIn ? 'Completed' : 'Window Open'}</span>
+                </div>
+                <div className={`border p-2.5 ${
+                  isUserCheckedIn
+                    ? 'border-ok/40 bg-ok/5 text-ok'
+                    : 'border-white/10 bg-surface/40 text-dim'
+                }`}>
+                  <span className="font-bold block">03 · Verified</span>
+                  <span className="text-[10px]">{isUserCheckedIn ? 'Attendance Confirmed' : 'Pending Check-in'}</span>
+                </div>
+                <div className={`border p-2.5 ${
+                  activeCreds
+                    ? 'border-cyan/40 bg-cyan/5 text-cyan'
+                    : 'border-white/10 bg-surface/40 text-dim'
+                }`}>
+                  <span className="font-bold block">04 · Credentials</span>
+                  <span className="text-[10px]">{activeCreds ? 'Room Details Active' : 'Awaiting Arbiters'}</span>
+                </div>
+                <div className={`border p-2.5 ${
+                  userMatch?.status === 'LIVE'
+                    ? 'border-live/40 bg-live/5 text-live font-bold animate-pulse'
+                    : 'border-white/10 bg-surface/40 text-dim'
+                }`}>
+                  <span className="block">05 · Match Live</span>
+                  <span className="text-[10px]">{userMatch?.status === 'LIVE' ? 'Battle in Progress' : 'Scheduled'}</span>
+                </div>
+              </div>
+
+              {/* Platform Check-in vs Game Client Entry Explainer & Action */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-white/10 bg-surface/60 p-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan">
+                      Step 1 · Platform Check-In (Ametheus)
+                    </span>
+                  </div>
+                  <p className="text-xs text-dim leading-relaxed mb-4">
+                    Verifies your presence and active attendance on the platform. Required before room credentials are distributed.
+                  </p>
+                  {isUserCheckedIn ? (
+                    <div className="inline-flex items-center gap-2 font-mono text-xs font-bold text-ok bg-ok/10 border border-ok/30 px-3 py-1.5">
+                      <span>✓ Ready &amp; Checked In</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={checkingIn || !userMatch}
+                      onClick={handleHubCheckIn}
+                      className="inline-flex items-center justify-center gap-2 border border-cyan bg-cyan/20 px-4 py-2 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <span>{checkingIn ? 'Verifying Attendance...' : 'Confirm Attendance & Check In'}</span>
+                      <span>→</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="border border-white/10 bg-surface/60 p-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
+                      Step 2 · Game Client Lobby Entry
+                    </span>
+                  </div>
+                  <p className="text-xs text-dim leading-relaxed mb-4">
+                    Launch your game client (e.g. Free Fire, BGMI, Valorant) and join custom lobby using the Room ID &amp; Password shown below.
+                  </p>
+                  <div className="font-mono text-xs text-dim">
+                    Status: <span className={activeCreds ? 'text-ok font-bold' : 'text-warn font-bold'}>
+                      {activeCreds ? 'Credentials Active Below' : 'Waiting for Arbiters to release room codes'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Match Lobby Credentials — Primary Focal Point for Confirmed Participants */}
             {activeCreds ? (
               <div className="mb-8 border border-cyan/40 bg-void/80 p-6 md:p-8 backdrop-blur-md relative overflow-hidden">
@@ -879,50 +1023,86 @@ export default function TournamentDetail() {
                 </div>
               </div>
 
-              {/* Card B: My Team & Roster */}
+              {/* Card B: Solo Contender Profile or Team & Roster */}
               <div className="flex flex-col justify-between border border-white/10 bg-surface p-6">
                 <div>
                   <div className="flex items-center justify-between">
-                    <Hud className="text-cyan">Squad & Roster</Hud>
+                    <Hud className="text-cyan">{isSolo ? 'Player Profile' : 'Squad & Roster'}</Hud>
                     <span className="border border-cyan/40 bg-cyan/10 px-2 py-0.5 font-mono text-[10px] uppercase text-cyan">
-                      {regStatus?.team?.my_role === 'CAPTAIN' ? '⭐ Squad Captain' : '🛡️ Roster Player'}
+                      {isSolo ? 'Solo Contender' : (regStatus?.team?.my_role === 'CAPTAIN' ? '⭐ Squad Captain' : '🛡️ Roster Player')}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <Crest name={regStatus?.team?.name || 'Squad'} size={38} color={accent} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-display text-xl font-black uppercase text-ink">
-                        {regStatus?.team?.name || 'Registered Squad'}
-                      </p>
-                      <p className="font-mono text-xs text-dim truncate">
-                        Tag: [{regStatus?.team?.tag || 'SQUAD'}] · Captain: {regStatus?.team?.captain_name || regStatus?.team?.captain_handle || 'Leader'}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="mt-4 border-t border-white/10 pt-3">
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-dim">Roster Members</p>
-                    <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
-                      {(regStatus?.team?.roster || regStatus?.team?.members || []).map((m, idx) => (
-                        <div key={m.user_id || idx} className="flex items-center justify-between rounded bg-void/50 p-2 text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Avatar id={m.equipped_avatar_url || m.avatar_url || m.username || 'PL'} size={24} />
-                            <div className="min-w-0">
-                              <p className="font-bold text-ink truncate max-w-[110px]">{m.display_name || m.username}</p>
-                              <span className="text-[10px] font-mono text-dim block truncate">@{m.username}</span>
-                            </div>
-                          </div>
-                          <span className={`font-mono text-[10px] uppercase px-1.5 py-0.5 shrink-0 ${
-                            m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN'
-                              ? 'border border-cyan/30 text-cyan bg-cyan/10'
-                              : 'text-dim'
-                          }`}>
-                            {m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN' ? 'Captain' : 'Player'}
-                          </span>
+                  {isSolo ? (
+                    <div className="mt-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar id={(profile as any)?.equipped_avatar_url || profile?.avatar_url || profile?.username || 'PL'} size={44} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-xl font-black uppercase text-ink">
+                            {profile?.display_name || profile?.username || 'Solo Contender'}
+                          </p>
+                          <p className="font-mono text-xs text-dim truncate">
+                            @{profile?.username} · Contender Verified
+                          </p>
                         </div>
-                      ))}
+                      </div>
+                      <div className="mt-4 border-t border-white/10 pt-3">
+                        <p className="font-mono text-[11px] uppercase tracking-wider text-dim">Contender Specs</p>
+                        <div className="mt-2 space-y-1.5 font-mono text-xs">
+                          <div className="flex justify-between text-dim">
+                            <span>Format:</span>
+                            <span className="text-cyan font-bold">{(tourData as any)?.gameFormat || (tourData as any)?.game_format || '1v1 Solo Battle'}</span>
+                          </div>
+                          <div className="flex justify-between text-dim">
+                            <span>Competitor Unit:</span>
+                            <span className="text-ink font-bold">Individual Player</span>
+                          </div>
+                          <div className="flex justify-between text-dim">
+                            <span>Registration Type:</span>
+                            <span className="text-ok font-bold">SOLO</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="mt-3 flex items-center gap-3">
+                        <Crest name={regStatus?.team?.name || 'Squad'} size={38} color={accent} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-xl font-black uppercase text-ink">
+                            {regStatus?.team?.name || 'Registered Squad'}
+                          </p>
+                          <p className="font-mono text-xs text-dim truncate">
+                            Tag: [{regStatus?.team?.tag || 'SQUAD'}] · Captain: {regStatus?.team?.captain_name || regStatus?.team?.captain_handle || 'Leader'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 border-t border-white/10 pt-3">
+                        <p className="font-mono text-[11px] uppercase tracking-wider text-dim">Roster Members</p>
+                        <div className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {(regStatus?.team?.roster || regStatus?.team?.members || []).map((m, idx) => (
+                            <div key={m.user_id || idx} className="flex items-center justify-between rounded bg-void/50 p-2 text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Avatar id={m.equipped_avatar_url || m.avatar_url || m.username || 'PL'} size={24} />
+                                <div className="min-w-0">
+                                  <p className="font-bold text-ink truncate max-w-[110px]">{m.display_name || m.username}</p>
+                                  <span className="text-[10px] font-mono text-dim block truncate">@{m.username}</span>
+                                </div>
+                              </div>
+                              <span className={`font-mono text-[10px] uppercase px-1.5 py-0.5 shrink-0 ${
+                                m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN'
+                                  ? 'border border-cyan/30 text-cyan bg-cyan/10'
+                                  : 'text-dim'
+                              }`}>
+                                {m.user_id === regStatus?.team?.captain_id || m.role === 'CAPTAIN' ? 'Captain' : 'Player'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -938,7 +1118,7 @@ export default function TournamentDetail() {
                   </h4>
                   <dl className="mt-4 space-y-3 font-mono text-xs">
                     <div className="flex justify-between border-b border-white/5 pb-2">
-                      <dt className="text-dim">Confirmed Squads</dt>
+                      <dt className="text-dim">Confirmed {(tourData as any)?.competitorUnit || (tourData as any)?.competitor_unit || (isSolo ? 'Players' : isBattleRoyale ? 'Squads' : 'Teams')}</dt>
                       <dd className="font-bold text-cyan">{tourData?.confirmedTeams || registeredCount}</dd>
                     </div>
                     <div className="flex justify-between border-b border-white/5 pb-2">
@@ -953,7 +1133,7 @@ export default function TournamentDetail() {
                     </div>
                     <div className="flex justify-between border-b border-white/5 pb-2">
                       <dt className="text-dim">Total Field Size</dt>
-                      <dd className="font-bold text-ink">{maxTeams} Teams</dd>
+                      <dd className="font-bold text-ink">{maxTeams} {(tourData as any)?.competitorUnit || (tourData as any)?.competitor_unit || (isSolo ? 'Players' : isBattleRoyale ? 'Squads' : 'Teams')}</dd>
                     </div>
                   </dl>
 
@@ -1142,6 +1322,43 @@ export default function TournamentDetail() {
                   >
                     Contact Support
                   </Link>
+                </div>
+              </div>
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* Non-Participant Notice for signed in users */}
+      {isSignedIn && !isConfirmedParticipant && !isPendingParticipant && !isRejectedParticipant && (
+        <section id="participant-hub" className="scroll-mt-24 border-b border-white/10 bg-surface/40 py-8">
+          <Container>
+            <div className="border border-dashed border-white/20 bg-void/60 p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-dim" />
+                    <Hud className="text-dim">Competitor Hub · Restricted Access</Hud>
+                  </div>
+                  <h3 className="mt-2 font-display text-2xl font-black uppercase text-ink">
+                    You Are Not Enrolled In This Tournament
+                  </h3>
+                  <p className="mt-2 text-sm text-dim leading-relaxed">
+                    Match lobby credentials, room passwords, platform check-in, and competitor voice channels are restricted exclusively to verified participants.
+                  </p>
+                </div>
+                <div className="shrink-0 flex flex-wrap gap-3">
+                  {!isRegistrationClosed && isRegOpen && (
+                    <Cta small onClick={() => setRegModalOpen(true)}>
+                      Register Entry
+                    </Cta>
+                  )}
+                  <a
+                    href="#Schedule"
+                    className="inline-flex items-center justify-center border border-white/20 bg-void/50 px-4 py-2 font-mono text-xs text-dim hover:text-ink hover:border-white/40 transition-colors"
+                  >
+                    View Schedule &amp; Brackets →
+                  </a>
                 </div>
               </div>
             </div>
@@ -1524,6 +1741,8 @@ function RegistrationModal({
 
   const isSolo =
     (tournament?.format || '').toLowerCase().includes('solo') ||
+    ((tournament as any)?.registration_type === 'SOLO') ||
+    ((tournament as any)?.is_solo === true) ||
     ((tournament as any)?.minTeamSize === 1 && (tournament as any)?.maxTeamSize === 1) ||
     ((tournament as any)?.min_team_size === 1 && (tournament as any)?.max_team_size === 1)
 
@@ -1546,7 +1765,7 @@ function RegistrationModal({
     setLoading(true)
     try {
       await registerTeamForTournament(tournament.id, {
-        team_id: selectedTeamId || undefined,
+        team_id: isSolo ? undefined : (selectedTeamId || undefined),
       })
       setStep(2)
       onSuccess()
@@ -1565,7 +1784,7 @@ function RegistrationModal({
     setLoading(true)
     try {
       const resp = await registerTournamentDirectUpi(tournament.id, {
-        team_id: selectedTeamId || undefined,
+        team_id: isSolo ? undefined : (selectedTeamId || undefined),
       })
       setUpiData(resp)
       setStep(1)

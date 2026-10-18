@@ -1013,6 +1013,13 @@ export interface RoundPlayerItem {
   existing_rating?: number
   existing_notes?: string
   is_rated: boolean
+  placement?: number
+  kills?: number
+  points?: number
+  wins?: number
+  proposed_adjustment?: number
+  post_rating?: number
+  calculation_reason?: string
 }
 
 export interface RoundStandingItem {

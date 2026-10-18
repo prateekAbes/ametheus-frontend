@@ -266,7 +266,50 @@ export function BattleRoyaleResultsModal({
     setStep('CONFIRM')
   }
 
-  // Submission to backend
+  // Save Draft (does not advance qualifiers or finalize)
+  const handleSaveDraft = async () => {
+    if (!match) return
+    setSubmitting(true)
+    setErrorMsg(null)
+
+    try {
+      const payloadTeamResults: BattleRoyaleTeamResultInput[] = rows.map((r) => ({
+        team_id: r.team_id,
+        team_name: r.team_name,
+        placement: r.placement,
+        kills: r.kills,
+        placement_points: r.placement_points,
+        elimination_points: r.elimination_points,
+        total_points: r.total_points,
+        qualified: r.qualified,
+      }))
+
+      const qualifierTeamIds = rows.filter((r) => r.qualified).map((r) => r.team_id)
+
+      const payload = {
+        team_results: payloadTeamResults,
+        qualifier_team_ids: qualifierTeamIds,
+        qualifiers_count: qualifiersCount,
+        advance_to_next_round: false,
+        is_final_round: isFinalRound,
+        draft: true,
+        scoring_matrix: {
+          placement: DEFAULT_SCORING_MATRIX,
+          kill: 1,
+        },
+      }
+
+      const res = await submitBattleRoyaleResultsAdmin(match.id, payload)
+      onSuccess(res)
+      onClose()
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to save draft results.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Submission to backend (Finalize)
   const handleFinalSubmit = async () => {
     if (!match) return
     setSubmitting(true)
@@ -293,6 +336,7 @@ export function BattleRoyaleResultsModal({
         advance_to_next_round: !isFinalRound && advanceToNextRound,
         next_round_name: nextRoundName.trim() || undefined,
         is_final_round: isFinalRound,
+        draft: false,
         scoring_matrix: {
           placement: DEFAULT_SCORING_MATRIX,
           kill: 1,
@@ -303,7 +347,7 @@ export function BattleRoyaleResultsModal({
       onSuccess(res)
       onClose()
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to submit Battle Royale results and advance qualifiers.')
+      setErrorMsg(err?.message || 'Failed to finalize Battle Royale results.')
     } finally {
       setSubmitting(false)
     }
@@ -616,8 +660,17 @@ export function BattleRoyaleResultsModal({
                     {selectedCount} team(s) selected for advancement
                   </span>
                   <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={submitting}
+                    className="border border-white/20 bg-surface px-4 py-2 uppercase text-xs font-bold text-ink hover:border-cyan hover:text-cyan transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {submitting ? 'Saving...' : '💾 Save Draft Results'}
+                  </button>
+                  <button
                     type="submit"
-                    className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer shadow-lg shadow-cyan/20"
+                    disabled={submitting}
+                    className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer shadow-lg shadow-cyan/20 disabled:opacity-50"
                   >
                     Review &amp; Finalize Qualifiers →
                   </button>

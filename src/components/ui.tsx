@@ -47,6 +47,16 @@ const STATUS: Record<string, [string, string, string]> = {
   closed: ['Closed', 'bg-dim', 'text-dim'],
   confirmed: ['Confirmed', 'bg-ok', 'text-ok'],
   active: ['Active', 'bg-cyan', 'text-cyan'],
+  ended: ['Match Ended', 'bg-amber-400', 'text-amber-400'],
+  'match ended': ['Match Ended', 'bg-amber-400', 'text-amber-400'],
+  results_saved: ['Results Saved', 'bg-cyan', 'text-cyan'],
+  'results saved': ['Results Saved', 'bg-cyan', 'text-cyan'],
+  results_pending: ['Results Pending', 'bg-amber-400', 'text-amber-400'],
+  'results pending': ['Results Pending', 'bg-amber-400', 'text-amber-400'],
+  finalized: ['Finalized', 'bg-dim', 'text-dim'],
+  scheduled: ['Scheduled', 'bg-cyan', 'text-cyan'],
+  check_in_open: ['Check-In Open', 'bg-ok', 'text-ok'],
+  'check-in open': ['Check-In Open', 'bg-ok', 'text-ok'],
 }
 /** Status badge. Accepts any key in STATUS (case-insensitive). */
 export function Badge({ s, label }: { s: string; label?: string }) {

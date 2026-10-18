@@ -171,7 +171,9 @@ export default function MatchDetail() {
   // Normalizations
   const rawStatus = (match?.status || 'SCHEDULED').toUpperCase()
   const isLive = rawStatus === 'LIVE' || rawStatus === 'IN_PROGRESS'
-  const isDone = rawStatus === 'COMPLETED'
+  const isDone = rawStatus === 'COMPLETED' || rawStatus === 'FINALIZED'
+  const isEnded = rawStatus === 'ENDED'
+  const isResultsSaved = rawStatus === 'RESULTS_SAVED' || rawStatus === 'RESULTS_PENDING'
   const isCheckInOpen = rawStatus === 'CHECK_IN_OPEN'
 
   const t = match?.tournament || {}
@@ -347,23 +349,87 @@ export default function MatchDetail() {
               </span>
             </div>
 
-            {/* Single Elegant Status Badge */}
-            <div className="flex items-center gap-3">
+            {/* Single Elegant Status Badge & Admin Control */}
+            <div className="flex flex-wrap items-center gap-3">
               <Badge
                 s={
                   isLive ? 'live' :
                   isDone ? 'completed' :
+                  isEnded ? 'ended' :
+                  isResultsSaved ? 'results_saved' :
                   isCheckInOpen ? 'waiting for user' :
                   'upcoming'
                 }
                 label={
                   isLive ? 'Live on Air' :
-                  isDone ? 'Result Confirmed' :
+                  isDone ? 'Final' :
+                  isEnded ? 'Match Ended' :
+                  isResultsSaved ? 'Results Saved' :
                   isCheckInOpen ? 'Check-in Open' :
                   rawStatus === 'CANCELLED' ? 'Cancelled' :
                   'Scheduled'
                 }
               />
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={rawStatus}
+                    disabled={updatingStatus}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="border border-cyan/40 bg-surface px-2.5 py-1 font-mono text-xs font-bold text-cyan uppercase cursor-pointer hover:border-cyan focus:outline-none"
+                    title="Arbiter Status Override"
+                  >
+                    <option value="SCHEDULED">SCHEDULED</option>
+                    <option value="CHECK_IN_OPEN">CHECK-IN OPEN</option>
+                    <option value="LIVE">LIVE ON AIR</option>
+                    <option value="ENDED">MATCH ENDED</option>
+                    <option value="RESULTS_SAVED">RESULTS SAVED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="FINALIZED">FINALIZED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+
+                  {/* Go Live button if Scheduled or Check-in Open */}
+                  {(rawStatus === 'SCHEDULED' || isCheckInOpen) && (
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      onClick={() => handleStatusChange('LIVE')}
+                      className="border border-live/60 bg-live/20 px-3 py-1 font-mono text-xs font-bold text-live hover:bg-live/30 transition-colors uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      title="Start match and go live"
+                    >
+                      <span className="size-2 rounded-full bg-live animate-ping" />
+                      <span>Go Live</span>
+                    </button>
+                  )}
+
+                  {/* End Match button if Live */}
+                  {isLive && (
+                    <button
+                      type="button"
+                      disabled={updatingStatus}
+                      onClick={() => handleStatusChange('ENDED')}
+                      className="border border-live/60 bg-live/20 px-3 py-1 font-mono text-xs font-bold text-live hover:bg-live/30 transition-colors uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      title="Conclude gameplay and transition to Ended"
+                    >
+                      <span>⏹</span>
+                      <span>End Match</span>
+                    </button>
+                  )}
+
+                  {/* Result & Qualifier entry button (strictly gated: never visible on Scheduled or Live) */}
+                  {isBattleRoyale && (isEnded || isResultsSaved || isDone) && (
+                    <button
+                      type="button"
+                      onClick={() => setBrModalOpen(true)}
+                      className="border border-amber-400/60 bg-amber-400/15 px-3 py-1 font-mono text-xs font-bold text-amber-300 hover:bg-amber-400/25 transition-colors uppercase flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>🏆</span>
+                      <span>{isDone ? 'View Qualifiers' : isResultsSaved ? 'Review Results' : 'Enter Results'}</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -486,6 +552,32 @@ export default function MatchDetail() {
                   Arbiter Notes: &quot;{match.captain_notes}&quot;
                 </p>
               )}
+            </Panel>
+          ) : isResultsSaved ? (
+            <Panel className="overflow-hidden p-8 text-center md:p-12 border-cyan/40 bg-cyan/5">
+              <Brackets color="border-cyan/40" />
+              <Hud className="text-cyan">Draft Results Saved</Hud>
+              <div className="mt-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-black uppercase text-ink">
+                  Results Under Arbiter Review
+                </h2>
+                <p className="mt-2 font-mono text-xs text-dim max-w-xl mx-auto">
+                  Preliminary statistics and placements have been saved. Awaiting final confirmation and certified rating submission.
+                </p>
+              </div>
+            </Panel>
+          ) : isEnded ? (
+            <Panel className="overflow-hidden p-8 text-center md:p-12 border-amber-500/40 bg-amber-500/5">
+              <Brackets color="border-amber-500/40" />
+              <Hud className="text-amber-400">Gameplay Concluded</Hud>
+              <div className="mt-4">
+                <h2 className="font-display text-3xl sm:text-4xl font-black uppercase text-ink">
+                  Match Ended
+                </h2>
+                <p className="mt-2 font-mono text-xs text-dim max-w-xl mx-auto">
+                  Match gameplay has completed. Awaiting arbiter results entry and qualifier selection.
+                </p>
+              </div>
             </Panel>
           ) : (
             <Panel className="p-8 text-center md:p-12 border-white/10 bg-graphite/50 backdrop-blur-md">
@@ -838,172 +930,7 @@ export default function MatchDetail() {
           )}
         </section>
 
-        {/* ========================================================================= */}
-        {/* 7. ESSENTIAL CONTROLS (Check-in, Admin Status Dropdown, Lobby Credentials) */}
-        {/* ========================================================================= */}
-        <section aria-label="Essential Controls">
-          <SectionHead kicker="Match Cockpit" title="Essential Controls" size="md" className="mb-6" />
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {/* Control 1: Participant Check-in */}
-            <Panel className="p-6 border-white/10 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
-                  <Hud className="text-cyan">Participant Check-in</Hud>
-                  <span className="size-2 rounded-full bg-cyan animate-pulse" />
-                </div>
-                <p className="text-xs text-dim font-mono leading-relaxed mb-4">
-                  Match check-in certifies team presence and unlocks server credentials.
-                </p>
-
-                {checkInMsg && (
-                  <div className={`p-2.5 mb-4 border font-mono text-xs ${checkInMsg.ok ? 'border-ok/40 bg-ok/10 text-ok' : 'border-warn/40 bg-warn/10 text-warn'}`}>
-                    {checkInMsg.text}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                {isAlreadyCheckedIn ? (
-                  <div className="border border-ok/40 bg-ok/10 p-3 text-center font-mono text-xs text-ok font-bold uppercase flex items-center justify-center gap-2">
-                    <span>✓</span>
-                    <span>You are Checked In</span>
-                  </div>
-                ) : isCheckInOpen ? (
-                  <button
-                    onClick={handleCaptainCheckIn}
-                    disabled={checkingIn}
-                    className="w-full border border-cyan bg-cyan px-4 py-3 uppercase text-void font-bold text-xs font-mono hover:bg-white hover:border-white transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {checkingIn ? (
-                      <>
-                        <span className="size-3 border-2 border-void border-t-transparent rounded-full animate-spin" />
-                        <span>Verifying Check-In...</span>
-                      </>
-                    ) : (
-                      <span>Check-In to Match Now →</span>
-                    )}
-                  </button>
-                ) : (
-                  <div className="border border-white/10 bg-void/50 p-3 text-center font-mono text-xs text-dim">
-                    {isDone ? 'Match Completed' : 'Check-In Scheduled (Not Open Yet)'}
-                  </div>
-                )}
-              </div>
-            </Panel>
-
-            {/* Control 2: Lobby Credentials Card */}
-            <Panel className="p-6 border-white/10 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
-                  <Hud className="text-cyan">Lobby Credentials</Hud>
-                  <span className={`size-2 rounded-full ${credentialsReleased ? 'bg-ok' : 'bg-dim'}`} />
-                </div>
-
-                {credentialsReleased && roomId ? (
-                  <div className="space-y-3 font-mono text-xs">
-                    <div>
-                      <span className="text-dim text-[10px] block uppercase">ROOM / LOBBY ID</span>
-                      <div className="mt-1 flex items-center justify-between border border-white/15 bg-surface px-3 py-2 text-ink font-bold">
-                        <span className="tracking-widest">{roomId}</span>
-                        <button
-                          onClick={() => handleCopy(roomId, 'room_id')}
-                          className="text-[11px] text-cyan hover:underline uppercase cursor-pointer"
-                        >
-                          {copiedField === 'room_id' ? 'Copied!' : 'Copy'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {roomPassword && (
-                      <div>
-                        <span className="text-dim text-[10px] block uppercase">ROOM PASSWORD</span>
-                        <div className="mt-1 flex items-center justify-between border border-white/15 bg-surface px-3 py-2 text-ink font-bold">
-                          <span className="tracking-widest">{roomPassword}</span>
-                          <button
-                            onClick={() => handleCopy(roomPassword, 'room_pass')}
-                            className="text-[11px] text-cyan hover:underline uppercase cursor-pointer"
-                          >
-                            {copiedField === 'room_pass' ? 'Copied!' : 'Copy'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {instructions && (
-                      <div className="mt-2 text-[11px] text-dim border-t border-white/5 pt-2">
-                        <span className="text-cyan font-bold">Instructions:</span> {instructions}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-6 text-center font-mono text-xs text-dim border border-dashed border-white/10 bg-void/40">
-                    <p className="font-bold uppercase text-dim">Credentials Encrypted</p>
-                    <p className="mt-1 text-[11px] text-dim/70">
-                      Lobby credentials release automatically upon check-in confirmation by the match arbiter.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </Panel>
-
-            {/* Control 3: Admin & Arbiter Status Control */}
-            <Panel className="p-6 border-white/10 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
-                  <Hud className="text-cyan">Match Operations</Hud>
-                  <span className="font-mono text-[10px] text-cyan font-bold uppercase">Arbiter Dispatch</span>
-                </div>
-                <p className="text-xs text-dim font-mono leading-relaxed mb-4">
-                  Match state governance controls for certified tournament directors.
-                </p>
-
-                {isAdmin ? (
-                  <div className="space-y-3 font-mono text-xs">
-                    <div>
-                      <label className="text-dim block uppercase text-[10px] mb-1">Update Match Status</label>
-                      <select
-                        value={rawStatus}
-                        disabled={updatingStatus}
-                        onChange={(e) => handleStatusChange(e.target.value)}
-                        className="w-full border border-cyan/40 bg-surface px-3 py-2.5 font-mono text-xs font-bold text-cyan uppercase cursor-pointer hover:border-cyan focus:outline-none"
-                      >
-                        <option value="SCHEDULED">SCHEDULED</option>
-                        <option value="CHECK_IN_OPEN">CHECK-IN OPEN</option>
-                        <option value="LIVE">LIVE ON AIR</option>
-                        <option value="COMPLETED">COMPLETED</option>
-                        <option value="CANCELLED">CANCELLED</option>
-                      </select>
-                    </div>
-                    {updatingStatus && (
-                      <p className="text-cyan text-[11px] animate-pulse">Broadcasting status change...</p>
-                    )}
-
-                    {isBattleRoyale && (
-                      <div className="pt-2 border-t border-white/10 space-y-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setBrModalOpen(true)}
-                          className="w-full border border-amber-400/60 bg-amber-400/15 px-3 py-2.5 font-mono text-xs font-bold text-amber-300 hover:bg-amber-400/25 transition-colors uppercase flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.15)]"
-                        >
-                          <span>🏆</span>
-                          <span>{isDone ? 'View / Edit Qualifiers' : 'Enter Results & Qualifiers'}</span>
-                        </button>
-                        <p className="text-[10px] text-dim/70">
-                          Select multiple advancing qualifiers (e.g. top 10 from 25) and progress rounds.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="border border-white/10 bg-void/50 p-3 text-center font-mono text-xs text-dim">
-                    Standard competitor view. Admin controls restricted.
-                  </div>
-                )}
-              </div>
-            </Panel>
-          </div>
-        </section>
 
         {/* ========================================================================= */}
         {/* INTERACTIVE ROUND NAVIGATION & FIXTURES */}

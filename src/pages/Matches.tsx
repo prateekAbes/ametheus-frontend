@@ -19,6 +19,41 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
   const tourTitle = m.tourName || tourBy(m.tour)?.name || 'Tournament'
   const isLive = m.status === 'live'
 
+  // Authoritative status and badge
+  const rawStat = (m.rawStatus || m.status || '').toUpperCase()
+  const badgeLabel =
+    rawStat === 'LIVE' ? 'Live Now' :
+    rawStat === 'ENDED' ? 'Match Ended' :
+    rawStat === 'RESULTS_SAVED' ? 'Results Saved' :
+    rawStat === 'RESULTS_PENDING' ? 'Results Pending' :
+    rawStat === 'COMPLETED' || rawStat === 'FINALIZED' ? 'Final' :
+    'Scheduled'
+  const badgeKey =
+    rawStat === 'LIVE' ? 'live' :
+    rawStat === 'ENDED' ? 'ended' :
+    rawStat === 'RESULTS_SAVED' ? 'results_saved' :
+    rawStat === 'RESULTS_PENDING' ? 'results_pending' :
+    rawStat === 'COMPLETED' || rawStat === 'FINALIZED' ? 'completed' :
+    'upcoming'
+
+  // Structured heading: e.g. 24 OCT · ROUND 1 · MATCH 1
+  const dateUpper = m.date && m.date !== 'Not Scheduled' ? m.date.toUpperCase() : 'MATCH DAY'
+  const roundUpper = (m.round || 'ROUND 1').toUpperCase()
+  const matchNum = m.no ?? 1
+  const structuredHeading = `${dateUpper} · ${roundUpper} · MATCH ${matchNum}`
+
+  // Format-aware participant count and terminology
+  const participantCount = m.squadsCount > 0 ? m.squadsCount : (m.hasParticipants ? 2 : 0)
+  const participantTerm = m.isSolo
+    ? (participantCount === 1 ? 'Competing Player' : 'Competing Players')
+    : m.isBattleRoyale
+    ? (participantCount === 1 ? 'Competing Squad' : 'Competing Squads')
+    : (participantCount === 1 ? 'Competing Team' : 'Competing Teams')
+
+  const participantHeading = participantCount > 0
+    ? `${participantCount} ${participantTerm}`
+    : 'Participants TBD'
+
   return (
     <div
       className={`@container group relative block min-h-[300px] h-full overflow-hidden border transition-all duration-300 ${
@@ -35,7 +70,7 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
         {/* Header Strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Badge s={m.status} label={isLive ? 'Live Now' : m.status === 'completed' ? 'Final' : 'Scheduled'} />
+            <Badge s={badgeKey} label={badgeLabel} />
             <Hud className="truncate text-ink max-w-[280px]">
               {tourTitle} · {m.round}
             </Hud>
@@ -54,18 +89,14 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
         {m.isBattleRoyale ? (
           <div className="my-auto py-6 text-center">
             <div className="inline-flex items-center gap-2 border border-cyan/30 bg-cyan/10 px-3 py-1 font-mono text-xs uppercase tracking-wider text-cyan mb-3">
-              <span>{m.isSolo ? 'Multi-Player Battle Royale' : 'Multi-Squad Battle Royale'}</span>
-              <span>•</span>
-              <span>Match {String(m.no).padStart(2, '0')}</span>
+              <span>{structuredHeading}</span>
             </div>
             <h3 className="font-display text-3xl @xl:text-4xl font-black uppercase text-ink">
-              {m.squadsCount > 0
-                ? `${m.squadsCount} ${m.isSolo ? 'Solo Contenders' : 'Competing Squads'}`
-                : (m.hasParticipants ? (m.isSolo ? 'Solo Contenders' : 'Competing Squads') : 'Participants TBD')}
+              {participantHeading}
             </h3>
             {m.squads && m.squads.length > 0 ? (
               <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
-                {m.squads.slice(0, 6).map((sq: any, i: number) => (
+                {m.squads.slice(0, 4).map((sq: any, i: number) => (
                   <span
                     key={sq.id || sq.name || i}
                     className="border border-white/10 bg-void/80 px-2.5 py-1 font-mono text-[11px] text-ink font-bold uppercase"
@@ -73,9 +104,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
                     {sq.name || sq.team_name || (m.isSolo ? `Player ${i + 1}` : `Squad ${i + 1}`)}
                   </span>
                 ))}
-                {m.squads.length > 6 && (
+                {m.squads.length > 4 && (
                   <span className="border border-white/10 bg-void/40 px-2 py-1 font-mono text-[11px] text-dim">
-                    +{m.squads.length - 6} more
+                    +{m.squads.length - 4} more
                   </span>
                 )}
               </div>
@@ -91,7 +122,7 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
           /* Head-to-Head without assigned participants */
           <div className="my-auto py-6 text-center">
             <div className="inline-block border border-white/15 bg-void/60 px-4 py-2 font-mono text-xs uppercase tracking-widest text-dim mb-3">
-              Match {String(m.no).padStart(2, '0')}
+              {structuredHeading}
             </div>
             <h3 className="font-display text-2xl @xl:text-3xl font-black uppercase text-ink">
               Participants TBD
@@ -119,6 +150,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
 
             {/* Score or VS */}
             <div className="text-center px-2">
+              <div className="inline-block border border-cyan/20 bg-cyan/5 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-cyan mb-2">
+                {structuredHeading}
+              </div>
               {m.score ? (
                 <p className="whitespace-nowrap font-display text-[clamp(2rem,10cqw,5.5rem)] font-black tabular-nums leading-none text-ink">
                   {m.score[0]}
@@ -133,6 +167,9 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
               <Hud className="mt-2 block">
                 {m.status === 'completed' ? 'Final Result' : `Match ${String(m.no).padStart(2, '0')}`}
               </Hud>
+              <span className="mt-1 block font-mono text-[10px] text-dim">
+                {participantHeading}
+              </span>
             </div>
 
             {/* Team B */}

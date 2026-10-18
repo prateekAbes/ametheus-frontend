@@ -259,9 +259,18 @@ export default function Organizer() {
       const startIso = formData.starts_at || new Date(Date.now() + 86400000 * 3).toISOString()
       const lockIso = formData.roster_lock_time || new Date(Date.now() + 86400000 * 2).toISOString()
 
+      const rawFmt = (formData.tournament_type || formData.format || '').toLowerCase();
+      const isBr = rawFmt.includes('battle royale') || rawFmt.includes('battle_royale');
+      const isRr = rawFmt.includes('round robin') || rawFmt.includes('round_robin');
+      const match_structure = isBr ? 'BATTLE_ROYALE' : isRr ? 'ROUND_ROBIN' : 'KNOCKOUT';
+      const registration_type = formData.is_solo ? 'SOLO' : 'TEAM';
+
       const payload = {
         title: formData.title,
         game_id: formData.game_id,
+        is_solo: formData.is_solo,
+        registration_type: registration_type,
+        match_structure: match_structure,
         prize_pool_inr: Number(formData.prize_pool_inr),
         entry_fee_inr: Number(formData.entry_fee_inr),
         starts_at: startIso,

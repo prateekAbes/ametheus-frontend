@@ -58,8 +58,8 @@ export const RoundReviewAndRatingModal: React.FC<RoundReviewAndRatingModalProps>
       data.players.forEach((p) => {
         initialMap[p.user_id] = {
           rating: p.existing_rating || 8,
-          skill_adjustment: 0,
-          notes: p.existing_notes || '',
+          skill_adjustment: p.proposed_adjustment ?? 0,
+          notes: p.existing_notes || p.calculation_reason || '',
         }
       })
       setPlayerRatings(initialMap)
@@ -313,96 +313,159 @@ export const RoundReviewAndRatingModal: React.FC<RoundReviewAndRatingModalProps>
                   ) : (
                     <div className="space-y-3 max-h-[460px] overflow-y-auto pr-2">
                       {reviewData?.players.map((p) => {
-                        const cur = playerRatings[p.user_id] || { rating: 8, skill_adjustment: 0, notes: '' }
+                        const cur = playerRatings[p.user_id] || { rating: 8, skill_adjustment: p.proposed_adjustment ?? 0, notes: '' }
+                        const postRating = Math.max(100, (p.current_rating || 500) + (cur.skill_adjustment || 0))
+                        const isGain = (cur.skill_adjustment || 0) > 0
+                        const isLoss = (cur.skill_adjustment || 0) < 0
                         return (
                           <div
                             key={p.user_id}
-                            className="p-3 border border-white/10 bg-void/70 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                            className="p-3.5 border border-white/10 bg-void/70 flex flex-col gap-3"
                           >
-                            {/* Player Info */}
-                            <div className="flex items-center gap-3 min-w-0 md:w-1/3">
-                              {p.avatar_url ? (
-                                <img
-                                  src={p.avatar_url}
-                                  alt={p.username}
-                                  className="size-9 rounded-full object-cover border border-white/20 shrink-0"
-                                />
-                              ) : (
-                                <div className="size-9 rounded-full bg-cyan/15 border border-cyan/40 text-cyan flex items-center justify-center font-bold uppercase shrink-0">
-                                  {p.username.slice(0, 2)}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              {/* Player Info */}
+                              <div className="flex items-center gap-3 min-w-0 md:w-1/3">
+                                {p.avatar_url ? (
+                                  <img
+                                    src={p.avatar_url}
+                                    alt={p.username}
+                                    className="size-10 rounded-full object-cover border border-white/20 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="size-10 rounded-full bg-cyan/15 border border-cyan/40 text-cyan flex items-center justify-center font-bold uppercase shrink-0">
+                                    {p.username.slice(0, 2)}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-display font-black text-sm uppercase text-ink truncate">
+                                    {p.display_name || p.username}
+                                  </div>
+                                  <div className="text-[10px] text-dim truncate">
+                                    {p.team_name || 'Solo Contender'} • @{p.username} • <span className="opacity-70">ID: {p.user_id.slice(0, 8)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Match Statistics Badges */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                {p.placement !== undefined && p.placement !== null && (
+                                  <span className={`px-2 py-0.5 text-[11px] font-bold uppercase border ${
+                                    p.placement === 1
+                                      ? 'border-amber-400/50 bg-amber-400/10 text-amber-300'
+                                      : p.placement <= 3
+                                      ? 'border-cyan/50 bg-cyan/10 text-cyan'
+                                      : 'border-white/15 bg-white/5 text-ink'
+                                  }`}>
+                                    Rank #{p.placement}
+                                  </span>
+                                )}
+                                {p.kills !== undefined && p.kills > 0 && (
+                                  <span className="px-2 py-0.5 text-[11px] border border-white/15 bg-white/5 text-dim">
+                                    Kills: <strong className="text-ink">{p.kills}</strong>
+                                  </span>
+                                )}
+                                {p.points !== undefined && p.points > 0 && (
+                                  <span className="px-2 py-0.5 text-[11px] border border-white/15 bg-white/5 text-dim">
+                                    Pts: <strong className="text-cyan font-bold">{p.points}</strong>
+                                  </span>
+                                )}
+                                {p.wins !== undefined && p.wins > 0 && (
+                                  <span className="px-2 py-0.5 text-[11px] border border-amber-400/40 bg-amber-400/10 text-amber-300 font-bold">
+                                    Win: {p.wins}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Performance Rating (1-10) with +/- buttons */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-dim text-[11px]">Match Rating:</span>
+                                <div className="flex items-center border border-cyan/40 bg-surface">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRatingChange(p.user_id, cur.rating - 0.5)}
+                                    className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
+                                    title="Decrease rating"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    step="0.5"
+                                    value={cur.rating}
+                                    onChange={(e) => handleRatingChange(p.user_id, parseFloat(e.target.value) || 1)}
+                                    className="w-12 text-center font-display font-black text-cyan text-sm bg-transparent outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRatingChange(p.user_id, cur.rating + 0.5)}
+                                    className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
+                                    title="Increase rating"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <span className="text-dim text-[10px]">/ 10</span>
+                              </div>
+
+                              {/* MMR Progression (Pre -> Adj -> Post) */}
+                              <div className="flex items-center gap-2.5">
+                                <div className="text-right">
+                                  <span className="text-[10px] text-dim block uppercase">Pre MMR</span>
+                                  <span className="text-ink font-bold">{p.current_rating}</span>
+                                </div>
+
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[10px] text-dim uppercase">Skill Adj</span>
+                                  <select
+                                    value={cur.skill_adjustment}
+                                    onChange={(e) => handleSkillAdjustmentChange(p.user_id, parseInt(e.target.value, 10))}
+                                    className={`border px-2 py-1 outline-none text-xs font-bold ${
+                                      isGain
+                                        ? 'border-ok/50 bg-ok/10 text-ok'
+                                        : isLoss
+                                        ? 'border-live/50 bg-live/10 text-live'
+                                        : 'border-white/20 bg-surface text-ink'
+                                    }`}
+                                  >
+                                    <option value="0">0 (Neutral)</option>
+                                    <option value="25">+25 (Dominant)</option>
+                                    <option value="15">+15 (Strong Win)</option>
+                                    <option value="10">+10 (Good Play)</option>
+                                    <option value="5">+5 (Slight Gain)</option>
+                                    <option value="-5">-5 (Slight Loss)</option>
+                                    <option value="-10">-10 (Underperform)</option>
+                                    <option value="-15">-15 (Disqualified / AFK)</option>
+                                  </select>
+                                </div>
+
+                                <div className="text-left">
+                                  <span className="text-[10px] text-dim block uppercase">Post MMR</span>
+                                  <span className={`font-black ${isGain ? 'text-ok' : isLoss ? 'text-live' : 'text-cyan'}`}>
+                                    {postRating}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Transparent Calculation Breakdown & Arbiter Feedback */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-white/5 text-[11px]">
+                              {p.calculation_reason && (
+                                <div className="flex-1 flex items-center gap-1.5 text-dim bg-white/[0.02] border border-white/5 px-2.5 py-1">
+                                  <span className="text-cyan font-bold shrink-0">📊 Reason:</span>
+                                  <span className="text-ink/90 truncate">{p.calculation_reason}</span>
                                 </div>
                               )}
-                              <div className="min-w-0">
-                                <div className="font-display font-black text-sm uppercase text-ink truncate">
-                                  {p.display_name || p.username}
-                                </div>
-                                <div className="text-[10px] text-dim truncate">
-                                  {p.team_name || 'Solo Contender'} • MMR: <span className="text-cyan font-bold">{p.current_rating}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Performance Rating (1-10) with +/- buttons */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-dim text-[11px]">Match Rating:</span>
-                              <div className="flex items-center border border-cyan/40 bg-surface">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRatingChange(p.user_id, cur.rating - 0.5)}
-                                  className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
-                                  title="Decrease rating"
-                                >
-                                  -
-                                </button>
+                              <div className="min-w-0 flex-1">
                                 <input
-                                  type="number"
-                                  min="1"
-                                  max="10"
-                                  step="0.5"
-                                  value={cur.rating}
-                                  onChange={(e) => handleRatingChange(p.user_id, parseFloat(e.target.value) || 1)}
-                                  className="w-12 text-center font-display font-black text-cyan text-sm bg-transparent outline-none"
+                                  type="text"
+                                  placeholder="Arbiter feedback / custom notes..."
+                                  value={cur.notes}
+                                  onChange={(e) => handleNotesChange(p.user_id, e.target.value)}
+                                  className="w-full border border-white/10 bg-surface px-2.5 py-1 text-xs text-ink outline-none focus:border-cyan"
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRatingChange(p.user_id, cur.rating + 0.5)}
-                                  className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
-                                  title="Increase rating"
-                                >
-                                  +
-                                </button>
                               </div>
-                              <span className="text-dim text-[10px]">/ 10</span>
-                            </div>
-
-                            {/* MMR Skill Delta (+ / -) */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-dim text-[11px]">Skill Adj:</span>
-                              <select
-                                value={cur.skill_adjustment}
-                                onChange={(e) => handleSkillAdjustmentChange(p.user_id, parseInt(e.target.value, 10))}
-                                className="border border-white/20 bg-surface px-2 py-1 text-ink outline-none focus:border-cyan text-xs font-bold"
-                              >
-                                <option value="0">0 (Neutral)</option>
-                                <option value="25">+25 (Dominant)</option>
-                                <option value="15">+15 (Strong Win)</option>
-                                <option value="10">+10 (Good Play)</option>
-                                <option value="5">+5 (Slight Gain)</option>
-                                <option value="-5">-5 (Slight Loss)</option>
-                                <option value="-10">-10 (Underperform)</option>
-                                <option value="-15">-15 (Disqualified / AFK)</option>
-                              </select>
-                            </div>
-
-                            {/* Notes input */}
-                            <div className="min-w-0 flex-1 md:max-w-xs">
-                              <input
-                                type="text"
-                                placeholder="Arbiter feedback / notes..."
-                                value={cur.notes}
-                                onChange={(e) => handleNotesChange(p.user_id, e.target.value)}
-                                className="w-full border border-white/10 bg-surface px-2.5 py-1 text-xs text-ink outline-none focus:border-cyan"
-                              />
                             </div>
                           </div>
                         )

@@ -2131,9 +2131,13 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
           {/* MATCHES LIST */}
           <div className="space-y-4">
             {filteredMatches.map((m) => {
-              const isLive = (m.status || '').toUpperCase() === 'LIVE'
-              const isCheckIn = (m.status || '').toUpperCase() === 'CHECK_IN_OPEN'
-              const isDone = (m.status || '').toUpperCase() === 'COMPLETED'
+              const rawStat = (m.status || '').toUpperCase()
+              const isLive = rawStat === 'LIVE'
+              const isCheckIn = rawStat === 'CHECK_IN_OPEN'
+              const isDone = rawStat === 'COMPLETED' || rawStat === 'FINALIZED'
+              const isEnded = rawStat === 'ENDED'
+              const isResultsSaved = rawStat === 'RESULTS_SAVED' || rawStat === 'RESULTS_PENDING'
+              const isScheduled = rawStat === 'SCHEDULED' || (!isLive && !isDone && !isEnded && !isResultsSaved && !isCheckIn)
               const isDraft = (m.roster_status || '').toUpperCase() === 'DRAFT'
               const isUpdated = (m.roster_status || '').toUpperCase() === 'UPDATED'
 
@@ -2195,6 +2199,10 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                       ? 'border-warn/40 bg-warn/[0.02]'
                       : isCheckIn
                       ? 'border-cyan/40 bg-cyan/[0.02]'
+                      : isEnded
+                      ? 'border-amber-400/40 bg-amber-400/[0.02]'
+                      : isResultsSaved
+                      ? 'border-cyan/40 bg-cyan/[0.03]'
                       : 'border-white/10 bg-surface/50'
                   }`}
                 >
@@ -2231,11 +2239,27 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                               ? 'live'
                               : isDone
                               ? 'completed'
+                              : isEnded
+                              ? 'ended'
+                              : isResultsSaved
+                              ? 'results_saved'
                               : isCheckIn
-                              ? 'warn'
+                              ? 'check_in_open'
                               : 'upcoming'
                           }
-                          label={m.status || 'SCHEDULED'}
+                          label={
+                            isLive
+                              ? 'LIVE NOW'
+                              : isDone
+                              ? 'FINALIZED'
+                              : isEnded
+                              ? 'MATCH ENDED'
+                              : isResultsSaved
+                              ? 'RESULTS SAVED'
+                              : isCheckIn
+                              ? 'CHECK-IN OPEN'
+                              : 'SCHEDULED'
+                          }
                         />
 
                         {streamUrl && (
@@ -2458,7 +2482,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         </button>
                       )}
 
-                      {!isLive && !isDone && (
+                      {/* 1. SCHEDULED: Show Go Live button only */}
+                      {!isLive && !isDone && !isEnded && !isResultsSaved && (
                         <button
                           onClick={() => handleQuickStatus(m.id, 'LIVE')}
                           className="border border-live bg-live/20 px-3 py-1.5 uppercase text-xs font-bold text-live hover:bg-live hover:text-white transition-all cursor-pointer"
@@ -2467,36 +2492,77 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         </button>
                       )}
 
-                      {isBattleRoyale ? (
+                      {/* 2. LIVE: Show End Match button (removes Go Live permanently) */}
+                      {isLive && (
                         <button
-                          onClick={() => handleOpenBrResultsModal(m)}
-                          className="border border-ok bg-ok/20 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
+                          onClick={() => handleQuickStatus(m.id, 'ENDED')}
+                          className="border border-amber-500 bg-amber-500/20 px-3 py-1.5 uppercase text-xs font-bold text-amber-400 hover:bg-amber-500 hover:text-void transition-all cursor-pointer"
                         >
-                          {isDone ? '🏆 View / Edit Qualifiers' : '🏆 Enter Results & Qualifiers'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setScoreMatch(m)
-                            setScoreForm({
-                              score_a: m.team_a?.score ?? m.score_a ?? 0,
-                              score_b: m.team_b?.score ?? m.score_b ?? 0,
-                              winner_team_id: m.winner_team_id || '',
-                            })
-                          }}
-                          className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
-                        >
-                          🏁 Score / Complete
+                          ⏹ End Match
                         </button>
                       )}
 
+                      {/* 3. ENDED / RESULTS_SAVED: Result entry unlocked */}
+                      {(isEnded || isResultsSaved) && (
+                        <>
+                          {isBattleRoyale ? (
+                            <button
+                              onClick={() => handleOpenBrResultsModal(m)}
+                              className="border border-ok bg-ok/20 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
+                            >
+                              {isResultsSaved ? '✏️ Review / Edit Results' : '🏆 Enter Results & Qualifiers'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setScoreMatch(m)
+                                setScoreForm({
+                                  score_a: m.team_a?.score ?? m.score_a ?? 0,
+                                  score_b: m.team_b?.score ?? m.score_b ?? 0,
+                                  winner_team_id: m.winner_team_id || '',
+                                })
+                              }}
+                              className="border border-ok/40 bg-ok/10 px-3 py-1.5 uppercase text-xs font-bold text-ok hover:bg-ok hover:text-void transition-all cursor-pointer"
+                            >
+                              {isResultsSaved ? '✏️ Review / Edit Scores' : '🏁 Enter Scores'}
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {/* 4. COMPLETED / FINALIZED: Show View Results and Rate Players */}
                       {isDone && (
-                        <button
-                          onClick={() => handleOpenRatingsModal(m)}
-                          className="border border-cyan bg-cyan/20 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
-                        >
-                          ★ Rate Players
-                        </button>
+                        <>
+                          {isBattleRoyale ? (
+                            <button
+                              onClick={() => handleOpenBrResultsModal(m)}
+                              className="border border-dim bg-white/5 px-3 py-1.5 uppercase text-xs font-bold text-dim hover:text-ink transition-all cursor-pointer"
+                            >
+                              👁 View Results &amp; Qualifiers
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setScoreMatch(m)
+                                setScoreForm({
+                                  score_a: m.team_a?.score ?? m.score_a ?? 0,
+                                  score_b: m.team_b?.score ?? m.score_b ?? 0,
+                                  winner_team_id: m.winner_team_id || '',
+                                })
+                              }}
+                              className="border border-dim bg-white/5 px-3 py-1.5 uppercase text-xs font-bold text-dim hover:text-ink transition-all cursor-pointer"
+                            >
+                              👁 View Scores
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleOpenRatingsModal(m)}
+                            className="border border-cyan bg-cyan/20 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
+                          >
+                            ★ Rate Players
+                          </button>
+                        </>
                       )}
 
                       <button

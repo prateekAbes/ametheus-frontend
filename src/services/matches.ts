@@ -165,8 +165,18 @@ export interface ApiMatch {
 export function mapApiMatchToUiMatch(m: ApiMatch) {
   const statusLower = (m.status || '').toLowerCase()
   const isLive = statusLower === 'live' || statusLower === 'in_progress'
-  const isDone = statusLower === 'completed'
-  const status = isLive ? ('live' as const) : isDone ? ('completed' as const) : ('upcoming' as const)
+  const isDone = statusLower === 'completed' || statusLower === 'finalized'
+  const isEnded = statusLower === 'ended'
+  const isResultsSaved = statusLower === 'results_saved' || statusLower === 'results_pending'
+  const status = isLive
+    ? ('live' as const)
+    : isDone
+    ? ('completed' as const)
+    : isEnded
+    ? ('ended' as const)
+    : isResultsSaved
+    ? ('results_saved' as const)
+    : ('upcoming' as const)
 
   const isBattleRoyale =
     (m.format || '').toLowerCase().includes('battle royale') ||
@@ -754,6 +764,7 @@ export interface BattleRoyaleSubmitPayload {
   next_round_name?: string
   is_final_round?: boolean
   scoring_matrix?: Record<string, any>
+  draft?: boolean
 }
 
 export async function submitBattleRoyaleResultsAdmin(
