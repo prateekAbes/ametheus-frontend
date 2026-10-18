@@ -35,6 +35,8 @@ import { resolveMediaUrl } from '../../services/apiClient'
 import { Panel, Hud, Badge, Brackets } from '../ui'
 import { Portal } from '../Modal'
 import { BattleRoyaleResultsModal } from './BattleRoyaleResultsModal'
+import { EditLobbyCredentialsModal } from './EditLobbyCredentialsModal'
+import { RoundReviewAndRatingModal } from './RoundReviewAndRatingModal'
 
 function normalizeStreamUrl(url?: string): string {
   if (!url) return ''
@@ -728,6 +730,20 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     }
   }
 
+  // Collapsible squad roster state
+  const [expandedRosterMatchIds, setExpandedRosterMatchIds] = useState<Record<string, boolean>>({})
+  const toggleRosterExpanded = (matchId: string) => {
+    setExpandedRosterMatchIds((prev) => ({ ...prev, [matchId]: !prev[matchId] }))
+  }
+
+  // Round Review and Finalize Modal State
+  const [roundReviewModalOpen, setRoundReviewModalOpen] = useState(false)
+  const [roundReviewTarget, setRoundReviewTarget] = useState<{
+    tournamentId: string
+    roundName: string
+    tournamentTitle?: string
+  } | null>(null)
+
   // Participant Ratings Modal State & Handlers
   const [ratingsModalMatch, setRatingsModalMatch] = useState<ApiMatch | null>(null)
   const [ratingsList, setRatingsList] = useState<ParticipantRatingItem[]>([])
@@ -739,18 +755,42 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     setLoadingRatings(true)
     try {
       const existing = await getMatchRatingsAdmin(m.id)
-      if (existing?.ratings && existing.ratings.length > 0) {
+      if (existing?.participants && existing.participants.length > 0) {
+        setRatingsList(
+          existing.participants.map((p) => ({
+            user_id: p.user_id,
+            player_id: p.player_id || p.user_id,
+            username: p.username || p.display_name || 'Player',
+            display_name: p.display_name || p.username || 'Player',
+            avatar_url: p.avatar_url,
+            team_id: p.team_id,
+            team_name: p.team_name,
+            current_rating: p.current_rating || 500,
+            rating: p.rating || 8,
+            skill_adjustment: p.skill_adjustment || 0,
+            review: p.review || p.notes || '',
+            notes: p.notes || p.review || '',
+          }))
+        )
+      } else if (existing?.ratings && existing.ratings.length > 0) {
         setRatingsList(existing.ratings)
       } else {
         const items: ParticipantRatingItem[] = []
         if (m.team_a_details?.members) {
           m.team_a_details.members.forEach((mem: any) => {
-            if (mem.id) {
+            if (mem.id || mem.user_id) {
+              const uid = mem.id || mem.user_id
               items.push({
-                user_id: mem.id,
-                username: mem.name || mem.handle || 'Player',
+                user_id: uid,
+                player_id: uid,
+                username: mem.name || mem.username || 'Player',
+                display_name: mem.name || mem.display_name || mem.username || 'Player',
+                avatar_url: mem.avatar_url,
                 team_id: m.team_a_id,
+                team_name: m.team_a?.name || m.team_a_name,
+                current_rating: 500,
                 rating: 8,
+                skill_adjustment: 0,
                 review: '',
               })
             }
@@ -758,36 +798,23 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         }
         if (m.team_b_details?.members) {
           m.team_b_details.members.forEach((mem: any) => {
-            if (mem.id) {
+            if (mem.id || mem.user_id) {
+              const uid = mem.id || mem.user_id
               items.push({
-                user_id: mem.id,
-                username: mem.name || mem.handle || 'Player',
+                user_id: uid,
+                player_id: uid,
+                username: mem.name || mem.username || 'Player',
+                display_name: mem.name || mem.display_name || mem.username || 'Player',
+                avatar_url: mem.avatar_url,
                 team_id: m.team_b_id,
+                team_name: m.team_b?.name || m.team_b_name,
+                current_rating: 500,
                 rating: 8,
+                skill_adjustment: 0,
                 review: '',
               })
             }
           })
-        }
-        if (items.length === 0) {
-          if (m.team_a_id) {
-            items.push({
-              user_id: m.team_a_id,
-              username: m.team_a?.name || m.team_a_name || 'Team A',
-              team_id: m.team_a_id,
-              rating: 8,
-              review: '',
-            })
-          }
-          if (m.team_b_id) {
-            items.push({
-              user_id: m.team_b_id,
-              username: m.team_b?.name || m.team_b_name || 'Team B',
-              team_id: m.team_b_id,
-              rating: 8,
-              review: '',
-            })
-          }
         }
         setRatingsList(items)
       }
@@ -803,7 +830,8 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     if (!ratingsModalMatch) return
     setSubmittingRatings(true)
     try {
-      await submitMatchRatingsAdmin(ratingsModalMatch.id, ratingsList)
+      const submissionId = `match_ratings_${ratingsModalMatch.id}_${Date.now()}`
+      await submitMatchRatingsAdmin(ratingsModalMatch.id, ratingsList, submissionId)
       showBanner(`✓ Match ratings submitted successfully for ${ratingsList.length} player(s).`)
       setRatingsModalMatch(null)
       fetchMatches()
@@ -2057,6 +2085,25 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   📢 Publish All Drafts ({draftMatchesInScope.length})
                 </button>
               )}
+
+              {selectedTournId !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetRound = selectedRoundTab !== 'ALL' ? selectedRoundTab : (availableRoundTabs[0] || 'Round 1')
+                    setRoundReviewTarget({
+                      tournamentId: selectedTournId,
+                      roundName: targetRound,
+                      tournamentTitle: currentTournament?.title,
+                    })
+                    setRoundReviewModalOpen(true)
+                  }}
+                  className="border border-cyan bg-cyan/15 px-3 py-1 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Open round-level player rating and qualification review"
+                >
+                  ⭐ Round Review &amp; Qualifiers {selectedRoundTab !== 'ALL' ? `(${selectedRoundTab})` : ''}
+                </button>
+              )}
             </div>
 
             {/* Lifecycle Status Filter */}
@@ -2205,50 +2252,80 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
 
                       {/* BATTLE ROYALE MULTI-SQUAD LOBBY OR 1v1 CONFRONTATION */}
                       {isBattleRoyale ? (
-                        <div className="py-2 border-y border-white/5 my-1 space-y-2">
-                          <div className="flex items-center justify-between text-[11px] text-dim">
-                            <span className="font-bold uppercase text-ink">
-                              Battle Royale Lobby ({brSquads.length} Squads)
-                            </span>
-                            <span className="text-cyan">Shared Room Lobby</span>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {brSquads.map((sq) => (
-                              <div
-                                key={sq.id}
-                                className={`p-2 border flex items-center justify-between gap-2 ${
-                                  !sq.alive
-                                    ? 'border-live/30 bg-live/5 opacity-60'
-                                    : 'border-white/10 bg-void/60'
-                                }`}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-display font-black text-ink uppercase truncate text-xs">
-                                    {sq.name} {sq.tag ? `[${sq.tag}]` : ''}
+                        <div className="py-2 border-y border-white/5 my-1 space-y-2 font-mono">
+                          {(() => {
+                            const isExpanded = Boolean(expandedRosterMatchIds[m.id])
+                            const aliveCount = brSquads.filter((s) => s.alive).length
+                            const checkedInCount = brSquads.filter((s) => s.checkedIn).length
+                            const isSolo = (m as any).team_size === 1 || (currentTournament as any)?.team_size === 1
+                            const entityName = isSolo ? 'Contenders' : 'Squads'
+
+                            return (
+                              <>
+                                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-void/70 border border-white/10">
+                                  <div className="flex items-center gap-3 text-xs">
+                                    <span className="font-display font-black uppercase text-ink flex items-center gap-1.5">
+                                      <span>👥</span> {brSquads.length} {entityName}
+                                    </span>
+                                    <span className="text-ok font-bold">
+                                      ● {aliveCount} Alive
+                                    </span>
+                                    <span className="text-dim">
+                                      ✓ {checkedInCount} Checked In
+                                    </span>
                                   </div>
-                                  <div className="text-[10px]">
-                                    {sq.checkedIn ? (
-                                      <span className="text-ok">✓ Checked In</span>
-                                    ) : (
-                                      <span className="text-dim">Check-in Pending</span>
-                                    )}
-                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleRosterExpanded(m.id)}
+                                    className="border border-white/20 bg-surface px-3 py-1 text-[11px] uppercase font-bold text-cyan hover:text-ink hover:border-cyan transition-colors cursor-pointer"
+                                  >
+                                    {isExpanded ? '▲ Hide Roster' : '▼ View Roster & Alive Status'}
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleSquadAlive(m.id, sq.id, sq.alive)}
-                                  className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
-                                    sq.alive
-                                      ? 'border-ok/40 bg-ok/10 text-ok hover:bg-live hover:text-white hover:border-live'
-                                      : 'border-live/40 bg-live/15 text-live hover:bg-ok hover:text-void hover:border-ok'
-                                  }`}
-                                  title="Toggle Alive / Eliminated operational status"
-                                >
-                                  {sq.alive ? '● ALIVE' : '✕ ELIMINATED'}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+
+                                {isExpanded && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1 animate-fadeIn">
+                                    {brSquads.map((sq) => (
+                                      <div
+                                        key={sq.id}
+                                        className={`p-2 border flex items-center justify-between gap-2 ${
+                                          !sq.alive
+                                            ? 'border-live/30 bg-live/5 opacity-60'
+                                            : 'border-white/10 bg-void/60'
+                                        }`}
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-display font-black text-ink uppercase truncate text-xs">
+                                            {sq.name} {sq.tag ? `[${sq.tag}]` : ''}
+                                          </div>
+                                          <div className="text-[10px]">
+                                            {sq.checkedIn ? (
+                                              <span className="text-ok">✓ Checked In</span>
+                                            ) : (
+                                              <span className="text-dim">Check-in Pending</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleSquadAlive(m.id, sq.id, sq.alive)}
+                                          className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
+                                            sq.alive
+                                              ? 'border-ok/40 bg-ok/10 text-ok hover:bg-live hover:text-white hover:border-live'
+                                              : 'border-live/40 bg-live/15 text-live hover:bg-ok hover:text-void hover:border-ok'
+                                          }`}
+                                          title="Toggle Alive / Eliminated operational status"
+                                        >
+                                          {sq.alive ? '● ALIVE' : '✕ ELIMINATED'}
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            )
+                          })()}
                         </div>
                       ) : (
                         /* VISUAL WHO IS PLAYING WHOM (1v1) */
@@ -2423,6 +2500,15 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                       )}
 
                       <button
+                        type="button"
+                        onClick={() => handleOpenCredentialsModal(m)}
+                        className="border border-cyan bg-cyan/15 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        🔑 Edit Lobby
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => {
                           setEditMatch(m)
                           setEditForm({
@@ -2443,9 +2529,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                             winner_team_id: m.winner_team_id || '',
                           })
                         }}
-                        className="border border-cyan bg-cyan/15 px-3 py-1.5 uppercase text-xs font-bold text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer"
+                        className="border border-white/20 bg-surface px-3 py-1.5 uppercase text-xs font-bold text-dim hover:text-ink hover:border-cyan transition-all cursor-pointer"
                       >
-                        Edit Lobby
+                        ⚙️ Match Settings
                       </button>
 
                       {!isBattleRoyale && (
@@ -3333,70 +3419,44 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
       )}
 
       {/* EDIT CREDENTIALS MODAL */}
-      {credentialModalMatch && (
-        <Portal lockScroll>
-          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
-            <div className="relative w-full max-w-md border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
-              <Brackets color="border-cyan/50" />
-              <h3 className="font-display text-2xl font-black uppercase text-ink">
-                Room Credentials (Confidential)
-              </h3>
-              <p className="text-xs text-dim mt-1">
-                Enter room ID and password. Credentials remain strictly confidential until you explicitly click &quot;Release Credentials&quot;.
-              </p>
+      <EditLobbyCredentialsModal
+        isOpen={!!credentialModalMatch}
+        match={credentialModalMatch}
+        tournamentTitle={
+          tournaments.find(
+            (t) =>
+              t.id === credentialModalMatch?.tournament_id ||
+              t.slug === credentialModalMatch?.tournament_id
+          )?.title
+        }
+        onClose={() => setCredentialModalMatch(null)}
+        onSave={async (payload) => {
+          if (!credentialModalMatch) return
+          await updateMatchCredentialsAdmin(credentialModalMatch.id, payload)
+          showBanner('✓ Credentials saved in confidential state.')
+          setCredentialModalMatch(null)
+          fetchMatches()
+          if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+        }}
+      />
 
-              <form onSubmit={handleSaveCredentialsSubmit} className="mt-4 space-y-4 font-mono text-xs">
-                <div>
-                  <label className="block text-dim uppercase mb-1">Room ID / Lobby Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. AMT-LOBBY-01"
-                    value={credentialForm.room_id}
-                    onChange={(e) => setCredentialForm({ ...credentialForm, room_id: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan font-bold text-cyan"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Room Password / PIN</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 7894"
-                    value={credentialForm.room_password}
-                    onChange={(e) => setCredentialForm({ ...credentialForm, room_password: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan font-bold text-warn"
-                  />
-                </div>
-                <div>
-                  <label className="block text-dim uppercase mb-1">Custom Join Instructions (Optional)</label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Map: Erangel, Slot 1-4 for Squad A, check in within 10 mins"
-                    value={credentialForm.custom_instructions}
-                    onChange={(e) => setCredentialForm({ ...credentialForm, custom_instructions: e.target.value })}
-                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setCredentialModalMatch(null)}
-                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingCredentials}
-                    className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
-                  >
-                    {submittingCredentials ? 'Saving...' : 'Save Credentials'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </Portal>
+      {/* ROUND REVIEW & QUALIFICATIONS MODAL */}
+      {roundReviewTarget && (
+        <RoundReviewAndRatingModal
+          isOpen={roundReviewModalOpen}
+          tournamentId={roundReviewTarget.tournamentId}
+          tournamentTitle={roundReviewTarget.tournamentTitle}
+          roundName={roundReviewTarget.roundName}
+          onClose={() => {
+            setRoundReviewModalOpen(false)
+            setRoundReviewTarget(null)
+          }}
+          onFinalized={() => {
+            fetchMatches()
+            if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
+            onMatchesUpdated?.()
+          }}
+        />
       )}
 
       {/* BATTLE ROYALE RESULTS & QUALIFIERS MODAL */}
@@ -3420,57 +3480,144 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
       {ratingsModalMatch && (
         <Portal lockScroll>
           <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
-            <div className="relative w-full max-w-xl border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text">
+            <div className="relative w-full max-w-2xl border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text shadow-2xl">
               <Brackets color="border-cyan/50" />
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <h3 className="font-display text-2xl font-black uppercase text-ink">
-                  ★ Post-Match Player Ratings
-                </h3>
-                <span className="text-[10px] text-cyan font-bold uppercase">
-                  Match #{ratingsModalMatch.match_number || 1}
+                <div>
+                  <h3 className="font-display text-2xl font-black uppercase text-ink">
+                    ★ Post-Match Player Ratings
+                  </h3>
+                  <p className="text-xs text-dim mt-0.5 font-mono">
+                    Match #{ratingsModalMatch.match_number || 1} • {ratingsModalMatch.round_name || ratingsModalMatch.stage || 'Round 1'}
+                  </p>
+                </div>
+                <span className="text-[10px] text-cyan font-bold uppercase font-mono border border-cyan/30 px-2 py-0.5 bg-cyan/10">
+                  {ratingsList.length} Player(s)
                 </span>
               </div>
-              <p className="text-xs text-dim mt-1">
-                Authorized organizers can assign 1-10 performance ratings and optional feedback for participants.
+              <p className="text-xs text-dim mt-2 font-mono leading-relaxed">
+                Assign 1-10 performance ratings and optional skill adjustments (+/- MMR) for each participant who competed in this match.
               </p>
 
               {loadingRatings ? (
-                <div className="p-8 text-center text-dim font-mono">Loading participants...</div>
+                <div className="p-8 text-center text-dim font-mono text-xs">Loading participants...</div>
               ) : (
                 <form onSubmit={handleSubmitRatings} className="mt-4 space-y-4 font-mono text-xs">
-                  <div className="max-h-[320px] overflow-y-auto space-y-3 pr-1">
+                  <div className="max-h-[360px] overflow-y-auto space-y-3 pr-1">
                     {ratingsList.length === 0 ? (
-                      <div className="p-4 border border-white/10 text-center text-dim">
+                      <div className="p-6 border border-white/10 text-center text-dim">
                         No individual player roster found for this match.
                       </div>
                     ) : (
                       ratingsList.map((item, idx) => (
-                        <div key={item.user_id || idx} className="border border-white/10 bg-void/60 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-display font-black text-ink text-sm uppercase">
-                              {item.username}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-dim text-[11px]">Rating:</span>
-                              <input
-                                type="number"
-                                min="1"
-                                max="10"
-                                step="0.5"
-                                value={item.rating}
-                                onChange={(e) => {
-                                  const val = Math.min(10, Math.max(1, parseFloat(e.target.value) || 1))
-                                  setRatingsList((prev) => {
-                                    const next = [...prev]
-                                    next[idx] = { ...next[idx], rating: val }
-                                    return next
-                                  })
-                                }}
-                                className="w-16 border border-cyan/40 bg-surface px-2 py-1 text-center font-display font-black text-cyan text-sm outline-none"
-                              />
-                              <span className="text-dim text-[10px]">/ 10</span>
+                        <div key={item.user_id || idx} className="border border-white/10 bg-void/70 p-3 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            {/* Player Info */}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {item.avatar_url ? (
+                                <img
+                                  src={item.avatar_url}
+                                  alt={item.username || 'Player'}
+                                  className="size-8 rounded-full object-cover border border-white/20 shrink-0"
+                                />
+                              ) : (
+                                <div className="size-8 rounded-full bg-cyan/15 border border-cyan/40 text-cyan flex items-center justify-center font-bold uppercase text-xs shrink-0">
+                                  {(item.display_name || item.username || 'PL').slice(0, 2)}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <span className="font-display font-black text-ink text-sm uppercase block truncate">
+                                  {item.display_name || item.username}
+                                </span>
+                                <span className="text-[10px] text-dim block truncate">
+                                  {item.team_name || 'Solo Contender'} • MMR: <span className="text-cyan font-bold">{item.current_rating || 500}</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Performance Rating (1-10) with +/- buttons */}
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-dim text-[11px]">Rating:</span>
+                                <div className="flex items-center border border-cyan/40 bg-surface">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const val = Math.max(1, Math.round(((item.rating || 8) - 0.5) * 10) / 10)
+                                      setRatingsList((prev) => {
+                                        const next = [...prev]
+                                        next[idx] = { ...next[idx], rating: val }
+                                        return next
+                                      })
+                                    }}
+                                    className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
+                                    title="Decrease rating"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    step="0.5"
+                                    value={item.rating}
+                                    onChange={(e) => {
+                                      const val = Math.min(10, Math.max(1, parseFloat(e.target.value) || 1))
+                                      setRatingsList((prev) => {
+                                        const next = [...prev]
+                                        next[idx] = { ...next[idx], rating: val }
+                                        return next
+                                      })
+                                    }}
+                                    className="w-12 border-0 bg-transparent text-center font-display font-black text-cyan text-sm outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const val = Math.min(10, Math.round(((item.rating || 8) + 0.5) * 10) / 10)
+                                      setRatingsList((prev) => {
+                                        const next = [...prev]
+                                        next[idx] = { ...next[idx], rating: val }
+                                        return next
+                                      })
+                                    }}
+                                    className="px-2 py-1 text-dim hover:text-cyan font-bold cursor-pointer"
+                                    title="Increase rating"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <span className="text-dim text-[10px]">/ 10</span>
+                              </div>
+
+                              {/* Skill Adjustment Delta */}
+                              <div className="flex items-center gap-1">
+                                <select
+                                  value={item.skill_adjustment || 0}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10) || 0
+                                    setRatingsList((prev) => {
+                                      const next = [...prev]
+                                      next[idx] = { ...next[idx], skill_adjustment: val }
+                                      return next
+                                    })
+                                  }}
+                                  className="border border-white/20 bg-surface px-1.5 py-1 text-ink outline-none focus:border-cyan text-xs font-bold"
+                                  title="Skill MMR Adjustment"
+                                >
+                                  <option value="0">±0 MMR</option>
+                                  <option value="25">+25 MMR</option>
+                                  <option value="15">+15 MMR</option>
+                                  <option value="10">+10 MMR</option>
+                                  <option value="5">+5 MMR</option>
+                                  <option value="-5">-5 MMR</option>
+                                  <option value="-10">-10 MMR</option>
+                                  <option value="-15">-15 MMR</option>
+                                </select>
+                              </div>
                             </div>
                           </div>
+
                           <div>
                             <input
                               type="text"
@@ -3480,11 +3627,11 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                 const val = e.target.value
                                 setRatingsList((prev) => {
                                   const next = [...prev]
-                                  next[idx] = { ...next[idx], review: val }
+                                  next[idx] = { ...next[idx], review: val, notes: val }
                                   return next
                                 })
                               }}
-                              className="w-full border border-white/10 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
+                              className="w-full border border-white/10 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan placeholder:text-dim/40"
                             />
                           </div>
                         </div>
@@ -3503,7 +3650,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                     <button
                       type="submit"
                       disabled={submittingRatings || ratingsList.length === 0}
-                      className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+                      className="border border-cyan bg-cyan px-5 py-2 uppercase text-xs font-bold text-void hover:bg-cyan/90 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       {submittingRatings ? 'Saving...' : 'Submit Player Ratings'}
                     </button>

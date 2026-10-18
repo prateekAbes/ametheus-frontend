@@ -780,24 +780,42 @@ export async function submitBattleRoyaleResultsAdmin(
 
 export interface ParticipantRatingItem {
   user_id: string
+  player_id?: string
   username?: string
+  display_name?: string
+  avatar_url?: string
   team_id?: string
+  team_name?: string
+  current_rating?: number
   rating: number
+  skill_adjustment?: number
+  adjustment_reason?: string
+  adjustment_explanation?: string
   review?: string
+  notes?: string
 }
 
 export async function getMatchRatingsAdmin(
   matchId: string
-): Promise<{ status: string; match_id: string; ratings: ParticipantRatingItem[] }> {
+): Promise<{
+  status: string
+  match_id: string
+  is_completed: boolean
+  participants: ParticipantRatingItem[]
+  ratings: ParticipantRatingItem[]
+  rating_scale: string
+}> {
   return apiClient(`/admin/matches/${matchId}/ratings`)
 }
 
 export async function submitMatchRatingsAdmin(
   matchId: string,
-  ratings: ParticipantRatingItem[]
+  ratings: ParticipantRatingItem[],
+  submissionId?: string
 ): Promise<{ status: string; message: string; match_id: string; total_rated: number }> {
   return apiClient(`/admin/matches/${matchId}/ratings`, {
     method: 'POST',
-    body: JSON.stringify({ ratings }),
+    body: JSON.stringify({ ratings, submission_id: submissionId }),
   })
 }
+

@@ -1000,4 +1000,93 @@ export async function getRatingAuditLogs(params?: {
   return apiClient<{ status: string; total: number; logs: any[] }>(`/admin/rating-management/audit-logs?${q.toString()}`)
 }
 
+export interface RoundPlayerItem {
+  player_id: string
+  user_id: string
+  username: string
+  display_name: string
+  avatar_url?: string
+  team_id?: string
+  team_name?: string
+  current_rating: number
+  match_id: string
+  existing_rating?: number
+  existing_notes?: string
+  is_rated: boolean
+}
+
+export interface RoundStandingItem {
+  participant_id: string
+  participant_name: string
+  total_points: number
+  kills?: number
+  wins?: number
+  matches_played: number
+  best_placement?: number
+  qualified?: boolean
+  rank: number
+}
+
+export interface RoundReviewResponse {
+  status: string
+  tournament_id: string
+  round_name: string
+  total_matches: number
+  completed_matches: number
+  all_matches_completed: boolean
+  is_round_finalized: boolean
+  standings: RoundStandingItem[]
+  proposed_qualifiers: string[]
+  confirmed_qualifiers: string[]
+  players: RoundPlayerItem[]
+  total_players: number
+  total_rated_players: number
+}
+
+export interface RoundRatingSubmitItem {
+  player_id?: string
+  user_id: string
+  username?: string
+  display_name?: string
+  team_id?: string
+  team_name?: string
+  match_id?: string
+  rating: number
+  skill_adjustment?: number
+  adjustment_reason?: string
+  adjustment_explanation?: string
+  notes?: string
+  review?: string
+}
+
+export interface RoundRatingsSubmitPayload {
+  ratings: RoundRatingSubmitItem[]
+  submission_id?: string
+}
+
+export interface RoundFinalizePayload {
+  qualifier_ids: string[]
+  round_number?: number
+  notes?: string
+}
+
+export async function getRoundReviewAdmin(tournamentId: string, roundName: string): Promise<RoundReviewResponse> {
+  return apiClient<RoundReviewResponse>(`/admin/tournaments/${tournamentId}/rounds/${encodeURIComponent(roundName)}/review`)
+}
+
+export async function submitRoundRatingsAdmin(tournamentId: string, roundName: string, payload: RoundRatingsSubmitPayload): Promise<{ status: string; message: string; total_rated: number }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds/${encodeURIComponent(roundName)}/ratings`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function finalizeRoundAdmin(tournamentId: string, roundName: string, payload: RoundFinalizePayload): Promise<{ status: string; message: string; qualified_count: number; qualifier_ids: string[] }> {
+  return apiClient(`/admin/tournaments/${tournamentId}/rounds/${encodeURIComponent(roundName)}/finalize`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+
 
