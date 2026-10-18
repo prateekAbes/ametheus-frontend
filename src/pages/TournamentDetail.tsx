@@ -309,81 +309,74 @@ export default function TournamentDetail() {
   const userPlayerId = profile?.id || (profile as any)?.clerk_id || profile?.clerk_user_id || regStatus?.registration?.player_id
   const userMatch = useMemo(() => {
     if (!matchesData || matchesData.length === 0) return null
-    if (userTeamId) {
-      const found = matchesData.find((m: any) =>
-        m.team_a?.id === userTeamId ||
-        m.team_b?.id === userTeamId ||
-        m.team_a_id === userTeamId ||
-        m.team_b_id === userTeamId ||
-        (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id) === userTeamId))
-      )
-      if (found) return found
-    }
-    if (userPlayerId) {
-      const found = matchesData.find((m: any) =>
-        m.team_a?.id === userPlayerId ||
-        m.team_b?.id === userPlayerId ||
-        m.team_a_id === userPlayerId ||
-        m.team_b_id === userPlayerId ||
-        (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id || t?.user_id) === userPlayerId))
-      )
-      if (found) return found
-    }
-    return null
+    // Find all matches where user or team participates
+    const userMatches = matchesData.filter((m: any) => {
+      if (userTeamId) {
+        if (m.team_a?.id === userTeamId || m.team_b?.id === userTeamId || m.team_a_id === userTeamId || m.team_b_id === userTeamId) return true
+        if (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id) === userTeamId)) return true
+      }
+      if (userPlayerId) {
+        if (m.team_a?.id === userPlayerId || m.team_b?.id === userPlayerId || m.team_a_id === userPlayerId || m.team_b_id === userPlayerId) return true
+        if (Array.isArray(m.teams) && m.teams.some((t: any) => (t?.id || t?._id || t?.user_id) === userPlayerId)) return true
+      }
+      return false
+    })
+
+    if (userMatches.length === 0) return null
+
+    // Prioritize active/current match: LIVE first, then SCHEDULED/UPCOMING (highest round), then ENDED, then COMPLETED
+    const liveMatch = userMatches.find((m: any) => (m.status || '').toUpperCase() === 'LIVE')
+    if (liveMatch) return liveMatch
+
+    const scheduledMatches = userMatches
+      .filter((m: any) => ['SCHEDULED', 'DRAFT', 'CHECK_IN_OPEN', 'UPCOMING'].includes((m.status || '').toUpperCase()))
+      .sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))
+    if (scheduledMatches.length > 0) return scheduledMatches[0]
+
+    const endedMatches = userMatches
+      .filter((m: any) => ['ENDED', 'RESULTS_SAVED', 'RESULTS_PENDING'].includes((m.status || '').toUpperCase()))
+      .sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))
+    if (endedMatches.length > 0) return endedMatches[0]
+
+    return [...userMatches].sort((a: any, b: any) => (b.round_number || 1) - (a.round_number || 1))[0]
   }, [matchesData, userTeamId, userPlayerId])
 
-  const [checkingIn, setCheckingIn] = useState(false)
-  const [checkInSuccessMsg, setCheckInSuccessMsg] = useState<string | null>(null)
-
-  const isUserCheckedIn = Boolean(
-    (userMatch?.check_in_status && userPlayerId && userMatch.check_in_status[userPlayerId]) ||
-    (userMatch?.check_in_status && userTeamId && userMatch.check_in_status[userTeamId]) ||
-    (userMatch?.check_ins && Object.values(userMatch.check_ins).some((ci: any) => ci?.user_id === userPlayerId || ci?.team_id === userTeamId))
-  )
-
-  const handleHubCheckIn = async () => {
-    if (!userMatch) return
-    setCheckingIn(true)
-    setCheckInSuccessMsg(null)
-    try {
-      await captainCheckIn(userMatch.id || userMatch._id)
-      setCheckInSuccessMsg('Check-in verified! You are confirmed ready.')
-      fetchTour()
-      fetchStatus(id)
-    } catch (err: any) {
-      alert(err.message || 'Failed to check in')
-    } finally {
-      setCheckingIn(false)
-    }
-  }
-
+  // Strict Round-Specific Credential Isolation: Credentials belong to user's active match only
   const activeCreds = useMemo(() => {
-    if (userMatch?.credentials_released) {
-      const rId = userMatch.room_id || userMatch.lobby_code
-      const rPass = userMatch.room_password || userMatch.lobby_password
-      if (rId && rId !== 'TBD') {
+    if (userMatch) {
+      if (userMatch.credentials_released) {
+        const rId = userMatch.room_id || userMatch.lobby_code
+        const rPass = userMatch.room_password || userMatch.lobby_password
+        if (rId && rId !== 'TBD') {
+          return {
+            roomId: rId,
+            roomPassword: rPass || 'None',
+            customInstructions: userMatch.custom_instructions,
+            serverRegion: userMatch.server_region || tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
+            isReleased: true,
+          }
+        }
+      }
+      // If user has an active match but credentials are NOT released for it, do NOT bleed credentials from other rounds
+      return null
+    }
+
+    // Only if tournament has no match records at all, check tournament-level broadcast credentials
+    if (!matchesData || matchesData.length === 0) {
+      const tRoomId = (tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id
+      if (tRoomId && tRoomId !== 'TBD') {
+        const tRoomPass = (tourData as any)?.customRoomPassword || (tourData as any)?.custom_room_password || (communityInfo as any)?.room_password
         return {
-          roomId: rId,
-          roomPassword: rPass || 'None',
-          customInstructions: userMatch.custom_instructions,
-          serverRegion: userMatch.server_region || tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
+          roomId: tRoomId,
+          roomPassword: tRoomPass || 'None',
+          customInstructions: (tourData as any)?.customInstructions,
+          serverRegion: tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
           isReleased: true,
         }
       }
     }
-    const tRoomId = (tourData as any)?.customRoomId || (tourData as any)?.custom_room_id || (communityInfo as any)?.room_id
-    if (tRoomId && tRoomId !== 'TBD') {
-      const tRoomPass = (tourData as any)?.customRoomPassword || (tourData as any)?.custom_room_password || (communityInfo as any)?.room_password
-      return {
-        roomId: tRoomId,
-        roomPassword: tRoomPass || 'None',
-        customInstructions: (tourData as any)?.customInstructions,
-        serverRegion: tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
-        isReleased: true,
-      }
-    }
     return null
-  }, [userMatch, tourData, communityInfo])
+  }, [userMatch, matchesData, tourData, communityInfo])
 
   // Registered rosters
   const rosterList = tourData?.registeredRosters || []
@@ -712,112 +705,7 @@ export default function TournamentDetail() {
               </div>
             )}
 
-            {/* Participant Readiness & Check-in Control (Part G 5-stage readiness state machine) */}
-            <div className="mb-8 border border-white/10 bg-void/70 p-6 md:p-8 backdrop-blur-md">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <span className={`size-2 rounded-full ${isUserCheckedIn ? 'bg-ok animate-pulse' : 'bg-cyan animate-pulse'}`} />
-                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink">
-                    Participant Readiness &amp; Check-In
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] text-dim uppercase">
-                    Stage {userMatch?.status === 'LIVE' ? '5/5: Live' : (activeCreds && isUserCheckedIn) ? '4/5: Credentials Released' : isUserCheckedIn ? '3/5: Checked In' : (userMatch?.status === 'CHECK_IN_OPEN' || tourData?.status === 'IN_PROGRESS') ? '2/5: Check-In Open' : '1/5: Confirmed'}
-                  </span>
-                  <span className={`px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider border ${
-                    isUserCheckedIn ? 'border-ok/40 bg-ok/10 text-ok' : 'border-cyan/40 bg-cyan/10 text-cyan'
-                  }`}>
-                    {isUserCheckedIn ? '✓ Platform Verified' : 'Action Required'}
-                  </span>
-                </div>
-              </div>
 
-              {/* 5-Stage Stepper Visualization */}
-              <div className="mt-5 grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-[11px]">
-                <div className="border border-ok/40 bg-ok/5 p-2.5">
-                  <span className="text-ok font-bold block">01 · Enrolled</span>
-                  <span className="text-dim text-[10px]">Slot Confirmed</span>
-                </div>
-                <div className={`border p-2.5 ${
-                  (userMatch?.status === 'CHECK_IN_OPEN' || tourData?.status === 'IN_PROGRESS' || isUserCheckedIn)
-                    ? 'border-ok/40 bg-ok/5 text-ok'
-                    : 'border-white/10 bg-surface/40 text-dim'
-                }`}>
-                  <span className="font-bold block">02 · Check-In</span>
-                  <span className="text-[10px]">{isUserCheckedIn ? 'Completed' : 'Window Open'}</span>
-                </div>
-                <div className={`border p-2.5 ${
-                  isUserCheckedIn
-                    ? 'border-ok/40 bg-ok/5 text-ok'
-                    : 'border-white/10 bg-surface/40 text-dim'
-                }`}>
-                  <span className="font-bold block">03 · Verified</span>
-                  <span className="text-[10px]">{isUserCheckedIn ? 'Attendance Confirmed' : 'Pending Check-in'}</span>
-                </div>
-                <div className={`border p-2.5 ${
-                  activeCreds
-                    ? 'border-cyan/40 bg-cyan/5 text-cyan'
-                    : 'border-white/10 bg-surface/40 text-dim'
-                }`}>
-                  <span className="font-bold block">04 · Credentials</span>
-                  <span className="text-[10px]">{activeCreds ? 'Room Details Active' : 'Awaiting Arbiters'}</span>
-                </div>
-                <div className={`border p-2.5 ${
-                  userMatch?.status === 'LIVE'
-                    ? 'border-live/40 bg-live/5 text-live font-bold animate-pulse'
-                    : 'border-white/10 bg-surface/40 text-dim'
-                }`}>
-                  <span className="block">05 · Match Live</span>
-                  <span className="text-[10px]">{userMatch?.status === 'LIVE' ? 'Battle in Progress' : 'Scheduled'}</span>
-                </div>
-              </div>
-
-              {/* Platform Check-in vs Game Client Entry Explainer & Action */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-white/10 bg-surface/60 p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan">
-                      Step 1 · Platform Check-In (Ametheus)
-                    </span>
-                  </div>
-                  <p className="text-xs text-dim leading-relaxed mb-4">
-                    Verifies your presence and active attendance on the platform. Required before room credentials are distributed.
-                  </p>
-                  {isUserCheckedIn ? (
-                    <div className="inline-flex items-center gap-2 font-mono text-xs font-bold text-ok bg-ok/10 border border-ok/30 px-3 py-1.5">
-                      <span>✓ Ready &amp; Checked In</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={checkingIn || !userMatch}
-                      onClick={handleHubCheckIn}
-                      className="inline-flex items-center justify-center gap-2 border border-cyan bg-cyan/20 px-4 py-2 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <span>{checkingIn ? 'Verifying Attendance...' : 'Confirm Attendance & Check In'}</span>
-                      <span>→</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="border border-white/10 bg-surface/60 p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400">
-                      Step 2 · Game Client Lobby Entry
-                    </span>
-                  </div>
-                  <p className="text-xs text-dim leading-relaxed mb-4">
-                    Launch your game client (e.g. Free Fire, BGMI, Valorant) and join custom lobby using the Room ID &amp; Password shown below.
-                  </p>
-                  <div className="font-mono text-xs text-dim">
-                    Status: <span className={activeCreds ? 'text-ok font-bold' : 'text-warn font-bold'}>
-                      {activeCreds ? 'Credentials Active Below' : 'Waiting for Arbiters to release room codes'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Match Lobby Credentials — Primary Focal Point for Confirmed Participants */}
             {activeCreds ? (
@@ -932,7 +820,7 @@ export default function TournamentDetail() {
                       </span>
                       <span className={`px-2 py-0.5 font-mono text-[10px] font-bold uppercase border ${
                         userMatch.status === 'LIVE' ? 'border-live bg-live/10 text-live' :
-                        userMatch.status === 'CHECK_IN_OPEN' ? 'border-ok bg-ok/10 text-ok' :
+                        userMatch.status === 'COMPLETED' ? 'border-ok bg-ok/10 text-ok' :
                         'border-white/20 bg-white/5 text-dim'
                       }`}>
                         {userMatch.status || 'SCHEDULED'}
@@ -969,7 +857,7 @@ export default function TournamentDetail() {
                     </p>
                   </div>
                   <div className="shrink-0 border border-white/10 bg-surface/60 px-3.5 py-2 font-mono text-xs text-dim">
-                    <span>⏱ Lobby opens 15m prior to start</span>
+                    <span>⏱ Released prior to match start</span>
                   </div>
                 </div>
               </div>
@@ -1209,7 +1097,7 @@ export default function TournamentDetail() {
 
               <div className="mt-6 border-t border-white/10 pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <p className="text-xs text-dim max-w-2xl leading-relaxed">
-                  <strong className="text-ink">Match Readiness:</strong> Custom Room ID and Password unlock directly in your Competitor Hub 15 minutes before match start. Teams that fail to join within 10 minutes of scheduled start will receive a forfeit loss.
+                  <strong className="text-ink">Match Readiness:</strong> Custom Room ID and Password unlock directly in your Competitor Hub once released by arbiters. Participants must join the custom room using their registered in-game UID before kickoff.
                 </p>
                 <Cta small ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
                   Review Full Rulebook ↓
@@ -1343,8 +1231,8 @@ export default function TournamentDetail() {
                   <h3 className="mt-2 font-display text-2xl font-black uppercase text-ink">
                     You Are Not Enrolled In This Tournament
                   </h3>
-                  <p className="mt-2 text-sm text-dim leading-relaxed">
-                    Match lobby credentials, room passwords, platform check-in, and competitor voice channels are restricted exclusively to verified participants.
+                  <p className="text-sm text-dim leading-relaxed">
+                    Match lobby credentials, room passwords, official server links, and competitor channels are restricted exclusively to verified participants.
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-wrap gap-3">

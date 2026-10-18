@@ -8,7 +8,6 @@ import {
   getMatchById,
   getMatches,
   updateMatchStatus,
-  captainCheckIn,
   type ApiMatch,
 } from '../services/matches'
 import { useAuthContext } from '../context/AuthContext'
@@ -106,9 +105,6 @@ export default function MatchDetail() {
   const [tournamentMatches, setTournamentMatches] = useState<ApiMatch[]>([])
   const [selectedRound, setSelectedRound] = useState<string>('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [checkingIn, setCheckingIn] = useState(false)
-  const [hasCheckedIn, setHasCheckedIn] = useState(false)
-  const [checkInMsg, setCheckInMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [brModalOpen, setBrModalOpen] = useState(false)
 
@@ -153,28 +149,14 @@ export default function MatchDetail() {
     loadData()
   }, [loadData])
 
-  const handleCaptainCheckIn = async () => {
-    setCheckingIn(true)
-    setCheckInMsg(null)
-    try {
-      await captainCheckIn(id)
-      setHasCheckedIn(true)
-      setCheckInMsg({ text: 'Check-in confirmed! You are registered as ready for this match.', ok: true })
-      loadData()
-    } catch (err: any) {
-      setCheckInMsg({ text: err.message || 'Check-in failed. Please verify your team or registration status.', ok: false })
-    } finally {
-      setCheckingIn(false)
-    }
-  }
-
-  // Normalizations
+  // Normalizations — CHECK_IN_OPEN is treated the same as SCHEDULED (check-in system removed)
   const rawStatus = (match?.status || 'SCHEDULED').toUpperCase()
   const isLive = rawStatus === 'LIVE' || rawStatus === 'IN_PROGRESS'
   const isDone = rawStatus === 'COMPLETED' || rawStatus === 'FINALIZED'
   const isEnded = rawStatus === 'ENDED'
   const isResultsSaved = rawStatus === 'RESULTS_SAVED' || rawStatus === 'RESULTS_PENDING'
-  const isCheckInOpen = rawStatus === 'CHECK_IN_OPEN'
+  // CHECK_IN_OPEN is a legacy status — treat it the same as SCHEDULED
+  const isScheduled = !isLive && !isDone && !isEnded && !isResultsSaved
 
   const t = match?.tournament || {}
   const g = gameBy(t.game_slug || match?.game_slug || 'valorant')
@@ -206,10 +188,17 @@ export default function MatchDetail() {
     multiTeams.length > 2
 
   const isSolo = Boolean(
-    (match as any)?.is_solo ??
-    (t as any)?.is_solo ??
-    ((t as any)?.min_team_size === 1 && (t as any)?.max_team_size === 1) ??
-    (match?.game_slug && match.game_slug.toLowerCase().includes('solo'))
+    (match as any)?.is_solo ||
+    (t as any)?.is_solo ||
+    (match as any)?.isSolo ||
+    (t as any)?.isSolo ||
+    (match as any)?.registration_type === 'SOLO' ||
+    (t as any)?.registration_type === 'SOLO' ||
+    ((t as any)?.min_team_size === 1 && (t as any)?.max_team_size === 1) ||
+    ((t as any)?.minTeamSize === 1 && (t as any)?.maxTeamSize === 1) ||
+    (match?.game_slug && match.game_slug.toLowerCase().includes('solo')) ||
+    (t?.format && t.format.toLowerCase().includes('solo')) ||
+    (match?.format && match.format.toLowerCase().includes('solo'))
   )
 
   const hasParticipants = Boolean(
@@ -223,16 +212,6 @@ export default function MatchDetail() {
     ? (winnerId === match.team_a_id ? teamA.name : winnerId === match.team_b_id ? teamB.name : null) ||
       (match.score_a !== undefined && match.score_b !== undefined && match.score_a > match.score_b ? teamA.name : teamB.name)
     : null
-
-  // Participant check-in check
-  const currentUserId = profile?.id || (profile as any)?.clerk_id || profile?.clerk_user_id
-  const isAlreadyCheckedIn = Boolean(
-    hasCheckedIn ||
-    (match?.check_ins && currentUserId && (match.check_ins[currentUserId] || Object.values(match.check_ins).some((v: any) => v?.user_id === currentUserId || v?.captain_id === currentUserId))) ||
-    (match?.check_in_status && currentUserId && match.check_in_status[currentUserId]) ||
-    (match?.check_in_status && match.team_a_id && match.check_in_status[match.team_a_id]) ||
-    (match?.check_in_status && match.team_b_id && match.check_in_status[match.team_b_id])
-  )
 
   // Credentials
   const roomId = (match as any)?.custom_room_id || match?.room_id || (match as any)?.lobby_code || (match as any)?.lobbyCode
@@ -357,7 +336,6 @@ export default function MatchDetail() {
                   isDone ? 'completed' :
                   isEnded ? 'ended' :
                   isResultsSaved ? 'results_saved' :
-                  isCheckInOpen ? 'waiting for user' :
                   'upcoming'
                 }
                 label={
@@ -365,7 +343,6 @@ export default function MatchDetail() {
                   isDone ? 'Final' :
                   isEnded ? 'Match Ended' :
                   isResultsSaved ? 'Results Saved' :
-                  isCheckInOpen ? 'Check-in Open' :
                   rawStatus === 'CANCELLED' ? 'Cancelled' :
                   'Scheduled'
                 }
@@ -380,7 +357,6 @@ export default function MatchDetail() {
                     title="Arbiter Status Override"
                   >
                     <option value="SCHEDULED">SCHEDULED</option>
-                    <option value="CHECK_IN_OPEN">CHECK-IN OPEN</option>
                     <option value="LIVE">LIVE ON AIR</option>
                     <option value="ENDED">MATCH ENDED</option>
                     <option value="RESULTS_SAVED">RESULTS SAVED</option>
@@ -389,8 +365,8 @@ export default function MatchDetail() {
                     <option value="CANCELLED">CANCELLED</option>
                   </select>
 
-                  {/* Go Live button if Scheduled or Check-in Open */}
-                  {(rawStatus === 'SCHEDULED' || isCheckInOpen) && (
+                  {/* Go Live button if Scheduled */}
+                  {isScheduled && (
                     <button
                       type="button"
                       disabled={updatingStatus}
@@ -764,7 +740,7 @@ export default function MatchDetail() {
         <section aria-label="Team Rosters">
           <SectionHead
             kicker="Authoritative Lineups"
-            title={isBattleRoyale ? (isSolo ? 'Contender Roster' : 'Squad Rosters') : 'Team Rosters'}
+            title={isSolo ? 'Contender Roster' : isBattleRoyale ? 'Squad Rosters' : 'Team Rosters'}
             size="md"
             className="mb-6"
           />
@@ -822,6 +798,47 @@ export default function MatchDetail() {
                 })}
               </div>
             )
+          ) : isSolo ? (
+            /* Head-to-Head 1v1 Solo Contenders */
+            <div className="grid gap-6 md:grid-cols-2">
+              <Panel className="p-6 border-white/10">
+                <div className="flex items-center gap-4">
+                  {teamA.logo_url ? (
+                    <DynamicImage src={resolveMediaUrl(teamA.logo_url)} alt="" className="size-16 rounded-full border border-white/20 object-cover" />
+                  ) : (
+                    <Crest name={teamA.name || 'Contender A'} size={64} color={g.accent} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider block">SOLO CONTENDER 1</span>
+                    <h3 className="font-display text-2xl font-black uppercase text-ink truncate mt-0.5">
+                      {teamA.captain?.name || teamA.captain?.handle || teamA.name || 'Player 1'}
+                    </h3>
+                    <p className="font-mono text-xs text-dim mt-1">
+                      Handle: @{teamA.captain?.handle || teamA.captain?.name || teamA.name || 'TBD'}
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel className="p-6 border-white/10">
+                <div className="flex items-center gap-4">
+                  {teamB.logo_url ? (
+                    <DynamicImage src={resolveMediaUrl(teamB.logo_url)} alt="" className="size-16 rounded-full border border-white/20 object-cover" />
+                  ) : (
+                    <Crest name={teamB.name || 'Contender B'} size={64} color={g.accent} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider block">SOLO CONTENDER 2</span>
+                    <h3 className="font-display text-2xl font-black uppercase text-ink truncate mt-0.5">
+                      {teamB.captain?.name || teamB.captain?.handle || teamB.name || 'Player 2'}
+                    </h3>
+                    <p className="font-mono text-xs text-dim mt-1">
+                      Handle: @{teamB.captain?.handle || teamB.captain?.name || teamB.name || 'TBD'}
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+            </div>
           ) : (
             /* Head-to-Head Team Rosters */
             <div className="grid gap-6 md:grid-cols-2">
@@ -840,14 +857,14 @@ export default function MatchDetail() {
                     </div>
                   </div>
                   <span className="font-mono text-xs text-dim">
-                    {isSolo ? 'Solo Contender' : `${teamA.members?.length || 1} Registered Contenders`}
+                    {`${teamA.members?.length || 1} Registered Contenders`}
                   </span>
                 </div>
 
                 {/* Captain Bar */}
                 <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
                   <span className="text-[10px] uppercase text-cyan block font-bold">
-                    {isSolo ? 'SOLO CONTENDER:' : 'TEAM LEADER / CAPTAIN:'}
+                    TEAM LEADER / CAPTAIN:
                   </span>
                   <p className="font-display text-base font-black text-ink uppercase mt-0.5">
                     {teamA.captain?.name || teamA.captain?.handle || teamA.name || 'Contender'}
@@ -891,14 +908,14 @@ export default function MatchDetail() {
                     </div>
                   </div>
                   <span className="font-mono text-xs text-dim">
-                    {isSolo ? 'Solo Contender' : `${teamB.members?.length || 1} Registered Contenders`}
+                    {`${teamB.members?.length || 1} Registered Contenders`}
                   </span>
                 </div>
 
                 {/* Captain Bar */}
                 <div className="border border-cyan/40 bg-cyan/10 p-3 mb-4 rounded font-mono text-xs">
                   <span className="text-[10px] uppercase text-cyan block font-bold">
-                    {isSolo ? 'SOLO CONTENDER:' : 'TEAM LEADER / CAPTAIN:'}
+                    TEAM LEADER / CAPTAIN:
                   </span>
                   <p className="font-display text-base font-black text-ink uppercase mt-0.5">
                     {teamB.captain?.name || teamB.captain?.handle || teamB.name || 'Contender'}

@@ -55,8 +55,8 @@ const STATUS: Record<string, [string, string, string]> = {
   'results pending': ['Results Pending', 'bg-amber-400', 'text-amber-400'],
   finalized: ['Finalized', 'bg-dim', 'text-dim'],
   scheduled: ['Scheduled', 'bg-cyan', 'text-cyan'],
-  check_in_open: ['Check-In Open', 'bg-ok', 'text-ok'],
-  'check-in open': ['Check-In Open', 'bg-ok', 'text-ok'],
+  check_in_open: ['Scheduled', 'bg-cyan', 'text-cyan'],
+  'check-in open': ['Scheduled', 'bg-cyan', 'text-cyan'],
 }
 /** Status badge. Accepts any key in STATUS (case-insensitive). */
 export function Badge({ s, label }: { s: string; label?: string }) {

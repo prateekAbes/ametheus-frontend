@@ -697,13 +697,13 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const handleReleaseCredentialsClick = async (m: ApiMatch) => {
     if (
       !confirm(
-        `Release room credentials and open check-in for Match #${m.match_number || 1}? Registered participants will receive in-app alerts and access room credentials immediately.`
+        `Release room credentials for Match #${m.match_number || 1}? Registered participants will receive in-app alerts and access room credentials immediately.`
       )
     )
       return
     try {
       await releaseMatchCredentialsAdmin(m.id)
-      showBanner('✓ Credentials released to participants! Check-in is now OPEN.')
+      showBanner('✓ Credentials released to participants.')
       fetchMatches()
       if (selectedTournId !== 'ALL') fetchRoundsData(selectedTournId)
       onMatchesUpdated?.()
@@ -2110,7 +2110,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-dim uppercase font-bold text-[11px] mr-1">Status:</span>
-                {['ALL', 'LIVE', 'CHECK_IN_OPEN', 'SCHEDULED', 'COMPLETED'].map((s) => (
+                {['ALL', 'LIVE', 'SCHEDULED', 'COMPLETED'].map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
@@ -2133,11 +2133,10 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
             {filteredMatches.map((m) => {
               const rawStat = (m.status || '').toUpperCase()
               const isLive = rawStat === 'LIVE'
-              const isCheckIn = rawStat === 'CHECK_IN_OPEN'
               const isDone = rawStat === 'COMPLETED' || rawStat === 'FINALIZED'
               const isEnded = rawStat === 'ENDED'
               const isResultsSaved = rawStat === 'RESULTS_SAVED' || rawStat === 'RESULTS_PENDING'
-              const isScheduled = rawStat === 'SCHEDULED' || (!isLive && !isDone && !isEnded && !isResultsSaved && !isCheckIn)
+              const isScheduled = rawStat === 'SCHEDULED' || rawStat === 'CHECK_IN_OPEN' || (!isLive && !isDone && !isEnded && !isResultsSaved)
               const isDraft = (m.roster_status || '').toUpperCase() === 'DRAFT'
               const isUpdated = (m.roster_status || '').toUpperCase() === 'UPDATED'
 
@@ -2158,18 +2157,16 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
               const matchNum = m.match_number || m.order || 1
 
               // Battle Royale squad list
-              const brSquads: Array<{ id: string; name: string; tag?: string; checkedIn: boolean; alive: boolean }> = []
+              const brSquads: Array<{ id: string; name: string; tag?: string; alive: boolean }> = []
               if (isBattleRoyale) {
                 if (Array.isArray(m.teams) && m.teams.length > 0) {
                   m.teams.forEach((t: any, idx: number) => {
                     const tid = String(t.id || t._id || `squad-${idx}`)
                     const isAlive = m.alive_status?.[tid] !== false
-                    const hasCheckedIn = Boolean(m.check_ins?.[tid])
                     brSquads.push({
                       id: tid,
                       name: t.name || `Squad ${idx + 1}`,
                       tag: t.tag || '',
-                      checkedIn: hasCheckedIn,
                       alive: isAlive,
                     })
                   })
@@ -2177,12 +2174,10 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   m.team_ids.forEach((tid: string, idx: number) => {
                     const found = tournRosters.find((r) => r.team_id === tid)
                     const isAlive = m.alive_status?.[tid] !== false
-                    const hasCheckedIn = Boolean(m.check_ins?.[tid])
                     brSquads.push({
                       id: tid,
                       name: found?.team_name || `Squad ${idx + 1}`,
                       tag: found?.team_tag || '',
-                      checkedIn: hasCheckedIn,
                       alive: isAlive,
                     })
                   })
@@ -2197,8 +2192,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                       ? 'border-live/60 bg-live/[0.04]'
                       : isDraft
                       ? 'border-warn/40 bg-warn/[0.02]'
-                      : isCheckIn
-                      ? 'border-cyan/40 bg-cyan/[0.02]'
                       : isEnded
                       ? 'border-amber-400/40 bg-amber-400/[0.02]'
                       : isResultsSaved
@@ -2243,8 +2236,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                               ? 'ended'
                               : isResultsSaved
                               ? 'results_saved'
-                              : isCheckIn
-                              ? 'check_in_open'
                               : 'upcoming'
                           }
                           label={
@@ -2256,8 +2247,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                               ? 'MATCH ENDED'
                               : isResultsSaved
                               ? 'RESULTS SAVED'
-                              : isCheckIn
-                              ? 'CHECK-IN OPEN'
                               : 'SCHEDULED'
                           }
                         />
@@ -2280,7 +2269,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                           {(() => {
                             const isExpanded = Boolean(expandedRosterMatchIds[m.id])
                             const aliveCount = brSquads.filter((s) => s.alive).length
-                            const checkedInCount = brSquads.filter((s) => s.checkedIn).length
                             const isSolo = (m as any).team_size === 1 || (currentTournament as any)?.team_size === 1
                             const entityName = isSolo ? 'Contenders' : 'Squads'
 
@@ -2293,9 +2281,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                     </span>
                                     <span className="text-ok font-bold">
                                       ● {aliveCount} Alive
-                                    </span>
-                                    <span className="text-dim">
-                                      ✓ {checkedInCount} Checked In
                                     </span>
                                   </div>
 
@@ -2322,13 +2307,6 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                         <div className="min-w-0 flex-1">
                                           <div className="font-display font-black text-ink uppercase truncate text-xs">
                                             {sq.name} {sq.tag ? `[${sq.tag}]` : ''}
-                                          </div>
-                                          <div className="text-[10px]">
-                                            {sq.checkedIn ? (
-                                              <span className="text-ok">✓ Checked In</span>
-                                            ) : (
-                                              <span className="text-dim">Check-in Pending</span>
-                                            )}
                                           </div>
                                         </div>
                                         <button
@@ -2402,12 +2380,12 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         </div>
                       )}
 
-                      {/* Credentials & Check-In Bar */}
+                      {/* Credentials Bar */}
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
                         <span className="text-dim font-bold uppercase">Room Credentials:</span>
                         {m.credentials_released ? (
                           <span className="border border-ok/40 bg-ok/10 text-ok px-2 py-0.5 font-bold uppercase text-[10px]">
-                            ✓ Credentials Released (Check-In Open)
+                            ✓ Credentials Released
                           </span>
                         ) : (
                           <span className="border border-warn/40 bg-warn/10 text-warn px-2 py-0.5 font-bold uppercase text-[10px]">
@@ -2429,7 +2407,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                             onClick={() => handleReleaseCredentialsClick(m)}
                             className="border border-ok/50 bg-ok/20 px-2.5 py-0.5 text-ok hover:bg-ok hover:text-void uppercase text-[10px] font-bold cursor-pointer"
                           >
-                            📢 Release Credentials &amp; Open Check-In
+                            📢 Release Credentials
                           </button>
                         )}
                       </div>
@@ -3338,8 +3316,9 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                       className="w-full border border-white/20 bg-surface px-3 py-1.5 text-xs text-ink outline-none focus:border-cyan"
                     >
                       <option value="SCHEDULED">SCHEDULED</option>
-                      <option value="CHECK_IN_OPEN">CHECK_IN_OPEN</option>
                       <option value="LIVE">LIVE</option>
+                      <option value="ENDED">ENDED</option>
+                      <option value="RESULTS_SAVED">RESULTS_SAVED</option>
                       <option value="COMPLETED">COMPLETED</option>
                       <option value="DISPUTED">DISPUTED</option>
                     </select>

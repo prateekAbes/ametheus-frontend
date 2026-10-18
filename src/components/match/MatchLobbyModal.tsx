@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { captainCheckIn, getMatchJoinInfo, type MatchJoinInfo } from '../../services/matches'
+import { getMatchJoinInfo, type MatchJoinInfo } from '../../services/matches'
 import { Brackets, Hud, Modal } from '../ui'
 
 interface Props {
@@ -11,11 +11,8 @@ interface Props {
 
 export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [isCheckedIn, setIsCheckedIn] = useState(false)
-  const [isCheckingIn, setIsCheckingIn] = useState(false)
   const [joinInfoData, setJoinInfoData] = useState<MatchJoinInfo | null>(null)
   const [isLoadingJoinInfo, setIsLoadingJoinInfo] = useState(false)
-  const [checkInMsg, setCheckInMsg] = useState('')
 
   useEffect(() => {
     if (!isOpen || !match?.id) return
@@ -28,31 +25,12 @@ export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
 
   if (!isOpen || !match) return null
 
-  const handleCheckIn = async () => {
-    setIsCheckingIn(true)
-    setCheckInMsg('')
-    try {
-      await captainCheckIn(match.id)
-      setIsCheckedIn(true)
-      setCheckInMsg('Checked in successfully!')
-    } catch (e: any) {
-      setIsCheckedIn(true)
-      setCheckInMsg(e?.message || 'Check-in recorded')
-    } finally {
-      setIsCheckingIn(false)
-    }
-  }
-
   const handleCopy = (text: string, keyName: string) => {
     navigator.clipboard?.writeText(text)
     setCopiedKey(keyName)
     setTimeout(() => setCopiedKey(null), 2000)
   }
 
-  const teamAName = match.a || match.team_a?.name || match.team1_name || 'Team A'
-  const teamBName = match.b || match.team_b?.name || match.team2_name || 'Team B'
-  const scoreA = match.score?.[0] ?? match.team_a?.score ?? 0
-  const scoreB = match.score?.[1] ?? match.team_b?.score ?? 0
   const statusStr = (match.rawStatus || match.status || 'SCHEDULED').toUpperCase()
   const isLive = statusStr === 'LIVE' || statusStr === 'IN_PROGRESS'
 
@@ -88,56 +66,16 @@ export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
 
         {/* Modal Body */}
         <div className="p-6 space-y-6 overflow-y-auto font-mono text-xs">
-          {/* Teams Confrontation */}
-          <div className="grid grid-cols-3 items-center border border-white/10 bg-void/60 p-4 text-center">
-            {/* Team A */}
-            <div className="flex flex-col items-center">
-              <div className="size-12 border border-white/15 bg-surface flex items-center justify-center font-display font-black text-sm text-ink uppercase">
-                {teamAName.slice(0, 3)}
-              </div>
-              <span className="font-display font-bold text-sm text-ink mt-2 truncate max-w-[120px]">
-                {teamAName}
-              </span>
-              {isCheckedIn ? (
-                <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-ok bg-ok/10 border border-ok/30 px-2 py-0.5 font-bold">
-                  ✓ CHECKED IN
-                </span>
-              ) : (
-                <span className="mt-1.5 text-[10px] text-warn font-semibold">
-                  PENDING CHECK-IN
-                </span>
-              )}
-            </div>
-
-            {/* Score / Versus */}
-            <div className="flex flex-col items-center justify-center">
-              <span
-                className={`px-2 py-0.5 border text-[10px] uppercase font-bold tracking-wider mb-1.5 ${
-                  isLive
-                    ? 'border-live bg-live/20 text-live'
-                    : 'border-white/20 bg-surface text-cyan'
-                }`}
-              >
-                {statusStr}
-              </span>
-              <div className="font-display text-2xl font-black tabular-nums text-ink">
-                {scoreA} <span className="text-dim">:</span> {scoreB}
-              </div>
-              <span className="text-[10px] text-dim mt-1">
-                {match.format || 'Best of 1'}
-              </span>
-            </div>
-
-            {/* Team B */}
-            <div className="flex flex-col items-center">
-              <div className="size-12 border border-white/15 bg-surface flex items-center justify-center font-display font-black text-sm text-ink uppercase">
-                {teamBName.slice(0, 3)}
-              </div>
-              <span className="font-display font-bold text-sm text-ink mt-2 truncate max-w-[120px]">
-                {teamBName}
-              </span>
-              <span className="mt-1.5 text-[10px] text-dim">ROSTER VERIFIED</span>
-            </div>
+          {/* Status Banner */}
+          <div className="flex items-center justify-between border border-white/10 bg-void/60 px-4 py-3">
+            <span className={`px-2 py-0.5 border text-[10px] uppercase font-bold tracking-wider ${
+              isLive
+                ? 'border-live bg-live/20 text-live'
+                : 'border-white/20 bg-surface text-cyan'
+            }`}>
+              {statusStr}
+            </span>
+            <Hud>{match.format || 'Match Lobby'}</Hud>
           </div>
 
           {/* Match Join Credentials */}
@@ -250,7 +188,7 @@ export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
                   Credentials Pending Release
                 </div>
                 <p className="text-[11px] text-dim">
-                  In-game lobby room codes and credentials will be released by tournament arbiters once check-in opens.
+                  In-game lobby room codes and credentials will be released by tournament arbiters before match start.
                 </p>
               </div>
             )}
@@ -264,34 +202,13 @@ export function MatchLobbyModal({ match, isOpen, onClose }: Props) {
         </div>
 
         {/* Modal Footer */}
-        <div className="border-t border-white/10 bg-surface/80 p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {!isCheckedIn ? (
-              <button
-                onClick={handleCheckIn}
-                disabled={isCheckingIn}
-                className="border border-ok bg-ok/20 px-4 py-2 font-mono text-xs font-bold uppercase text-ok hover:bg-ok hover:text-void transition-colors cursor-pointer"
-              >
-                {isCheckingIn ? 'Verifying...' : '⚡ Captain Check-In'}
-              </button>
-            ) : (
-              <span className="font-mono text-xs font-bold text-ok flex items-center gap-1.5 px-3 py-1.5 border border-ok/40 bg-ok/10">
-                ✓ Ready for Kickoff
-              </span>
-            )}
-            {checkInMsg && (
-              <span className="font-mono text-[11px] text-dim">{checkInMsg}</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="border border-cyan bg-cyan px-5 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-cyan/90 transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
+        <div className="border-t border-white/10 bg-surface/80 p-4 flex items-center justify-end">
+          <button
+            onClick={onClose}
+            className="border border-cyan bg-cyan px-5 py-2 font-mono text-xs font-bold uppercase text-void hover:bg-cyan/90 transition-colors cursor-pointer"
+          >
+            Close
+          </button>
         </div>
       </div>
     </Modal>
