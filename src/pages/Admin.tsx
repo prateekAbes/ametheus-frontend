@@ -385,7 +385,6 @@ export default function Admin() {
     game_id: string
     format: string
     participation_mode: string
-    series_format?: string
     status: 'REGISTRATION_OPEN' | 'UPCOMING' | 'DRAFT'
     prize_pool_inr: number
     entry_fee_inr: number
@@ -401,6 +400,8 @@ export default function Admin() {
     discord_url?: string
     community_link: string
     description: string
+    enable_mvp: boolean
+    prize_distribution: Array<{ id: string; name: string; amount: number }>
   }
 
   const getInitialNewTourState = (): NewTournamentFormState => {
@@ -411,7 +412,6 @@ export default function Admin() {
       game_id: 'valorant',
       format: 'Knockout',
       participation_mode: 'SQUAD',
-      series_format: 'BO1',
       status: 'REGISTRATION_OPEN',
       prize_pool_inr: 25000,
       entry_fee_inr: 100,
@@ -427,6 +427,11 @@ export default function Admin() {
       discord_url: '',
       community_link: '',
       description: 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
+      enable_mvp: false,
+      prize_distribution: [
+        { id: 'pz_1', name: 'Champions', amount: 15000 },
+        { id: 'pz_2', name: 'Runner Up', amount: 10000 },
+      ],
     }
   }
 
@@ -1621,7 +1626,6 @@ export default function Admin() {
         game_id: newTour.game_id,
         format,
         participation_mode: partMode,
-        series_format: newTour.series_format || 'BO1',
         status: newTour.status || 'REGISTRATION_OPEN',
         prize_pool_inr: prizePool,
         entry_fee_inr: entryFee,
@@ -1637,7 +1641,9 @@ export default function Admin() {
         discord_url: (newTour.discord_url?.trim() || newTour.community_link?.trim()) || undefined,
         community_link: (newTour.discord_url?.trim() || newTour.community_link?.trim()) || undefined,
         description: newTour.description?.trim() || 'Official Sanctioned Competitive Esports Tournament on AMETHEUS.',
-      })
+        enable_mvp: Boolean(newTour.enable_mvp),
+        prize_distribution: newTour.prize_distribution || [],
+      } as any)
       if (created && (created.id || (created as any).slug)) {
         setTournaments((prev) => {
           const exists = prev.some((t) => (t.id && t.id === created.id) || (t.slug && t.slug === created.slug))
@@ -1677,7 +1683,6 @@ export default function Admin() {
         game_id: editingTour.game_id,
         format: editingTour.format,
         participation_mode: (editingTour as any).participation_mode || undefined,
-        series_format: (editingTour as any).series_format || 'BO1',
         status: editingTour.status,
         registration_status: regStatus,
         prize_pool_inr: Number(editingTour.prize_pool_inr),
@@ -1693,7 +1698,9 @@ export default function Admin() {
         discord_url: (editingTour as any).discord_url || editingTour.community_link,
         community_link: editingTour.community_link || (editingTour as any).discord_url,
         description: editingTour.description,
-      })
+        enable_mvp: Boolean((editingTour as any).enable_mvp),
+        prize_distribution: (editingTour as any).prize_distribution || [],
+      } as any)
       showToast('Tournament updated successfully!')
       setEditingTour(null)
       loadData()
@@ -2187,9 +2194,16 @@ export default function Admin() {
                           <button
                             onClick={() => {
                               const pMode = ((t as any).participation_mode || (t as any).participationMode || (norm.isSolo ? 'SOLO' : 'SQUAD')).toUpperCase().trim()
+                              const rawPrizes = Array.isArray((t as any).prize_distribution) ? (t as any).prize_distribution : []
                               setEditingTour({
                                 ...t,
                                 participation_mode: pMode,
+                                enable_mvp: (t as any).enable_mvp !== undefined ? Boolean((t as any).enable_mvp) : true,
+                                prize_distribution: rawPrizes.map((p: any, i: number) => ({
+                                  id: p.id || `pz_${i}_${Date.now()}`,
+                                  name: p.name || p.category_name || '',
+                                  amount: Number(p.amount ?? p.prize_amount ?? 0),
+                                })),
                               } as any)
                             }}
                             className="border border-white/20 bg-surface px-2.5 py-1.5 font-mono text-[10px] uppercase text-ink hover:border-cyan hover:text-cyan transition-colors"
@@ -6445,18 +6459,23 @@ export default function Admin() {
                             />
                           </div>
 
-                          {/* 6. Series Format */}
+                          {/* 6. Enable MVP System */}
                           <div>
-                            <label className="text-dim">Series Format <span className="text-cyan">*</span></label>
-                            <select
-                              required
-                              value={newTour.series_format || 'BO1'}
-                              onChange={(e) => setNewTour({ ...newTour, series_format: e.target.value })}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            <label className="text-dim flex items-center justify-between">
+                              <span>Enable MVP System</span>
+                              <span className="text-[10px] text-cyan uppercase font-mono">{newTour.enable_mvp ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setNewTour({ ...newTour, enable_mvp: !newTour.enable_mvp })}
+                              className={`mt-1 w-full border p-2.5 text-xs font-mono flex items-center justify-between transition-colors ${
+                                newTour.enable_mvp ? 'border-cyan bg-cyan/15 text-cyan' : 'border-white/15 bg-surface text-dim hover:text-ink'
+                              }`}
                             >
-                              <option value="BO1">Best of 1 (BO1)</option>
-                              <option value="BO3">Best of 3 (BO3)</option>
-                            </select>
+                              <span>{newTour.enable_mvp ? 'MVP Selection Active' : 'MVP Selection Disabled'}</span>
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${newTour.enable_mvp ? 'bg-cyan' : 'bg-white/30'}`} />
+                            </button>
+                            <p className="mt-1 text-[10px] text-dim font-mono">When enabled, prompts for round MVP and tournament MVP after matches.</p>
                           </div>
                         </div>
 
@@ -6490,6 +6509,102 @@ export default function Admin() {
                             />
                             <p className="mt-1 text-[10px] text-dim font-mono">Set to 0 for Free-to-enter tournaments.</p>
                           </div>
+                        </div>
+
+                        {/* Configurable Prize Distribution */}
+                        <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-dim text-xs font-mono uppercase tracking-wider">
+                              Configurable Prize Distribution
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rows = newTour.prize_distribution || []
+                                setNewTour({
+                                  ...newTour,
+                                  prize_distribution: [...rows, { id: `pz_${Date.now()}_${Math.random()}`, name: '', amount: 0 }],
+                                })
+                              }}
+                              className="text-[10px] font-mono border border-cyan/40 bg-cyan/10 text-cyan px-2 py-0.5 hover:bg-cyan/20 cursor-pointer"
+                            >
+                              + Add Prize Row
+                            </button>
+                          </div>
+
+                          {(!newTour.prize_distribution || newTour.prize_distribution.length === 0) ? (
+                            <p className="text-[11px] text-dim italic">No custom prize categories added yet. Click &quot;+ Add Prize Row&quot; to define awards.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {newTour.prize_distribution.map((row: any, idx: number) => (
+                                <div key={row.id || idx} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. First Place, MVP, Best Fragger"
+                                    value={row.name || row.category_name || ''}
+                                    onChange={(e) => {
+                                      const updated = [...newTour.prize_distribution]
+                                      updated[idx] = { ...updated[idx], name: e.target.value }
+                                      setNewTour({ ...newTour, prize_distribution: updated })
+                                    }}
+                                    className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs"
+                                  />
+                                  <div className="flex items-center gap-1 w-36">
+                                    <span className="text-xs text-dim">₹</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder="Amount"
+                                      value={row.amount ?? row.prize_amount ?? 0}
+                                      onChange={(e) => {
+                                        const updated = [...newTour.prize_distribution]
+                                        updated[idx] = { ...updated[idx], amount: Number(e.target.value) }
+                                        setNewTour({ ...newTour, prize_distribution: updated })
+                                      }}
+                                      className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs font-mono"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = newTour.prize_distribution.filter((_: any, i: number) => i !== idx)
+                                      setNewTour({ ...newTour, prize_distribution: updated })
+                                    }}
+                                    className="text-red-400 hover:text-red-300 text-xs px-2 py-1 border border-red-500/30 hover:border-red-500/60"
+                                    title="Remove prize row"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Prize Reconciliation Status Warning */}
+                          {(() => {
+                            const declared = Number(newTour.prize_pool_inr || 0)
+                            const configured = (newTour.prize_distribution || []).reduce((acc: number, r: any) => acc + Number(r.amount ?? r.prize_amount ?? 0), 0)
+                            const diff = configured - declared
+                            const isMatch = declared === configured
+                            return (
+                              <div className={`mt-2 p-2 border text-[11px] font-mono flex items-center justify-between ${
+                                isMatch ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                              }`}>
+                                <div className="flex flex-wrap items-center gap-x-3">
+                                  <span>Declared: <strong>₹{declared.toLocaleString()}</strong></span>
+                                  <span>Configured: <strong>₹{configured.toLocaleString()}</strong></span>
+                                  <span>Diff: <strong>{diff >= 0 ? `+₹${diff.toLocaleString()}` : `-₹${Math.abs(diff).toLocaleString()}`}</strong></span>
+                                </div>
+                                <div>
+                                  {isMatch ? (
+                                    <span className="text-emerald-400 font-bold">✓ Matched</span>
+                                  ) : (
+                                    <span className="text-amber-300 font-bold">⚠️ Mismatch (Save Allowed)</span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
 
                         {/* 9 & 10. Start Date & Start Time */}
@@ -6753,17 +6868,23 @@ export default function Admin() {
                               className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
                             />
                           </div>
+                          {/* Enable MVP System */}
                           <div>
-                            <label className="text-dim">Series Format</label>
-                            <select
-                              required
-                              value={(editingTour as any).series_format || 'BO1'}
-                              onChange={(e) => setEditingTour({ ...editingTour, series_format: e.target.value } as any)}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                            <label className="text-dim flex items-center justify-between">
+                              <span>Enable MVP System</span>
+                              <span className="text-[10px] text-cyan uppercase font-mono">{(editingTour as any).enable_mvp ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTour({ ...editingTour, enable_mvp: !(editingTour as any).enable_mvp } as any)}
+                              className={`mt-1 w-full border p-2.5 text-xs font-mono flex items-center justify-between transition-colors ${
+                                (editingTour as any).enable_mvp ? 'border-cyan bg-cyan/15 text-cyan' : 'border-white/15 bg-surface text-dim hover:text-ink'
+                              }`}
                             >
-                              <option value="BO1">Best of 1 (BO1)</option>
-                              <option value="BO3">Best of 3 (BO3)</option>
-                            </select>
+                              <span>{(editingTour as any).enable_mvp ? 'MVP Selection Active' : 'MVP Selection Disabled'}</span>
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${(editingTour as any).enable_mvp ? 'bg-cyan' : 'bg-white/30'}`} />
+                            </button>
+                            <p className="mt-1 text-[10px] text-dim font-mono">When enabled, prompts for round MVP and tournament MVP after matches.</p>
                           </div>
                         </div>
                       </>
@@ -6778,6 +6899,102 @@ export default function Admin() {
                       <label className="text-dim">Entry Fee (₹)</label>
                       <input required type="number" min="0" value={editingTour.entry_fee_inr} onChange={(e) => setEditingTour({ ...editingTour, entry_fee_inr: Number(e.target.value) })} className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan" />
                     </div>
+                  </div>
+
+                  {/* Configurable Prize Distribution for Edit Tournament */}
+                  <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-dim text-xs font-mono uppercase tracking-wider">
+                        Configurable Prize Distribution
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (editingTour as any).prize_distribution || []
+                          setEditingTour({
+                            ...editingTour,
+                            prize_distribution: [...rows, { id: `pz_${Date.now()}_${Math.random()}`, name: '', amount: 0 }],
+                          } as any)
+                        }}
+                        className="text-[10px] font-mono border border-cyan/40 bg-cyan/10 text-cyan px-2 py-0.5 hover:bg-cyan/20 cursor-pointer"
+                      >
+                        + Add Prize Row
+                      </button>
+                    </div>
+
+                    {(!((editingTour as any).prize_distribution) || (editingTour as any).prize_distribution.length === 0) ? (
+                      <p className="text-[11px] text-dim italic">No custom prize categories added yet. Click &quot;+ Add Prize Row&quot; to define awards.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {((editingTour as any).prize_distribution).map((row: any, idx: number) => (
+                          <div key={row.id || idx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. First Place, MVP, Best Fragger"
+                              value={row.name || row.category_name || ''}
+                              onChange={(e) => {
+                                const updated = [...(editingTour as any).prize_distribution]
+                                updated[idx] = { ...updated[idx], name: e.target.value }
+                                setEditingTour({ ...editingTour, prize_distribution: updated } as any)
+                              }}
+                              className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs"
+                            />
+                            <div className="flex items-center gap-1 w-36">
+                              <span className="text-xs text-dim">₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Amount"
+                                value={row.amount ?? row.prize_amount ?? 0}
+                                onChange={(e) => {
+                                  const updated = [...(editingTour as any).prize_distribution]
+                                  updated[idx] = { ...updated[idx], amount: Number(e.target.value) }
+                                  setEditingTour({ ...editingTour, prize_distribution: updated } as any)
+                                }}
+                                className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs font-mono"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (editingTour as any).prize_distribution.filter((_: any, i: number) => i !== idx)
+                                setEditingTour({ ...editingTour, prize_distribution: updated } as any)
+                              }}
+                              className="text-red-400 hover:text-red-300 text-xs px-2 py-1 border border-red-500/30 hover:border-red-500/60"
+                              title="Remove prize row"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Prize Reconciliation Status Warning */}
+                    {(() => {
+                      const declared = Number(editingTour.prize_pool_inr || 0)
+                      const configured = ((editingTour as any).prize_distribution || []).reduce((acc: number, r: any) => acc + Number(r.amount ?? r.prize_amount ?? 0), 0)
+                      const diff = configured - declared
+                      const isMatch = declared === configured
+                      return (
+                        <div className={`mt-2 p-2 border text-[11px] font-mono flex items-center justify-between ${
+                          isMatch ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                        }`}>
+                          <div className="flex flex-wrap items-center gap-x-3">
+                            <span>Declared: <strong>₹{declared.toLocaleString()}</strong></span>
+                            <span>Configured: <strong>₹{configured.toLocaleString()}</strong></span>
+                            <span>Diff: <strong>{diff >= 0 ? `+₹${diff.toLocaleString()}` : `-₹${Math.abs(diff).toLocaleString()}`}</strong></span>
+                          </div>
+                          <div>
+                            {isMatch ? (
+                              <span className="text-emerald-400 font-bold">✓ Matched</span>
+                            ) : (
+                              <span className="text-amber-300 font-bold">⚠️ Mismatch (Save Allowed)</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div>
                     <label className="text-dim">Start Date & Time (UTC/Local)</label>

@@ -110,6 +110,11 @@ export default function Organizer() {
     rank_requirement: 'Open to All Ranks',
     description: 'Sanctioned competitive esports tournament. Anti-cheat verification mandatory.',
     rules: '1. Standard competitive rules apply.\n2. Roster check-in required 15 mins prior to match start.\n3. Toxic conduct or cheating results in immediate disqualification.',
+    enable_mvp: true,
+    prize_distribution: [
+      { id: 'pz_1', name: 'Champions', amount: 6000 },
+      { id: 'pz_2', name: 'Runner Up', amount: 4000 },
+    ] as Array<{ id: string; name: string; amount: number; category_name?: string; prize_amount?: number }>,
   })
 
   // Edit Tournament State
@@ -239,6 +244,11 @@ export default function Organizer() {
       rank_requirement: 'Open to All Ranks',
       description: 'Sanctioned competitive esports tournament. Anti-cheat verification mandatory.',
       rules: '1. Standard competitive rules apply.\n2. Roster check-in required 15 mins prior to match start.\n3. Toxic conduct or cheating results in immediate disqualification.',
+      enable_mvp: true,
+      prize_distribution: [
+        { id: 'pz_1', name: 'Champions', amount: 6000 },
+        { id: 'pz_2', name: 'Runner Up', amount: 4000 },
+      ],
     })
     setIsCreateModalOpen(true)
   }
@@ -248,6 +258,7 @@ export default function Organizer() {
     const pMode = ((t as any).participation_mode || (t as any).participationMode || (t.is_solo ? 'SOLO' : 'SQUAD')).toUpperCase().trim()
     const startDateVal = t.starts_at ? t.starts_at.split('T')[0] : ''
     const startTimeVal = t.starts_at && t.starts_at.includes('T') ? t.starts_at.split('T')[1].slice(0, 5) : '18:00'
+    const rawPrizes = Array.isArray(t.prize_distribution) ? t.prize_distribution : []
     setFormData({
       title: t.title || '',
       game_id: t.game_id || t.gameId || games[0]?.slug || '',
@@ -270,6 +281,12 @@ export default function Organizer() {
       rank_requirement: t.rank_requirement || 'Open to All Ranks',
       description: t.description || '',
       rules: Array.isArray(t.rules) ? t.rules.join('\n') : (t.rules || ''),
+      enable_mvp: t.enable_mvp !== undefined ? Boolean(t.enable_mvp) : true,
+      prize_distribution: rawPrizes.map((p: any, i: number) => ({
+        id: p.id || `pz_${i}_${Date.now()}`,
+        name: p.name || p.category_name || '',
+        amount: Number(p.amount ?? p.prize_amount ?? 0),
+      })),
     })
     setIsCreateModalOpen(true)
   }
@@ -316,12 +333,16 @@ export default function Organizer() {
         rank_requirement: formData.rank_requirement,
         format: formData.format,
         tournament_type: formData.tournament_type || formData.format,
-        match_format: formData.match_format,
         whatsapp_group_url: formData.whatsapp_group_url || undefined,
         discord_url: formData.discord_url || undefined,
         community_link: formData.discord_url || undefined,
         description: formData.description,
         rules: rulesArr,
+        enable_mvp: Boolean(formData.enable_mvp),
+        prize_distribution: (formData.prize_distribution || []).map((p: any) => ({
+          category_name: p.name || p.category_name || '',
+          prize_amount: Number(p.amount ?? p.prize_amount ?? 0),
+        })),
       }
 
       if (editingTournament) {
@@ -1725,18 +1746,23 @@ export default function Organizer() {
                         />
                       </div>
 
-                      {/* 6. Series Format */}
+                      {/* 6. Enable MVP System */}
                       <div>
-                        <Hud>6. Series Format <span className="text-cyan">*</span></Hud>
-                        <select
-                          required
-                          value={formData.match_format}
-                          onChange={(e) => setFormData({ ...formData, match_format: e.target.value })}
-                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
+                        <div className="flex items-center justify-between">
+                          <Hud>6. Enable MVP System</Hud>
+                          <span className="text-[10px] text-cyan uppercase font-mono">{formData.enable_mvp ? 'Enabled' : 'Disabled'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, enable_mvp: !formData.enable_mvp })}
+                          className={`mt-1 w-full border px-3 py-2 text-xs font-mono flex items-center justify-between transition-colors ${
+                            formData.enable_mvp ? 'border-cyan bg-cyan/15 text-cyan' : 'border-white/15 bg-surface text-dim hover:text-ink'
+                          }`}
                         >
-                          <option value="Best of 1">Best of 1 (BO1)</option>
-                          <option value="Best of 3">Best of 3 (BO3)</option>
-                        </select>
+                          <span>{formData.enable_mvp ? 'MVP Selection Active' : 'MVP Selection Disabled'}</span>
+                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${formData.enable_mvp ? 'bg-cyan' : 'bg-white/30'}`} />
+                        </button>
+                        <p className="mt-1 text-[10px] text-dim font-mono">When enabled, prompts for round MVP and tournament MVP after matches.</p>
                       </div>
                     </div>
 
@@ -1767,6 +1793,102 @@ export default function Organizer() {
                           className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm font-mono"
                         />
                       </div>
+                    </div>
+
+                    {/* Configurable Prize Distribution */}
+                    <div className="border border-white/10 bg-void/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-dim text-xs font-mono uppercase tracking-wider">
+                          Configurable Prize Distribution
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const rows = formData.prize_distribution || []
+                            setFormData({
+                              ...formData,
+                              prize_distribution: [...rows, { id: `pz_${Date.now()}_${Math.random()}`, name: '', amount: 0 }],
+                            })
+                          }}
+                          className="text-[10px] font-mono border border-cyan/40 bg-cyan/10 text-cyan px-2 py-0.5 hover:bg-cyan/20 cursor-pointer"
+                        >
+                          + Add Prize Row
+                        </button>
+                      </div>
+
+                      {(!formData.prize_distribution || formData.prize_distribution.length === 0) ? (
+                        <p className="text-[11px] text-dim italic">No custom prize categories added yet. Click &quot;+ Add Prize Row&quot; to define awards.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {formData.prize_distribution.map((row: any, idx: number) => (
+                            <div key={row.id || idx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="e.g. First Place, MVP, Best Fragger"
+                                value={row.name || row.category_name || ''}
+                                onChange={(e) => {
+                                  const updated = [...formData.prize_distribution]
+                                  updated[idx] = { ...updated[idx], name: e.target.value }
+                                  setFormData({ ...formData, prize_distribution: updated })
+                                }}
+                                className="flex-1 border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs"
+                              />
+                              <div className="flex items-center gap-1 w-36">
+                                <span className="text-xs text-dim">₹</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="Amount"
+                                  value={row.amount ?? row.prize_amount ?? 0}
+                                  onChange={(e) => {
+                                    const updated = [...formData.prize_distribution]
+                                    updated[idx] = { ...updated[idx], amount: Number(e.target.value) }
+                                    setFormData({ ...formData, prize_distribution: updated })
+                                  }}
+                                  className="w-full border border-white/15 bg-surface p-2 text-ink outline-none focus:border-cyan text-xs font-mono"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = formData.prize_distribution.filter((_: any, i: number) => i !== idx)
+                                  setFormData({ ...formData, prize_distribution: updated })
+                                }}
+                                className="text-red-400 hover:text-red-300 text-xs px-2 py-1 border border-red-500/30 hover:border-red-500/60"
+                                title="Remove prize row"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Prize Reconciliation Status Warning */}
+                      {(() => {
+                        const declared = Number(formData.prize_pool_inr || 0)
+                        const configured = (formData.prize_distribution || []).reduce((acc: number, r: any) => acc + Number(r.amount ?? r.prize_amount ?? 0), 0)
+                        const diff = configured - declared
+                        const isMatch = declared === configured
+                        return (
+                          <div className={`mt-2 p-2 border text-[11px] font-mono flex items-center justify-between ${
+                            isMatch ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                          }`}>
+                            <div className="flex flex-wrap items-center gap-x-3">
+                              <span>Declared: <strong>₹{declared.toLocaleString()}</strong></span>
+                              <span>Configured: <strong>₹{configured.toLocaleString()}</strong></span>
+                              <span>Diff: <strong>{diff >= 0 ? `+₹${diff.toLocaleString()}` : `-₹${Math.abs(diff).toLocaleString()}`}</strong></span>
+                            </div>
+                            <div>
+                              {isMatch ? (
+                                <span className="text-emerald-400 font-bold">✓ Matched</span>
+                              ) : (
+                                <span className="text-amber-300 font-bold">⚠️ Mismatch (Save Allowed)</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* 9 & 10. Start Date & Start Time */}

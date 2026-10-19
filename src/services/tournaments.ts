@@ -62,6 +62,13 @@ export interface Tournament {
   capacity_label?: string
   server_region?: string
   media_config?: Record<string, any>
+  enable_mvp?: boolean
+  prize_distribution?: Array<{ id?: string; name: string; amount: number }>
+  champion?: { id: string; name: string; type?: string }
+  tournament_mvp?: { player_id: string; player_name: string; stats?: string; notes?: string }
+  final_results?: Array<{ award_name: string; recipient_type: string; recipient_id: string; recipient_name: string; prize_amount?: number; display_order?: number }>
+  results_display_duration_days?: number
+  completed_at?: string
 }
 
 export interface NormalizedTournament {
@@ -120,6 +127,19 @@ export interface NormalizedTournament {
   isFeatured?: boolean
   media_config?: Record<string, any>
   mediaConfig?: Record<string, any>
+  enableMvp?: boolean
+  enable_mvp?: boolean
+  prizeDistribution?: Array<{ id?: string; name: string; amount: number }>
+  prize_distribution?: Array<{ id?: string; name: string; amount: number }>
+  champion?: { id: string; name: string; type?: string }
+  tournamentMvp?: { player_id: string; player_name: string; stats?: string; notes?: string }
+  tournament_mvp?: { player_id: string; player_name: string; stats?: string; notes?: string }
+  finalResults?: any[]
+  final_results?: any[]
+  resultsDisplayDurationDays?: number
+  results_display_duration_days?: number
+  completedAt?: string
+  completed_at?: string
 }
 
 export function getRequiredTeamSizeDisplay(tour: NormalizedTournament | Tournament | null | undefined): string {
@@ -284,6 +304,19 @@ export function normalizeTournament(t: Tournament): NormalizedTournament {
     isFeatured: Boolean(t.is_featured ?? (t as any).isFeatured),
     media_config: mediaConfig,
     mediaConfig,
+    enableMvp: Boolean(t.enable_mvp ?? (t as any).enableMvp),
+    enable_mvp: Boolean(t.enable_mvp ?? (t as any).enableMvp),
+    prizeDistribution: t.prize_distribution || (t as any).prizeDistribution || [],
+    prize_distribution: t.prize_distribution || (t as any).prizeDistribution || [],
+    champion: t.champion || (t as any).champion,
+    tournamentMvp: t.tournament_mvp || (t as any).tournamentMvp,
+    tournament_mvp: t.tournament_mvp || (t as any).tournamentMvp,
+    finalResults: t.final_results || (t as any).finalResults || [],
+    final_results: t.final_results || (t as any).finalResults || [],
+    resultsDisplayDurationDays: t.results_display_duration_days ?? (t as any).resultsDisplayDurationDays ?? 30,
+    results_display_duration_days: t.results_display_duration_days ?? (t as any).resultsDisplayDurationDays ?? 30,
+    completedAt: t.completed_at || (t as any).completedAt || (t as any).completed_at,
+    completed_at: t.completed_at || (t as any).completedAt || (t as any).completed_at,
   }
 }
 

@@ -321,9 +321,73 @@ export default function GameDetail() {
               sub="Historical brackets, championship results, and awarded prizes."
             />
             <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {completedTours.map((t) => (
-                <TournamentCard key={t.id} t={t} />
-              ))}
+              {completedTours.map((t) => {
+                const orig = tournaments.find((origT) => (origT.slug || origT.id) === t.id)
+                const champ = orig?.champion
+                const mvp = orig?.tournament_mvp
+                const results = orig?.final_results || []
+                const durationDays = orig?.results_display_duration_days ?? 30
+                const isWithinDuration = (() => {
+                  if (!orig?.completed_at) return true
+                  const completedDate = new Date(orig.completed_at)
+                  const diffDays = (Date.now() - completedDate.getTime()) / (1000 * 60 * 60 * 24)
+                  return diffDays <= durationDays
+                })()
+                const hasResults = isWithinDuration && (champ || mvp || results.length > 0)
+
+                return (
+                  <div key={t.id} className="space-y-3">
+                    <TournamentCard t={t} />
+                    {hasResults && (
+                      <div className="border border-cyan/30 bg-void/80 p-3.5 text-xs font-mono space-y-2.5 shadow-lg">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                          <span className="text-[10px] uppercase font-bold text-cyan tracking-wider flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-cyan animate-pulse" />
+                            Official Final Results
+                          </span>
+                          <span className="text-[10px] text-dim">Active Showcase</span>
+                        </div>
+                        {champ && (
+                          <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5">
+                            <span className="text-amber-300 font-bold text-[11px] flex items-center gap-1">
+                              🏆 Champion
+                            </span>
+                            <span className="text-ink font-black uppercase text-xs truncate max-w-[150px]">
+                              {champ.name || (champ as any).champion_name}
+                            </span>
+                          </div>
+                        )}
+                        {mvp && (
+                          <div className="flex items-center justify-between bg-cyan/10 border border-cyan/20 px-2.5 py-1.5">
+                            <span className="text-cyan font-bold text-[11px] flex items-center gap-1">
+                              ⭐ Tournament MVP
+                            </span>
+                            <span className="text-ink font-bold uppercase text-xs truncate max-w-[150px]">
+                              {mvp.player_name || (mvp as any).name}
+                            </span>
+                          </div>
+                        )}
+                        {results.length > 0 && (
+                          <div className="pt-1.5 border-t border-white/5 space-y-1">
+                            <span className="text-[10px] text-dim block uppercase font-bold tracking-wider">
+                              Award Recipients:
+                            </span>
+                            {results.map((res: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-[11px] py-0.5 border-b border-white/5 last:border-b-0">
+                                <span className="text-dim truncate">{res.award_name || `Award ${idx + 1}`}</span>
+                                <span className="text-ink font-bold truncate max-w-[140px] text-right">
+                                  {res.recipient_name || 'TBD'}
+                                  {res.prize_amount ? ` (₹${Number(res.prize_amount).toLocaleString()})` : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </Container>
         </section>

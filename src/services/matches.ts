@@ -620,16 +620,6 @@ export async function publishAllRostersAdmin(
   })
 }
 
-export async function createTournamentRoundAdmin(
-  tournamentId: string,
-  roundName: string
-): Promise<{ status: string; message: string; round_name: string; custom_rounds: string[] }> {
-  return apiClient(`/admin/tournaments/${tournamentId}/rounds`, {
-    method: 'POST',
-    body: JSON.stringify({ round_name: roundName }),
-  })
-}
-
 export async function deleteTournamentRoundAdmin(
   tournamentId: string,
   roundName: string
@@ -844,4 +834,173 @@ export async function submitMatchRatingsAdmin(
     body: JSON.stringify({ ratings, submission_id: submissionId }),
   })
 }
+
+// -------------------------------------------------------------
+// TOURNAMENT ROUND & RESULTS MANAGEMENT API
+// -------------------------------------------------------------
+
+export interface TournamentRoundContender {
+  id: string
+  name: string
+  tag?: string
+  type: string
+  captain_name?: string
+  avatar_url?: string
+  logo_url?: string
+  member_count?: number
+}
+
+export interface TournamentRoundDetail {
+  id: string
+  tournament_id: string
+  round_number: number
+  round_name: string
+  stage_name: string
+  format: 'BATTLE_ROYALE' | 'KNOCKOUT'
+  is_final_round: boolean
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED'
+  room_id?: string
+  room_password?: string
+  credentials_released?: boolean
+  credentials_released_at?: string
+  custom_instructions?: string
+  eligible_contenders: TournamentRoundContender[]
+  qualifier_ids: string[]
+  eliminated_ids: string[]
+  champion_id?: string
+  champion_name?: string
+  mvp_player_id?: string
+  mvp_player_name?: string
+  mvp_stats?: string
+  mvp_notes?: string
+  match_ids: string[]
+  matches?: any[]
+}
+
+export async function createTournamentRoundAdmin(
+  tournId: string,
+  payload: { stage_name: string; competition_format: string; is_final_round: boolean }
+): Promise<{ status: string; message: string; round: TournamentRoundDetail; round_name: string; custom_rounds: string[] }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getTournamentRoundsAdmin(
+  tournId: string
+): Promise<{ status: string; tournament_id: string; rounds: TournamentRoundDetail[]; total_rounds: number }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds`)
+}
+
+export async function getTournamentRoundDetailAdmin(
+  tournId: string,
+  roundId: string
+): Promise<{ status: string; round: TournamentRoundDetail }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}`)
+}
+
+export async function saveRoundCredentialsAdmin(
+  tournId: string,
+  roundId: string,
+  payload: { room_id: string; room_password?: string; custom_instructions?: string }
+): Promise<{ status: string; message: string; room_id: string; room_password?: string; credentials_released: boolean }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/credentials`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function releaseRoundCredentialsAdmin(
+  tournId: string,
+  roundId: string
+): Promise<{ status: string; message: string; credentials_released: boolean; credentials_released_at: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/release-credentials`, {
+    method: 'POST',
+  })
+}
+
+export async function startRoundLiveAdmin(
+  tournId: string,
+  roundId: string
+): Promise<{ status: string; message: string; round_status: string; tournament_status: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/go-live`, {
+    method: 'POST',
+  })
+}
+
+export async function setRoundQualifiersAdmin(
+  tournId: string,
+  roundId: string,
+  payload: { qualifier_ids?: string[]; champion_id?: string; champion_name?: string }
+): Promise<{ status: string; message: string; qualifier_ids: string[]; eliminated_ids: string[]; champion_id?: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/qualifiers`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function createKnockoutMatchAdmin(
+  tournId: string,
+  roundId: string,
+  payload: { match_number: number; team_a_id: string; team_b_id: string; scheduled_time?: string }
+): Promise<{ status: string; message: string; match: any }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function recordKnockoutMatchResultAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string,
+  payload: { winner_id: string; score_a?: number; score_b?: number }
+): Promise<{ status: string; message: string; winner_id: string; round_completed: boolean; qualifier_ids: string[]; champion_id?: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}/result`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function setRoundMvpAdmin(
+  tournId: string,
+  roundId: string,
+  payload: { player_id: string; player_name: string; stats?: string; notes?: string }
+): Promise<{ status: string; message: string; mvp_player_id: string; mvp_player_name: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/mvp`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function setTournamentMvpAdmin(
+  tournId: string,
+  payload: { player_id: string; player_name: string; stats?: string; notes?: string }
+): Promise<{ status: string; message: string; tournament_mvp: any }> {
+  return apiClient(`/admin/tournaments/${tournId}/tournament-mvp`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function saveFinalTournamentResultsAdmin(
+  tournId: string,
+  payload: { results: any[]; champion_id?: string; champion_name?: string; tournament_mvp?: any; results_display_duration_days?: number }
+): Promise<{ status: string; message: string; final_results: any[]; champion_conflict: boolean }> {
+  return apiClient(`/admin/tournaments/${tournId}/final-results`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function endTournamentRoundAdmin(
+  tournId: string,
+  roundId: string
+): Promise<{ status: string; message: string; is_final_round: boolean; tournament_completed: boolean }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/end-round`, {
+    method: 'POST',
+  })
+}
+
 
