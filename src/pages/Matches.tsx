@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router'
 import { PageHero, Container, Chips, Hud, Badge, Crest, Brackets, Cta } from '../components/ui'
 import { gameBy, tourBy } from '../lib/data'
@@ -213,9 +213,11 @@ export default function Matches() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchMatchesData = useCallback(async () => {
+  const hasLoadedRef = useRef(false)
+
+  const fetchMatchesData = useCallback(async (isBackground = false) => {
     try {
-      setIsLoading(true)
+      if (!isBackground) setIsLoading(true)
       setError(null)
       const data = await getMatches()
       if (Array.isArray(data)) {
@@ -223,17 +225,21 @@ export default function Matches() {
       } else {
         setMatches([])
       }
+      hasLoadedRef.current = true
     } catch (err: any) {
       console.warn('Could not fetch matches:', err)
-      setError(err?.message || 'Failed to load tournament matches. Please check your connection and try again.')
+      // Only surface errors on the initial load; background poll failures are silent
+      if (!isBackground) {
+        setError(err?.message || 'Failed to load tournament matches. Please check your connection and try again.')
+      }
     } finally {
-      setIsLoading(false)
+      if (!isBackground) setIsLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchMatchesData()
-    const interval = setInterval(fetchMatchesData, 25000)
+    fetchMatchesData(false)
+    const interval = setInterval(() => fetchMatchesData(true), 25000)
     return () => clearInterval(interval)
   }, [fetchMatchesData])
 
@@ -245,7 +251,7 @@ export default function Matches() {
         event.event === 'MATCH_VERIFIED' ||
         event.event === 'MATCH_STATUS_CHANGED'
       ) {
-        fetchMatchesData()
+        fetchMatchesData(true)
       }
     },
     [fetchMatchesData]
@@ -306,7 +312,7 @@ export default function Matches() {
               </h2>
               <p className="font-mono text-xs text-dim max-w-md mb-6">{error}</p>
               <button
-                onClick={() => fetchMatchesData()}
+                onClick={() => fetchMatchesData(false)}
                 className="border border-cyan bg-cyan/10 px-5 py-2 font-mono text-xs uppercase font-bold text-cyan hover:bg-cyan/20 transition-colors cursor-pointer"
               >
                 ↻ Retry

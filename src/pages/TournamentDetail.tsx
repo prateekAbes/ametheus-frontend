@@ -413,7 +413,7 @@ export default function TournamentDetail() {
   // Strict Round-Specific Credential Isolation: Credentials belong to user's active match only
   const activeCreds = useMemo(() => {
     // 1. Authoritative released credentials direct from secure endpoint
-    if (serverCredentials && serverCredentials.credentials_released && serverCredentials.room_id) {
+    if (serverCredentials && (serverCredentials.is_released || serverCredentials.credentials_released) && serverCredentials.room_id) {
       return {
         roomId: serverCredentials.room_id,
         roomPassword: serverCredentials.room_password || 'None',

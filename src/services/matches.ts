@@ -211,7 +211,7 @@ export function mapApiMatchToUiMatch(m: ApiMatch) {
     tourName: m.tournament_title || 'Ametheus Tournament',
     game: m.game_slug || 'valorant',
     no: m.current_encounter_number ?? m.match_number ?? m.order ?? 1,
-    round: m.current_round_name || m.current_encounter_title || m.round_name || m.stage || m.match_type || 'Match',
+    round: m.current_round_name || m.round_name || m.stage || m.current_encounter_title || m.match_type || 'Match',
     a: nameA,
     b: nameB,
     hasParticipants,

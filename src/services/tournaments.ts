@@ -524,9 +524,12 @@ export async function getTournamentCommunityLink(
 
 export interface TournamentCredentialsResponse {
   status: string
-  tournament_id: string
+  tournament_id?: string
   tournament_title?: string
-  credentials_released: boolean
+  /** Backend v2 field name */
+  is_released?: boolean
+  /** Legacy alias kept for compatibility */
+  credentials_released?: boolean
   room_id?: string | null
   room_password?: string | null
   lobby_code?: string | null
