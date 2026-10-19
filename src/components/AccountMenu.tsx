@@ -113,7 +113,7 @@ export default function AccountMenu() {
           key: 'user',
           to: '/profile',
           label: 'My Profile',
-          hint: 'Player card & match stats',
+          hint: 'Player card & stats',
           group: 0,
         },
         {
@@ -128,13 +128,6 @@ export default function AccountMenu() {
           to: '/my/registrations',
           label: 'My Registrations',
           hint: 'Active tournament entries',
-          group: 1,
-        },
-        {
-          key: 'match',
-          to: '/my/matches',
-          label: 'My Matches',
-          hint: 'Upcoming and completed',
           group: 1,
         },
         {
@@ -176,7 +169,7 @@ export default function AccountMenu() {
           key: 'organizer',
           to: '/organizer',
           label: 'Organizer Portal',
-          hint: 'Tournaments & matches',
+          hint: 'Tournaments & operations',
           trail: (
             <span className="font-mono text-[9px] uppercase tracking-[0.16em] px-1.5 py-0.5 border border-cyan/40 bg-cyan/10 text-cyan">
               ORGANIZER

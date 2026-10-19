@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
-import { BattleRoyaleResultsModal } from '../components/admin/BattleRoyaleResultsModal'
 import { useAuthContext } from '../context/AuthContext'
 import {
   getMyOrganizedTournaments,
@@ -22,14 +21,6 @@ import {
   getTournamentRegistrations,
 } from '../services/tournaments'
 import {
-  getMatches,
-  submitMatchResult,
-  updateMatch,
-  updateMatchCredentialsAdmin,
-  releaseMatchCredentialsAdmin,
-  ApiMatch,
-} from '../services/matches'
-import {
   createMatchRequest,
   getMyMatchRequests,
   sendOrganizerEmail,
@@ -45,7 +36,6 @@ export default function Organizer() {
 
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [games, setGames] = useState<Game[]>([])
-  const [matches, setMatches] = useState<ApiMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
@@ -126,47 +116,26 @@ export default function Organizer() {
   const [rostersList, setRostersList] = useState<any[]>([])
   const [loadingRosters, setLoadingRosters] = useState(false)
 
-  // Match Arbitration State
-  const [selectedMatch, setSelectedMatch] = useState<ApiMatch | null>(null)
-  const [scoreA, setScoreA] = useState(0)
-  const [scoreB, setScoreB] = useState(0)
-  const [winnerTeamId, setWinnerTeamId] = useState('')
-  const [isSubmittingScore, setIsSubmittingScore] = useState(false)
-  const [selectedBrMatch, setSelectedBrMatch] = useState<ApiMatch | null>(null)
-
   // Tournament Cockpit State (Drill-down from Overview)
   const [managingTournament, setManagingTournament] = useState<any | null>(null)
-  const [cockpitMatches, setCockpitMatches] = useState<ApiMatch[]>([])
   const [cockpitRosters, setCockpitRosters] = useState<any[]>([])
   const [loadingCockpit, setLoadingCockpit] = useState(false)
-  const [cockpitTab, setCockpitTab] = useState<'MATCHES' | 'ROSTERS' | 'COMMUNITY'>('MATCHES')
+  const [cockpitTab, setCockpitTab] = useState<'ROSTERS' | 'COMMUNITY'>('ROSTERS')
   const [cockpitWhatsappUrl, setCockpitWhatsappUrl] = useState('')
   const [cockpitDiscordUrl, setCockpitDiscordUrl] = useState('')
   const [savingCommunityLinks, setSavingCommunityLinks] = useState(false)
 
-  // Stream & Room Creds State
-  const [selectedLobbyMatch, setSelectedLobbyMatch] = useState<ApiMatch | null>(null)
-  const [lobbyCode, setLobbyCode] = useState('')
-  const [lobbyPassword, setLobbyPassword] = useState('')
-  const [serverRegion, setServerRegion] = useState('')
-  const [customInstructions, setCustomInstructions] = useState('')
-  const [streamUrl, setStreamUrl] = useState('')
-  const [isSavingLobby, setIsSavingLobby] = useState(false)
-  const [isReleasingCreds, setIsReleasingCreds] = useState(false)
-
   const loadData = async () => {
     setLoading(true)
     try {
-      const [tList, gList, mList, reqList, mailList] = await Promise.all([
+      const [tList, gList, reqList, mailList] = await Promise.all([
         getMyOrganizedTournaments().catch(() => []),
         getGames(true).catch(() => []),
-        getMatches().catch(() => []),
         getMyMatchRequests().catch(() => []),
         getMyOrganizerEmails().catch(() => []),
       ])
       setTournaments(tList)
       setGames(gList)
-      setMatches(mList)
       setMatchRequests(reqList)
       setEmailThreads(mailList)
 
@@ -346,7 +315,8 @@ export default function Organizer() {
       }
 
       if (editingTournament) {
-        await updateTournamentOrganizer(editingTournament.id, payload)
+        const { format: _fmt, tournament_type: _tt, match_structure: _ms, ...updatePayload } = payload
+        await updateTournamentOrganizer(editingTournament.id, updatePayload)
         setActionMsg(`Tournament "${formData.title}" updated successfully!`)
       } else {
         await createTournamentOrganizer(payload)
@@ -459,48 +429,14 @@ export default function Organizer() {
     }
   }
 
-  const openArbitrationModal = (m: ApiMatch) => {
-    setSelectedMatch(m)
-    setScoreA(m.team_a?.score ?? 0)
-    setScoreB(m.team_b?.score ?? 0)
-    setWinnerTeamId(m.winner_team_id || '')
-  }
-
-  const handleSubmitScore = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedMatch) return
-    setIsSubmittingScore(true)
-    try {
-      await submitMatchResult(selectedMatch.id, {
-        score_a: Number(scoreA),
-        score_b: Number(scoreB),
-        winner_team_id: winnerTeamId || (scoreA > scoreB ? selectedMatch.team_a?.id : selectedMatch.team_b?.id),
-      })
-      setActionMsg(`Match score submitted: ${scoreA} - ${scoreB}`)
-      setTimeout(() => setActionMsg(null), 4000)
-      setSelectedMatch(null)
-      loadData()
-    } catch (err: any) {
-      alert(err.message || 'Failed to submit match score')
-    } finally {
-      setIsSubmittingScore(false)
-    }
-  }
-
   const openManageTournament = async (t: any) => {
     setManagingTournament(t)
-    setCockpitTab('MATCHES')
+    setCockpitTab('ROSTERS')
     setCockpitWhatsappUrl(t.whatsapp_group_url || t.community_link || '')
     setCockpitDiscordUrl(t.discord_url || '')
     setLoadingCockpit(true)
     try {
-      const [allM, rosters] = await Promise.all([
-        getMatches({ tournament_id: t.id || t.slug }),
-        getTournamentRegistrations(t.id || t.slug).catch(() => []),
-      ])
-      const tid = t.id || t.slug
-      const filtered = allM.filter((m: ApiMatch) => m.tournament_id === tid || m.tournament_id === t.slug)
-      setCockpitMatches(filtered.length > 0 ? filtered : allM)
+      const rosters = await getTournamentRegistrations(t.id || t.slug).catch(() => [])
       setCockpitRosters(rosters || [])
     } catch (err) {
       console.error(err)
@@ -534,79 +470,6 @@ export default function Organizer() {
       alert(err.message || 'Failed to update community links')
     } finally {
       setSavingCommunityLinks(false)
-    }
-  }
-
-  const openLobbyModal = (m: ApiMatch) => {
-    setSelectedLobbyMatch(m)
-    setLobbyCode(m.room_id || '')
-    setLobbyPassword(m.room_password || '')
-    setServerRegion(m.server_region || 'AWS Mumbai (ap-south-1)')
-    setCustomInstructions(m.custom_instructions || m.match_message || '')
-    setStreamUrl(m.youtube_live_url || m.live_link || '')
-  }
-
-  const handleSaveLobbyCredentials = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    if (!selectedLobbyMatch) return
-    setIsSavingLobby(true)
-    try {
-      await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
-        room_id: lobbyCode.trim(),
-        room_password: lobbyPassword.trim(),
-        server_region: serverRegion.trim(),
-        custom_instructions: customInstructions.trim(),
-      })
-      if (streamUrl.trim()) {
-        await updateMatch(selectedLobbyMatch.id, {
-          youtube_live_url: streamUrl.trim(),
-        })
-      }
-      setActionMsg('✓ Match credentials saved (unreleased).')
-      setTimeout(() => setActionMsg(null), 4000)
-      setSelectedLobbyMatch(null)
-      if (managingTournament) {
-        openManageTournament(managingTournament)
-      } else {
-        loadData()
-      }
-    } catch (err: any) {
-      alert(err.message || 'Failed to save match credentials')
-    } finally {
-      setIsSavingLobby(false)
-    }
-  }
-
-  const handleReleaseCredentials = async () => {
-    if (!selectedLobbyMatch) return
-    if (!lobbyCode.trim() || !lobbyPassword.trim()) {
-      alert('Please enter and save Room ID and Password before releasing.')
-      return
-    }
-    if (!confirm('Release room credentials to registered participants now? Captain check-in will immediately open.')) {
-      return
-    }
-    setIsReleasingCreds(true)
-    try {
-      await updateMatchCredentialsAdmin(selectedLobbyMatch.id, {
-        room_id: lobbyCode.trim(),
-        room_password: lobbyPassword.trim(),
-        server_region: serverRegion.trim(),
-        custom_instructions: customInstructions.trim(),
-      })
-      await releaseMatchCredentialsAdmin(selectedLobbyMatch.id)
-      setActionMsg('✓ Credentials released and check-in window opened!')
-      setTimeout(() => setActionMsg(null), 5000)
-      setSelectedLobbyMatch(null)
-      if (managingTournament) {
-        openManageTournament(managingTournament)
-      } else {
-        loadData()
-      }
-    } catch (err: any) {
-      alert(err.message || 'Failed to release credentials')
-    } finally {
-      setIsReleasingCreds(false)
     }
   }
 
@@ -697,8 +560,6 @@ export default function Organizer() {
   const isAnyModalOpen =
     isCreateModalOpen ||
     !!viewingRostersTour ||
-    !!selectedMatch ||
-    !!selectedLobbyMatch ||
     isRequestModalOpen ||
     isNewEmailOpen ||
     !!activeThread
@@ -793,8 +654,8 @@ export default function Organizer() {
             <p className="mt-2 font-display text-4xl font-black text-ok">{inr(totalPrizeVault)}</p>
           </Panel>
           <Panel className="p-5">
-            <Hud className="text-dim">MATCHES MONITORED</Hud>
-            <p className="mt-2 font-display text-4xl font-black">{matches.length}</p>
+            <Hud className="text-dim">COMPLETED EVENTS</Hud>
+            <p className="mt-2 font-display text-4xl font-black">{tournaments.filter((t) => t.status === 'COMPLETED').length}</p>
           </Panel>
         </div>
 
@@ -918,16 +779,6 @@ export default function Organizer() {
                 {/* Cockpit Navigation Tabs */}
                 <div className="flex border-b border-white/10 gap-2 font-mono text-xs uppercase">
                   <button
-                    onClick={() => setCockpitTab('MATCHES')}
-                    className={`px-4 py-2 border-b-2 transition-colors ${
-                      cockpitTab === 'MATCHES'
-                        ? 'border-cyan bg-cyan/10 text-cyan font-bold'
-                        : 'border-transparent text-dim hover:text-ink'
-                    }`}
-                  >
-                    Match Cockpit & Room Credentials ({cockpitMatches.length})
-                  </button>
-                  <button
                     onClick={() => setCockpitTab('ROSTERS')}
                     className={`px-4 py-2 border-b-2 transition-colors ${
                       cockpitTab === 'ROSTERS'
@@ -949,152 +800,7 @@ export default function Organizer() {
                   </button>
                 </div>
 
-                {/* Cockpit Tab 1: Matches & Credentials */}
-                {cockpitTab === 'MATCHES' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-display text-xl font-bold uppercase text-ink">Scheduled Tournament Matches</h3>
-                        <p className="text-xs text-dim">Configure room credentials, stream broadcast links, and arbitrate scores for this tournament.</p>
-                      </div>
-                      <button
-                        onClick={() => openManageTournament(managingTournament)}
-                        className="border border-white/20 px-3 py-1 font-mono text-xs text-dim hover:text-ink hover:border-cyan"
-                      >
-                        ↻ Refresh Matches
-                      </button>
-                    </div>
 
-                    {loadingCockpit ? (
-                      <div className="p-12 text-center border border-white/10 font-mono text-xs text-cyan animate-pulse">
-                        FETCHING TOURNAMENT MATCHES & CREDENTIALS...
-                      </div>
-                    ) : cockpitMatches.length === 0 ? (
-                      <div className="border border-dashed border-white/15 p-12 text-center space-y-3">
-                        <p className="font-display text-2xl font-bold uppercase text-dim">No Matches Scheduled Yet</p>
-                        <p className="text-xs text-dim max-w-md mx-auto">
-                          Matches are generated once registrations are closed and the bracket is seeded.
-                        </p>
-                        {managingTournament.status === 'REGISTRATION_CLOSED' && (
-                          <button
-                            onClick={() => handleGenBracket(managingTournament.id)}
-                            className="mt-3 border border-cyan bg-cyan/15 px-4 py-2 font-mono text-xs uppercase text-cyan hover:bg-cyan/30 transition-colors font-bold"
-                          >
-                            ⚡ Generate Bracket / Lobbies Now
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {cockpitMatches.map((m) => {
-                          const hasCreds = !!m.room_id
-                          const isReleased = !!m.credentials_released
-                          const isBR = (managingTournament.format || '').toLowerCase().includes('battle') || (managingTournament.tournament_type || '').toLowerCase().includes('battle')
-                          const isSolo = !!(managingTournament.is_solo)
-
-                          return (
-                            <div key={m.id} className="border border-white/15 bg-graphite p-5 space-y-4">
-                              <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs text-cyan font-bold uppercase">
-                                  {m.stage || (isBR ? `Lobby Match ${m.match_order || 1}` : `Match ${m.match_order || 1}`)}
-                                </span>
-                                <Badge s={m.status || 'SCHEDULED'} />
-                              </div>
-
-                              {isBR ? (
-                                <div className="border-y border-white/5 py-3 space-y-2">
-                                  <div className="flex items-center justify-between font-mono text-xs">
-                                    <span className="text-dim">Contenders:</span>
-                                    <strong className="text-cyan">{m.squads_count || (m.teams ? m.teams.length : (m.team_ids ? m.team_ids.length : 0))} Participants</strong>
-                                  </div>
-                                  {m.teams && m.teams.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pt-1">
-                                      {m.teams.map((tm: any, idx: number) => (
-                                        <span key={idx} className="font-mono text-[10px] px-2 py-0.5 bg-surface border border-white/10 text-dim">
-                                          {tm.name || `Team ${idx + 1}`}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-between border-y border-white/5 py-3">
-                                  <div className="text-sm font-bold truncate max-w-[140px] text-ink">
-                                    {m.team_a?.name || (isSolo ? 'Contender 1' : 'Team 1')}
-                                  </div>
-                                  <div className="font-mono text-xs px-2.5 py-1 bg-surface border border-white/10 font-bold">
-                                    {m.team_a?.score ?? 0} : {m.team_b?.score ?? 0}
-                                  </div>
-                                  <div className="text-sm font-bold truncate max-w-[140px] text-right text-ink">
-                                    {m.team_b?.name || (isSolo ? 'Contender 2' : 'Team 2')}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-between text-xs font-mono">
-                                <div className="flex items-center gap-2">
-                                  {isReleased ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-ok/10 border border-ok/30 text-ok text-[11px] font-bold">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
-                                      Credentials Released (Check-in Open)
-                                    </span>
-                                  ) : hasCreds ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-warn/10 border border-warn/30 text-warn text-[11px]">
-                                      🔒 Draft Saved (Unreleased)
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 text-dim text-[11px]">
-                                      ⚠️ No Credentials Set
-                                    </span>
-                                  )}
-                                </div>
-
-                                <span className="text-[11px] text-dim">{m.server_region || 'AWS Mumbai'}</span>
-                              </div>
-
-                              {hasCreds && (
-                                <div className="bg-surface/60 border border-white/10 p-2.5 font-mono text-[11px] grid grid-cols-2 gap-2">
-                                  <div>
-                                    <span className="text-dim block text-[10px]">ROOM ID:</span>
-                                    <span className="text-ink font-bold">{m.room_id}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-dim block text-[10px]">ROOM PASSWORD:</span>
-                                    <span className="text-ink font-bold">{m.room_password}</span>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/5">
-                                <button
-                                  onClick={() => openLobbyModal(m)}
-                                  className="border border-white/20 bg-surface px-3 py-1.5 font-mono text-xs text-ink hover:border-cyan hover:text-cyan transition-colors"
-                                >
-                                  Room & Credentials
-                                </button>
-                                {isBR ? (
-                                  <button
-                                    onClick={() => setSelectedBrMatch(m)}
-                                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors font-bold"
-                                  >
-                                    {m.status === 'COMPLETED' ? 'View / Edit Qualifiers' : 'Enter Results & Qualifiers'}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => openArbitrationModal(m)}
-                                    className="border border-cyan/40 bg-cyan/10 px-3 py-1.5 font-mono text-xs text-cyan hover:bg-cyan/20 transition-colors font-bold"
-                                  >
-                                    Submit Score
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Cockpit Tab 2: Rosters */}
                 {cockpitTab === 'ROSTERS' && (
@@ -2060,231 +1766,7 @@ export default function Organizer() {
         </Portal>
       )}
 
-      {/* Arbitration Score Modal */}
-      {selectedMatch && (
-        <Portal lockScroll>
-          <div
-            role="dialog"
-            aria-modal
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
-            onClick={() => setSelectedMatch(null)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
-            >
-              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-ink">Submit Match Score</h3>
-                  <p className="text-xs text-dim">Arbitrate and certify official match results.</p>
-                </div>
-                <button onClick={() => setSelectedMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
-              </div>
 
-              <form onSubmit={handleSubmitScore} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-mono text-xs text-dim block truncate">{selectedMatch.team_a?.name || 'Team A'}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={scoreA}
-                      onChange={(e) => setScoreA(Number(e.target.value))}
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-mono text-xs text-dim block truncate text-right">{selectedMatch.team_b?.name || 'Team B'}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={scoreB}
-                      onChange={(e) => setScoreB(Number(e.target.value))}
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-lg outline-none focus:border-cyan text-center"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Hud>Winner Declaration</Hud>
-                  <select
-                    value={winnerTeamId}
-                    onChange={(e) => setWinnerTeamId(e.target.value)}
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                  >
-                    <option value="">Auto-select by score</option>
-                    {selectedMatch.team_a?.id && <option value={selectedMatch.team_a.id}>{selectedMatch.team_a.name}</option>}
-                    {selectedMatch.team_b?.id && <option value={selectedMatch.team_b.id}>{selectedMatch.team_b.name}</option>}
-                  </select>
-                </div>
-
-                <div className="pt-4 flex justify-end gap-3 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMatch(null)}
-                    className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingScore}
-                    className="px-6 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs"
-                  >
-                    {isSubmittingScore ? 'Submitting...' : 'Certify Result'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </Portal>
-      )}
-
-      {/* Battle Royale Results & Qualifiers Modal */}
-      <BattleRoyaleResultsModal
-        isOpen={!!selectedBrMatch}
-        onClose={() => setSelectedBrMatch(null)}
-        match={selectedBrMatch}
-        tournamentTitle={managingTournament?.title}
-        onSuccess={(res) => {
-          setActionMsg(res?.message || '✓ Battle Royale results finalized and qualifiers advanced!')
-          setSelectedBrMatch(null)
-          if (managingTournament) {
-            openManageTournament(managingTournament)
-          }
-        }}
-      />
-
-      {/* Room & Stream Modal */}
-      {selectedLobbyMatch && (
-        <Portal lockScroll>
-          <div
-            role="dialog"
-            aria-modal
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none"
-            onClick={() => setSelectedLobbyMatch(null)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-lg border border-white/20 bg-graphite p-6 md:p-8 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text"
-            >
-              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="font-display text-2xl font-black uppercase text-ink">Room & Stream Settings</h3>
-                  <p className="text-xs text-dim">Configure room credentials, instructions, and live broadcast.</p>
-                </div>
-                <button onClick={() => setSelectedLobbyMatch(null)} className="text-dim hover:text-ink text-xl">✕</button>
-              </div>
-
-              {/* Credential Status Banner */}
-              <div className="mb-4 p-3 border font-mono text-xs flex items-center justify-between bg-surface/50">
-                <span className="text-dim">STATUS:</span>
-                {selectedLobbyMatch.credentials_released ? (
-                  <span className="text-ok font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-ok animate-pulse" />
-                    ✓ RELEASED TO PARTICIPANTS
-                  </span>
-                ) : selectedLobbyMatch.room_id ? (
-                  <span className="text-warn font-bold flex items-center gap-1.5">
-                    🔒 DRAFT SAVED (PRIVATE TO ORGANIZER)
-                  </span>
-                ) : (
-                  <span className="text-dim">
-                    ⚠️ CREDENTIALS NOT CONFIGURED
-                  </span>
-                )}
-              </div>
-
-              <form onSubmit={handleSaveLobbyCredentials} className="space-y-4 font-mono text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Hud>Room ID</Hud>
-                    <input
-                      type="text"
-                      value={lobbyCode}
-                      onChange={(e) => setLobbyCode(e.target.value)}
-                      placeholder="e.g. AMT-ROOM-01"
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                    />
-                  </div>
-
-                  <div>
-                    <Hud>Room Password</Hud>
-                    <input
-                      type="text"
-                      value={lobbyPassword}
-                      onChange={(e) => setLobbyPassword(e.target.value)}
-                      placeholder="e.g. PASS123"
-                      className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Hud>Server Region</Hud>
-                  <input
-                    type="text"
-                    value={serverRegion}
-                    onChange={(e) => setServerRegion(e.target.value)}
-                    placeholder="e.g. AWS Mumbai (ap-south-1)"
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                  />
-                </div>
-
-                <div>
-                  <Hud>Custom Match Instructions / Notes</Hud>
-                  <textarea
-                    rows={2}
-                    value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
-                    placeholder="e.g. Join lobby 10 mins prior. Map: Erangel. Spectating disallowed."
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-xs outline-none focus:border-cyan"
-                  />
-                </div>
-
-                <div>
-                  <Hud>Live Stream URL (YouTube Embed / Watch Link)</Hud>
-                  <input
-                    type="url"
-                    value={streamUrl}
-                    onChange={(e) => setStreamUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink font-mono text-sm outline-none focus:border-cyan"
-                  />
-                  <span className="mt-1 block text-[10px] text-dim font-sans">
-                    Stream will be featured on public match details page and official broadcasts.
-                  </span>
-                </div>
-
-                <div className="pt-4 flex flex-col sm:flex-row justify-end gap-2 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLobbyMatch(null)}
-                    className="px-4 py-2 border border-white/20 text-dim hover:text-ink text-xs uppercase"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSavingLobby || isReleasingCreds}
-                    className="px-4 py-2 border border-white/20 bg-surface text-ink font-mono text-xs uppercase hover:border-cyan hover:text-cyan transition-colors"
-                  >
-                    {isSavingLobby ? 'Saving...' : 'Save Draft (Private)'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReleaseCredentials}
-                    disabled={isSavingLobby || isReleasingCreds}
-                    className="px-5 py-2 bg-cyan text-void font-bold uppercase hover:bg-white transition-colors text-xs font-mono"
-                  >
-                    {isReleasingCreds ? 'Releasing...' : '⚡ Release & Open Check-in'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </Portal>
-      )}
 
       {/* Live Match Request Modal */}
       {isRequestModalOpen && (

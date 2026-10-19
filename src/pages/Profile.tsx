@@ -7,7 +7,6 @@ import { resolveMediaUrl } from '../services/apiClient'
 import DynamicImage from '../components/DynamicImage'
 import { getMyTeams, type Team } from '../services/teams'
 import { getMyRegistrations, type UserRegistrationItem } from '../services/tournaments'
-import { getMatches, mapApiMatchToUiMatch } from '../services/matches'
 import { getAvailableCrests, type Crest as CrestType } from '../services/crests'
 import { updateUserProfile } from '../services/auth'
 import { uploadMediaFile } from '../services/admin'
@@ -21,7 +20,6 @@ export default function Profile() {
   const { profile, role, displayName: authDisplayName, avatarUrl: authAvatarUrl, googleAvatarUrl, isSignedIn, refreshProfile, updateLocalProfile } = useAuthContext()
   const [teams, setTeams] = useState<Team[]>([])
   const [registrations, setRegistrations] = useState<UserRegistrationItem[]>([])
-  const [matches, setMatches] = useState<any[]>([])
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('ALL')
@@ -70,30 +68,14 @@ export default function Profile() {
     Promise.allSettled([
       getMyTeams(),
       getMyRegistrations(),
-      getMatches(),
       getSupportTickets(),
-    ]).then(([teamsRes, regsRes, matchRes, tixRes]) => {
-      let teamNames: string[] = []
+    ]).then(([teamsRes, regsRes, tixRes]) => {
       if (teamsRes.status === 'fulfilled' && Array.isArray(teamsRes.value)) {
         setTeams(teamsRes.value)
-        teamNames = teamsRes.value.map((t) => t.name)
       }
-      if (profile?.username) teamNames.push(profile.username)
 
       if (regsRes.status === 'fulfilled' && Array.isArray(regsRes.value)) {
         setRegistrations(regsRes.value)
-      }
-
-      if (matchRes.status === 'fulfilled' && Array.isArray(matchRes.value)) {
-        const mapped = matchRes.value.map(mapApiMatchToUiMatch)
-        const userMatches = mapped.filter((m) =>
-          teamNames.some(
-            (tn) =>
-              tn.toLowerCase() === m.a.toLowerCase() ||
-              tn.toLowerCase() === m.b.toLowerCase()
-          )
-        )
-        setMatches(userMatches)
       }
 
       if (tixRes.status === 'fulfilled' && Array.isArray(tixRes.value)) {
@@ -299,8 +281,6 @@ export default function Profile() {
     return s === 'COMPLETED' || s === 'FINISHED' || s === 'CONCLUDED'
   }).length
 
-  const completedMatches = matches.filter((m) => m.status === 'completed' || m.score)
-
   // Past Tournaments participated in by user
   const pastTournaments = useMemo(() => {
     return registrations.filter((r) => {
@@ -450,8 +430,8 @@ export default function Profile() {
             { label: 'Registered Events', val: String(registrations.length), sub: 'Tournament Entries', color: 'text-white' },
             {
               label: 'Player Performance',
-              val: matches.length > 0 ? String(matches.length) : `${profile?.rating || 500}`,
-              sub: matches.length > 0 ? 'Matches Drawn' : 'Rating',
+              val: `${profile?.rating || 500}`,
+              sub: 'Rating',
               color: 'text-cyan',
             },
           ].map(({ label, val, sub, color }, i) => (
@@ -993,76 +973,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* BOTTOM: Actual Match History */}
-        <div className="mt-16">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-2xl font-black uppercase text-white tracking-wide">
-              Match Arena History
-            </h3>
-            <Link
-              to="/my/matches"
-              className="font-mono text-xs font-bold text-cyan hover:underline uppercase tracking-wider"
-            >
-              View Full Match Log →
-            </Link>
-          </div>
-
-          <div className="mt-4">
-            {profile?.privacy_settings?.show_matches === false ? (
-              <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                <p className="font-mono text-xs text-dim uppercase tracking-wider">
-                  Public Match History Disabled
-                </p>
-                <p className="mt-1 text-sm text-dim">
-                  Match arena history is currently set to private in your Privacy Settings.
-                </p>
-                <div className="mt-4">
-                  <Link
-                    to="/settings#Privacy"
-                    className="inline-block border border-cyan/40 bg-cyan/10 px-4 py-2 font-mono text-xs uppercase tracking-wider text-cyan hover:bg-cyan hover:text-void transition-colors"
-                  >
-                    Adjust Privacy Settings →
-                  </Link>
-                </div>
-              </div>
-            ) : completedMatches.length === 0 ? (
-              <div className="border border-white/10 bg-surface/30 p-8 text-center">
-                <h4 className="font-display text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
-                  No Completed Match Scores Recorded Yet
-                </h4>
-                <p className="mt-2 text-sm text-dim">
-                  Match arbitration scores appear here once official tournament matches conclude.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-3">
-                {completedMatches.slice(0, 6).map((m) => (
-                  <Link
-                    key={m.id}
-                    to={`/matches/${m.id}`}
-                    className="border border-white/10 p-5 transition-colors hover:bg-white/[0.03] hover:border-cyan/50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-display text-2xl font-black text-cyan">
-                        {m.status ? m.status.toUpperCase() : 'COMPLETED'}
-                      </span>
-                      <Hud>{m.date || 'RECENT'}</Hud>
-                    </div>
-                    <p className="mt-3 font-display text-xl font-black uppercase">
-                      {m.a} <span className="text-dim">vs</span> {m.b}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <Hud>{m.round || 'Tournament Match'}</Hud>
-                      <span className="font-display text-2xl font-black tabular-nums">
-                        {m.score ? `${m.score[0]} : ${m.score[1]}` : 'VS'}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </Container>
 
       {/* PLAYER CREST & AVATAR CUSTOMIZATION MODAL */}

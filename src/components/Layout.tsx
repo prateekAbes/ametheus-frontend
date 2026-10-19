@@ -13,7 +13,6 @@ const MAIN = [
   ['Home', '/'],
   ['Games', '/games'],
   ['Tournaments', '/tournaments'],
-  ['Matches', '/matches'],
   ['Leaderboard', '/leaderboard'],
   ['Teams', '/teams'],
   ['Wallet', '/wallet'],
@@ -23,7 +22,6 @@ const PROFILE = [
   ['Profile', '/profile'],
   ['My Team', '/teams'],
   ['My Registrations', '/my/registrations'],
-  ['My Matches', '/my/matches'],
   ['Wallet', '/wallet'],
   ['Transactions', '/transactions'],
   ['Settings', '/settings'],
@@ -226,8 +224,8 @@ function Nav() {
       </div>
 
       {/* mobile bottom nav */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 border border-white/10 bg-void/95 md:hidden">
-        {([['Home', '/', '◆'], ['Games', '/games', '▲'], ['Events', '/tournaments', '✦'], ['Matches', '/matches', '●'], ['Me', '/profile', '■']] as const).map(([l, to, ic]) => (
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 border border-white/10 bg-void/95 md:hidden">
+        {([['Home', '/', '◆'], ['Games', '/games', '▲'], ['Events', '/tournaments', '✦'], ['Me', '/profile', '■']] as const).map(([l, to, ic]) => (
           <NavLink key={l} to={to} end={to === '/'} className={({ isActive }) => `relative flex flex-col items-center gap-1 py-2.5 ${isActive ? 'text-cyan' : 'text-dim'}`}>
             {({ isActive }) => (<><span className={`absolute inset-x-4 top-0 h-[2px] bg-cyan transition-transform ${isActive ? 'scale-x-100' : 'scale-x-0'}`} /><span className="text-xs">{ic}</span><span className="font-mono text-[9px] uppercase tracking-[0.15em]">{l}</span></>)}
           </NavLink>
@@ -239,7 +237,7 @@ function Nav() {
 
 export function Footer() {
   const navColumns = [
-    ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Matches / Live Matches', '/matches'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
+    ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
     ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
     ['Outlinks', [
       ['Discord', 'https://discord.gg/VzkfuK7We', true],

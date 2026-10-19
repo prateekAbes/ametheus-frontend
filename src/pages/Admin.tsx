@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
-import { LiveMatchesManager } from '../components/admin/LiveMatchesManager'
 import { RatingManager } from '../components/admin/RatingManager'
 import { useAuthContext } from '../context/AuthContext'
 import {
@@ -111,7 +110,6 @@ import {
   generateBracketOrganizer,
   cancelTournamentOrganizer,
 } from '../services/organizer'
-import { getMatches, updateMatch, ApiMatch } from '../services/matches'
 import {
   getUsersWithSupportTickets,
   replyToSupportTicket,
@@ -233,7 +231,6 @@ const TABS = [
   'OVERVIEW',
   'MEDIA & ARTWORK MANAGER',
   'TOURNAMENTS',
-  'LIVE MATCHES',
   'RATING MANAGEMENT',
   'ORGANIZER MATCH REQUESTS',
   'ORGANIZER EMAILS',
@@ -539,89 +536,6 @@ export default function Admin() {
   const [modStatus, setModStatus] = useState<'APPROVED' | 'FEATURED' | 'PENDING' | 'HIDDEN'>('APPROVED')
   const [modNotes, setModNotes] = useState('')
 
-  // LIVE MATCHES Interactive States
-  const [adminMatches, setAdminMatches] = useState<ApiMatch[]>([])
-  const [matchesLoading, setMatchesLoading] = useState(false)
-  const [matchStatusFilter, setMatchStatusFilter] = useState('ALL')
-  const [matchTourFilter, setMatchTourFilter] = useState('ALL')
-  const [editingMatch, setEditingMatch] = useState<ApiMatch | null>(null)
-  const [editMatchForm, setEditMatchForm] = useState({
-    status: 'SCHEDULED',
-    youtube_live_url: '',
-    live_link: '',
-    lobby_code: '',
-    lobby_password: '',
-    server_region: 'AWS Mumbai (ap-south-1)',
-    score_a: 0,
-    score_b: 0,
-    winner_team_id: '',
-  })
-
-  const fetchAdminMatches = async () => {
-    setMatchesLoading(true)
-    try {
-      const data = await getMatches()
-      if (Array.isArray(data)) setAdminMatches(data)
-    } catch (err) {
-      console.warn('Failed to load matches:', err)
-    } finally {
-      setMatchesLoading(false)
-    }
-  }
-
-  const handleQuickMatchStatus = async (matchId: string, newStatus: string) => {
-    try {
-      await updateMatch(matchId, { status: newStatus })
-      setActionMsg(`Match status updated to ${newStatus}`)
-      setTimeout(() => setActionMsg(null), 3000)
-      fetchAdminMatches()
-    } catch (err: any) {
-      alert(err.message || 'Failed to update match status')
-    }
-  }
-
-  const handleOpenEditMatch = (m: ApiMatch) => {
-    setEditingMatch(m)
-    setEditMatchForm({
-      status: m.status || 'SCHEDULED',
-      youtube_live_url: m.youtube_live_url || '',
-      live_link: m.live_link || '',
-      lobby_code: m.lobby_code || '',
-      lobby_password: m.lobby_password || '',
-      server_region: m.server_region || 'AWS Mumbai (ap-south-1)',
-      score_a: m.team_a?.score ?? 0,
-      score_b: m.team_b?.score ?? 0,
-      winner_team_id: m.winner_team_id || '',
-    })
-  }
-
-  const handleSaveMatchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingMatch) return
-    try {
-      await updateMatch(editingMatch.id, {
-        status: editMatchForm.status,
-        youtube_live_url: editMatchForm.youtube_live_url,
-        live_link: editMatchForm.live_link,
-        lobby_code: editMatchForm.lobby_code,
-        lobby_password: editMatchForm.lobby_password,
-        server_region: editMatchForm.server_region,
-        score_a: Number(editMatchForm.score_a),
-        score_b: Number(editMatchForm.score_b),
-        winner_team_id: editMatchForm.winner_team_id || undefined,
-      })
-      setActionMsg('Match credentials, stream & score updated successfully')
-      setTimeout(() => setActionMsg(null), 3500)
-      setEditingMatch(null)
-      fetchAdminMatches()
-    } catch (err: any) {
-      alert(err.message || 'Failed to update match')
-    }
-  }
-
-  // Formation jump state
-  const [selectedFormationTourId, setSelectedFormationTourId] = useState<string>('')
-
   // Users Tab filtering & search
   const [userRoleFilter, setUserRoleFilter] = useState<'ALL' | 'PLAYER' | 'ORGANIZER' | 'SUPER_ADMIN'>('ALL')
   const [userSearchTerm, setUserSearchTerm] = useState('')
@@ -761,7 +675,6 @@ export default function Admin() {
         regList,
         eStat,
         dispList,
-        mAll,
         genreList,
         revList,
         sUsers,
@@ -789,7 +702,6 @@ export default function Admin() {
         getRegulations().catch(() => []),
         getEmailSystemStatusAdmin().catch(() => null),
         getDisputes().catch(() => []),
-        getMatches().catch(() => []),
         getGenres(true).catch(() => []),
         getAdminReviews().catch(() => []),
         getUsersWithSupportTickets().catch(() => []),
@@ -822,7 +734,6 @@ export default function Admin() {
       setRegulations(Array.isArray(regList) ? regList : [])
       setEmailStatus(eStat)
       setDisputes(Array.isArray(dispList) ? dispList : [])
-      if (Array.isArray(mAll)) setAdminMatches(mAll)
       setGenres(genreList)
       setAdminReviews(revList)
       setSupportUsers(sUsers)
@@ -1681,7 +1592,6 @@ export default function Admin() {
       await updateTournamentOrganizer(editingTour.id || editingTour.slug, {
         title,
         game_id: editingTour.game_id,
-        format: editingTour.format,
         participation_mode: (editingTour as any).participation_mode || undefined,
         status: editingTour.status,
         registration_status: regStatus,
@@ -2230,42 +2140,20 @@ export default function Admin() {
                             </button>
                           )}
                           {t.status === 'REGISTRATION_CLOSED' && (
-                            <>
-                              <button
-                                onClick={() => handleReopenRegTour(t.id || t.slug)}
-                                className="border border-white/20 bg-surface px-2 py-1 font-mono text-[10px] uppercase text-dim hover:text-ink hover:border-cyan"
-                              >
-                                Reopen Reg
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedFormationTourId(t.id || t.slug)
-                                  setTab('LIVE MATCHES')
-                                }}
-                                className="border border-cyan bg-cyan/15 px-2 py-1 font-mono text-[10px] uppercase text-cyan hover:bg-cyan/30"
-                              >
-                                Match Formation
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleReopenRegTour(t.id || t.slug)}
+                              className="border border-white/20 bg-surface px-2 py-1 font-mono text-[10px] uppercase text-dim hover:text-ink hover:border-cyan"
+                            >
+                              Reopen Reg
+                            </button>
                           )}
                           {t.status === 'LIVE' && (
-                            <>
-                              <button
-                                onClick={() => handleCompleteTour(t.id || t.slug)}
-                                className="border border-ok bg-ok/20 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30 font-bold"
-                              >
-                                ✓ Complete Event
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedFormationTourId(t.id || t.slug)
-                                  setTab('LIVE MATCHES')
-                                }}
-                                className="border border-cyan bg-cyan/15 px-2 py-1 font-mono text-[10px] uppercase text-cyan hover:bg-cyan/30"
-                              >
-                                View Matches
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleCompleteTour(t.id || t.slug)}
+                              className="border border-ok bg-ok/20 px-2 py-1 font-mono text-[10px] uppercase text-ok hover:bg-ok/30 font-bold"
+                            >
+                              ✓ Complete Event
+                            </button>
                           )}
                           <button
                             onClick={() => handleSetFeatured(isFeatured ? 'none' : t.id || t.slug)}
@@ -2301,17 +2189,6 @@ export default function Admin() {
                   )
                 })}
             </div>
-          </div>
-        )}
-
-        {/* TAB: LIVE MATCHES */}
-        {tab === 'LIVE MATCHES' && (
-          <div className="mt-8">
-            <LiveMatchesManager
-              tournaments={tournaments}
-              onMatchesUpdated={loadData}
-              initialTournamentId={selectedFormationTourId}
-            />
           </div>
         )}
 
@@ -6795,38 +6672,23 @@ export default function Admin() {
 
                     return (
                       <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-dim">Competition Format</label>
-                            <select
-                              required
-                              value={editingTour.format}
-                              onChange={(e) => setEditingTour({ ...editingTour, format: e.target.value })}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                            >
-                              <option value="Knockout">Knockout</option>
-                              <option value="Round Robin">Round Robin</option>
-                              <option value="Battle Royale">Battle Royale</option>
-                            </select>
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="text-dim">Participation Mode</label>
+                            <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
                           </div>
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <label className="text-dim">Participation Mode</label>
-                              <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
-                            </div>
-                            <select
-                              required
-                              value={currentPartMode}
-                              onChange={(e) => setEditingTour({ ...editingTour, participation_mode: e.target.value } as any)}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                            >
-                              {supportedModes.map((mode) => (
-                                <option key={mode} value={mode}>
-                                  {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <select
+                            required
+                            value={currentPartMode}
+                            onChange={(e) => setEditingTour({ ...editingTour, participation_mode: e.target.value } as any)}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          >
+                            {supportedModes.map((mode) => (
+                              <option key={mode} value={mode}>
+                                {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

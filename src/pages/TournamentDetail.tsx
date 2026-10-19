@@ -25,7 +25,6 @@ import {
 } from '../services/tournaments'
 import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games'
 import { getMyTeams, Team } from '../services/teams'
-import { captainCheckIn } from '../services/matches'
 import { uploadMediaFile } from '../services/admin'
 import { useAuthContext } from '../context/AuthContext'
 import { gameBy, img, inr, TOUR_EXTRA, teamNames, type Match } from '../lib/data'
@@ -935,13 +934,6 @@ export default function TournamentDetail() {
                         {userMatch.status || 'SCHEDULED'}
                       </span>
                     </div>
-                    <Link
-                      to={`/matches/${userMatch.id || userMatch._id}`}
-                      className="inline-flex items-center gap-1.5 border border-cyan/40 bg-cyan/10 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-cyan hover:bg-cyan hover:text-void transition-colors cursor-pointer"
-                    >
-                      <span>Open Match Details</span>
-                      <span>→</span>
-                    </Link>
                   </div>
                 )}
               </div>

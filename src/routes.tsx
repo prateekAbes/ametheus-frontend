@@ -6,8 +6,6 @@ import GameDetail from './pages/GameDetail'
 import CategoryDetail from './pages/CategoryDetail'
 import Tournaments from './pages/Tournaments'
 import TournamentDetail from './pages/TournamentDetail'
-import Matches from './pages/Matches'
-import MatchDetail from './pages/MatchDetail'
 import Leaderboard from './pages/Leaderboard'
 import Teams from './pages/Teams'
 import CreateTeam from './pages/CreateTeam'
@@ -16,7 +14,6 @@ import Wallet from './pages/Wallet'
 import Transactions from './pages/Transactions'
 import Profile from './pages/Profile'
 import MyRegistrations from './pages/MyRegistrations'
-import MyMatches from './pages/MyMatches'
 import Notifications from './pages/Notifications'
 import Support from './pages/Support'
 import Reviews from './pages/Reviews'
@@ -64,8 +61,6 @@ export const router = createBrowserRouter([
       { path: 'joiners/category/:slug', Component: CategoryDetail },
       { path: 'tournaments', Component: Tournaments },
       { path: 'tournaments/:id', Component: TournamentDetail },
-      { path: 'matches', Component: Matches },
-      { path: 'matches/:id', Component: MatchDetail },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'teams', Component: Teams },
       {
@@ -121,14 +116,6 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <MyRegistrations />
-          </RequireAuth>
-        ),
-      },
-      {
-        path: 'my/matches',
-        element: (
-          <RequireAuth>
-            <MyMatches />
           </RequireAuth>
         ),
       },

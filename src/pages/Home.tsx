@@ -9,7 +9,6 @@ import {
   NormalizedTournament,
 } from '../services/tournaments'
 import { getGames, Game as ApiGame } from '../services/games'
-import { getMatches, normalizeMatch, NormalizedMatch } from '../services/matches'
 import EsportsHeroVisual from '../components/EsportsHeroVisual'
 import {
   CATALOG,
