@@ -6397,42 +6397,24 @@ export default function Admin() {
                           </select>
                         </div>
 
-                        {/* 3 & 4. Competition Format & Participation Mode */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {/* 3. Competition Format */}
-                          <div>
-                            <label className="text-dim">Competition Format <span className="text-cyan">*</span></label>
-                            <select
-                              required
-                              value={newTour.format}
-                              onChange={(e) => setNewTour({ ...newTour, format: e.target.value })}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                            >
-                              <option value="Knockout">Knockout</option>
-                              <option value="Round Robin">Round Robin</option>
-                              <option value="Battle Royale">Battle Royale</option>
-                            </select>
+                        {/* Participation Mode (Dynamically filtered by selected game's supported modes) */}
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="text-dim">Participation Mode <span className="text-cyan">*</span></label>
+                            <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
                           </div>
-
-                          {/* 4. Participation Mode (Dynamically filtered by selected game's supported modes) */}
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <label className="text-dim">Participation Mode <span className="text-cyan">*</span></label>
-                              <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
-                            </div>
-                            <select
-                              required
-                              value={currentPartMode}
-                              onChange={(e) => setNewTour({ ...newTour, participation_mode: e.target.value })}
-                              className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
-                            >
-                              {activeGameModes.map((mode) => (
-                                <option key={mode} value={mode}>
-                                  {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <select
+                            required
+                            value={currentPartMode}
+                            onChange={(e) => setNewTour({ ...newTour, participation_mode: e.target.value })}
+                            className="mt-1 w-full border border-white/15 bg-surface p-2.5 text-ink outline-none focus:border-cyan text-xs"
+                          >
+                            {activeGameModes.map((mode) => (
+                              <option key={mode} value={mode}>
+                                {mode === 'SOLO' ? 'Solo' : mode === 'DUO' ? 'Duo' : 'Squad'}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         {/* 5 & 6. Dynamic Capacity & Series Format */}

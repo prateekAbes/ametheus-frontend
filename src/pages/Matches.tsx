@@ -128,7 +128,7 @@ function PublicMatchCard({ m }: { m: UiMatchItem }) {
               Participants TBD
             </h3>
             <p className="mt-2 font-mono text-xs text-dim">
-              Competitor seeding or previous round progression pending.
+              Contender qualification or previous round match result pending.
             </p>
           </div>
         ) : (

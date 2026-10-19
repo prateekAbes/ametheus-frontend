@@ -1673,29 +1673,12 @@ export default function Organizer() {
                       </div>
                     </div>
 
-                    {/* 3 & 4. Competition Format & Participation Mode */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 3. Competition Format */}
-                      <div>
-                        <Hud>3. Competition Format <span className="text-cyan">*</span></Hud>
-                        <select
-                          required
-                          value={formData.format}
-                          onChange={(e) => setFormData({ ...formData, format: e.target.value, tournament_type: e.target.value })}
-                          className="mt-1 w-full border border-white/15 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-sm"
-                        >
-                          <option value="Knockout">Knockout</option>
-                          <option value="Round Robin">Round Robin</option>
-                          <option value="Battle Royale">Battle Royale</option>
-                        </select>
+                    {/* Participation Mode (Game Dependent) */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Hud>3. Participation Mode <span className="text-cyan">*</span></Hud>
+                        <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
                       </div>
-
-                      {/* 4. Participation Mode (Game Dependent) */}
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <Hud>4. Participation Mode <span className="text-cyan">*</span></Hud>
-                          <span className="text-[10px] text-cyan font-mono">Game Dependent</span>
-                        </div>
                         <select
                           required
                           value={currentPartMode}
@@ -1720,7 +1703,6 @@ export default function Organizer() {
                           ))}
                         </select>
                       </div>
-                    </div>
 
                     {/* 5 & 6. Dynamic Capacity & Series Format */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

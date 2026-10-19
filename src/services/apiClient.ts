@@ -81,12 +81,37 @@ export class ApiError extends Error {
 
   constructor(statusCode: number, data: ApiErrorResponse) {
     let message = ''
-    if (typeof data.detail === 'string') {
-      message = data.detail
+    if (statusCode === 0) {
+      message = 'Unable to connect. Please check your internet connection and try again.'
+    } else if (typeof data.detail === 'string') {
+      const d = data.detail
+      // Filter out raw server stack traces or database error strings on server faults
+      if (
+        statusCode >= 500 &&
+        (d.includes('Traceback') ||
+          d.includes('pymongo') ||
+          d.includes('MongoDB') ||
+          d.includes('Internal Server Error') ||
+          d.includes('ConnectionRefusedError'))
+      ) {
+        message = 'The service is temporarily unavailable. Please try again shortly.'
+      } else {
+        message = d
+      }
     } else if (Array.isArray(data.detail)) {
       message = data.detail.map((d) => (d.loc ? `${d.loc.slice(-1)}: ${d.msg}` : d.msg)).join('; ')
+    } else if (data.message) {
+      message = data.message
+    } else if (statusCode === 401) {
+      message = 'Please sign in to continue.'
+    } else if (statusCode === 403) {
+      message = 'You do not have permission to perform this action.'
+    } else if (statusCode === 404) {
+      message = 'The requested resource was not found.'
+    } else if (statusCode >= 500) {
+      message = 'The service encountered an error. Please try again shortly.'
     } else {
-      message = data.message || `API request failed with status ${statusCode}`
+      message = 'An unexpected error occurred. Please try again.'
     }
     super(message)
     this.name = 'ApiError'
@@ -204,11 +229,10 @@ export async function apiClient<T>(
       headers,
     })
   } catch (netErr: any) {
-    const errorMsg = netErr?.message || 'Network connection failed'
-    const isUpload = options.body instanceof FormData
-    const extra = isUpload ? ' If uploading media, ensure the file is within allowed limits.' : ''
+    console.error(`[API Network Error] ${fetchOptions.method || 'GET'} ${endpoint}:`, netErr)
     throw new ApiError(0, {
-      message: `Unable to connect to Ametheus server (${API_BASE_URL}). Please verify your connection or try again.${extra} Details: ${errorMsg}`,
+      message: 'Unable to connect. Please check your internet connection and try again.',
+      code: 'NETWORK_ERROR',
     })
   }
 

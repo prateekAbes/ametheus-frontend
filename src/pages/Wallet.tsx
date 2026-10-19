@@ -15,6 +15,7 @@ import {
 } from '../services/wallet'
 import { useAuthContext } from '../context/AuthContext'
 import { resolveMediaUrl } from '../services/apiClient'
+import { uploadMediaFile } from '../services/admin'
 
 // Uses universal PortalModal via ui.tsx
 
@@ -39,7 +40,10 @@ export default function Wallet() {
     qr_url?: string
   } | null>(null)
   const [utr, setUtr] = useState('')
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null)
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgressText, setUploadProgressText] = useState('')
   const [topupSuccess, setTopupSuccess] = useState(false)
   const [withdrawalSuccess, setWithdrawalSuccess] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -69,9 +73,33 @@ export default function Wallet() {
     setModal(null)
     setTopupDetails(null)
     setUtr('')
+    if (screenshotPreview && screenshotPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(screenshotPreview)
+    }
+    setScreenshotFile(null)
+    setScreenshotPreview(null)
+    setUploadProgressText('')
     setTopupSuccess(false)
     setWithdrawalSuccess(false)
     setActionError('')
+  }
+
+  const handleScreenshotChange = (file: File | null) => {
+    setActionError('')
+    if (screenshotPreview && screenshotPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(screenshotPreview)
+    }
+    if (!file) {
+      setScreenshotFile(null)
+      setScreenshotPreview(null)
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setActionError('Please select a valid image file (PNG, JPG, JPEG, WEBP).')
+      return
+    }
+    setScreenshotFile(file)
+    setScreenshotPreview(URL.createObjectURL(file))
   }
 
   const handleStartTopup = async () => {
@@ -89,17 +117,39 @@ export default function Wallet() {
 
   const handleSubmitTopupUtr = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!topupDetails || utr.trim().length < 6) return
+    if (!topupDetails) return
+    if (!utr.trim() || utr.trim().length < 6) {
+      setActionError('Please enter a valid 12-digit UPI UTR / Transaction Reference number.')
+      return
+    }
+    if (!screenshotFile) {
+      setActionError('A payment proof screenshot is required to complete and verify your deposit.')
+      return
+    }
+
     setIsSubmitting(true)
     setActionError('')
+    setUploadProgressText('Uploading payment screenshot...')
+
     try {
-      await submitWalletTopupUtr(topupDetails.payment_id, { utr: utr.trim() })
+      // 1. Upload screenshot to database-managed media storage
+      const uploadRes = await uploadMediaFile(screenshotFile)
+      const screenshotUrl = uploadRes.url
+
+      // 2. Submit payment reference with validated screenshot URL
+      setUploadProgressText('Submitting transaction details...')
+      await submitWalletTopupUtr(topupDetails.payment_id, {
+        utr: utr.trim(),
+        screenshot_url: screenshotUrl,
+      })
+
       setTopupSuccess(true)
       fetchWalletData()
     } catch (err: any) {
-      setActionError(err.message || 'Failed to submit UTR reference')
+      setActionError(err.message || 'Failed to submit payment details')
     } finally {
       setIsSubmitting(false)
+      setUploadProgressText('')
     }
   }
 
@@ -364,8 +414,10 @@ export default function Wallet() {
                   Amount: <b className="text-ok">₹{topupDetails.amount_inr}</b>
                 </p>
               </div>
-              <div className="text-left pt-2">
-                <label className="text-xs text-dim">Enter 12-digit UPI UTR / Ref No.</label>
+              <div className="text-left pt-2 space-y-1">
+                <label className="text-xs text-dim">
+                  Enter 12-digit UPI UTR / Ref No. <span className="text-cyan">*</span>
+                </label>
                 <input
                   type="text"
                   required
@@ -375,13 +427,97 @@ export default function Wallet() {
                   className="mt-1 w-full border border-white/20 bg-void p-2.5 font-mono text-sm uppercase outline-none focus:border-cyan"
                 />
               </div>
+
+              {/* Payment Proof Screenshot (Mandatory) */}
+              <div className="text-left pt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-dim">
+                    Payment Proof Screenshot <span className="text-cyan">*</span>
+                  </label>
+                  <span className="font-mono text-[10px] text-cyan uppercase font-bold tracking-wider">
+                    Required for Verification
+                  </span>
+                </div>
+
+                {screenshotPreview ? (
+                  <div className="relative border border-cyan/40 bg-surface/80 p-3 rounded space-y-2">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={screenshotPreview}
+                        alt="Payment Screenshot Preview"
+                        className="size-20 rounded object-cover border border-white/20 bg-void"
+                      />
+                      <div className="flex-1 min-w-0 font-mono text-xs">
+                        <div className="text-ink truncate font-medium">
+                          {screenshotFile?.name || 'Payment_Proof.png'}
+                        </div>
+                        <div className="text-dim text-[11px]">
+                          {screenshotFile ? `${(screenshotFile.size / 1024).toFixed(1)} KB` : ''}
+                        </div>
+                        <div className="mt-1 text-ok text-[11px] font-bold">
+                          ✓ Screenshot ready to upload
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <label className="border border-white/20 bg-white/5 hover:border-cyan px-2.5 py-1 font-mono text-[11px] uppercase text-ink cursor-pointer transition-colors">
+                        Replace Screenshot
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null
+                            handleScreenshotChange(file)
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleScreenshotChange(null)}
+                        className="border border-live/30 text-live hover:bg-live/10 px-2 py-1 font-mono text-[11px] uppercase transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block border-2 border-dashed border-white/20 hover:border-cyan/70 bg-white/5 hover:bg-white/10 p-4 rounded text-center cursor-pointer transition-all">
+                    <input
+                      type="file"
+                      required
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        handleScreenshotChange(file)
+                      }}
+                    />
+                    <div className="text-xl mb-1 text-cyan">📷</div>
+                    <div className="font-mono text-xs text-ink font-bold uppercase">
+                      Upload Payment Screenshot
+                    </div>
+                    <div className="font-mono text-[10px] text-dim mt-1">
+                      PNG, JPG, or WEBP (UPI transaction screen showing UTR & Amount)
+                    </div>
+                  </label>
+                )}
+              </div>
+
               {actionError && (
-                <p className="border border-live/30 bg-live/10 p-2 font-mono text-xs text-live">
+                <p className="border border-live/30 bg-live/10 p-2 font-mono text-xs text-live text-left">
                   {actionError}
                 </p>
               )}
-              <Cta type="submit" disabled={isSubmitting || utr.length < 6} className="w-full mt-2">
-                {isSubmitting ? 'Verifying...' : 'Submit UTR & Complete Top-up'}
+
+              <Cta
+                type="submit"
+                disabled={isSubmitting || utr.length < 6 || !screenshotFile}
+                className="w-full mt-2"
+              >
+                {isSubmitting
+                  ? (uploadProgressText || 'Verifying...')
+                  : 'Submit UTR & Screenshot'}
               </Cta>
             </form>
           )}

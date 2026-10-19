@@ -41,6 +41,13 @@ import {
   setTournamentMvpAdmin,
   saveFinalTournamentResultsAdmin,
   endTournamentRoundAdmin,
+  updateTournamentRoundAdmin,
+  deleteTournamentRoundAdmin,
+  updateRoundMatchAdmin,
+  deleteRoundMatchAdmin,
+  completeRoundMatchAdmin,
+  saveKnockoutMatchCredentialsAdmin,
+  releaseKnockoutMatchCredentialsAdmin,
   type TournamentRoundDetail,
   type TournamentRoundContender,
 } from '../../services/matches'
@@ -349,6 +356,39 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
   const [finalResultRows, setFinalResultRows] = useState<Array<{ id: string; award_name: string; recipient_type: 'PLAYER' | 'TEAM'; recipient_id: string; recipient_name: string; display_order: number; prize_amount?: number }>>([])
   const [savingFinalResults, setSavingFinalResults] = useState(false)
 
+  // Edit Round state
+  const [editingRound, setEditingRound] = useState<TournamentRoundDetail | null>(null)
+  const [editRoundStageName, setEditRoundStageName] = useState('')
+  const [editRoundFormat, setEditRoundFormat] = useState<'Battle Royale' | 'Knockout'>('Battle Royale')
+  const [editRoundIsFinal, setEditRoundIsFinal] = useState(false)
+  const [editRoundStatus, setEditRoundStatus] = useState('UPCOMING')
+  const [isEditRoundModalOpen, setIsEditRoundModalOpen] = useState(false)
+  const [isSavingEditRound, setIsSavingEditRound] = useState(false)
+
+  // Delete Round state
+  const [roundToDelete, setRoundToDelete] = useState<TournamentRoundDetail | null>(null)
+  const [isDeletingRound, setIsDeletingRound] = useState(false)
+
+  // Edit Match state
+  const [editingMatchData, setEditingMatchData] = useState<{ roundId: string; match: any } | null>(null)
+  const [editMatchNumber, setEditMatchNumber] = useState<number>(1)
+  const [editMatchContenderA, setEditMatchContenderA] = useState<string>('')
+  const [editMatchContenderB, setEditMatchContenderB] = useState<string>('')
+  const [editMatchTime, setEditMatchTime] = useState<string>('')
+  const [editMatchCustomInstructions, setEditMatchCustomInstructions] = useState<string>('')
+  const [isEditMatchModalOpen, setIsEditMatchModalOpen] = useState(false)
+  const [isSavingEditMatch, setIsSavingEditMatch] = useState(false)
+
+  // Knockout match credentials state
+  const [knockoutMatchCreds, setKnockoutMatchCreds] = useState<{ [matchId: string]: { room_id: string; room_password: string; custom_instructions: string } }>({})
+  const [savingKnockoutMatchCreds, setSavingKnockoutMatchCreds] = useState<string | null>(null)
+  const [releasingKnockoutMatchCreds, setReleasingKnockoutMatchCreds] = useState<string | null>(null)
+
+  // Left rail active round selection
+  const [selectedContenderRoundId, setSelectedContenderRoundId] = useState<string>('ALL')
+  const [showActiveOnly, setShowActiveOnly] = useState<boolean>(true)
+  const [contenderFilterStatus, setContenderFilterStatus] = useState<'ALL' | 'ACTIVE' | 'QUALIFIED' | 'ELIMINATED'>('ALL')
+
   const isSoloTournament = useMemo(() => {
     if (!currentFormationTourn) return false
     const mode = (currentFormationTourn.participation_mode || (currentFormationTourn as any).participationMode || '').toUpperCase()
@@ -368,13 +408,21 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         const credsMap: { [roundId: string]: { room_id: string; room_password: string; custom_instructions: string } } = {}
         const qualMap: { [roundId: string]: string[] } = {}
         const champMap: { [roundId: string]: { id: string; name: string } } = {}
+        const koCredsMap: { [matchId: string]: { room_id: string; room_password: string; custom_instructions: string } } = {}
         res.rounds.forEach((rnd) => {
           credsMap[rnd.id] = {
             room_id: rnd.room_id || '',
             room_password: rnd.room_password || '',
             custom_instructions: rnd.custom_instructions || '',
           }
-          qualMap[rnd.id] = rnd.qualifier_ids || []
+          qualMap[rnd.id] = rnd.qualifier_ids || [];
+          (rnd.matches || []).forEach((m: any) => {
+            koCredsMap[m.id] = {
+              room_id: m.room_id || '',
+              room_password: m.room_password || '',
+              custom_instructions: m.custom_instructions || '',
+            }
+          })
           if (rnd.champion_id) {
             champMap[rnd.id] = { id: rnd.champion_id, name: rnd.champion_name || '' }
           }
@@ -382,6 +430,7 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
         setRoundCredsEditing((prev) => ({ ...credsMap, ...prev }))
         setSelectedQualifiersByRound((prev) => ({ ...qualMap, ...prev }))
         setChampionSelectionByRound((prev) => ({ ...champMap, ...prev }))
+        setKnockoutMatchCreds((prev) => ({ ...koCredsMap, ...prev }))
       } else {
         setDbRounds([])
       }
@@ -413,6 +462,109 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     })
     return s
   }, [formationMatches])
+
+  // Contenders dynamically resolved for left rail based on selected stage / round
+  const displayedContenders = useMemo(() => {
+    if (selectedContenderRoundId === 'ALL' || !dbRounds.length) {
+      const completedRounds = dbRounds.filter((r) => r.status === 'COMPLETED')
+      const latestCompleted = completedRounds[completedRounds.length - 1]
+      const activeRound = dbRounds.find((r) => r.status === 'LIVE') || dbRounds.find((r) => r.status === 'UPCOMING')
+
+      return formationRosters.map((team, idx) => {
+        const teamIdStr = String(team.team_id)
+        const isPaired = pairedFormationTeamIds.has(teamIdStr)
+        let statusTag = isPaired ? 'Paired' : 'Unpaired'
+        let statusType: 'ok' | 'warn' | 'live' | 'cyan' = isPaired ? 'ok' : 'warn'
+
+        const isChamp = dbRounds.some((r) => r.champion_id === teamIdStr)
+        if (isChamp) {
+          statusTag = '🏆 Champion'
+          statusType = 'warn'
+        } else if (latestCompleted) {
+          const wasInRound = (latestCompleted.eligible_contenders || []).some((c: any) => String(c.id) === teamIdStr)
+          if (wasInRound) {
+            const qualified = (latestCompleted.qualifier_ids || []).some((qid: string) => String(qid) === teamIdStr)
+            if (qualified) {
+              statusTag = 'Qualified'
+              statusType = 'ok'
+            } else {
+              statusTag = 'Eliminated'
+              statusType = 'live'
+            }
+          } else if (activeRound && (activeRound.eligible_contenders || []).some((c: any) => String(c.id) === teamIdStr)) {
+            statusTag = activeRound.status === 'LIVE' ? 'Playing' : 'Active'
+            statusType = 'cyan'
+          }
+        } else if (activeRound && activeRound.status === 'LIVE') {
+          statusTag = 'Playing'
+          statusType = 'cyan'
+        }
+
+        const displayName = isSoloTournament
+          ? team.captain?.username || team.team_name
+          : `${team.team_name} [${team.team_tag}]`
+
+        return {
+          id: teamIdStr,
+          idx: idx + 1,
+          displayName,
+          captainName: team.captain?.username || team.captain_username || 'TBD',
+          memberCount: team.members?.length || 0,
+          statusTag,
+          statusType,
+          isEliminated: statusTag === 'Eliminated',
+          isQualified: statusTag === 'Qualified' || statusTag === '🏆 Champion',
+          isActive: statusTag === 'Playing' || statusTag === 'Active',
+          isPaired,
+        }
+      })
+    }
+
+    const targetRound = dbRounds.find((r) => r.id === selectedContenderRoundId)
+    if (!targetRound) return []
+
+    const eligible = targetRound.eligible_contenders || []
+    return eligible.map((c, idx) => {
+      const cIdStr = String(c.id)
+      let statusTag = 'Eligible'
+      let statusType: 'ok' | 'warn' | 'live' | 'cyan' = 'cyan'
+
+      if (targetRound.champion_id === cIdStr) {
+        statusTag = '🏆 Champion'
+        statusType = 'warn'
+      } else if (targetRound.status === 'COMPLETED') {
+        const qualified = (targetRound.qualifier_ids || []).some((qid: string) => String(qid) === cIdStr)
+        if (qualified) {
+          statusTag = 'Qualified'
+          statusType = 'ok'
+        } else {
+          statusTag = 'Eliminated'
+          statusType = 'live'
+        }
+      } else if (targetRound.status === 'LIVE') {
+        statusTag = 'Playing'
+        statusType = 'live'
+      }
+
+      const displayName = isSoloTournament
+        ? c.name
+        : `${c.name}${c.tag ? ` [${c.tag}]` : ''}`
+
+      return {
+        id: cIdStr,
+        idx: idx + 1,
+        displayName,
+        captainName: c.name,
+        memberCount: 0,
+        statusTag,
+        statusType,
+        isEliminated: statusTag === 'Eliminated',
+        isQualified: statusTag === 'Qualified' || statusTag === '🏆 Champion',
+        isActive: statusTag === 'Playing' || statusTag === 'Eligible',
+        isPaired: true,
+      }
+    })
+  }, [selectedContenderRoundId, dbRounds, formationRosters, pairedFormationTeamIds, isSoloTournament])
 
   // Handle Add Round in Formation Workspace
   const handleAddRoundToFormation = (roundName: string) => {
@@ -505,6 +657,155 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
     } finally {
       setReleasingRoundCreds(null)
     }
+  }
+
+  const handleOpenEditRound = (round: TournamentRoundDetail) => {
+    setEditingRound(round)
+    setEditRoundStageName(round.stage_name || round.round_name || '')
+    setEditRoundFormat(round.format === 'BATTLE_ROYALE' ? 'Battle Royale' : 'Knockout')
+    setEditRoundIsFinal(Boolean(round.is_final_round))
+    setEditRoundStatus(round.status || 'UPCOMING')
+    setIsEditRoundModalOpen(true)
+  }
+
+  const handleSaveEditRound = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formationTournId || !editingRound) return
+    setIsSavingEditRound(true)
+    try {
+      await updateTournamentRoundAdmin(formationTournId, editingRound.id, {
+        round_name: editRoundStageName.trim(),
+        stage_name: editRoundStageName.trim(),
+        format: editRoundFormat === 'Battle Royale' ? 'BATTLE_ROYALE' : 'KNOCKOUT',
+        is_final_round: editRoundIsFinal,
+        status: editRoundStatus,
+      })
+      showBanner(`Round "${editRoundStageName.trim()}" updated successfully!`)
+      await loadDbRounds(formationTournId)
+      setIsEditRoundModalOpen(false)
+      setEditingRound(null)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to update round', 'err')
+    } finally {
+      setIsSavingEditRound(false)
+    }
+  }
+
+  const handleDeleteRound = async () => {
+    if (!formationTournId || !roundToDelete) return
+    setIsDeletingRound(true)
+    try {
+      await deleteTournamentRoundAdmin(formationTournId, roundToDelete.stage_name || roundToDelete.round_name)
+      showBanner(`Round "${roundToDelete.stage_name}" deleted successfully.`)
+      await loadDbRounds(formationTournId)
+      setRoundToDelete(null)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to delete round', 'err')
+    } finally {
+      setIsDeletingRound(false)
+    }
+  }
+
+  const handleOpenEditMatch = (roundId: string, match: any) => {
+    setEditingMatchData({ roundId, match })
+    setEditMatchNumber(match.match_number || 1)
+    setEditMatchContenderA(match.team_a_id || '')
+    setEditMatchContenderB(match.team_b_id || '')
+    setEditMatchTime(match.scheduled_time || '18:00')
+    setEditMatchCustomInstructions(match.custom_instructions || '')
+    setIsEditMatchModalOpen(true)
+  }
+
+  const handleSaveEditMatch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formationTournId || !editingMatchData) return
+    setIsSavingEditMatch(true)
+    try {
+      await updateRoundMatchAdmin(formationTournId, editingMatchData.roundId, editingMatchData.match.id, {
+        match_number: editMatchNumber,
+        team_a_id: editMatchContenderA,
+        team_b_id: editMatchContenderB,
+        scheduled_time: editMatchTime,
+        custom_instructions: editMatchCustomInstructions,
+      })
+      showBanner(`Match #${editMatchNumber} updated successfully!`)
+      await loadDbRounds(formationTournId)
+      setIsEditMatchModalOpen(false)
+      setEditingMatchData(null)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to update match', 'err')
+    } finally {
+      setIsSavingEditMatch(false)
+    }
+  }
+
+  const handleDeleteRoundMatch = async (roundId: string, matchId: string, matchNumber: number) => {
+    if (!formationTournId) return
+    if (!window.confirm(`Delete Match #${matchNumber}? This cannot be undone.`)) return
+    try {
+      await deleteRoundMatchAdmin(formationTournId, roundId, matchId)
+      showBanner(`Match #${matchNumber} deleted successfully.`)
+      await loadDbRounds(formationTournId)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to delete match', 'err')
+    }
+  }
+
+  const handleCompleteKnockoutMatch = async (roundId: string, matchId: string, winnerId: string, scoreA: number, scoreB: number) => {
+    if (!formationTournId) return
+    if (!winnerId) {
+      showBanner('Please select a winner before completing the match.', 'err')
+      return
+    }
+    try {
+      await completeRoundMatchAdmin(formationTournId, roundId, matchId, {
+        winner_id: winnerId,
+        score_a: scoreA,
+        score_b: scoreB,
+      })
+      showBanner('Match marked as COMPLETED and results recorded.')
+      await loadDbRounds(formationTournId)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to complete match', 'err')
+    }
+  }
+
+  const handleSaveKnockoutMatchCreds = async (roundId: string, matchId: string) => {
+    if (!formationTournId) return
+    const creds = knockoutMatchCreds[matchId] || { room_id: '', room_password: '', custom_instructions: '' }
+    if (!creds.room_id.trim()) {
+      showBanner('Room ID is required to save match credentials.', 'err')
+      return
+    }
+    setSavingKnockoutMatchCreds(matchId)
+    try {
+      await saveKnockoutMatchCredentialsAdmin(formationTournId, roundId, matchId, {
+        room_id: creds.room_id.trim(),
+        room_password: creds.room_password.trim() || undefined,
+        custom_instructions: creds.custom_instructions.trim() || undefined,
+      })
+      showBanner('Match Room credentials saved! (Not yet released)')
+      await loadDbRounds(formationTournId)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to save match credentials', 'err')
+    } finally {
+      setSavingKnockoutMatchCreds(null)
+    }
+  }
+
+  const handleReleaseKnockoutMatchCreds = async (roundId: string, matchId: string) => {
+    if (!formationTournId) return
+    setReleasingKnockoutMatchCreds(matchId)
+    try {
+      const res = await releaseKnockoutMatchCredentialsAdmin(formationTournId, roundId, matchId)
+      showBanner(`Credentials successfully released and sent to ${res.released_to_participants || 2} contenders!`)
+      await loadDbRounds(formationTournId)
+    } catch (err: any) {
+      showBanner(err.message || 'Failed to release match credentials', 'err')
+    } finally {
+      setReleasingKnockoutMatchCreds(null)
+    }
+
   }
 
   const handleSaveRoundQualifiers = async (round: TournamentRoundDetail) => {
@@ -1957,23 +2258,73 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
                     <Hud className="text-cyan">{isSoloTournament ? 'Registered Contenders' : 'Contender Squads'}</Hud>
                     <span className="border border-white/20 bg-void px-1.5 py-0.5 text-[10px] text-ink font-bold">
-                      {formationRosters.length} {isSoloTournament ? 'Players' : 'Teams'}
+                      {displayedContenders.length} {isSoloTournament ? 'Players' : 'Teams'}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-dim px-0.5">
-                    <span>
-                      Paired:{' '}
-                      <strong className="text-ok">
-                        {formationRosters.filter((t) => pairedFormationTeamIds.has(String(t.team_id))).length}
-                      </strong>
-                    </span>
-                    <span>
-                      Unpaired:{' '}
-                      <strong className="text-warn">
-                        {formationRosters.filter((t) => !pairedFormationTeamIds.has(String(t.team_id))).length}
-                      </strong>
-                    </span>
+                  {/* Stage / Round Filter */}
+                  <div>
+                    <label className="block text-dim uppercase text-[9px] mb-1 font-bold">Stage / Round View:</label>
+                    <select
+                      value={selectedContenderRoundId}
+                      onChange={(e) => setSelectedContenderRoundId(e.target.value)}
+                      className="w-full border border-white/20 bg-void px-2 py-1 text-[11px] text-ink outline-none focus:border-cyan"
+                    >
+                      <option value="ALL">All Registered ({formationRosters.length})</option>
+                      {dbRounds.map((rnd) => (
+                        <option key={rnd.id} value={rnd.id}>
+                          {rnd.stage_name} ({rnd.format === 'BATTLE_ROYALE' ? 'BR' : 'Knockout'}) — [{rnd.status}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Status Filter Pill Buttons */}
+                  <div className="flex items-center gap-1 border-b border-white/10 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setContenderFilterStatus('ALL')}
+                      className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors cursor-pointer border ${
+                        contenderFilterStatus === 'ALL'
+                          ? 'border-cyan bg-cyan/20 text-cyan'
+                          : 'border-white/10 text-dim hover:text-ink'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContenderFilterStatus('ACTIVE')}
+                      className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors cursor-pointer border ${
+                        contenderFilterStatus === 'ACTIVE'
+                          ? 'border-cyan bg-cyan/20 text-cyan'
+                          : 'border-white/10 text-dim hover:text-ink'
+                      }`}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContenderFilterStatus('QUALIFIED')}
+                      className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors cursor-pointer border ${
+                        contenderFilterStatus === 'QUALIFIED'
+                          ? 'border-ok bg-ok/20 text-ok'
+                          : 'border-white/10 text-dim hover:text-ink'
+                      }`}
+                    >
+                      Qualified
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContenderFilterStatus('ELIMINATED')}
+                      className={`px-2 py-0.5 text-[9px] font-bold uppercase transition-colors cursor-pointer border ${
+                        contenderFilterStatus === 'ELIMINATED'
+                          ? 'border-live bg-live/20 text-live'
+                          : 'border-white/10 text-dim hover:text-ink'
+                      }`}
+                    >
+                      Eliminated
+                    </button>
                   </div>
 
                   {/* Filter search */}
@@ -1986,56 +2337,68 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                   />
 
                   {/* Contender List */}
-                  {formationRosters.length === 0 ? (
+                  {displayedContenders.length === 0 ? (
                     <div className="p-4 border border-dashed border-white/10 text-center text-dim text-[11px]">
-                      {isSoloTournament ? 'No players registered for this tournament yet.' : 'No teams registered for this tournament yet.'}
+                      {isSoloTournament ? 'No players found for this stage.' : 'No teams found for this stage.'}
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[540px] overflow-y-auto pr-1">
-                      {formationRosters
-                        .filter(
-                          (t) =>
-                            !formationSquadSearch.trim() ||
-                            t.team_name.toLowerCase().includes(formationSquadSearch.toLowerCase()) ||
-                            t.team_tag.toLowerCase().includes(formationSquadSearch.toLowerCase()) ||
-                            (t.captain?.username || '').toLowerCase().includes(formationSquadSearch.toLowerCase())
-                        )
-                        .map((team, idx) => {
-                          const isPaired = pairedFormationTeamIds.has(String(team.team_id))
-                          const displayName = isSoloTournament
-                            ? team.captain?.username || team.team_name
-                            : `${team.team_name} [${team.team_tag}]`
+                      {displayedContenders
+                        .filter((c) => {
+                          if (
+                            formationSquadSearch.trim() &&
+                            !c.displayName.toLowerCase().includes(formationSquadSearch.toLowerCase()) &&
+                            !c.captainName.toLowerCase().includes(formationSquadSearch.toLowerCase())
+                          ) {
+                            return false
+                          }
+                          if (contenderFilterStatus === 'ACTIVE') return c.isActive
+                          if (contenderFilterStatus === 'QUALIFIED') return c.isQualified
+                          if (contenderFilterStatus === 'ELIMINATED') return c.isEliminated
+                          return true
+                        })
+                        .map((c) => {
                           return (
                             <div
-                              key={team.team_id}
-                              className="border border-white/10 bg-void/80 p-2 space-y-1 hover:border-cyan/40 transition-colors"
+                              key={c.id}
+                              className={`border p-2 space-y-1 transition-colors ${
+                                c.isEliminated
+                                  ? 'border-live/20 bg-void/50 opacity-60'
+                                  : c.isQualified
+                                  ? 'border-ok/30 bg-ok/5'
+                                  : 'border-white/10 bg-void/80 hover:border-cyan/40'
+                              }`}
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <span
                                   className="font-display font-black uppercase text-ink truncate text-[11px]"
-                                  title={displayName}
+                                  title={c.displayName}
                                 >
-                                  <span className="text-cyan mr-1 font-mono">#{idx + 1}</span>
-                                  {displayName}
+                                  <span className="text-cyan mr-1 font-mono">#{c.idx}</span>
+                                  {c.displayName}
                                 </span>
                                 <span
                                   className={`text-[8px] px-1 py-0.2 border uppercase shrink-0 font-bold ${
-                                    isPaired
+                                    c.statusType === 'ok'
                                       ? 'border-ok/40 text-ok bg-ok/10'
-                                      : 'border-warn/40 text-warn bg-warn/10'
+                                      : c.statusType === 'warn'
+                                      ? 'border-warn/40 text-warn bg-warn/10'
+                                      : c.statusType === 'live'
+                                      ? 'border-live/40 text-live bg-live/10'
+                                      : 'border-cyan/40 text-cyan bg-cyan/10'
                                   }`}
                                 >
-                                  {isPaired ? 'Paired' : 'Unpaired'}
+                                  {c.statusTag}
                                 </span>
                               </div>
-                              {!isSoloTournament && (
+                              {!isSoloTournament && c.captainName && (
                                 <div className="text-[10px] text-dim flex items-center justify-between">
                                   <span className="truncate max-w-[150px]">
-                                    Capt: @{team.captain?.username || team.captain_username || 'TBD'}
+                                    Capt: @{c.captainName}
                                   </span>
-                                  {team.members && team.members.length > 0 && (
+                                  {c.memberCount > 0 && (
                                     <span className="text-dim/70 shrink-0 font-mono">
-                                      ({team.members.length}p)
+                                      ({c.memberCount}p)
                                     </span>
                                   )}
                                 </div>
@@ -2179,6 +2542,24 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                   ▶ Go Live
                                 </button>
                               )}
+
+                              {/* Edit Round button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditRound(rnd)}
+                                className="border border-white/20 bg-white/5 hover:border-cyan hover:text-cyan px-2.5 py-1 font-mono text-[11px] uppercase text-dim transition-colors cursor-pointer"
+                              >
+                                ✎ Edit
+                              </button>
+
+                              {/* Delete Round button */}
+                              <button
+                                type="button"
+                                onClick={() => setRoundToDelete(rnd)}
+                                className="border border-live/30 bg-live/5 hover:bg-live/15 hover:border-live px-2 py-1 font-mono text-[11px] uppercase text-live transition-colors cursor-pointer"
+                              >
+                                ✕ Delete
+                              </button>
 
                               {/* End Round button */}
                               {!isCompleted && (
@@ -2475,12 +2856,40 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                                 Time: {m.scheduled_time}
                                               </span>
                                             )}
-                                          </div>
-                                          {isMatchDone && (
-                                            <span className="border border-ok/40 bg-ok/10 text-ok px-2 py-0.5 text-[10px] font-bold uppercase">
-                                              Winner: {winnerName}
+                                            <span
+                                              className={`border px-1.5 py-0.2 text-[9px] font-bold uppercase ${
+                                                m.status === 'COMPLETED'
+                                                  ? 'border-ok/40 bg-ok/10 text-ok'
+                                                  : m.status === 'LIVE'
+                                                  ? 'border-live/40 bg-live/10 text-live'
+                                                  : 'border-white/10 bg-void text-dim'
+                                              }`}
+                                            >
+                                              {m.status || 'SCHEDULED'}
                                             </span>
-                                          )}
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            {isMatchDone && (
+                                              <span className="border border-ok/40 bg-ok/10 text-ok px-2 py-0.5 text-[10px] font-bold uppercase">
+                                                Winner: {winnerName}
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenEditMatch(rnd.id, m)}
+                                              className="border border-white/15 bg-surface hover:border-cyan hover:text-cyan px-2 py-0.5 text-[10px] font-mono uppercase text-dim transition-colors cursor-pointer"
+                                            >
+                                              ✎ Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteRoundMatch(rnd.id, m.id, m.match_number)}
+                                              className="border border-live/30 bg-live/5 hover:border-live hover:bg-live/15 px-1.5 py-0.5 text-[10px] font-mono uppercase text-live transition-colors cursor-pointer"
+                                              title="Delete Match"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
                                         </div>
 
                                         {/* Contender A vs Contender B & Score inputs */}
@@ -2526,7 +2935,89 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                           </div>
                                         </div>
 
-                                        {/* Winner Selection & Save Button */}
+                                        {/* Knockout Match Room Credentials */}
+                                        <div className="border border-white/10 bg-void/60 p-2.5 rounded space-y-2">
+                                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-1.5">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold text-ink uppercase text-[10px]">Match Room Credentials</span>
+                                              <span
+                                                className={`text-[9px] px-1.5 py-0.2 border uppercase font-bold ${
+                                                  m.credentials_released
+                                                    ? 'border-ok/40 bg-ok/10 text-ok'
+                                                    : 'border-warn/40 bg-warn/10 text-warn'
+                                                }`}
+                                              >
+                                                {m.credentials_released ? '✓ Sent / Released' : '🔒 Unsent (Draft)'}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <div>
+                                              <label className="block text-dim uppercase text-[9px] mb-0.5">
+                                                Room ID <span className="text-warn">*</span>
+                                              </label>
+                                              <input
+                                                type="text"
+                                                placeholder="e.g. ROOM-KO-01"
+                                                value={(knockoutMatchCreds[m.id]?.room_id !== undefined ? knockoutMatchCreds[m.id].room_id : m.room_id) || ''}
+                                                onChange={(e) => {
+                                                  const val = e.target.value
+                                                  setKnockoutMatchCreds((prev) => ({
+                                                    ...prev,
+                                                    [m.id]: {
+                                                      ...(prev[m.id] || { room_password: m.room_password || '', custom_instructions: m.custom_instructions || '' }),
+                                                      room_id: val,
+                                                    },
+                                                  }))
+                                                }}
+                                                disabled={isCompleted}
+                                                className="w-full border border-white/15 bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-cyan font-bold text-cyan"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-dim uppercase text-[9px] mb-0.5">
+                                                Room Password <span className="text-dim text-[8px]">(Optional)</span>
+                                              </label>
+                                              <input
+                                                type="text"
+                                                placeholder="e.g. PASS123"
+                                                value={(knockoutMatchCreds[m.id]?.room_password !== undefined ? knockoutMatchCreds[m.id].room_password : m.room_password) || ''}
+                                                onChange={(e) => {
+                                                  const val = e.target.value
+                                                  setKnockoutMatchCreds((prev) => ({
+                                                    ...prev,
+                                                    [m.id]: {
+                                                      ...(prev[m.id] || { room_id: m.room_id || '', custom_instructions: m.custom_instructions || '' }),
+                                                      room_password: val,
+                                                    },
+                                                  }))
+                                                }}
+                                                disabled={isCompleted}
+                                                className="w-full border border-white/15 bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-cyan font-bold text-warn"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-white/5">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSaveKnockoutMatchCreds(rnd.id, m.id)}
+                                              disabled={savingKnockoutMatchCreds === m.id || isCompleted}
+                                              className="border border-white/20 bg-surface px-2.5 py-0.5 font-display text-[10px] font-bold uppercase text-ink hover:border-cyan transition-colors cursor-pointer"
+                                            >
+                                              {savingKnockoutMatchCreds === m.id ? 'Saving...' : 'Save Credentials'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleReleaseKnockoutMatchCreds(rnd.id, m.id)}
+                                              disabled={releasingKnockoutMatchCreds === m.id || isCompleted}
+                                              className="border border-ok bg-ok px-2.5 py-0.5 font-display text-[10px] font-black uppercase text-void hover:bg-ok/90 transition-colors cursor-pointer"
+                                            >
+                                              {releasingKnockoutMatchCreds === m.id ? 'Sending...' : 'Send Credentials'}
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Winner Selection & Action Buttons */}
                                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5">
                                           <div className="flex items-center gap-2">
                                             <span className="text-dim text-[10px] uppercase font-bold">Select Winner:</span>
@@ -2547,21 +3038,40 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                                             </select>
                                           </div>
 
-                                          <button
-                                            onClick={() =>
-                                              handleRecordKnockoutMatchResult(
-                                                rnd.id,
-                                                m.id,
-                                                matchScore.winner_id,
-                                                matchScore.score_a,
-                                                matchScore.score_b
-                                              )
-                                            }
-                                            disabled={savingMatchResultId === m.id || !matchScore.winner_id || isCompleted}
-                                            className="border border-ok bg-ok px-3 py-1 font-display text-[11px] font-black uppercase text-void hover:bg-ok/90 transition-colors cursor-pointer disabled:opacity-50"
-                                          >
-                                            {savingMatchResultId === m.id ? 'Saving...' : 'Save Match Result'}
-                                          </button>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleRecordKnockoutMatchResult(
+                                                  rnd.id,
+                                                  m.id,
+                                                  matchScore.winner_id,
+                                                  matchScore.score_a,
+                                                  matchScore.score_b
+                                                )
+                                              }
+                                              disabled={savingMatchResultId === m.id || !matchScore.winner_id || isCompleted}
+                                              className="border border-white/20 bg-surface hover:border-ok hover:text-ok px-3 py-1 font-display text-[11px] font-bold uppercase text-ink transition-colors cursor-pointer disabled:opacity-50"
+                                            >
+                                              {savingMatchResultId === m.id ? 'Saving...' : 'Save Result'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleCompleteKnockoutMatch(
+                                                  rnd.id,
+                                                  m.id,
+                                                  matchScore.winner_id,
+                                                  matchScore.score_a,
+                                                  matchScore.score_b
+                                                )
+                                              }
+                                              disabled={m.status === 'COMPLETED' || isCompleted || !matchScore.winner_id}
+                                              className="border border-ok bg-ok px-3 py-1 font-display text-[11px] font-black uppercase text-void hover:bg-ok/90 transition-colors cursor-pointer disabled:opacity-50"
+                                            >
+                                              {m.status === 'COMPLETED' ? '✓ Completed' : 'Complete Match'}
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     )
@@ -2758,6 +3268,265 @@ export function LiveMatchesManager({ tournaments, onMatchesUpdated, initialTourn
                         className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer disabled:opacity-50"
                       >
                         {isSubmittingKnockoutMatch ? 'Adding...' : 'Add Match'}
+                      </button>
+                    </div>
+                  </form>
+                )
+              })()}
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT ROUND MODAL */}
+      {/* ========================================================================= */}
+      {isEditRoundModalOpen && editingRound && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text shadow-2xl">
+              <Brackets color="border-cyan/50" />
+              <div className="flex items-center gap-2 mb-2">
+                <span className="size-2 rounded-full bg-cyan" />
+                <h3 className="font-display text-xl font-black uppercase text-ink">
+                  Edit Round: {editingRound.stage_name}
+                </h3>
+              </div>
+              <p className="text-xs text-dim mb-4">
+                Update round metadata, format, final round status, and lifecycle state.
+              </p>
+
+              <form onSubmit={handleSaveEditRound} className="space-y-4 font-mono text-xs">
+                <div>
+                  <label className="block text-dim uppercase mb-1">Stage / Round Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editRoundStageName}
+                    onChange={(e) => setEditRoundStageName(e.target.value)}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-dim uppercase mb-1">Competition Format</label>
+                  <select
+                    value={editRoundFormat}
+                    onChange={(e) => setEditRoundFormat(e.target.value as 'Battle Royale' | 'Knockout')}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  >
+                    <option value="Battle Royale">Battle Royale</option>
+                    <option value="Knockout">Knockout</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-dim uppercase mb-1">Round Status</label>
+                  <select
+                    value={editRoundStatus}
+                    onChange={(e) => setEditRoundStatus(e.target.value)}
+                    className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                  >
+                    <option value="UPCOMING">UPCOMING</option>
+                    <option value="LIVE">LIVE</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                  </select>
+                </div>
+
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer p-2 border border-white/10 bg-surface/50 hover:border-cyan/40">
+                    <input
+                      type="checkbox"
+                      checked={editRoundIsFinal}
+                      onChange={(e) => setEditRoundIsFinal(e.target.checked)}
+                      className="accent-cyan"
+                    />
+                    <div>
+                      <span className="font-bold text-ink uppercase text-[11px] block">This Is the Final Round</span>
+                      <span className="text-[10px] text-dim block">Enables champion declaration and final results workflow</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditRoundModalOpen(false)
+                      setEditingRound(null)
+                    }}
+                    className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEditRound || !editRoundStageName.trim()}
+                    className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingEditRound ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: DELETE ROUND CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      {roundToDelete && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-live/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text shadow-2xl">
+              <Brackets color="border-live/50" />
+              <div className="flex items-center gap-2 mb-2">
+                <span className="size-2 rounded-full bg-live" />
+                <h3 className="font-display text-xl font-black uppercase text-live">
+                  Delete Round: {roundToDelete.stage_name}
+                </h3>
+              </div>
+              <p className="text-xs text-ink/90 leading-relaxed mb-4">
+                Are you sure you want to delete <strong>{roundToDelete.stage_name}</strong>? All associated matches and recorded results in this round will be permanently deleted.
+              </p>
+              <div className="p-3 border border-warn/30 bg-warn/10 text-warn text-xs mb-4">
+                ⚠️ This action cannot be undone. Any later rounds that depend on qualifiers from this round will have their qualification lineage removed.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setRoundToDelete(null)}
+                  className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteRound}
+                  disabled={isDeletingRound}
+                  className="border border-live bg-live px-4 py-1.5 uppercase text-white font-bold hover:bg-live/90 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeletingRound ? 'Deleting...' : 'Confirm Delete Round'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT KNOCKOUT MATCH MODAL */}
+      {/* ========================================================================= */}
+      {isEditMatchModalOpen && editingMatchData && (
+        <Portal lockScroll>
+          <div role="dialog" aria-modal className="fixed inset-0 z-[100] flex items-center justify-center bg-void/85 p-3 sm:p-6 backdrop-blur-md overflow-hidden select-none">
+            <div className="relative w-full max-w-md border border-cyan/50 bg-graphite p-6 max-h-[min(90vh,calc(100svh-2rem))] overflow-y-auto select-text shadow-2xl">
+              <Brackets color="border-cyan/50" />
+              <div className="flex items-center gap-2 mb-2">
+                <span className="size-2 rounded-full bg-cyan" />
+                <h3 className="font-display text-xl font-black uppercase text-ink">
+                  Edit Match #{editMatchNumber}
+                </h3>
+              </div>
+              <p className="text-xs text-dim mb-4">
+                Update contenders, match number, scheduled time, and custom lobby instructions.
+              </p>
+              {(() => {
+                const targetRound = dbRounds.find((r) => r.id === editingMatchData.roundId)
+                const contenders = targetRound?.eligible_contenders || []
+                return (
+                  <form onSubmit={handleSaveEditMatch} className="space-y-4 font-mono text-xs">
+                    <div>
+                      <label className="block text-dim uppercase mb-1">Match Number</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={editMatchNumber}
+                        onChange={(e) => setEditMatchNumber(Number(e.target.value))}
+                        className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-dim uppercase mb-1">Contender A</label>
+                        <select
+                          value={editMatchContenderA}
+                          onChange={(e) => setEditMatchContenderA(e.target.value)}
+                          required
+                          className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                        >
+                          <option value="">-- Select Contender A --</option>
+                          {contenders.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} {c.tag && !isSoloTournament ? `[${c.tag}]` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="text-center text-dim font-bold text-xs uppercase tracking-widest">VS</div>
+
+                      <div>
+                        <label className="block text-dim uppercase mb-1">Contender B</label>
+                        <select
+                          value={editMatchContenderB}
+                          onChange={(e) => setEditMatchContenderB(e.target.value)}
+                          required
+                          className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                        >
+                          <option value="">-- Select Contender B --</option>
+                          {contenders.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} {c.tag && !isSoloTournament ? `[${c.tag}]` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-dim uppercase mb-1">Scheduled Time</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 18:00 or 6:00 PM"
+                        value={editMatchTime}
+                        onChange={(e) => setEditMatchTime(e.target.value)}
+                        className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-dim uppercase mb-1">Custom Instructions (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Map: Erangel, Server: Asia"
+                        value={editMatchCustomInstructions}
+                        onChange={(e) => setEditMatchCustomInstructions(e.target.value)}
+                        className="w-full border border-white/20 bg-surface px-3 py-2 text-ink outline-none focus:border-cyan text-xs"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditMatchModalOpen(false)
+                          setEditingMatchData(null)
+                        }}
+                        className="border border-white/20 px-3 py-1.5 uppercase text-dim hover:text-ink cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingEditMatch}
+                        className="border border-cyan bg-cyan px-4 py-1.5 uppercase text-void font-bold hover:bg-cyan/90 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSavingEditMatch ? 'Saving...' : 'Save Match'}
                       </button>
                     </div>
                   </form>

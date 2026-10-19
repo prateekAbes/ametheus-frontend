@@ -17,18 +17,21 @@ import {
   getRequiredTeamSizeDisplay,
   getTournamentRegistrationStatus,
   getTournamentCommunityLink,
+  unregisterTournament,
+  getTournamentCredentials,
   type TournamentRegistrationStatusResponse,
   type TournamentCommunityLinkResponse,
+  type TournamentCredentialsResponse,
 } from '../services/tournaments'
 import { getGames, Game, normalizeGame, NormalizedGame } from '../services/games'
 import { getMyTeams, Team } from '../services/teams'
 import { captainCheckIn } from '../services/matches'
 import { uploadMediaFile } from '../services/admin'
 import { useAuthContext } from '../context/AuthContext'
-import { gameBy, img, inr, TOUR_EXTRA, teamNames, type Match, type Stage } from '../lib/data'
+import { gameBy, img, inr, TOUR_EXTRA, teamNames, type Match } from '../lib/data'
 import { gsap, isMobile, reducedMotion } from '../lib/motion'
 
-const NAV = ['Overview', 'Prizes', 'Rules', 'Teams', 'Bracket', 'Standings', 'Schedule'] as const
+const NAV = ['Overview', 'Prizes', 'Rules', 'Teams', 'Bracket', 'Standings'] as const
 type NavId = (typeof NAV)[number]
 const anchor = (n: string) => `t-${n.toLowerCase()}`
 
@@ -180,7 +183,12 @@ export default function TournamentDetail() {
   const [isRegistered, setIsRegistered] = useState(false)
   const [regStatus, setRegStatus] = useState<TournamentRegistrationStatusResponse | null>(null)
   const [communityInfo, setCommunityInfo] = useState<TournamentCommunityLinkResponse | null>(null)
+  const [serverCredentials, setServerCredentials] = useState<TournamentCredentialsResponse | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
+  const [unregisterModalOpen, setUnregisterModalOpen] = useState(false)
+  const [isUnregistering, setIsUnregistering] = useState(false)
+  const [unregisterError, setUnregisterError] = useState('')
+  const [unregisterSuccessMessage, setUnregisterSuccessMessage] = useState('')
 
   const fetchTour = async () => {
     try {
@@ -210,6 +218,7 @@ export default function TournamentDetail() {
     if (!isSignedIn) {
       setRegStatus(null)
       setCommunityInfo(null)
+      setServerCredentials(null)
       return
     }
     setLoadingStatus(true)
@@ -226,12 +235,37 @@ export default function TournamentDetail() {
           } catch {
             // Unconfirmed or unauthorized
           }
+          try {
+            const creds = await getTournamentCredentials(slugOrId)
+            setServerCredentials(creds)
+          } catch {
+            // Credentials pending or not released
+          }
         }
       }
     } catch {
       // Ignore
     } finally {
       setLoadingStatus(false)
+    }
+  }
+
+  const handleUnregister = async () => {
+    if (!id) return
+    setIsUnregistering(true)
+    setUnregisterError('')
+    try {
+      const res = await unregisterTournament(id)
+      setUnregisterSuccessMessage(res.message || 'Registration successfully cancelled.')
+      setIsRegistered(false)
+      setRegStatus(null)
+      setServerCredentials(null)
+      await fetchTour()
+      await fetchStatus(id)
+    } catch (err: any) {
+      setUnregisterError(err.message || 'Failed to cancel registration.')
+    } finally {
+      setIsUnregistering(false)
     }
   }
 
@@ -378,6 +412,19 @@ export default function TournamentDetail() {
 
   // Strict Round-Specific Credential Isolation: Credentials belong to user's active match only
   const activeCreds = useMemo(() => {
+    // 1. Authoritative released credentials direct from secure endpoint
+    if (serverCredentials && serverCredentials.credentials_released && serverCredentials.room_id) {
+      return {
+        roomId: serverCredentials.room_id,
+        roomPassword: serverCredentials.room_password || 'None',
+        customInstructions: serverCredentials.custom_instructions,
+        serverRegion: serverCredentials.server_region || tourData?.serverRegion || 'AWS Mumbai (ap-south-1)',
+        roundName: serverCredentials.round_name,
+        matchNumber: serverCredentials.match_number,
+        isReleased: true,
+      }
+    }
+
     if (userMatch) {
       const isLive = (userMatch.status || '').toUpperCase() === 'LIVE'
       if (userMatch.credentials_released || isLive) {
@@ -412,7 +459,7 @@ export default function TournamentDetail() {
       }
     }
     return null
-  }, [userMatch, matchesData, tourData, communityInfo])
+  }, [serverCredentials, userMatch, matchesData, tourData, communityInfo])
 
   // Registered rosters
   const rosterList = tourData?.registeredRosters || []
@@ -421,13 +468,6 @@ export default function TournamentDetail() {
   const words = title.split(' ')
   const mid = Math.ceil(words.length / 2)
   const lines = long ? [words.slice(0, mid).join(' '), words.slice(mid).join(' ')] : [title]
-
-  const stages: Stage[] = [
-    { name: 'Registration', date: 'Open now', time: 'Closes 24h before start' },
-    { name: maxTeams > 16 ? 'Qualifiers' : 'Group Stage', date: tourData?.startDate ? new Date(tourData.startDate).toLocaleDateString('en-GB') : 'TBD', time: '18:00 IST' },
-    ...(maxTeams > 8 ? [{ name: 'Semifinal', date: tourData?.startDate ? new Date(tourData.startDate).toLocaleDateString('en-GB') : 'TBD', time: '20:00 IST' }] : []),
-    { name: 'Grand Final', date: tourData?.startDate ? new Date(tourData.startDate).toLocaleDateString('en-GB') : 'TBD', time: '21:30 IST' },
-  ]
 
   const renderedRules = useMemo(() => {
     if (!tourData?.rules || tourData.rules.length === 0) {
@@ -601,6 +641,19 @@ export default function TournamentDetail() {
             <Cta ghost onClick={() => document.getElementById(anchor('Rules'))?.scrollIntoView({ behavior: 'smooth' })}>
               View Rules
             </Cta>
+            {(isConfirmedParticipant || isPendingParticipant || isRegistered) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUnregisterError('')
+                  setUnregisterSuccessMessage('')
+                  setUnregisterModalOpen(true)
+                }}
+                className="border border-live/40 bg-live/10 hover:bg-live/20 px-4 py-2 font-mono text-xs font-bold uppercase text-live tracking-wider transition-colors cursor-pointer"
+              >
+                Cancel Registration
+              </button>
+            )}
             {isRegOpen && !isConfirmedParticipant && !isPendingParticipant && !isRejectedParticipant && (
               <Hud className="ml-2">
                 {tourData?.availableSlots !== undefined ? tourData.availableSlots : Math.max(0, maxTeams - registeredCount)} slots remaining
@@ -650,6 +703,17 @@ export default function TournamentDetail() {
                 <span className="border border-ok/40 bg-ok/10 px-3.5 py-1.5 font-mono text-xs font-bold text-ok uppercase tracking-wider">
                   Confirmed Entry #{regStatus?.position ?? 1}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnregisterError('')
+                    setUnregisterSuccessMessage('')
+                    setUnregisterModalOpen(true)
+                  }}
+                  className="border border-live/40 bg-live/10 hover:bg-live/20 px-3.5 py-1.5 font-mono text-xs font-bold uppercase text-live tracking-wider transition-colors cursor-pointer"
+                >
+                  Unregister
+                </button>
               </div>
             </div>
 
@@ -837,10 +901,19 @@ export default function TournamentDetail() {
                 {/* Arbiter Host Instructions if present */}
                 {activeCreds.customInstructions && (
                   <div className="mt-4 border-t border-white/10 pt-4 font-mono text-xs">
-                    <span className="font-bold text-cyan uppercase tracking-wider block mb-1">
-                      Host Instructions:
-                    </span>
-                    <p className="text-ink text-sm leading-relaxed">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-bold text-cyan uppercase tracking-wider block">
+                        Host Instructions:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCredential(activeCreds.customInstructions!, 'instructions')}
+                        className="border border-white/20 bg-white/5 hover:border-cyan hover:text-cyan px-2.5 py-1 text-[11px] uppercase transition-colors cursor-pointer"
+                      >
+                        {copiedCredField === 'instructions' ? '✓ Copied' : '📋 Copy Instructions'}
+                      </button>
+                    </div>
+                    <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
                       {activeCreds.customInstructions}
                     </p>
                   </div>
@@ -1500,17 +1573,17 @@ export default function TournamentDetail() {
                 {isBattleRoyale ? '🪂' : '⚔️'}
               </span>
               <h3 className="font-display text-3xl font-black uppercase text-ink">
-                {isBattleRoyale ? 'Battle Royale Lobby Formation' : 'Automated Bracket Seeding'}
+                {isBattleRoyale ? 'Battle Royale Match Schedule' : 'Tournament Match Schedule'}
               </h3>
               <p className="text-sm text-dim leading-relaxed">
                 {isBattleRoyale
-                  ? `Lobby assignments and group stages generate automatically upon tournament registration close. Competing ${isSolo ? 'solo contenders' : 'squads'} will be seeded into custom Battle Royale lobbies based on lobby capacity.`
-                  : `Bracket trees and custom match pairings generate automatically upon tournament registration close. Competing ${isSolo ? 'contenders' : 'squads'} will be seeded into single-elimination brackets based on authoritative player ratings and registration order.`}
+                  ? `Lobbies and match groupings will be announced by tournament arbiters. Competing ${isSolo ? 'solo contenders' : 'squads'} will compete in custom lobbies and advance based on verified placement and elimination scores.`
+                  : `Official matches and round pairings are scheduled by tournament arbiters. Contenders advance to subsequent rounds based on verified match results recorded live on match day.`}
               </p>
               <div className="pt-2 flex flex-wrap justify-center gap-3 font-mono text-xs text-dim">
                 <span className="border border-white/10 bg-white/5 px-3 py-1">Format: {tourData?.format || (isBattleRoyale ? 'Battle Royale' : 'Knockout')}</span>
-                <span className="border border-white/10 bg-white/5 px-3 py-1">{isBattleRoyale ? 'Scoring: Placement + Eliminations' : 'Series: BO1 Qualifiers · BO3 Finals'}</span>
-                <span className="border border-white/10 bg-white/5 px-3 py-1">Slots: {maxTeams} {isSolo ? 'Solo Contenders' : 'Squads'}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">{isBattleRoyale ? 'Scoring: Placement + Eliminations' : 'Progression: Official Match Results'}</span>
+                <span className="border border-white/10 bg-white/5 px-3 py-1">Capacity: {maxTeams} {isSolo ? 'Solo Contenders' : 'Squads'}</span>
               </div>
             </div>
           </div>
@@ -1518,7 +1591,7 @@ export default function TournamentDetail() {
       </Block>
 
       {/* Standings & Results */}
-      <Block id="Standings" idx="05" kicker="Leaderboard" title="Standings">
+      <Block id="Standings" idx="06" kicker="Leaderboard" title="Standings">
         {tourStatus === 'completed' && tourData?.standings && tourData.standings.length > 0 ? (
           <div className="border border-white/10 bg-surface overflow-x-auto">
             <table className="w-full text-left font-mono text-xs">
@@ -1566,18 +1639,83 @@ export default function TournamentDetail() {
         )}
       </Block>
 
-      {/* Schedule */}
-      <Block id="Schedule" idx="06" kicker="Timeline" title="Road to Final" tone="graphite">
-        <ol className="grid gap-6 md:grid-cols-4">
-          {stages.map((s, idx) => (
-            <li key={s.name} className="border-t border-cyan/40 pt-4">
-              <Hud className="text-cyan">0{idx + 1} · {s.name}</Hud>
-              <p className="mt-2 font-display text-2xl font-black uppercase">{s.date}</p>
-              {s.time && <Hud className="mt-1 block">{s.time}</Hud>}
-            </li>
-          ))}
-        </ol>
-      </Block>
+      {/* Unregister Confirmation Modal */}
+      {unregisterModalOpen && (
+        <Modal
+          title="Cancel Tournament Registration"
+          onClose={() => {
+            setUnregisterModalOpen(false)
+            setUnregisterError('')
+          }}
+        >
+          {unregisterSuccessMessage ? (
+            <div className="py-6 text-center space-y-4">
+              <span className="grid size-12 mx-auto place-items-center rounded-full bg-ok/20 border border-ok text-ok text-2xl font-bold">
+                ✓
+              </span>
+              <h3 className="font-display text-xl font-bold uppercase text-ink">
+                Registration Cancelled
+              </h3>
+              <p className="font-mono text-xs text-dim leading-relaxed">
+                {unregisterSuccessMessage}
+              </p>
+              <div className="pt-2">
+                <Cta
+                  onClick={() => {
+                    setUnregisterModalOpen(false)
+                    setUnregisterSuccessMessage('')
+                  }}
+                >
+                  Close
+                </Cta>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 text-left">
+              <p className="text-sm text-dim leading-relaxed">
+                Are you sure you want to cancel your registration for{' '}
+                <strong className="text-ink">{title}</strong>?
+              </p>
+              {entryFee > 0 && (
+                <div className="border border-cyan/30 bg-cyan/5 p-3 rounded font-mono text-xs text-cyan space-y-1">
+                  <div className="font-bold uppercase tracking-wider">Refund Information</div>
+                  <p className="text-dim text-[11px] leading-relaxed">
+                    If your entry fee of {inr(entryFee)} was deducted from your wallet balance, it will be automatically and immediately refunded back to your wallet.
+                  </p>
+                </div>
+              )}
+              {!isSolo && (
+                <div className="border border-amber-500/30 bg-amber-500/5 p-3 rounded font-mono text-xs text-amber-400 leading-relaxed">
+                  <span className="font-bold">Team Captain Authority:</span> Cancelling registration will remove your entire squad ({regStatus?.team?.name || 'team'}) and release your reserved slot.
+                </div>
+              )}
+              {unregisterError && (
+                <p className="border border-live/30 bg-live/10 p-2.5 font-mono text-xs text-live">
+                  {unregisterError}
+                </p>
+              )}
+              <div className="mt-6 flex flex-wrap justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setUnregisterModalOpen(false)}
+                  disabled={isUnregistering}
+                  className="border border-white/20 bg-white/5 hover:bg-white/10 px-4 py-2 font-mono text-xs uppercase text-dim hover:text-ink cursor-pointer transition-colors"
+                >
+                  Keep Registration
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnregister}
+                  disabled={isUnregistering}
+                  className="border border-live bg-live/20 hover:bg-live/30 px-4 py-2 font-mono text-xs uppercase text-live font-bold cursor-pointer transition-colors"
+                >
+                  {isUnregistering ? 'Cancelling...' : 'Yes, Cancel Registration'}
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {/* Registration Modal */}
       {regModalOpen && (

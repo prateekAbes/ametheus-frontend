@@ -1003,4 +1003,88 @@ export async function endTournamentRoundAdmin(
   })
 }
 
+export async function updateTournamentRoundAdmin(
+  tournId: string,
+  roundId: string,
+  payload: {
+    round_name?: string
+    stage_name?: string
+    format?: string
+    competition_format?: string
+    is_final_round?: boolean
+    status?: string
+    scheduled_time?: string
+  }
+): Promise<{ status: string; message: string; round: any }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateRoundMatchAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string,
+  payload: {
+    match_number?: number
+    team_a_id?: string
+    team_b_id?: string
+    scheduled_time?: string
+    room_id?: string
+    room_password?: string
+    custom_instructions?: string
+    status?: string
+  }
+): Promise<{ status: string; message: string; match: any }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteRoundMatchAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string
+): Promise<{ status: string; message: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function completeRoundMatchAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string,
+  payload?: { winner_id?: string; score_a?: number; score_b?: number }
+): Promise<{ status: string; message: string; match: any; round_completed?: boolean }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  })
+}
+
+export async function saveKnockoutMatchCredentialsAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string,
+  payload: { room_id: string; room_password?: string; custom_instructions?: string }
+): Promise<{ status: string; message: string; room_id: string; room_password?: string }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}/credentials`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function releaseKnockoutMatchCredentialsAdmin(
+  tournId: string,
+  roundId: string,
+  matchId: string
+): Promise<{ status: string; message: string; released_to_participants: number }> {
+  return apiClient(`/admin/tournaments/${tournId}/rounds/${roundId}/matches/${matchId}/release-credentials`, {
+    method: 'POST',
+  })
+}
+
 

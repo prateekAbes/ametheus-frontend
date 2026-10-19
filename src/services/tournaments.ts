@@ -521,3 +521,34 @@ export async function getTournamentCommunityLink(
 ): Promise<TournamentCommunityLinkResponse> {
   return apiClient<TournamentCommunityLinkResponse>(`/tournaments/${slugOrId}/community`)
 }
+
+export interface TournamentCredentialsResponse {
+  status: string
+  tournament_id: string
+  tournament_title?: string
+  credentials_released: boolean
+  room_id?: string | null
+  room_password?: string | null
+  lobby_code?: string | null
+  lobby_password?: string | null
+  custom_instructions?: string | null
+  server_region?: string | null
+  message?: string
+  round_name?: string
+  match_number?: number
+}
+
+export async function unregisterTournament(
+  slugOrId: string
+): Promise<{ status: string; message: string; refund_issued?: boolean; refund_amount_inr?: number }> {
+  return apiClient(`/tournaments/${slugOrId}/unregister`, {
+    method: 'POST',
+  })
+}
+
+export async function getTournamentCredentials(
+  slugOrId: string
+): Promise<TournamentCredentialsResponse> {
+  return apiClient<TournamentCredentialsResponse>(`/tournaments/${slugOrId}/credentials`)
+}
+
