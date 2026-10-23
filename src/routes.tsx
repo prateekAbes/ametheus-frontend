@@ -21,6 +21,8 @@ import About from './pages/About'
 import Settings from './pages/Settings'
 import Rules from './pages/Rules'
 import Admin from './pages/Admin'
+import AdminLiveTournament from './pages/AdminLiveTournament'
+import LiveTournament from './pages/LiveTournament'
 import Organizer from './pages/Organizer'
 import Auth from './pages/Auth'
 import ErrorPage from './pages/ErrorPage'
@@ -61,6 +63,8 @@ export const router = createBrowserRouter([
       { path: 'joiners/category/:slug', Component: CategoryDetail },
       { path: 'tournaments', Component: Tournaments },
       { path: 'tournaments/:id', Component: TournamentDetail },
+      { path: 'live-tournament', Component: LiveTournament },
+      { path: 'live-tournaments', Component: LiveTournament },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'teams', Component: Teams },
       {
@@ -136,6 +140,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireSuperAdmin>
             <Admin />
+          </RequireSuperAdmin>
+        ),
+      },
+      {
+        path: 'admin/live-tournament',
+        element: (
+          <RequireSuperAdmin>
+            <AdminLiveTournament />
+          </RequireSuperAdmin>
+        ),
+      },
+      {
+        path: 'admin/live-tournaments',
+        element: (
+          <RequireSuperAdmin>
+            <AdminLiveTournament />
           </RequireSuperAdmin>
         ),
       },

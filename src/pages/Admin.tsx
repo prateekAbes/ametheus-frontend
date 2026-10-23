@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { RatingManager } from '../components/admin/RatingManager'
 import { useAuthContext } from '../context/AuthContext'
@@ -231,6 +231,7 @@ const TABS = [
   'OVERVIEW',
   'MEDIA & ARTWORK MANAGER',
   'TOURNAMENTS',
+  'LIVE TOURNAMENT',
   'RATING MANAGEMENT',
   'ORGANIZER MATCH REQUESTS',
   'ORGANIZER EMAILS',
@@ -253,6 +254,7 @@ const TABS = [
 ] as const
 
 export default function Admin() {
+  const navigate = useNavigate()
   const { profile, isSuperAdmin, isLoading: authLoading } = useAuthContext()
   const [tab, setTab] = useState<(typeof TABS)[number]>('OVERVIEW')
 
@@ -1924,7 +1926,12 @@ export default function Admin() {
           {TABS.map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setTab(t)
+                if (t === 'LIVE TOURNAMENT') {
+                  navigate('/admin/live-tournament')
+                }
+              }}
               className={`shrink-0 border-b-2 px-4 py-3 font-mono text-xs uppercase tracking-[0.18em] transition-colors ${
                 tab === t
                   ? 'border-cyan bg-cyan/10 text-cyan'
@@ -2190,6 +2197,11 @@ export default function Admin() {
                 })}
             </div>
           </div>
+        )}
+
+        {/* TAB: LIVE TOURNAMENT */}
+        {tab === 'LIVE TOURNAMENT' && (
+          <div className="mt-8" />
         )}
 
         {/* TAB: RATING MANAGEMENT */}
