@@ -13,6 +13,7 @@ const MAIN = [
   ['Home', '/'],
   ['Games', '/games'],
   ['Tournaments', '/tournaments'],
+  ['Live Tournaments', '/live-tournaments'],
   ['Leaderboard', '/leaderboard'],
   ['Teams', '/teams'],
   ['Wallet', '/wallet'],
@@ -94,11 +95,11 @@ function Nav() {
           <ul className="hidden items-center gap-1 xl:flex">
             {MAIN.map(([l, to]) => (
               <li key={l}>
-                <NavLink to={to} end={to === '/'} className={({ isActive }) => `group relative block px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-[color,opacity] duration-300 ${isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}`}>
+                <NavLink to={to} end={to === '/'} className={({ isActive }) => { const active = isActive || (to === '/live-tournaments' && location.pathname.startsWith('/live-tournament')); return `group relative block px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-[color,opacity] duration-300 ${active ? 'text-ink' : 'text-ink/55 hover:text-ink'}` }}>
                   {({ isActive }) => (
                     <>
                       <span className="inline-block transition-transform duration-300 group-hover:-translate-y-px">{l}</span>
-                      {isActive
+                      {isActive || (to === '/live-tournaments' && location.pathname.startsWith('/live-tournament'))
                         ? <motion.span layoutId="nav-active" transition={{ type: 'spring', stiffness: 380, damping: 32 }} className="absolute inset-x-3.5 bottom-0.5 h-px bg-cyan shadow-[0_0_8px_rgb(62_242_255/.7)]" />
                         : <span className="absolute inset-x-3.5 bottom-0.5 h-px origin-left scale-x-0 bg-white/40 transition-transform duration-300 group-hover:scale-x-100" />}
                     </>
@@ -156,7 +157,7 @@ function Nav() {
                     onClick={() => setDrawer(false)}
                     className={({ isActive }) =>
                       `flex items-baseline gap-3 py-2 font-display text-[clamp(1.5rem,5.5vw,2.25rem)] font-black uppercase tracking-tight transition-colors ${
-                        isActive ? 'text-cyan' : 'text-ink/80 hover:text-cyan'
+                        (isActive || (to === '/live-tournaments' && location.pathname.startsWith('/live-tournament'))) ? 'text-cyan' : 'text-ink/80 hover:text-cyan'
                       }`
                     }
                   >
@@ -237,7 +238,7 @@ function Nav() {
 
 export function Footer() {
   const navColumns = [
-    ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
+    ['Platform', [['Games', '/games'], ['Tournaments', '/tournaments'], ['Live Tournaments', '/live-tournaments'], ['Leaderboard', '/leaderboard'], ['Teams', '/teams']]],
     ['Help & About', [['About', '/about'], ['Help', '/help'], ['Support', '/support'], ['Reviews', '/reviews']]],
     ['Outlinks', [
       ['Discord', 'https://discord.gg/VzkfuK7We', true],

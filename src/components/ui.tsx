@@ -160,7 +160,7 @@ export function PageHero({
   )
 }
 
-export function Container({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Container({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-[1600px] px-5 md:px-10 ${className}`}>{children}</div>
 }
 

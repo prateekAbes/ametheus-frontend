@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useLocation } from 'react-router'
 import { Container, Hud, Badge, Dot, Cta, SectionHead, Modal, Panel, Portal } from '../components/ui'
 import { RatingManager } from '../components/admin/RatingManager'
 import { useAuthContext } from '../context/AuthContext'
@@ -253,10 +253,30 @@ const TABS = [
   'SMTP RELAY DIAGNOSTICS',
 ] as const
 
-export default function Admin() {
+export default function Admin({ initialTab }: { initialTab?: (typeof TABS)[number] } = {}) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile, isSuperAdmin, isLoading: authLoading } = useAuthContext()
-  const [tab, setTab] = useState<(typeof TABS)[number]>('OVERVIEW')
+  const getStartingTab = (): (typeof TABS)[number] => {
+    if (initialTab && (TABS as readonly string[]).includes(initialTab)) return initialTab
+    if (location.pathname.includes('/admin/live-tournament')) return 'LIVE TOURNAMENT'
+    const params = new URLSearchParams(location.search)
+    const tabParam = params.get('tab')
+    if (tabParam && (TABS as readonly string[]).includes(tabParam)) {
+      return tabParam as (typeof TABS)[number]
+    }
+    return 'OVERVIEW'
+  }
+
+  const [tab, setTab] = useState<(typeof TABS)[number]>(getStartingTab)
+
+  useEffect(() => {
+    if (location.pathname.includes('/admin/live-tournament')) {
+      setTab('LIVE TOURNAMENT')
+    } else if (initialTab && (TABS as readonly string[]).includes(initialTab)) {
+      setTab(initialTab)
+    }
+  }, [location.pathname, initialTab])
 
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -1929,7 +1949,11 @@ export default function Admin() {
               onClick={() => {
                 setTab(t)
                 if (t === 'LIVE TOURNAMENT') {
-                  navigate('/admin/live-tournament')
+                  if (!location.pathname.includes('/admin/live-tournament')) {
+                    navigate('/admin/live-tournament')
+                  }
+                } else if (location.pathname.includes('/admin/live-tournament')) {
+                  navigate('/admin')
                 }
               }}
               className={`shrink-0 border-b-2 px-4 py-3 font-mono text-xs uppercase tracking-[0.18em] transition-colors ${
@@ -2201,7 +2225,7 @@ export default function Admin() {
 
         {/* TAB: LIVE TOURNAMENT */}
         {tab === 'LIVE TOURNAMENT' && (
-          <div className="mt-8" />
+          <div className="mt-8 min-h-[350px]" />
         )}
 
         {/* TAB: RATING MANAGEMENT */}

@@ -65,6 +65,8 @@ export const router = createBrowserRouter([
       { path: 'tournaments/:id', Component: TournamentDetail },
       { path: 'live-tournament', Component: LiveTournament },
       { path: 'live-tournaments', Component: LiveTournament },
+      { path: 'live-tournament/:id', Component: LiveTournament },
+      { path: 'live-tournaments/:id', Component: LiveTournament },
       { path: 'leaderboard', Component: Leaderboard },
       { path: 'teams', Component: Teams },
       {
